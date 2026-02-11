@@ -1,0 +1,45 @@
+{
+  "shops": [
+    {
+      "id": "kipasa",
+      "name": "Kipasa",
+      "expenses": {
+        "rent": 0,
+        "salaries": 0,
+        "utilities": 0,
+        "misc": 0
+      }
+    },
+    {
+      "id": "dubdub",
+      "name": "Dub Dub",
+      "expenses": {
+        "rent": 0,
+        "salaries": 0,
+        "utilities": 0,
+        "misc": 0
+      }
+    },
+    {
+      "id": "tradecenter",
+      "name": "Trade Center",
+      "expenses": {
+        "rent": 0,
+        "salaries": 0,
+        "utilities": 0,
+        "misc": 0
+      }
+    }
+  ],
+  "globalExpenses": {
+    "rent": 0,
+    "salaries": 0,
+    "utilities": 0,
+    "shipping": 0,
+    "duty": 0,
+    "misc": 0
+  },
+  "inventory": [],
+  "sales": [],
+  "transfers": []
+}
