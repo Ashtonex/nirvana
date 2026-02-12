@@ -31,12 +31,15 @@ export async function GET() {
         // 2. Shipment
         results.push("Processing bulk shipment...");
         const shipmentData = {
-            supplier: "Nirvana Wholesale Ltd",
-            shippingCost: 800,
+            supplier: "Test Supplier",
+            shipmentNumber: "TEST-001",
+            purchasePrice: 5000,
+            shippingCost: 500,
             dutyCost: 200,
-            miscCost: 0,
+            miscCost: 100,
+            manifestPieces: 50,
             items: [
-                { name: "Stress Test Hoodie", category: "Apparel", quantity: 200, acquisitionPrice: 20 },
+                { name: "Stress Test Hoodie", category: "Hoodies", quantity: 50, acquisitionPrice: 100 }
             ]
         };
         await processShipment(shipmentData);
