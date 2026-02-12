@@ -56,6 +56,7 @@ export async function GET() {
         results.push("Recording a sale...");
         await recordSale({
             shopId: "kipasa",
+            employeeId: "test-employee",
             itemId: item.id,
             itemName: item.name,
             quantity: 10,
