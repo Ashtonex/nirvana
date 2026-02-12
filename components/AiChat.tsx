@@ -11,7 +11,8 @@ import { usePathname } from 'next/navigation';
 
 export function AiChat() {
     const pathname = usePathname();
-    const { messages, input, handleInputChange, handleSubmit, isLoading, error } = useChat();
+    const { messages, handleSubmit, isLoading, error } = useChat();
+    const [input, setInput] = useState("");
 
     const [isOpen, setIsOpen] = useState(false);
     const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -68,7 +69,7 @@ export function AiChat() {
                         <form onSubmit={(e) => handleSubmit(e, { body: { data: { path: pathname } } })} className="flex items-center gap-2">
                             <input
                                 value={input}
-                                onChange={handleInputChange}
+                                onChange={(e) => setInput(e.target.value)}
                                 placeholder="Ask Nirvana..."
                                 className="flex-1 bg-slate-950 border border-slate-800 rounded-full px-4 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-violet-500 transition-all placeholder:text-slate-600"
                             />
