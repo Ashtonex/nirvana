@@ -46,7 +46,7 @@ export default function InventoryMaster({ db }: { db: any }) {
         const daysToZero = velocity > 0 ? Math.floor(currentQty / velocity) : Infinity;
 
         // Aging & Bleed (Nirvana Logic)
-        const totalGlobalOverhead: number = Object.values(globalExpenses).reduce((a: any, b: any) => a + Number(b), 0 as number);
+        const totalGlobalOverhead = Object.values(globalExpenses).reduce((a: any, b: any) => a + Number(b), 0) as number;
         const totalInventoryPieces = inventory.reduce((sum: number, i: any) => sum + i.quantity, 0);
         const dailyBleedPerPiece = totalInventoryPieces > 0 ? (totalGlobalOverhead / 30) / totalInventoryPieces : 0;
         const daysInStock = Math.floor((new Date().getTime() - new Date(dateAdded).getTime()) / (1000 * 3600 * 24));
@@ -243,7 +243,7 @@ export default function InventoryMaster({ db }: { db: any }) {
                                         const unitAcquisition = item.quantity > 0 ? item.acquisitionPrice / item.quantity : 0;
                                         const landedUnitCost = unitAcquisition + feePerPiece;
 
-                                        const totalGlobalOverhead: number = Object.values(globalExpenses).reduce((a: any, b: any) => a + Number(b), 0);
+                                        const totalGlobalOverhead = Object.values(globalExpenses).reduce((a: any, b: any) => a + Number(b), 0) as number;
                                         const globalDailyBurn = totalGlobalOverhead / 30;
                                         const overheadPerPiece = logisticsBasis > 0 ? globalDailyBurn / logisticsBasis : 0;
 
