@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Nirvana Icon Generator</title>
+    <style>
+        body {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            background: #020617;
+            font-family: system-ui, -apple-system, sans-serif;
+            color: white;
+            padding: 20px;
+        }
+        .container {
+            text-align: center;
+            max-width: 600px;
+        }
+        canvas {
+            border: 2px solid #8b5cf6;
+            border-radius: 16px;
+            margin: 20px 0;
+        }
+        button {
+            background: linear-gradient(135deg, #8b5cf6, #6366f1);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-size: 16px;
+            cursor: pointer;
+            margin: 10px;
+            font-weight: 600;
+        }
+        button:hover {
+            opacity: 0.9;
+        }
+        .instructions {
+            background: #1e293b;
+            padding: 20px;
+            border-radius: 12px;
+            margin-top: 20px;
+            text-align: left;
+        }
+        h1 {
+            background: linear-gradient(135deg, #8b5cf6, #6366f1);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Nirvana Icon Generator</h1>
+        <p>Generate custom app icons for your Nirvana application</p>
+        
+        <canvas id="icon512" width="512" height="512"></canvas>
+        <div>
+            <button onclick="generateIcon(512)">Generate 512x512</button>
+            <button onclick="downloadIcon(512, 'icon-512.png')">Download 512x512</button>
+        </div>
+
+        <canvas id="icon192" width="192" height="192"></canvas>
+        <div>
+            <button onclick="generateIcon(192)">Generate 192x192</button>
+            <button onclick="downloadIcon(192, 'icon-192.png')">Download 192x192</button>
+        </div>
+
+        <div class="instructions">
+            <h3>📋 Instructions:</h3>
+            <ol>
+                <li>Click "Generate" buttons to create icons</li>
+                <li>Click "Download" to save each icon</li>
+                <li>Move the downloaded files to: <code>g:/work/ATMCAPPROJECTS/nirvana/public/</code></li>
+                <li>Refresh your browser - the icons will appear!</li>
+            </ol>
+        </div>
+    </div>
+
+    <script>
+        function generateIcon(size) {
+            const canvas = document.getElementById(`icon${size}`);
+            const ctx = canvas.getContext('2d');
+            
+            // Clear canvas
+            ctx.clearRect(0, 0, size, size);
+            
+            // Create gradient background
+            const gradient = ctx.createLinearGradient(0, 0, size, size);
+            gradient.addColorStop(0, '#8b5cf6');
+            gradient.addColorStop(1, '#6366f1');
+            
+            // Draw rounded rectangle background
+            const radius = size * 0.15;
+            ctx.fillStyle = gradient;
+            ctx.beginPath();
+            ctx.roundRect(0, 0, size, size, radius);
+            ctx.fill();
+            
+            // Draw "N" letter
+            ctx.fillStyle = 'white';
+            ctx.font = `bold ${size * 0.6}px Arial, sans-serif`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('N', size / 2, size / 2);
+            
+            // Add subtle glow
+            ctx.shadowColor = 'rgba(255, 255, 255, 0.3)';
+            ctx.shadowBlur = size * 0.05;
+            ctx.fillText('N', size / 2, size / 2);
+        }
+
+        function downloadIcon(size, filename) {
+            const canvas = document.getElementById(`icon${size}`);
+            const link = document.createElement('a');
+            link.download = filename;
+            link.href = canvas.toDataURL('image/png');
+            link.click();
+        }
+
+        // Generate icons on load
+        window.onload = () => {
+            generateIcon(512);
+            generateIcon(192);
+        };
+    </script>
+</body>
+</html>

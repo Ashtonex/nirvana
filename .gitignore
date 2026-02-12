@@ -39,3 +39,9 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# database backups (auto-generated)
+lib/db.json.bak.*
+
+# test results
+test-results/

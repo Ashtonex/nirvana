@@ -39,7 +39,36 @@
     "duty": 0,
     "misc": 0
   },
+  "shipments": [],
   "inventory": [],
   "sales": [],
-  "transfers": []
+  "transfers": [],
+  "ledger": [],
+  "quotations": [],
+  "employees": [
+    {
+      "id": "emp_5",
+      "name": "Harvey Specter",
+      "role": "owner",
+      "shopId": "kipasa",
+      "hireDate": "2023-12-01",
+      "active": true
+    }
+  ],
+  "auditLog": [
+    {
+      "id": "TEST_BACKUP_1770906902951",
+      "timestamp": "2026-02-12T14:35:02.951Z",
+      "employeeId": "TEST_BOT",
+      "action": "BACKUP_TEST",
+      "details": "Forcing a backup rotation"
+    },
+    {
+      "id": "TEST_BACKUP_1770907000552",
+      "timestamp": "2026-02-12T14:36:40.552Z",
+      "employeeId": "TEST_BOT",
+      "action": "BACKUP_TEST",
+      "details": "Forcing a backup rotation"
+    }
+  ]
 }
