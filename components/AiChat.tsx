@@ -1,20 +1,23 @@
 "use client";
 
-// @ts-ignore
-import { useChat } from '@ai-sdk/react';
 import { Button } from "@/components/ui";
 import { MessageCircle, X, Send, Sparkles } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui";
-
 import { usePathname } from 'next/navigation';
+
+type Message = {
+    id: string;
+    role: 'user' | 'assistant';
+    content: string;
+};
 
 export function AiChat() {
     const pathname = usePathname();
-    const { messages, handleSubmit, isLoading, error } = useChat();
+    const [messages, setMessages] = useState<Message[]>([]);
     const [input, setInput] = useState("");
-
     const [isOpen, setIsOpen] = useState(false);
+    const [isLoading, setIsLoading] = useState(false);
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
@@ -22,6 +25,72 @@ export function AiChat() {
             messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
         }
     }, [messages]);
+
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!input.trim() || isLoading) return;
+
+        const userMessage: Message = {
+            id: Date.now().toString(),
+            role: 'user',
+            content: input
+        };
+
+        setMessages(prev => [...prev, userMessage]);
+        setInput("");
+        setIsLoading(true);
+
+        try {
+            const response = await fetch('/api/chat', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    messages: [...messages, userMessage].map(m => ({ role: m.role, content: m.content })),
+                    data: { path: pathname }
+                })
+            });
+
+            if (!response.ok) throw new Error('Failed to get response');
+
+            const reader = response.body?.getReader();
+            const decoder = new TextDecoder();
+            let assistantMessage = '';
+
+            if (reader) {
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+
+                    const chunk = decoder.decode(value);
+                    assistantMessage += chunk;
+
+                    setMessages(prev => {
+                        const newMessages = [...prev];
+                        const lastMessage = newMessages[newMessages.length - 1];
+                        if (lastMessage?.role === 'assistant') {
+                            lastMessage.content = assistantMessage;
+                        } else {
+                            newMessages.push({
+                                id: (Date.now() + 1).toString(),
+                                role: 'assistant',
+                                content: assistantMessage
+                            });
+                        }
+                        return newMessages;
+                    });
+                }
+            }
+        } catch (error) {
+            console.error('Chat error:', error);
+            setMessages(prev => [...prev, {
+                id: (Date.now() + 1).toString(),
+                role: 'assistant',
+                content: 'Sorry, I encountered an error. Please try again.'
+            }]);
+        } finally {
+            setIsLoading(false);
+        }
+    };
 
     return (
         <div className="fixed bottom-6 md:bottom-6 bottom-20 right-6 z-50 flex flex-col items-end">
@@ -46,7 +115,7 @@ export function AiChat() {
                             </div>
                         )}
 
-                        {messages.map((m: any) => (
+                        {messages.map((m) => (
                             <div key={m.id} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                                 <div className={`max-w-[85%] rounded-2xl px-4 py-2 text-sm ${m.role === 'user'
                                     ? 'bg-violet-600 text-white rounded-tr-none'
@@ -66,7 +135,7 @@ export function AiChat() {
                         <div ref={messagesEndRef} />
                     </CardContent>
                     <div className="p-3 border-t border-slate-800 bg-slate-900/50">
-                        <form onSubmit={(e) => handleSubmit(e, { body: { data: { path: pathname } } })} className="flex items-center gap-2">
+                        <form onSubmit={handleSubmit} className="flex items-center gap-2">
                             <input
                                 value={input}
                                 onChange={(e) => setInput(e.target.value)}
