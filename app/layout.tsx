@@ -11,7 +11,6 @@ const inter = Inter({ subsets: ["latin"] });
 export const metadata: Metadata = {
   title: "Nirvana | Multi-Shop Command Center",
   description: "Advanced Inventory & Expense Management for Nirvana",
-  manifest: "/manifest.json",
   icons: {
     icon: [
       { url: "/icon-192.png", sizes: "192x192", type: "image/png" },
@@ -43,6 +42,9 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className="dark">
+      <head>
+        <link rel="manifest" href="/manifest.json" crossOrigin="use-credentials" />
+      </head>
       <body className={`${inter.className} antialiased bg-background text-foreground`}>
         <div className="flex h-screen overflow-hidden">
           <Sidebar />

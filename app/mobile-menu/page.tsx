@@ -30,38 +30,41 @@ const menuItems = [
 
 export default function MobileMenuPage() {
     return (
-        <div className="min-h-screen bg-slate-950 pb-24">
-            <div className="p-6">
-                <div className="flex items-center justify-between mb-8">
-                    <h1 className="text-3xl font-black text-white uppercase italic tracking-tighter">
+        <div className="min-h-screen bg-slate-950 pb-28">
+            <div className="px-4 py-4">
+                <div className="flex items-center justify-between mb-6">
+                    <h1 className="text-2xl font-black text-white uppercase italic tracking-tighter">
                         Menu
                     </h1>
-                    <div className="p-2 bg-slate-900 rounded-full">
-                        <Settings className="w-6 h-6 text-slate-400" />
+                    <div className="p-1.5 bg-slate-900 rounded-full">
+                        <Settings className="w-5 h-5 text-slate-400" />
                     </div>
                 </div>
 
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                <div className="grid grid-cols-2 xs:grid-cols-3 gap-2">
                     {menuItems.map((item) => (
                         <Link
                             key={item.name}
                             href={item.href}
-                            className="flex flex-col items-center justify-center p-4 rounded-xl bg-slate-900/50 border border-slate-800 transition-all active:scale-95 hover:bg-slate-800/50 group"
+                            className="flex flex-col items-center justify-center p-3 rounded-xl bg-slate-900/40 border border-slate-800/50 transition-all active:scale-95 hover:bg-slate-800/50 group"
                         >
-                            <div className={`p-3 rounded-xl ${item.bg} mb-2 group-hover:scale-110 transition-transform`}>
-                                <item.icon className={`w-6 h-6 ${item.color}`} />
+                            <div className={`p-2.5 rounded-lg ${item.bg} mb-2 group-hover:scale-110 transition-transform`}>
+                                <item.icon className={`w-5 h-5 ${item.color}`} />
                             </div>
-                            <span className="text-xs font-semibold text-slate-200 text-center line-clamp-1">
+                            <span className="text-[10px] sm:text-xs font-bold text-slate-300 text-center line-clamp-1">
                                 {item.name}
                             </span>
                         </Link>
                     ))}
                 </div>
 
-                <div className="mt-8 p-6 rounded-2xl bg-gradient-to-br from-primary/20 to-purple-500/10 border border-primary/20">
-                    <h3 className="text-lg font-bold text-white mb-2">Nirvana v0.1.0</h3>
-                    <p className="text-sm text-slate-400 mb-4">Command Center for Multi-Shop Operations</p>
-                    <button className="w-full py-3 rounded-xl bg-white text-slate-950 font-bold text-sm">
+                <div className="mt-6 p-4 rounded-xl bg-gradient-to-br from-primary/10 to-purple-500/5 border border-primary/10">
+                    <div className="flex justify-between items-center mb-1">
+                        <h3 className="text-sm font-bold text-white">Nirvana v0.1.0</h3>
+                        <span className="text-[10px] text-primary font-bold">ALPHA</span>
+                    </div>
+                    <p className="text-[10px] text-slate-500 mb-3">Multi-Shop Command Center</p>
+                    <button className="w-full py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-white font-bold text-[10px] transition-colors">
                         Check for Updates
                     </button>
                 </div>
