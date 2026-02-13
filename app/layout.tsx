@@ -4,6 +4,7 @@ import "./globals.css";
 import Sidebar from "@/components/Sidebar";
 import { AiChat } from "@/components/AiChat";
 import { MobileNav } from "@/components/MobileNav";
+import { ServiceWorkerRegistration } from "@/components/ServiceWorkerRegistration";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -50,6 +51,7 @@ export default function RootLayout({
           </main>
           <AiChat />
           <MobileNav />
+          <ServiceWorkerRegistration />
         </div>
       </body>
     </html>
