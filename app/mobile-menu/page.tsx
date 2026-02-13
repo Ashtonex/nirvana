@@ -41,17 +41,17 @@ export default function MobileMenuPage() {
                     </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                     {menuItems.map((item) => (
                         <Link
                             key={item.name}
                             href={item.href}
-                            className="flex flex-col items-center justify-center p-6 rounded-2xl bg-slate-900/50 border border-slate-800 transition-all active:scale-95 hover:bg-slate-800/50 group"
+                            className="flex flex-col items-center justify-center p-4 rounded-xl bg-slate-900/50 border border-slate-800 transition-all active:scale-95 hover:bg-slate-800/50 group"
                         >
-                            <div className={`p-4 rounded-2xl ${item.bg} mb-3 group-hover:scale-110 transition-transform`}>
-                                <item.icon className={`w-8 h-8 ${item.color}`} />
+                            <div className={`p-3 rounded-xl ${item.bg} mb-2 group-hover:scale-110 transition-transform`}>
+                                <item.icon className={`w-6 h-6 ${item.color}`} />
                             </div>
-                            <span className="text-sm font-semibold text-slate-200 text-center">
+                            <span className="text-xs font-semibold text-slate-200 text-center line-clamp-1">
                                 {item.name}
                             </span>
                         </Link>
