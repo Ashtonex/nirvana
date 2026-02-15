@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useState, useEffect } from 'react';
 import {
     Home,
     Store,
@@ -44,6 +45,14 @@ const navItems = [
 
 export default function Sidebar() {
     const pathname = usePathname();
+    const [visible, setVisible] = useState(true);
+
+    useEffect(() => {
+        const stage = localStorage.getItem('nirvana_stage');
+        setVisible(stage === 'admin');
+    }, []);
+
+    if (!visible) return null;
 
     return (
         <div className="hidden md:flex h-full w-64 flex-col border-r border-slate-800 bg-slate-950/50 backdrop-blur-xl">

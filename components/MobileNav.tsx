@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useState, useEffect } from 'react';
 import { Home, Package, ClipboardList, Users, Menu } from 'lucide-react';
 
 import { clsx, type ClassValue } from 'clsx';
@@ -13,6 +14,14 @@ function cn(...inputs: ClassValue[]) {
 
 export function MobileNav() {
     const pathname = usePathname();
+    const [visible, setVisible] = useState(true);
+
+    useEffect(() => {
+        const stage = localStorage.getItem('nirvana_stage');
+        setVisible(stage === 'admin');
+    }, []);
+
+    if (!visible) return null;
 
     const tabs = [
         { name: 'Home', href: '/', icon: Home },

@@ -46,7 +46,7 @@ export default async function ShopPage({ params }: { params: { shopId: string } 
             <div className="flex justify-between items-end">
                 <div className="space-y-1">
                     <div className="flex items-center gap-2">
-                        <h1 className="text-4xl font-black tracking-tighter uppercase italic">{shop.name}</h1>
+                        <h1 className="text-3xl sm:text-4xl font-black tracking-tighter uppercase italic">{shop.name}</h1>
                         <Badge className="bg-emerald-500/10 text-emerald-500 border-emerald-500/20">Operational</Badge>
                     </div>
                     <p className="text-slate-400 font-medium tracking-tight">Strategic command for location {shopId.toUpperCase()}</p>
