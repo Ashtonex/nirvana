@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 import { getStaffLeaderboard } from "@/lib/analytics";
 import {
     Card,
@@ -178,3 +180,4 @@ export default async function LeaderboardPage() {
         </div>
     );
 }
+

@@ -1,4 +1,6 @@
-import { getDashboardData, getZombieStockReport } from "../../actions";
+export const dynamic = 'force-dynamic';
+
+import { getOracleMasterPulse, getZombieStockReport } from "../../actions";
 import {
     Card,
     CardContent,
@@ -27,42 +29,29 @@ import {
 } from "lucide-react";
 
 export default async function OraclePage() {
-    const db = await getDashboardData();
+    const pulse = await getOracleMasterPulse();
     const zombies = await getZombieStockReport();
 
-    // Financial calculations
-    const globalExpenses = db.globalExpenses || {};
-    const monthlyBurn = Object.values(globalExpenses).reduce((acc: number, val: any) => acc + (val || 0), 0);
+    if (!pulse) return <div>Contacting the Oracle...</div>;
 
-    const totalZombieCapital = zombies.reduce((acc, z) => acc + z.deadCapital, 0);
-    const totalZombieBleed = zombies.reduce((acc, z) => acc + z.totalBleed, 0);
+    const { finances, shopPerformance, deadCapital } = pulse;
+    const monthlyBurn = finances.monthlyBurn || 0;
+    const grossProfit = finances.grossProfit || 0;
+    const revenue = finances.revenue || 0;
+    const netIncome = finances.netIncome || 0;
 
-    // Calculate 30-day profit
-    const thirtyDaysAgo = new Date();
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-    const recentSales = db.sales.filter(s => new Date(s.date) >= thirtyDaysAgo);
+    const totalZombieCapital = deadCapital || 0;
+    const totalZombieBleed = zombies.reduce((acc, z) => acc + (z.totalBleed || 0), 0);
 
-    // Revenue and Gross Profit
-    const revenue = recentSales.reduce((acc, s) => acc + s.totalWithTax, 0);
-
-    // Approx Gross Profit (Revenue - Landed Cost)
-    const grossProfit = recentSales.reduce((acc, s) => {
-        const item = db.inventory.find(i => i.id === s.itemId);
-        const cost = item ? item.landedCost * s.quantity : (s.unitPrice * 0.6) * s.quantity; // Fallback
-        return acc + (s.totalWithTax - cost);
-    }, 0);
-
-    const netIncome = grossProfit - monthlyBurn;
     const profitMargin = revenue > 0 ? (grossProfit / revenue) * 100 : 0;
 
     // Survival Analytics
-    // Assuming a starting cash position (simplified for demo)
     const startingCash = 25000;
     const currentLiquidity = startingCash + netIncome;
     const runwayMonths = netIncome < 0 ? Math.abs(currentLiquidity / netIncome) : Infinity;
 
-    // Expansion Readiness (Simple Logic)
-    const expansionScore = Math.min(100, (netIncome > 0 ? (netIncome / monthlyBurn) * 100 : 0));
+    // Expansion Readiness
+    const expansionScore = Math.min(100, (netIncome > 0 ? (netIncome / Math.max(1, monthlyBurn)) * 100 : 0));
 
     return (
         <div className="space-y-8 pb-32 pt-8">
@@ -269,3 +258,4 @@ export default async function OraclePage() {
         </div>
     );
 }
+

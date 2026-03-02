@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 import { getDashboardData, addEmployee, updateEmployee, deleteEmployee } from "../actions";
 import {
     Card,
@@ -181,3 +183,4 @@ export default async function EmployeesPage() {
         </div>
     );
 }
+

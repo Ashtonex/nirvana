@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 import { getDashboardData } from "../actions";
 import InventoryMaster from "./InventoryMaster";
 
@@ -6,3 +8,4 @@ export default async function InventoryPage() {
 
     return <InventoryMaster db={db} />;
 }
+

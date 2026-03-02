@@ -28,15 +28,36 @@ import {
     BadgeCheck,
     TrendingUp,
     RefreshCcw,
-    Skull
+    Skull,
+    History,
+    Sparkles,
+    Coins,
+    PackagePlus
 } from "lucide-react";
-import { recordSale, recordQuotation } from "../../actions";
+import { recordSale, recordQuotation, addNewProductFromPos } from "../../actions";
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
 function cn(...inputs: ClassValue[]) {
     return twMerge(clsx(inputs));
 }
+
+const Modal = ({ isOpen, onClose, title, children }: { isOpen: boolean, onClose: () => void, title: string, children: React.ReactNode }) => {
+    if (!isOpen) return null;
+    return (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
+            <Card className="w-full max-w-md bg-slate-900 border-slate-800 shadow-2xl">
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-xl font-black uppercase italic tracking-tight">{title}</CardTitle>
+                    <Button variant="ghost" size="icon" onClick={onClose} className="h-8 w-8 text-slate-500 hover:text-white">
+                        <X className="h-4 w-4" />
+                    </Button>
+                </CardHeader>
+                <CardContent>{children}</CardContent>
+            </Card>
+        </div>
+    );
+};
 
 export default function POS({ shopId, inventory, db }: { shopId: string, inventory: any[], db: any }) {
     const [cart, setCart] = useState<{ item: any, quantity: number, price: number }[]>([]);
@@ -46,8 +67,11 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
     const [clientName, setClientName] = useState("");
     const [selectedEmployeeId, setSelectedEmployeeId] = useState("");
 
-    const employees = (db.employees || []).filter((e: any) => e.shopId === shopId && e.active);
+    // Ad-hoc Product Modal State
+    const [isAddProductModalOpen, setIsAddProductModalOpen] = useState(false);
+    const [newProduct, setNewProduct] = useState({ name: "", category: "", landedCost: "", initialStock: "0" });
 
+    const employees = (db.employees || []).filter((e: any) => e.shopId === shopId && e.active);
     const shop = db.shops.find((s: any) => s.id === shopId);
     const shopExpenses = shop ? Object.values(shop.expenses).reduce((a: number, b: any) => a + Number(b), 0) : 0;
 
@@ -56,7 +80,6 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
         return sum + (alloc ? alloc.quantity : 0);
     }, 0);
 
-    // CRM Helper: LTV Calculation
     const getClientLTV = (name: string) => {
         if (!name) return 0;
         const clientSales = (db.sales || []).filter((s: any) => s.clientName?.toLowerCase() === name.toLowerCase());
@@ -65,12 +88,12 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
 
     const clientLTV = getClientLTV(clientName);
 
-    const addToCart = (item: any, suggestedPrice: number) => {
+    const addToCart = (item: any, price: number) => {
         const existing = cart.find(c => c.item.id === item.id);
         if (existing) {
-            setCart(cart.map(c => c.item.id === item.id ? { ...c, quantity: c.quantity + 1 } : c));
+            setCart(cart.map(c => c.item.id === item.id ? { ...c, quantity: c.quantity + 1, price } : c));
         } else {
-            setCart([...cart, { item, quantity: 1, price: suggestedPrice }]);
+            setCart([...cart, { item, quantity: 1, price }]);
         }
     };
 
@@ -92,7 +115,32 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
         setCart(cart.map(c => c.item.id === id ? { ...c, price: newPrice } : c));
     };
 
-    const totalBeforeTax = cart.reduce((sum, c) => sum + (c.price / 1.155) * c.quantity, 0);
+    const handleAddAdHocProduct = async () => {
+        if (!newProduct.name || !newProduct.category || !newProduct.landedCost) {
+            alert("Please fill all fields");
+            return;
+        }
+
+        startTransition(async () => {
+            try {
+                const addedItem = await addNewProductFromPos({
+                    name: newProduct.name,
+                    category: newProduct.category,
+                    landedCost: parseFloat(newProduct.landedCost),
+                    shopId,
+                    initialStock: parseInt(newProduct.initialStock) || 0
+                });
+                setIsAddProductModalOpen(false);
+                setNewProduct({ name: "", category: "", landedCost: "", initialStock: "0" });
+                alert(`${addedItem.name} added to inventory system.`);
+            } catch (error) {
+                alert("Failed to add product");
+            }
+        });
+    };
+
+    const taxRate = db.settings?.taxRate || 0.155;
+    const totalBeforeTax = cart.reduce((sum, c) => sum + (c.price / (1 + taxRate)) * c.quantity, 0);
     const totalWithTax = cart.reduce((sum, c) => sum + c.price * c.quantity, 0);
     const totalTax = totalWithTax - totalBeforeTax;
 
@@ -153,7 +201,13 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
                             onChange={(e) => setSearchTerm(e.target.value)}
                         />
                     </div>
-                    <div className="bg-slate-900 border border-slate-800 px-4 py-2 rounded-lg flex items-center gap-3 h-10 shadow-lg">
+                    <Button
+                        onClick={() => setIsAddProductModalOpen(true)}
+                        className="bg-violet-600 hover:bg-violet-500 text-[10px] font-black uppercase italic h-10 px-4 flex items-center gap-2"
+                    >
+                        <PackagePlus className="h-4 w-4" /> Add Ad-hoc
+                    </Button>
+                    <div className="bg-slate-900 border border-slate-800 px-4 py-2 rounded-lg flex items-center gap-3 h-10 shadow-lg shrink-0">
                         <LayoutGrid className="h-4 w-4 text-violet-400" />
                         <div className="flex flex-col">
                             <span className="text-[10px] text-slate-500 uppercase font-black leading-none">Shop Stock</span>
@@ -162,91 +216,112 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
                     </div>
                 </div>
 
-                <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
-                    {filteredInventory.map((item) => {
-                        const allocation = item.allocations.find((a: any) => a.shopId === shopId);
-                        const qtyAtShop = allocation ? allocation.quantity : 0;
-                        const totalNetworkStock = item.quantity || 0;
+                {filteredInventory.length === 0 && searchTerm ? (
+                    <div className="flex flex-col items-center justify-center py-20 bg-slate-900/40 border border-dashed border-slate-800 rounded-2xl">
+                        <PackagePlus className="h-12 w-12 text-slate-700 mb-4" />
+                        <p className="text-slate-400 font-bold uppercase text-xs">No products found for "{searchTerm}"</p>
+                        <Button
+                            variant="outline"
+                            className="mt-4 border-violet-500/50 text-violet-400 text-[10px] font-black uppercase italic"
+                            onClick={() => {
+                                setNewProduct({ ...newProduct, name: searchTerm, initialStock: "0" });
+                                setIsAddProductModalOpen(true);
+                            }}
+                        >
+                            Add "{searchTerm}" as new product
+                        </Button>
+                    </div>
+                ) : (
+                    <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+                        {filteredInventory.map((item) => {
+                            const allocation = item.allocations.find((a: any) => a.shopId === shopId);
+                            const qtyAtShop = (allocation ? allocation.quantity : 0);
+                            const totalNetworkStock = item.quantity || 0;
 
-                        const dynamicOverhead = totalShopStock > 0 ? (shopExpenses as number) / totalShopStock : 0;
-                        const baseCost = (item.landedCost || 0) + dynamicOverhead;
+                            const dynamicOverhead = totalShopStock > 0 ? (shopExpenses as number) / totalShopStock : 0;
+                            const baseCost = (item.landedCost || 0) + dynamicOverhead;
 
-                        const defaultMarkup = totalNetworkStock < 10 ? 0.70 : 0.50;
-                        const suggestedFinal = baseCost * (1 + defaultMarkup) * 1.155;
+                            const shipment = db.shipments?.find((s: any) => s.id === item.shipmentId);
+                            const supplier = shipment?.supplier || "Global Provider";
 
-                        const shipment = db.shipments.find((s: any) => s.id === item.shipmentId);
-                        const supplier = shipment?.supplier || "Global Provider";
+                            const daysInStock = Math.floor((new Date().getTime() - new Date(item.dateAdded).getTime()) / (1000 * 3600 * 24));
+                            const totalInventoryCount = inventory.reduce((sum, i) => sum + i.quantity, 0);
+                            const totalGlobalOverhead = db.globalExpenses ? Object.values(db.globalExpenses).reduce((acc: number, val: any) => acc + Number(val), 0) : 0;
+                            const dailyBleed = totalInventoryCount > 0 ? (totalGlobalOverhead / 30) / totalInventoryCount : 0;
+                            const cumulativeBleed = dailyBleed * daysInStock;
 
-                        const daysInStock = Math.floor((new Date().getTime() - new Date(item.dateAdded).getTime()) / (1000 * 3600 * 24));
-                        const totalInventoryCount = inventory.reduce((sum, i) => sum + i.quantity, 0);
-                        const totalGlobalOverhead = Object.values(db.globalExpenses).reduce((acc: number, val: any) => acc + Number(val), 0);
-                        const dailyBleed = totalInventoryCount > 0 ? (totalGlobalOverhead / 30) / totalInventoryCount : 0;
-                        const cumulativeBleed = dailyBleed * daysInStock;
-                        const realBreakEven = (item.landedCost + cumulativeBleed) * 1.155;
-                        const isZombie = daysInStock > 60;
+                            const minRecovery = (item.landedCost + cumulativeBleed) * 1.155;
+                            const suggestions = [
+                                { label: "Recovery", price: minRecovery, color: "text-rose-400", icon: <Skull className="h-3 w-3" /> },
+                                { label: "Conservative", price: (item.landedCost * 1.2) * 1.155, color: "text-amber-400", icon: <Coins className="h-3 w-3" /> },
+                                { label: "Balanced", price: (item.landedCost * 1.4) * 1.155, color: "text-emerald-400", icon: <TrendingUp className="h-3 w-3" /> },
+                                { label: "Performance", price: (item.landedCost * 1.6) * 1.155, color: "text-sky-400", icon: <Sparkles className="h-3 w-3" /> },
+                                { label: "Premium", price: (item.landedCost * 1.8) * 1.155, color: "text-violet-400", icon: <BadgeCheck className="h-3 w-3" /> },
+                            ];
 
-                        return (
-                            <Card key={item.id} className={qtyAtShop > 0 ? "group cursor-pointer hover:border-violet-500/50 transition-all duration-300 bg-slate-900/40 border-slate-800/50" : "opacity-30 grayscale"}>
-                                <CardContent className="pt-6 relative overflow-hidden" onClick={() => qtyAtShop > 0 && addToCart(item, isZombie ? realBreakEven : suggestedFinal)}>
-                                    <div className="absolute inset-0 bg-slate-950/98 backdrop-blur-md opacity-0 group-hover:opacity-100 transition-opacity p-4 flex flex-col justify-center gap-2 z-10 border border-violet-500/20 rounded-xl">
-                                        <div className="flex justify-between items-center border-b border-white/5 pb-1">
-                                            <h4 className="text-[10px] font-black text-violet-400 uppercase tracking-[0.2em]">{isZombie ? "Zombie Recovery" : "Sourcing Stats"}</h4>
-                                            {isZombie && (
-                                                <Badge className="bg-rose-500/10 text-rose-500 border-rose-500/10 text-[8px] font-black uppercase flex items-center gap-1">
-                                                    <Skull className="h-2 w-2" /> Dead Capital
-                                                </Badge>
-                                            )}
-                                        </div>
-                                        <div className="space-y-1">
-                                            <div className="flex justify-between text-[10px] text-slate-500 font-bold">
-                                                <span>Landed Sourcing</span>
-                                                <span>${(item.landedCost || 0).toFixed(2)}</span>
-                                            </div>
-                                            <div className="flex justify-between text-[10px] text-amber-500 italic font-bold">
-                                                <span>Rent Burn ({daysInStock}d)</span>
-                                                <span>+${cumulativeBleed.toFixed(2)}</span>
-                                            </div>
-                                        </div>
-                                        <div className="mt-2 pt-2 border-t border-white/5 flex justify-between items-center">
-                                            <span className="text-[9px] font-black text-slate-400 uppercase italic">{isZombie ? "Recovery Price" : "Suggested"}</span>
-                                            <span className={cn("text-xl font-black italic tracking-tighter", isZombie ? "text-rose-400" : "text-white")}>
-                                                ${(isZombie ? realBreakEven : suggestedFinal).toFixed(2)}
-                                            </span>
-                                        </div>
-                                        {isZombie && <p className="text-[7px] text-rose-500 text-center font-black uppercase tracking-tighter">Liquidate to recover tied capital</p>}
+                            const isZombie = daysInStock > 60;
+
+                            return (
+                                <Card key={item.id} className={cn("group transition-all duration-300 bg-slate-900/40 border-slate-800/50 overflow-hidden relative", (qtyAtShop > 0 || item.id.startsWith('adhoc')) ? "hover:border-violet-500/50" : "opacity-30 grayscale")}>
+                                    <div className="absolute top-0 right-0 p-2 z-20">
+                                        {isZombie && (
+                                            <Badge className="bg-rose-500/10 text-rose-500 border-rose-500/10 text-[8px] font-black uppercase flex items-center gap-1">
+                                                <Skull className="h-2 w-2" /> Zombie
+                                            </Badge>
+                                        )}
                                     </div>
 
-                                    <div className="flex justify-between items-start mb-2 relative z-0">
-                                        <Badge variant="outline" className="text-[9px] uppercase font-black tracking-widest text-slate-500 bg-slate-900/50 border-slate-800 px-2 py-0">
-                                            {item.category}
-                                        </Badge>
-                                        <div className="text-right">
-                                            <span className={cn("text-sm font-black block italic tracking-tighter", isZombie ? "text-rose-400" : "text-white")}>
-                                                ${(isZombie ? realBreakEven : suggestedFinal).toFixed(2)}
-                                            </span>
-                                            {isZombie ? (
-                                                <span className="text-[8px] font-black text-rose-500 uppercase animate-pulse flex items-center gap-1 justify-end">
-                                                    <Skull className="h-2 w-2" /> Zombie Stock
+                                    <CardContent className="pt-6">
+                                        <div className="flex justify-between items-start mb-2">
+                                            <Badge variant="outline" className="text-[9px] uppercase font-black tracking-widest text-slate-500 bg-slate-900/50 border-slate-800 px-2 py-0">
+                                                {item.category}
+                                            </Badge>
+                                            <div className="text-right">
+                                                <span className="text-sm font-black block italic tracking-tighter text-white">
+                                                    ${minRecovery.toFixed(2)} <span className="text-[10px] text-slate-600 font-normal">Min</span>
                                                 </span>
-                                            ) : totalNetworkStock < 10 && (
-                                                <span className="text-[8px] font-black text-rose-500 uppercase animate-pulse">Low Global Stock</span>
-                                            )}
+                                            </div>
                                         </div>
-                                    </div>
-                                    <h3 className="font-semibold text-slate-100 truncate relative z-0">{item.name}</h3>
-                                    <div className="flex items-center gap-1.5 mt-1 opacity-70 relative z-0">
-                                        <Truck className="h-3 w-3 text-slate-500" />
-                                        <span className="text-[10px] text-slate-400 uppercase font-bold">{supplier}</span>
-                                    </div>
-                                    <div className="mt-4 pt-3 border-t border-slate-800/50 flex justify-between items-center relative z-0">
-                                        <span className="text-[10px] text-slate-500">{qtyAtShop} in stock</span>
-                                        <div className={cn("h-1.5 w-1.5 rounded-full", qtyAtShop < 5 ? "bg-rose-500" : "bg-emerald-500")} />
-                                    </div>
-                                </CardContent>
-                            </Card>
-                        );
-                    })}
-                </div>
+                                        <h3 className="font-semibold text-slate-100 truncate mb-1">{item.name}</h3>
+                                        <div className="flex items-center gap-1.5 opacity-70 mb-4">
+                                            <Truck className="h-3 w-3 text-slate-500" />
+                                            <span className="text-[10px] text-slate-400 uppercase font-bold">{supplier}</span>
+                                        </div>
+
+                                        <div className="space-y-1.5 border-t border-slate-800/50 pt-4 mt-2">
+                                            <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 flex items-center gap-2">
+                                                <Sparkles className="h-3 w-3 text-violet-400" /> Oracle Suggestions
+                                            </p>
+                                            <div className="grid grid-cols-1 gap-1">
+                                                {suggestions.map((s, idx) => (
+                                                    <button
+                                                        key={idx}
+                                                        onClick={() => (qtyAtShop > 0 || item.id.startsWith('adhoc')) && addToCart(item, s.price)}
+                                                        className="flex items-center justify-between p-2 rounded-lg bg-slate-950/50 border border-slate-800 hover:border-violet-500/50 hover:bg-slate-900 transition-all group/btn"
+                                                    >
+                                                        <div className="flex items-center gap-2">
+                                                            <div className={cn("p-1 rounded bg-slate-900", s.color)}>{s.icon}</div>
+                                                            <span className="text-[10px] font-black uppercase tracking-tight text-slate-400 group-hover/btn:text-slate-200">{s.label}</span>
+                                                        </div>
+                                                        <span className={cn("text-xs font-black italic", s.color)}>${s.price.toFixed(2)}</span>
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+
+                                        <div className="mt-4 pt-3 border-t border-slate-800/50 flex justify-between items-center bg-slate-950/30 -mx-6 -mb-6 px-6 py-4">
+                                            <div className="flex flex-col">
+                                                <span className="text-[10px] text-slate-500 uppercase font-black leading-none">In Shop</span>
+                                                <span className="text-xs font-bold text-slate-200">{qtyAtShop} Units</span>
+                                            </div>
+                                            <div className={cn("h-2 w-2 rounded-full", qtyAtShop < 5 ? "bg-rose-500 animate-pulse" : "bg-emerald-500")} />
+                                        </div>
+                                    </CardContent>
+                                </Card>
+                            );
+                        })}
+                    </div>
+                )}
             </div>
 
             <Card className="md:col-span-4 h-fit sticky top-6 border-slate-800 bg-slate-950/40 backdrop-blur-md">
@@ -285,7 +360,12 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
                     </div>
 
                     <div className="space-y-3 max-h-[350px] overflow-y-auto pr-2">
-                        {cart.map((entry) => {
+                        {cart.length === 0 ? (
+                            <div className="text-center py-10 border border-dashed border-slate-800 rounded-xl bg-slate-900/20">
+                                <ShoppingCart className="h-8 w-8 text-slate-800 mx-auto mb-2" />
+                                <p className="text-[10px] text-slate-600 font-bold uppercase">Cart is Empty</p>
+                            </div>
+                        ) : cart.map((entry) => {
                             const dynamicOverhead = totalShopStock > 0 ? shopExpenses / totalShopStock : 0;
                             const landedCostWithOverhead = (entry.item.landedCost || 0) + dynamicOverhead;
                             const isLossLeading = entry.price < (landedCostWithOverhead * 1.155);
@@ -322,6 +402,62 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
                     </Button>
                 </CardContent>
             </Card>
+
+            <Modal
+                isOpen={isAddProductModalOpen}
+                onClose={() => setIsAddProductModalOpen(false)}
+                title="Add Ad-hoc Product"
+            >
+                <div className="space-y-4 pt-2">
+                    <p className="text-[10px] text-slate-500 font-bold uppercase">This will add the product to the global inventory and make it available for this shop.</p>
+                    <div className="space-y-2">
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Product Name</label>
+                        <Input
+                            placeholder="e.g. Premium Hub Cap"
+                            value={newProduct.name}
+                            onChange={(e) => setNewProduct({ ...newProduct, name: e.target.value })}
+                            className="bg-slate-950"
+                        />
+                    </div>
+                    <div className="space-y-2">
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Category</label>
+                        <Input
+                            placeholder="e.g. Accessories"
+                            value={newProduct.category}
+                            onChange={(e) => setNewProduct({ ...newProduct, category: e.target.value })}
+                            className="bg-slate-950"
+                        />
+                    </div>
+                    <div className="space-y-2">
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Estimated Landed Cost ($)</label>
+                        <Input
+                            type="number"
+                            placeholder="0.00"
+                            value={newProduct.landedCost}
+                            onChange={(e) => setNewProduct({ ...newProduct, landedCost: e.target.value })}
+                            className="bg-slate-950"
+                        />
+                    </div>
+                    <div className="space-y-2">
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Initial Physical Stock</label>
+                        <Input
+                            type="number"
+                            placeholder="0"
+                            value={newProduct.initialStock}
+                            onChange={(e) => setNewProduct({ ...newProduct, initialStock: e.target.value })}
+                            className="bg-slate-950 font-bold text-sky-500"
+                        />
+                    </div>
+                    <Button
+                        onClick={handleAddAdHocProduct}
+                        disabled={isPending}
+                        className="w-full bg-violet-600 hover:bg-violet-500 font-black uppercase italic tracking-widest h-12 mt-4"
+                    >
+                        {isPending ? <RefreshCcw className="h-4 w-4 animate-spin mr-2" /> : <PackagePlus className="h-4 w-4 mr-2" />}
+                        Persist to Oracle
+                    </Button>
+                </div>
+            </Modal>
         </div>
     );
 }

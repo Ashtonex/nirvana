@@ -17,7 +17,8 @@ import {
     Compass,
     Flame,
     ClipboardList,
-    ShieldCheck
+    ShieldCheck,
+    Scale
 } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -35,9 +36,11 @@ const navItems = [
     { name: 'Stocktake Audit', href: '/inventory/stocktake', icon: ClipboardList },
     { name: 'Security Audit', href: '/admin/audit', icon: ShieldCheck },
     { name: 'The Oracle', href: '/finance/oracle', icon: Flame },
+    { name: "Oracle's Eye", href: '/intelligence', icon: Compass },
     { name: 'Staff Leaderboard', href: '/employees/leaderboard', icon: Trophy },
     { name: 'Employee Registry', href: '/employees', icon: Users },
     { name: 'Transfers', href: '/transfers', icon: RefreshCcw },
+    { name: 'Tax Ledger', href: '/admin/tax', icon: Scale },
     { name: 'Financials', href: '/finance', icon: BarChart3 },
     { name: 'Reports', href: '/reports', icon: BarChart3 },
     { name: 'Data Vault', href: '/admin/backups', icon: ShieldCheck },
@@ -85,10 +88,13 @@ export default function Sidebar() {
             </nav>
 
             <div className="mt-auto border-t border-slate-800 p-4">
-                <div className="flex items-center rounded-lg px-3 py-2 text-sm text-slate-400 hover:bg-slate-900 hover:text-slate-100 transition-colors cursor-pointer">
+                <Link
+                    href="/admin/settings"
+                    className="flex items-center rounded-lg px-3 py-2 text-sm text-slate-400 hover:bg-slate-900 hover:text-slate-100 transition-colors cursor-pointer"
+                >
                     <Settings className="mr-3 h-5 w-5" />
                     Settings
-                </div>
+                </Link>
             </div>
         </div>
     );

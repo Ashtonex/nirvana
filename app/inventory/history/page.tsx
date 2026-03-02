@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 import { getInventoryHistory, getShipments } from "../../actions";
 import {
     Card,
@@ -107,3 +109,4 @@ export default async function InventoryHistoryPage() {
         </div>
     );
 }
+

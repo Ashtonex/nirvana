@@ -1,599 +1,413 @@
 "use server";
 
-import { readDb, writeDb, Database, InventoryItem, Sale, Shipment, FinancialEntry, Quotation, Employee } from "@/lib/db";
+import { readDb, writeDb, Database, InventoryItem, Sale, Shipment, FinancialEntry, Quotation, Employee, AuditEntry, OracleEmail } from "@/lib/db";
 import { revalidatePath } from "next/cache";
+import { resend, ORACLE_RECIPIENT } from "@/lib/resend";
+import { supabase, supabaseAdmin } from "@/lib/supabase";
 
 export async function getDashboardData() {
-    return await readDb();
+    const { data: inventory } = await supabaseAdmin.from('inventory_items').select('*');
+    const { data: allocations } = await supabaseAdmin.from('inventory_allocations').select('*');
+    const { data: sales } = await supabaseAdmin.from('sales').select('*');
+    const { data: shops } = await supabaseAdmin.from('shops').select('*');
+    const { data: quotations } = await supabaseAdmin.from('quotations').select('*');
+    const { data: employees } = await supabaseAdmin.from('employees').select('*');
+    const { data: shipments } = await supabaseAdmin.from('shipments').select('*');
+    const { data: settings } = await supabaseAdmin.from('oracle_settings').select('*').single();
+    const { data: ledger } = await supabaseAdmin.from('ledger_entries').select('*');
+    const { data: auditLog } = await supabaseAdmin.from('audit_log').select('*');
+    const { data: transfers } = await supabaseAdmin.from('transfers').select('*');
+    const { data: emails } = await supabaseAdmin.from('oracle_emails').select('*');
+
+    return {
+        inventory: (inventory || []).map((i: any) => ({
+            id: i.id,
+            name: i.name || "Unknown Product",
+            category: i.category || "General",
+            quantity: Number(i.quantity || 0),
+            landedCost: Number(i.landed_cost || 0),
+            acquisitionPrice: Number(i.acquisition_price || 0),
+            dateAdded: i.date_added || new Date().toISOString(),
+            sku: i.sku || i.id,
+            allocations: (allocations || []).filter((a: any) => a.item_id === i.id).map((a: any) => ({
+                shopId: a.shop_id,
+                quantity: Number(a.quantity || 0)
+            }))
+        })),
+        sales: (sales || []).map((s: any) => ({
+            id: s.id, shopId: s.shop_id, itemId: s.item_id, itemName: s.item_name || "Unknown Item",
+            quantity: Number(s.quantity || 0), unitPrice: Number(s.unit_price || 0),
+            totalWithTax: Number(s.total_with_tax || 0), totalBeforeTax: Number(s.total_before_tax || 0),
+            tax: Number(s.tax || 0), date: s.date || new Date().toISOString(), employeeId: s.employee_id
+        })),
+        shops: (shops || []).map((sh: any) => ({
+            id: sh.id, name: sh.name || "Unnamed Shop",
+            expenses: sh.expenses || { rent: 0, salaries: 0, utilities: 0, misc: 0 }
+        })),
+        quotations: (quotations || []).map((q: any) => ({
+            id: q.id, shopId: q.shop_id, clientName: q.client_name || "Guest",
+            totalWithTax: Number(q.total_with_tax || 0), status: q.status || 'pending',
+            date: q.date || new Date().toISOString()
+        })),
+        employees: (employees || []).map((e: any) => ({
+            id: e.id, name: e.name || "New Recruit", role: e.role || "sales", shopId: e.shop_id, active: Boolean(e.active)
+        })),
+        shipments: (shipments || []).map((sh: any) => ({
+            id: sh.id, supplier: sh.supplier || "Internal Transfer", shipmentNumber: sh.shipment_number || "---", date: sh.date || new Date().toISOString()
+        })),
+        ledger: (ledger || []).map((l: any) => ({
+            id: l.id, type: l.type || 'expense', category: l.category || 'General', amount: Number(l.amount || 0),
+            date: l.date || new Date().toISOString(), description: l.description || "", shopId: l.shop_id
+        })),
+        auditLog: (auditLog || []).map((a: any) => ({
+            id: a.id, timestamp: a.timestamp || new Date().toISOString(), employeeId: a.employee_id || "SYSTEM", action: a.action, details: a.details, changes: a.changes
+        })),
+        transfers: (transfers || []).map((t: any) => ({
+            id: t.id, itemId: t.item_id, itemName: t.item_name, fromShopId: t.from_shop_id, toShopId: t.to_shop_id, quantity: Number(t.quantity || 0), date: t.date || new Date().toISOString()
+        })),
+        oracleEmails: (emails || []).map((em: any) => ({
+            id: em.id, timestamp: em.timestamp || new Date().toISOString(), to: em.recipient, subject: em.subject, body: em.body, type: em.type
+        })),
+        settings: {
+            taxRate: Number(settings?.tax_rate || 0.155),
+            taxThreshold: Number(settings?.tax_threshold || 100),
+            taxMode: settings?.tax_mode || 'all',
+            zombieDays: Number(settings?.zombie_days || 60),
+            currencySymbol: settings?.currency_symbol || "$"
+        },
+        globalExpenses: settings?.global_expenses || {}
+    };
 }
 
 export async function updateGlobalExpenses(expenses: Database['globalExpenses']) {
-    const db = await readDb();
-    db.globalExpenses = expenses;
-    await writeDb(db);
-    revalidatePath("/");
+    await supabase.from('oracle_settings').update({ global_expenses: expenses }).eq('id', 1);
+    await supabase.from('audit_log').insert({
+        id: Math.random().toString(36).substring(2, 9), timestamp: new Date().toISOString(),
+        employee_id: 'ADMIN', action: 'EXPENSES_UPDATED', details: `Updated global expenses`
+    });
+    const db = await readDb(); db.globalExpenses = expenses; await writeDb(db);
+    revalidatePath("/"); revalidatePath("/finance");
 }
 
 export async function updateShopExpenses(shopId: string, expenses: { rent: number; salaries: number; utilities: number; misc: number }) {
-    const db = await readDb();
-    const shop = db.shops.find(s => s.id === shopId);
-    if (shop) {
-        shop.expenses = expenses;
-        await writeDb(db);
-        revalidatePath("/");
-    }
+    await supabase.from('shops').update({ expenses }).eq('id', shopId);
+    await supabase.from('audit_log').insert({
+        id: Math.random().toString(36).substring(2, 9), timestamp: new Date().toISOString(),
+        employee_id: 'ADMIN', action: 'SHOP_EXPENSES_UPDATED', details: `Shop: ${shopId}`
+    });
+    const db = await readDb(); const shop = db.shops.find(s => s.id === shopId);
+    if (shop) { shop.expenses = expenses; await writeDb(db); }
+    revalidatePath("/"); revalidatePath("/inventory");
 }
 
-export async function processShipment(shipmentData: {
-    supplier: string;
-    shipmentNumber: string;
-    purchasePrice: number;
-    shippingCost: number;
-    dutyCost: number;
-    miscCost: number;
-    manifestPieces: number; // Added this
-    items: {
-        name: string;
-        category: string;
-        quantity: number;
-        acquisitionPrice: number; // This is now TOTAL CLASS PRICE
-    }[];
-}) {
-    const db = await readDb();
+export async function processShipment(shipmentData: any) {
     const shipmentId = Math.random().toString(36).substring(2, 9);
-
-    // Calculate totals
-    const totalClassPurchase = shipmentData.purchasePrice;
+    const timestamp = new Date().toISOString();
     const totalLogistics = shipmentData.shippingCost + shipmentData.dutyCost + shipmentData.miscCost;
-    const totalQty = shipmentData.items.reduce((sum, i) => sum + i.quantity, 0);
+    const totalQty = shipmentData.items.reduce((sum: number, i: any) => sum + i.quantity, 0);
+    const feePerPiece = shipmentData.manifestPieces > 0 ? totalLogistics / shipmentData.manifestPieces : totalLogistics / totalQty;
 
-    // Unit Logistics Fee (Shared across all pieces in shipment)
-    // Use manifestPieces if provided, otherwise fallback to totalQty
-    const logisticsBasis = shipmentData.manifestPieces > 0 ? shipmentData.manifestPieces : totalQty;
-    const feePerPiece = logisticsBasis > 0 ? totalLogistics / logisticsBasis : 0;
+    await supabase.from('shipments').insert({
+        id: shipmentId, date: timestamp, supplier: shipmentData.supplier, shipment_number: shipmentData.shipmentNumber,
+        purchase_price: shipmentData.purchasePrice, shipping_cost: shipmentData.shippingCost, duty_cost: shipmentData.dutyCost,
+        misc_cost: shipmentData.miscCost, manifest_pieces: shipmentData.manifestPieces, total_quantity: totalQty
+    });
 
-    // Calculate Global Overhead per piece (monthly overheads / new shipment total qty)
-    const totalGlobalOverhead = Object.values(db.globalExpenses).reduce((a, b) => a + Number(b), 0);
-    const overheadPerPiece = totalQty > 0 ? totalGlobalOverhead / totalQty : 0;
-
-    const newItems: InventoryItem[] = [];
+    const { data: shops } = await supabase.from('shops').select('*');
+    const totalShopExpenses = (shops || []).reduce((sum, shop) => sum + Object.values(shop.expenses || {}).reduce((a: number, b: any) => a + Number(b), 0), 0);
 
     for (const itemData of shipmentData.items) {
+        const itemId = Math.random().toString(36).substring(2, 9);
         const unitAcquisitionPrice = itemData.quantity > 0 ? itemData.acquisitionPrice / itemData.quantity : 0;
+        const landedCost = unitAcquisitionPrice + feePerPiece;
 
-        const newItem: InventoryItem = {
-            id: Math.random().toString(36).substring(2, 9),
-            shipmentId,
-            name: itemData.name,
-            category: itemData.category,
-            quantity: itemData.quantity,
-            acquisitionPrice: unitAcquisitionPrice,
-            landedCost: unitAcquisitionPrice + feePerPiece,
-            overheadContribution: 0, // We will calculate this dynamically in the POS or per-shop later
-            dateAdded: new Date().toISOString(),
-            allocations: []
-        };
-
-        // Rationalization Logic: Allocate based on current shop overhead weights
-        const totalShopExpenses = db.shops.reduce((sum, shop) => {
-            return sum + Object.values(shop.expenses).reduce((a, b) => a + Number(b), 0);
-        }, 0);
-
-        if (totalShopExpenses > 0) {
-            db.shops.forEach(shop => {
-                const shopTotal = Object.values(shop.expenses).reduce((a, b) => a + Number(b), 0);
-                const ratio = shopTotal / totalShopExpenses;
-                const allocatedQty = Math.floor(newItem.quantity * ratio);
-
-                if (allocatedQty > 0) {
-                    newItem.allocations.push({
-                        shopId: shop.id,
-                        quantity: allocatedQty
-                    });
-                }
-            });
-
-            // Remainder to the largest shop or first shop
-            const totalAllocated = newItem.allocations.reduce((sum, a) => sum + a.quantity, 0);
-            const remainder = newItem.quantity - totalAllocated;
-            if (remainder > 0 && newItem.allocations.length > 0) {
-                newItem.allocations[0].quantity += remainder;
-            }
-        }
-
-        newItems.push(newItem);
-    }
-
-    // Update DB
-    db.inventory.push(...newItems);
-    db.shipments.push({
-        id: shipmentId,
-        date: new Date().toISOString(),
-        supplier: shipmentData.supplier,
-        shipmentNumber: shipmentData.shipmentNumber,
-        purchasePrice: totalClassPurchase,
-        shippingCost: shipmentData.shippingCost,
-        dutyCost: shipmentData.dutyCost,
-        miscCost: shipmentData.miscCost,
-        manifestPieces: shipmentData.manifestPieces,
-        items: newItems.map(i => i.id),
-        totalQuantity: totalQty
-    });
-
-    // Record Asset Acquisition in Ledger
-    db.ledger.push({
-        id: Math.random().toString(36).substring(2, 9),
-        type: 'asset',
-        category: 'Inventory Acquisition',
-        amount: totalClassPurchase,
-        date: new Date().toISOString(),
-        description: `Source: ${shipmentData.supplier} - ${totalQty} units`
-    });
-
-    // Record Shipment Expenses
-    if (totalLogistics > 0) {
-        db.ledger.push({
-            id: Math.random().toString(36).substring(2, 9),
-            type: 'expense',
-            category: 'Shipping & Logistics',
-            amount: totalLogistics,
-            date: new Date().toISOString(),
-            description: `Shipment Fees for ${shipmentData.supplier}`
+        await supabase.from('inventory_items').insert({
+            id: itemId, shipment_id: shipmentId, name: itemData.name, category: itemData.category,
+            quantity: itemData.quantity, acquisition_price: unitAcquisitionPrice, landed_cost: landedCost, date_added: timestamp
         });
+
+        if (totalShopExpenses > 0 && shops) {
+            let allocatedSum = 0;
+            const allocations = shops.map((shop, idx) => {
+                const shopTotal = Object.values(shop.expenses || {}).reduce((a: number, b: any) => a + Number(b), 0);
+                let allocatedQty = idx === shops.length - 1 ? itemData.quantity - allocatedSum : Math.floor(itemData.quantity * (shopTotal / totalShopExpenses));
+                allocatedSum += allocatedQty;
+                return { item_id: itemId, shop_id: shop.id, quantity: allocatedQty };
+            }).filter(a => a.quantity > 0);
+            if (allocations.length > 0) await supabase.from('inventory_allocations').insert(allocations);
+        }
     }
 
-    // Audit Logging (Fort Knox)
-    db.auditLog.push({
-        id: Math.random().toString(36).substring(2, 9),
-        timestamp: new Date().toISOString(),
-        employeeId: 'SYSTEM', // Shipments are usually global/manager level
-        action: 'SHIPMENT_PROCESSED',
-        details: `Supplier: ${shipmentData.supplier}, Ref: ${shipmentData.shipmentNumber}, Total Qty: ${totalQty}`
-    });
+    await supabase.from('ledger_entries').insert([{
+        id: Math.random().toString(36).substring(2, 9), type: 'asset', category: 'Inventory Acquisition',
+        amount: shipmentData.purchasePrice, date: timestamp, description: `Source: ${shipmentData.supplier}`
+    }, {
+        id: Math.random().toString(36).substring(2, 9), type: 'expense', category: 'Shipping & Logistics',
+        amount: totalLogistics, date: timestamp, description: `Shipment Fees`
+    }]);
 
-    await writeDb(db);
-    revalidatePath("/");
-    revalidatePath("/inventory");
-    revalidatePath("/finance");
+    revalidatePath("/"); revalidatePath("/inventory");
 }
 
-export async function recordStocktake(stocktakeData: {
-    shopId: string;
-    employeeId: string;
-    items: {
-        itemId: string;
-        physicalQuantity: number;
-    }[];
-}) {
-    const db = await readDb();
-    let totalShrinkageValue = 0;
+export async function recordSale(sale: any) {
+    const { data: settings } = await supabase.from('oracle_settings').select('*').single();
+    if (!settings) throw new Error("Settings not found");
 
-    for (const record of stocktakeData.items) {
-        const item = db.inventory.find(i => i.id === record.itemId);
-        if (!item) continue;
-
-        const allocation = item.allocations.find(a => a.shopId === stocktakeData.shopId);
-        if (!allocation) continue;
-
-        const systemQty = allocation.quantity;
-        const diff = record.physicalQuantity - systemQty;
-
-        if (diff !== 0) {
-            // Record Shrinkage in Ledger if negative
-            if (diff < 0) {
-                const lossValue = Math.abs(diff) * item.landedCost;
-                totalShrinkageValue += lossValue;
-
-                db.ledger.push({
-                    id: Math.random().toString(36).substring(2, 9),
-                    type: 'expense',
-                    category: 'Inventory Shrinkage',
-                    amount: lossValue,
-                    date: new Date().toISOString(),
-                    description: `Shrinkage: ${item.name} (${Math.abs(diff)} units lost at ${stocktakeData.shopId})`
-                });
-            }
-
-            // Sync System to Physical
-            allocation.quantity = record.physicalQuantity;
-
-            // Adjust global inventory count
-            const diffGlobal = record.physicalQuantity - systemQty;
-            item.quantity += diffGlobal;
-
-            // Audit the adjustment
-            db.auditLog.push({
-                id: Math.random().toString(36).substring(2, 9),
-                timestamp: new Date().toISOString(),
-                employeeId: stocktakeData.employeeId,
-                action: 'STOCK_ADJUSTMENT',
-                details: `Item: ${item.name}, Shop: ${stocktakeData.shopId}, System: ${systemQty}, Physical: ${record.physicalQuantity}, Diff: ${diff}`
-            });
+    let tax = 0;
+    const taxRate = Number(settings.tax_rate) || 0.155;
+    if (settings.tax_mode === 'all') {
+        tax = sale.totalBeforeTax * taxRate;
+    } else if (settings.tax_mode === 'above_threshold') {
+        if ((sale.totalBeforeTax / sale.quantity) >= Number(settings.tax_threshold)) {
+            tax = sale.totalBeforeTax * taxRate;
         }
     }
 
-    await writeDb(db);
-    revalidatePath(`/shops/${stocktakeData.shopId}`);
-    revalidatePath("/inventory");
-    revalidatePath("/finance");
+    const totalWithTax = sale.totalBeforeTax + tax;
+    const saleId = Math.random().toString(36).substring(2, 9);
+    const timestamp = new Date().toISOString();
 
-    return { totalShrinkageValue };
+    await supabase.from('sales').insert({
+        id: saleId, shop_id: sale.shopId, item_id: sale.itemId, item_name: sale.itemName,
+        quantity: sale.quantity, unit_price: sale.unitPrice, total_before_tax: sale.totalBeforeTax,
+        tax, total_with_tax: totalWithTax, date: timestamp, employee_id: sale.employeeId, client_name: sale.clientName
+    });
+
+    const { data: alloc } = await supabase.from('inventory_allocations').select('quantity').eq('item_id', sale.itemId).eq('shop_id', sale.shopId).single();
+    if (alloc) await supabase.from('inventory_allocations').update({ quantity: Math.max(0, alloc.quantity - sale.quantity) }).eq('item_id', sale.itemId).eq('shop_id', sale.shopId);
+
+    const { data: item } = await supabase.from('inventory_items').select('quantity, name').eq('id', sale.itemId).single();
+    if (item) {
+        const newQty = Math.max(0, item.quantity - sale.quantity);
+        await supabase.from('inventory_items').update({ quantity: newQty }).eq('id', sale.itemId);
+        if (newQty <= 0) {
+            try { await resend.emails.send({ from: "Oracle Alerts <alerts@nirvana-intel.com>", to: ORACLE_RECIPIENT, subject: `[ALERT] Stock Depleted: ${item.name}`, html: `<p>Product 0 units.</p>` }); } catch (e) { }
+        }
+    }
+
+    await supabase.from('audit_log').insert({ id: Math.random().toString(36).substring(2, 9), timestamp, employee_id: sale.employeeId, action: 'SALE_RECORDED', details: sale.itemName });
+
+    revalidatePath(`/shops/${sale.shopId}`); revalidatePath("/inventory");
+}
+
+export async function registerInventoryItem(item: { name: string, category: string, quantity: number, acquisitionPrice: number, landedCost: number }) {
+    const id = Math.random().toString(36).substring(2, 9);
+    const date_added = new Date().toISOString();
+    await supabaseAdmin.from('inventory_items').insert({ id, ...item, date_added });
+    revalidatePath("/inventory");
+    return { id };
+}
+
+export async function updateInventoryItem(itemId: string, updates: any) {
+    await supabaseAdmin.from('inventory_items').update(updates).eq('id', itemId);
+    revalidatePath("/inventory");
+}
+
+export async function deleteInventoryItem(itemId: string) {
+    await supabaseAdmin.from('inventory_items').delete().eq('id', itemId);
+    revalidatePath("/inventory");
+}
+
+export async function recordStocktake(stocktakeData: any) {
+    const timestamp = new Date().toISOString();
+    for (const record of stocktakeData.items) {
+        const { data: item } = await supabase.from('inventory_items').select('*').eq('id', record.itemId).single();
+        const { data: alloc } = await supabase.from('inventory_allocations').select('*').eq('item_id', record.itemId).eq('shop_id', stocktakeData.shopId).single();
+        if (!item || !alloc) continue;
+        const diff = record.physicalQuantity - alloc.quantity;
+        if (diff !== 0) {
+            await supabase.from('inventory_allocations').update({ quantity: record.physicalQuantity }).eq('item_id', record.itemId).eq('shop_id', stocktakeData.shopId);
+            await supabase.from('inventory_items').update({ quantity: (item.quantity - alloc.quantity) + record.physicalQuantity }).eq('id', record.itemId);
+        }
+    }
+    revalidatePath("/inventory"); revalidatePath(`/shops/${stocktakeData.shopId}`);
 }
 
 export async function getShipments() {
-    const db = await readDb();
-    return db.shipments;
+    const { data } = await supabaseAdmin.from('shipments').select('*').order('date', { ascending: false });
+    return data || [];
 }
 
 export async function getInventoryHistory() {
-    const db = await readDb();
-    // Return inventory sorted by date
-    return [...db.inventory].sort((a, b) => new Date(b.dateAdded).getTime() - new Date(a.dateAdded).getTime());
+    const { data } = await supabaseAdmin.from('inventory_items').select('*, inventory_allocations(*)').order('date_added', { ascending: false });
+    return data || [];
 }
 
 export async function getFinancials() {
-    const db = await readDb();
-    return {
-        ledger: db.ledger,
-        sales: db.sales,
-        globalExpenses: db.globalExpenses,
-        shops: db.shops
-    };
-}
-
-/**
- * @deprecated This function is deprecated. Use `processShipment` instead.
- */
-export async function _addInventoryDeprecated(item: Omit<InventoryItem, "id" | "dateAdded" | "allocations">) {
-    const db = await readDb();
-    const newItem: InventoryItem = {
-        ...item,
-        id: Math.random().toString(36).substring(2, 9),
-        dateAdded: new Date().toISOString(),
-        allocations: []
-    };
-
-    // Rationalization Logic: Allocate based on total expenses
-    const totalShopExpenses = db.shops.reduce((sum, shop) => {
-        return sum + shop.expenses.rent + shop.expenses.salaries + shop.expenses.utilities + shop.expenses.misc;
-    }, 0);
-
-    if (totalShopExpenses > 0) {
-        db.shops.forEach(shop => {
-            const shopTotal = shop.expenses.rent + shop.expenses.salaries + shop.expenses.utilities + shop.expenses.misc;
-            const ratio = shopTotal / totalShopExpenses;
-            const allocatedQty = Math.floor(newItem.quantity * ratio);
-
-            if (allocatedQty > 0) {
-                newItem.allocations.push({
-                    shopId: shop.id,
-                    quantity: allocatedQty
-                });
-            }
-        });
-
-        // Adjust for rounding errors (give remainder to the largest shop or first shop)
-        const totalAllocated = newItem.allocations.reduce((sum, a) => sum + a.quantity, 0);
-        const remainder = newItem.quantity - totalAllocated;
-        if (remainder > 0 && newItem.allocations.length > 0) {
-            newItem.allocations[0].quantity += remainder;
-        }
-    }
-
-    db.inventory.push(newItem);
-    await writeDb(db);
-    revalidatePath("/");
-}
-
-export async function recordSale(sale: Omit<Sale, "id" | "date" | "tax" | "totalWithTax">) {
-    const db = await readDb();
-    const taxRate = 0.155;
-    const tax = sale.totalBeforeTax * taxRate;
-    const totalWithTax = sale.totalBeforeTax + tax;
-
-    const newSale: Sale = {
-        ...sale,
-        id: Math.random().toString(36).substring(2, 9),
-        date: new Date().toISOString(),
-        tax,
-        totalWithTax
-    };
-
-    db.sales.push(newSale);
-
-    // Audit Logging (Fort Knox)
-    db.auditLog.push({
-        id: Math.random().toString(36).substring(2, 9),
-        timestamp: new Date().toISOString(),
-        employeeId: sale.employeeId,
-        action: 'SALE_RECORDED',
-        details: `Item: ${sale.itemName}, Qty: ${sale.quantity}, Total: $${totalWithTax.toFixed(2)}`
-    });
-
-    // Update inventory
-    const inventoryItem = db.inventory.find(i => i.id === sale.itemId);
-    if (inventoryItem) {
-        const allocation = inventoryItem.allocations.find(a => a.shopId === sale.shopId);
-        if (allocation) {
-            allocation.quantity -= sale.quantity;
-        }
-        inventoryItem.quantity -= sale.quantity;
-    }
-
-    await writeDb(db);
-    revalidatePath(`/shops/${sale.shopId}`);
-}
-
-export async function transferInventory(itemId: string, fromShopId: string, toShopId: string, quantity: number) {
-    const db = await readDb();
-    const item = db.inventory.find(i => i.id === itemId);
-
-    if (!item) throw new Error("Item not found");
-
-    const fromAlloc = item.allocations.find(a => a.shopId === fromShopId);
-    if (!fromAlloc || fromAlloc.quantity < quantity) throw new Error("Insufficient stock in source shop");
-
-    // Subtract from source
-    fromAlloc.quantity -= quantity;
-
-    // Add to destination
-    let toAlloc = item.allocations.find(a => a.shopId === toShopId);
-    if (toAlloc) {
-        toAlloc.quantity += quantity;
-    } else {
-        item.allocations.push({ shopId: toShopId, quantity });
-    }
-
-    // Record transfer
-    db.transfers.push({
-        id: Math.random().toString(36).substring(2, 9),
-        itemId,
-        itemName: item.name,
-        fromShopId,
-        toShopId,
-        quantity,
-        date: new Date().toISOString()
-    });
-
-    // Audit Logging
-    db.auditLog.push({
-        id: Math.random().toString(36).substring(2, 9),
-        timestamp: new Date().toISOString(),
-        employeeId: 'SYSTEM', // Transfer origin
-        action: 'INV_TRANSFER',
-        details: `Moved ${quantity} units of ${item.name} from ${fromShopId} to ${toShopId}`
-    });
-
-    await writeDb(db);
-    revalidatePath("/transfers");
-    revalidatePath(`/shops/${fromShopId}`);
-    revalidatePath(`/shops/${toShopId}`);
-}
-
-export async function recordQuotation(quotation: Omit<Quotation, "id" | "date" | "expiryDate" | "status">) {
-    const db = await readDb();
-    const newQuotation: Quotation = {
-        ...quotation,
-        id: Math.random().toString(36).substring(2, 9),
-        date: new Date().toISOString(),
-        expiryDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(), // 7 days expiry
-        status: 'pending'
-    };
-
-    db.quotations.push(newQuotation);
-    await writeDb(db);
-    revalidatePath(`/shops/${quotation.shopId}`);
-    return newQuotation;
-}
-
-export async function deleteQuotation(quoteId: string, shopId: string) {
-    const db = await readDb();
-    db.quotations = db.quotations.filter(q => q.id !== quoteId);
-    await writeDb(db);
-    revalidatePath(`/shops/${shopId}`);
-}
-
-export async function addEmployee(employee: Omit<Employee, "id" | "active">) {
-    const db = await readDb();
-    const newEmployee: Employee = {
-        ...employee,
-        id: Math.random().toString(36).substring(2, 9),
-        active: true
-    };
-    db.employees.push(newEmployee);
-
-    // Audit Logging
-    db.auditLog.push({
-        id: Math.random().toString(36).substring(2, 9),
-        timestamp: new Date().toISOString(),
-        employeeId: 'ADMIN',
-        action: 'EMPLOYEE_ADDED',
-        details: `Name: ${newEmployee.name}, Role: ${newEmployee.role}, Shop: ${newEmployee.shopId}`
-    });
-
-    await writeDb(db);
-    revalidatePath("/employees");
-    revalidatePath(`/shops/${employee.shopId}`);
-    return newEmployee;
-}
-
-export async function updateEmployee(id: string, updates: Partial<Employee>) {
-    const db = await readDb();
-    const employee = db.employees.find(e => e.id === id);
-    if (!employee) throw new Error("Employee not found");
-
-    const oldShopId = employee.shopId;
-    Object.assign(employee, updates);
-
-    // Audit Logging
-    db.auditLog.push({
-        id: Math.random().toString(36).substring(2, 9),
-        timestamp: new Date().toISOString(),
-        employeeId: 'ADMIN',
-        action: 'EMPLOYEE_UPDATED',
-        details: `ID: ${id}, Updates: ${JSON.stringify(updates)}`
-    });
-
-    await writeDb(db);
-    revalidatePath("/employees");
-    revalidatePath(`/shops/${oldShopId}`);
-    if (updates.shopId) revalidatePath(`/shops/${updates.shopId}`);
-}
-
-export async function deleteEmployee(id: string) {
-    const db = await readDb();
-    const employee = db.employees.find(e => e.id === id);
-    if (!employee) throw new Error("Employee not found");
-
-    const oldShopId = employee.shopId;
-    db.employees = db.employees.filter(e => e.id !== id);
-
-    // Audit Logging
-    db.auditLog.push({
-        id: Math.random().toString(36).substring(2, 9),
-        timestamp: new Date().toISOString(),
-        employeeId: 'ADMIN',
-        action: 'EMPLOYEE_DELETED',
-        details: `ID: ${id}, Name: ${employee.name}`
-    });
-
-    await writeDb(db);
-    revalidatePath("/employees");
-    revalidatePath(`/shops/${oldShopId}`);
+    const { data: ledger } = await supabaseAdmin.from('ledger_entries').select('*').order('date', { ascending: false });
+    const { data: sales } = await supabaseAdmin.from('sales').select('*').order('date', { ascending: false });
+    const { data: shops } = await supabaseAdmin.from('shops').select('*');
+    const { data: settings } = await supabaseAdmin.from('oracle_settings').select('*').single();
+    return { ledger: ledger || [], sales: sales || [], globalExpenses: settings?.global_expenses || {}, shops: shops || [] };
 }
 
 export async function getInventoryInsights(itemId: string) {
-    const db = await readDb();
-    const item = db.inventory.find(i => i.id === itemId);
+    const { data: item } = await supabaseAdmin.from('inventory_items').select('*').eq('id', itemId).single();
+    const { data: sales } = await supabaseAdmin.from('sales').select('*').eq('item_id', itemId);
+    const { data: settings } = await supabaseAdmin.from('oracle_settings').select('*').single();
     if (!item) return null;
+    const thirtyDaysAgo = new Date(); thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    const totalSold = (sales || []).filter(s => new Date(s.date) >= thirtyDaysAgo).reduce((acc, s) => acc + s.quantity, 0);
+    const velocity = totalSold / 30;
+    return { dailyVelocity: velocity, daysToZero: velocity > 0 ? Math.floor(item.quantity / velocity) : Infinity, totalSold30d: totalSold };
+}
 
-    const thirtyDaysAgo = new Date();
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-
-    const relevantSales = db.sales.filter(s =>
-        s.itemId === itemId &&
-        new Date(s.date) >= thirtyDaysAgo
-    );
-
-    const totalSold = relevantSales.reduce((acc, s) => acc + s.quantity, 0);
-    const dailyVelocity = totalSold / 30;
-    const daysToZero = dailyVelocity > 0 ? Math.floor(item.quantity / dailyVelocity) : Infinity;
-
-    // Aging & Bleed logic
-    const daysInStock = Math.floor((new Date().getTime() - new Date(item.dateAdded).getTime()) / (1000 * 3600 * 24));
-
-    // Calculate overhead bleed for the SPECIFIC shop(s) it is in (simplified to global weight)
-    const totalGlobalOverhead = Object.values(db.globalExpenses).reduce((a, b) => a + Number(b), 0);
-    const totalInventoryCount = db.inventory.reduce((sum, i) => sum + i.quantity, 0);
-    const dailyBleedPerPiece = totalInventoryCount > 0 ? (totalGlobalOverhead / 30) / totalInventoryCount : 0;
-    const cumulativeBleed = dailyBleedPerPiece * daysInStock;
-
+export async function getGlobalSettings() {
+    const { data: settings } = await supabaseAdmin.from('oracle_settings').select('*').single();
+    if (!settings) return null;
     return {
-        dailyVelocity,
-        daysToZero,
-        daysInStock,
-        cumulativeBleed,
-        realBreakEven: (item.landedCost + cumulativeBleed) * 1.155, // Incl tax
-        totalSold30d: totalSold,
-        status: daysToZero < 7 ? "critical" : daysToZero < 14 ? "warning" : "healthy"
+        taxRate: Number(settings.tax_rate), taxThreshold: Number(settings.tax_threshold),
+        taxMode: settings.tax_mode as any, zombieDays: Number(settings.zombie_days), currencySymbol: settings.currency_symbol || "$"
+    };
+}
+
+export async function updateGlobalSettings(settings: any) {
+    const updates: any = {};
+    if (settings.taxRate !== undefined) updates.tax_rate = settings.taxRate;
+    if (settings.taxThreshold !== undefined) updates.tax_threshold = settings.taxThreshold;
+    if (settings.taxMode !== undefined) updates.tax_mode = settings.taxMode;
+    if (settings.zombieDays !== undefined) updates.zombie_days = settings.zombieDays;
+    if (settings.currencySymbol !== undefined) updates.currency_symbol = settings.currencySymbol;
+    await supabaseAdmin.from('oracle_settings').update(updates).eq('id', 1);
+    revalidatePath("/admin/settings");
+}
+
+export async function finalizeQuotation(quoteId: string) {
+    const { data: quote } = await supabase.from('quotations').select('*').eq('id', quoteId).single();
+    if (!quote || quote.status !== 'pending') return;
+    for (const item of (quote.items as any[])) {
+        await recordSale({
+            shopId: quote.shop_id, itemId: item.itemId, itemName: item.itemName,
+            quantity: item.quantity, unitPrice: item.unitPrice, totalBeforeTax: item.unitPrice * item.quantity,
+            employeeId: quote.employee_id, clientName: quote.client_name
+        });
+    }
+    await supabase.from('quotations').update({ status: 'converted' }).eq('id', quoteId);
+    revalidatePath(`/shops/${quote.shop_id}`);
+}
+
+export async function addNewProductFromPos(productData: any) {
+    const id = Math.random().toString(36).substring(2, 9);
+    const timestamp = new Date().toISOString();
+    await supabase.from('inventory_items').insert({
+        id, shipment_id: 'POS-AD-HOC', name: productData.name, category: productData.category,
+        quantity: productData.initialStock || 0, acquisition_price: productData.landedCost, landed_cost: productData.landedCost, date_added: timestamp
+    });
+    await supabase.from('inventory_allocations').insert({ item_id: id, shop_id: productData.shopId, quantity: productData.initialStock || 0 });
+    revalidatePath("/inventory"); revalidatePath(`/shops/${productData.shopId}`);
+    return { id };
+}
+
+export async function getOracleMasterPulse() {
+    const { data: settings } = await supabaseAdmin.from('oracle_settings').select('*').single();
+    const { data: inventory } = await supabaseAdmin.from('inventory_items').select('*, inventory_allocations(*)');
+    const { data: sales } = await supabaseAdmin.from('sales').select('*');
+    const { data: shops } = await supabaseAdmin.from('shops').select('*');
+    if (!inventory || !sales || !shops || !settings) return null;
+    const totalRevenue = sales.reduce((sum, s) => sum + Number(s.total_with_tax), 0);
+    const totalTax = sales.reduce((sum, s) => sum + Number(s.tax), 0);
+    const grossProfit = sales.reduce((sum, s) => sum + Number(s.total_before_tax), 0) - sales.reduce((sum, s) => {
+        const item = inventory.find(i => i.id === s.item_id);
+        return sum + (item ? Number(item.landed_cost) * s.quantity : 0);
+    }, 0);
+    return {
+        totalUnits: inventory.reduce((sum, i) => sum + i.quantity, 0),
+        finances: { revenue: totalRevenue, tax: totalTax, grossProfit, netIncome: grossProfit, monthlyBurn: 0 },
+        shopPerformance: shops.map(s => ({ id: s.id, name: s.name, revenue: sales.filter(sa => sa.shop_id === s.id).reduce((acc, sa) => acc + Number(sa.total_with_tax), 0), progress: 100 })),
+        deadCapital: 0, zombieCount: 0, recentEmails: []
     };
 }
 
 export async function getZombieStockReport() {
-    const db = await readDb();
-    const reports = db.inventory.map(item => {
-        const thirtyDaysAgo = new Date();
-        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-
-        const recentSales = db.sales.filter(s => s.itemId === item.id && new Date(s.date) >= thirtyDaysAgo);
-        const hasSoldRecently = recentSales.length > 0;
-        const daysInStock = Math.floor((new Date().getTime() - new Date(item.dateAdded).getTime()) / (1000 * 3600 * 24));
-
-        // Bleed Logic
-        const totalGlobalOverhead = Object.values(db.globalExpenses).reduce((a, b) => a + Number(b), 0);
-        const totalInventoryCount = db.inventory.reduce((sum, i) => sum + i.quantity, 0);
-        const dailyBleedPerPiece = totalInventoryCount > 0 ? (totalGlobalOverhead / 30) / totalInventoryCount : 0;
-        const cumulativeBleed = dailyBleedPerPiece * daysInStock;
-
-        return {
-            ...item,
-            daysInStock,
-            hasSoldRecently,
-            cumulativeBleed,
-            deadCapital: item.landedCost * item.quantity,
-            totalBleed: cumulativeBleed * item.quantity,
-            isZombie: daysInStock > 60 && !hasSoldRecently
-        };
-    });
-
-    return reports.filter(r => r.isZombie).sort((a, b) => b.totalBleed - a.totalBleed);
+    const { data: settings } = await supabaseAdmin.from('oracle_settings').select('zombie_days').single();
+    const { data: inventory } = await supabaseAdmin.from('inventory_items').select('*');
+    if (!inventory) return [];
+    return inventory.filter(i => {
+        const days = Math.floor((new Date().getTime() - new Date(i.date_added).getTime()) / (1000 * 3600 * 24));
+        return days > (settings?.zombie_days || 60);
+    }).map(i => ({ ...i, daysInStock: Math.floor((new Date().getTime() - new Date(i.date_added).getTime()) / (1000 * 3600 * 24)), deadCapital: Number(i.landed_cost) * i.quantity }));
 }
 
-
-
-export async function finalizeQuotation(quoteId: string) {
-    const db = await readDb();
-    const quote = db.quotations.find(q => q.id === quoteId);
-    if (!quote) throw new Error("Quotation not found");
-    if (quote.status !== 'pending') throw new Error("Quotation already processed");
-
-    // Convert items to sales
-    for (const item of quote.items) {
-        // We use recordSale logic here manually to avoid multiple DB reads/writes
-        const newSale: Sale = {
-            id: Math.random().toString(36).substring(2, 9),
-            shopId: quote.shopId,
-            itemId: item.itemId,
-            itemName: item.itemName,
-            quantity: item.quantity,
-            unitPrice: item.unitPrice,
-            totalBeforeTax: (item.unitPrice * item.quantity),
-            date: new Date().toISOString(),
-            tax: (item.unitPrice * item.quantity) * 0.155,
-            totalWithTax: item.total,
-            employeeId: quote.employeeId
-        };
-        db.sales.push(newSale);
-
-        // Update inventory
-        const inventoryItem = db.inventory.find(i => i.id === item.itemId);
-        if (inventoryItem) {
-            const allocation = inventoryItem.allocations.find(a => a.shopId === quote.shopId);
-            if (allocation) {
-                allocation.quantity -= item.quantity;
-            }
-            inventoryItem.quantity -= item.quantity;
-        }
-    }
-
-    quote.status = 'converted';
-
-    // Audit Logging
-    db.auditLog.push({
-        id: Math.random().toString(36).substring(2, 9),
-        timestamp: new Date().toISOString(),
-        employeeId: quote.employeeId,
-        action: 'QUOTE_CONVERTED',
-        details: `Quote ID: ${quoteId}, Total: $${quote.totalWithTax.toFixed(2)}`
-    });
-
-    await writeDb(db);
-    revalidatePath(`/shops/${quote.shopId}`);
-    revalidatePath("/finance");
+export async function addEmployee(employee: any) {
+    const id = Math.random().toString(36).substring(2, 9);
+    await supabase.from('employees').insert({ id, name: employee.name, role: employee.role, shop_id: employee.shopId, active: true });
+    revalidatePath("/employees");
 }
 
-export async function exportDatabase() {
-    const db = await readDb();
+export async function updateEmployee(id: string, updates: any) {
+    const { shopId, ...rest } = updates;
+    const supabaseUpdates = { ...rest, ...(shopId ? { shop_id: shopId } : {}) };
+    await supabase.from('employees').update(supabaseUpdates).eq('id', id);
+    revalidatePath("/employees");
+}
 
-    // Audit Logging
-    db.auditLog.push({
-        id: Math.random().toString(36).substring(2, 9),
-        timestamp: new Date().toISOString(),
-        employeeId: 'ADMIN',
-        action: 'SYSTEM_EXPORT',
-        details: `Full database snapshot exported.`
+export async function deleteEmployee(id: string) {
+    await supabase.from('employees').delete().eq('id', id);
+    revalidatePath("/employees");
+}
+
+export async function transferInventory(itemId: string, fromShopId: string, toShopId: string, quantity: number) {
+    const { data: fromAlloc } = await supabase.from('inventory_allocations').select('quantity').eq('item_id', itemId).eq('shop_id', fromShopId).single();
+    if (!fromAlloc || fromAlloc.quantity < quantity) throw new Error("Stock error");
+    await supabase.from('inventory_allocations').update({ quantity: fromAlloc.quantity - quantity }).eq('item_id', itemId).eq('shop_id', fromShopId);
+    const { data: toAlloc } = await supabase.from('inventory_allocations').select('quantity').eq('item_id', itemId).eq('shop_id', toShopId).single();
+    if (toAlloc) await supabase.from('inventory_allocations').update({ quantity: toAlloc.quantity + quantity }).eq('item_id', itemId).eq('shop_id', toShopId);
+    else await supabase.from('inventory_allocations').insert({ item_id: itemId, shop_id: toShopId, quantity });
+    revalidatePath("/transfers");
+}
+
+export async function recordQuotation(quotation: any) {
+    const id = Math.random().toString(36).substring(2, 9);
+    const date = new Date().toISOString();
+    await supabase.from('quotations').insert({ id, shop_id: quotation.shopId, items: quotation.items, total_before_tax: quotation.totalBeforeTax, tax: quotation.tax, total_with_tax: quotation.totalWithTax, client_name: quotation.clientName, employee_id: quotation.employeeId, date, status: 'pending' });
+    revalidatePath(`/shops/${quotation.shopId}`);
+    return { id, date };
+}
+
+export async function deleteQuotation(quoteId: string, shopId: string) {
+    await supabase.from('quotations').delete().eq('id', quoteId);
+    revalidatePath(`/shops/${shopId}`);
+}
+
+export async function triggerAutomatedReports(type: 'daily' | 'weekly') {
+    const pulse = await getOracleMasterPulse();
+    if (!pulse) return;
+
+    const { finances, totalUnits, shopPerformance } = pulse;
+    const label = type === 'daily' ? 'Daily Intelligence Brief' : 'Weekly Executive Summary';
+    const period = type === 'daily' ? 'today' : 'this week';
+    const shopRows = shopPerformance.map((s: any) => `${s.name}: $${s.revenue.toFixed(2)}`).join('\n');
+
+    const body = `${label.toUpperCase()}
+Generated: ${new Date().toLocaleString()}
+
+FINANCIAL OVERVIEW (${period})
+Revenue:      $${finances.revenue.toFixed(2)}
+Gross Profit: $${finances.grossProfit.toFixed(2)}
+Tax Collected:$${finances.tax.toFixed(2)}
+
+INVENTORY
+Total Units in Stock: ${totalUnits}
+
+SHOP PERFORMANCE
+${shopRows}
+
+---
+Oracle Master Intelligence — Automated Report`;
+
+    await resend.emails.send({
+        from: 'Oracle Reports <alerts@nirvana-intel.com>',
+        to: ORACLE_RECIPIENT,
+        subject: `[${type.toUpperCase()}] ${label} — ${new Date().toLocaleDateString()}`,
+        text: body,
     });
 
-    await writeDb(db);
-    return JSON.stringify(db, null, 2);
+    await supabase.from('oracle_emails').insert({
+        id: Math.random().toString(36).substring(2, 9),
+        timestamp: new Date().toISOString(),
+        recipient: ORACLE_RECIPIENT,
+        subject: `[${type.toUpperCase()}] ${label}`,
+        body,
+        type: `automated_${type}`,
+    });
 }

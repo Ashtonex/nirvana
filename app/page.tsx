@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 import { getDashboardData } from "./actions";
 import { getBestSellers, getPerformanceTrends, getReorderSuggestions, getDeadStock, getSalesHistory, getStaffLeaderboard, getRevenueForecast } from "@/lib/analytics";
 import { IntelligenceDashboard } from "@/components/IntelligenceDashboard";
@@ -36,17 +38,17 @@ export default async function Home() {
     getRevenueForecast()
   ]);
 
-  const totalExpenses = Object.values(db.globalExpenses).reduce((a, b) => a + b, 0);
-  const totalSales = db.sales.reduce((sum, s) => sum + s.totalWithTax, 0);
-  const activeItems = db.inventory.reduce((sum, i) => sum + i.quantity, 0);
+  const totalExpenses = Object.values(db?.globalExpenses || {}).reduce((a: number, b: any) => a + Number(b), 0);
+  const totalSales = (db?.sales || []).reduce((sum: number, s: any) => sum + Number(s.totalWithTax || 0), 0);
+  const activeItems = (db?.inventory || []).reduce((sum: number, i: any) => sum + Number(i.quantity || 0), 0);
 
   // Calculate shop performance/distribution ratios
-  const shopTotals = db.shops.map(shop => {
-    const expenses = Object.values(shop.expenses).reduce((a, b) => a + b, 0);
+  const shopTotals = (db?.shops || []).map((shop: any) => {
+    const expenses = Object.values(shop.expenses || {}).reduce((a: number, b: any) => a + Number(b), 0);
     return { ...shop, totalExpenses: expenses };
   });
 
-  const grandTotalShopExpenses = shopTotals.reduce((sum, s) => sum + s.totalExpenses, 0);
+  const grandTotalShopExpenses = shopTotals.reduce((sum: number, s: any) => sum + Number(s.totalExpenses || 0), 0);
 
   return (
     <div className="space-y-8">
@@ -109,7 +111,7 @@ export default async function Home() {
             <Package className="h-4 w-4 text-violet-400" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">${db.ledger.filter(l => l.category === 'Inventory Acquisition').reduce((sum, l) => sum + l.amount, 0).toLocaleString()}</div>
+            <div className="text-2xl font-bold">${(db?.ledger || []).filter(l => l.category === 'Inventory Acquisition').reduce((sum, l) => sum + l.amount, 0).toLocaleString()}</div>
             <p className="text-xs text-slate-400 mt-1">Total Assets (At Cost)</p>
           </CardContent>
         </Card>
@@ -180,3 +182,4 @@ export default async function Home() {
     </div>
   );
 }
+

@@ -1,0 +1,32 @@
+Shops in DB: [
+  {
+    "id": "kipasa",
+    "name": "Kipasa Branch",
+    "expenses": {
+      "misc": 100,
+      "rent": 1200,
+      "salaries": 2500,
+      "utilities": 450
+    }
+  },
+  {
+    "id": "dubdub",
+    "name": "Dub Dub Outlet",
+    "expenses": {
+      "misc": 50,
+      "rent": 800,
+      "salaries": 1800,
+      "utilities": 300
+    }
+  },
+  {
+    "id": "tradecenter",
+    "name": "Trade Center HQ",
+    "expenses": {
+      "misc": 300,
+      "rent": 2000,
+      "salaries": 4500,
+      "utilities": 900
+    }
+  }
+]

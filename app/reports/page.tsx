@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 import { getDashboardData } from "../actions";
 import {
     Card,
@@ -102,3 +104,4 @@ export default async function ReportsPage() {
         </div>
     );
 }
+

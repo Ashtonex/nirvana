@@ -4,10 +4,10 @@
       "id": "kipasa",
       "name": "Kipasa",
       "expenses": {
+        "misc": 0,
         "rent": 0,
         "salaries": 0,
-        "utilities": 0,
-        "misc": 0
+        "utilities": 0
       }
     },
     {
