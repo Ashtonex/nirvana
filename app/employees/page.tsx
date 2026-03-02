@@ -122,7 +122,7 @@ export default async function EmployeesPage() {
                                                 <td className="py-4">
                                                     <div className="flex items-center gap-3">
                                                         <div className="h-10 w-10 rounded-full bg-gradient-to-br from-violet-600 to-indigo-600 flex items-center justify-center text-xs font-black text-white border-2 border-slate-900 shadow-lg shadow-indigo-500/10">
-                                                            {emp.name.split(' ').map(n => n[0]).join('')}
+                                                            {emp.name.split(' ').map((n: string) => n[0]).join('')}
                                                         </div>
                                                         <div>
                                                             <p className="text-sm font-black text-white">{emp.name}</p>
