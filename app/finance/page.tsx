@@ -22,8 +22,14 @@ export default async function FinancePage() {
     // Income Statement logic
     const revenue = sales.reduce((sum, s) => sum + s.totalBeforeTax, 0); // Excluding tax for P&L
     const cogs = ledger.filter(l => l.category === 'Inventory Acquisition').reduce((sum, l) => sum + l.amount, 0);
-    const operatingExpenses = Object.values(globalExpenses).reduce((a, b) => a + b, 0) +
-        shops.reduce((sum, s) => sum + Object.values(s.expenses).reduce((a, b) => a + b, 0), 0);
+    const operatingExpenses =
+        Object.values(globalExpenses as Record<string, number>).reduce((a, b) => a + b, 0) +
+        shops.reduce(
+            (sum, s) =>
+                sum +
+                Object.values(s.expenses as Record<string, number>).reduce((a, b) => a + b, 0),
+            0
+        );
     const netIncome = revenue - (cogs + operatingExpenses);
 
     // Balance Sheet logic

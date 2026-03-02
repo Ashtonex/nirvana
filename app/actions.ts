@@ -50,7 +50,12 @@ export async function getDashboardData() {
             date: q.date || new Date().toISOString()
         })),
         employees: (employees || []).map((e: any) => ({
-            id: e.id, name: e.name || "New Recruit", role: e.role || "sales", shopId: e.shop_id, active: Boolean(e.active)
+            id: e.id,
+            name: e.name || "New Recruit",
+            role: e.role || "sales",
+            shopId: e.shop_id,
+            hireDate: e.hire_date || new Date().toISOString(),
+            active: Boolean(e.active)
         })),
         shipments: (shipments || []).map((sh: any) => ({
             id: sh.id, supplier: sh.supplier || "Internal Transfer", shipmentNumber: sh.shipment_number || "---", date: sh.date || new Date().toISOString()
@@ -304,17 +309,41 @@ export async function getOracleMasterPulse() {
     const { data: sales } = await supabaseAdmin.from('sales').select('*');
     const { data: shops } = await supabaseAdmin.from('shops').select('*');
     if (!inventory || !sales || !shops || !settings) return null;
+
     const totalRevenue = sales.reduce((sum, s) => sum + Number(s.total_with_tax), 0);
     const totalTax = sales.reduce((sum, s) => sum + Number(s.tax), 0);
-    const grossProfit = sales.reduce((sum, s) => sum + Number(s.total_before_tax), 0) - sales.reduce((sum, s) => {
-        const item = inventory.find(i => i.id === s.item_id);
-        return sum + (item ? Number(item.landed_cost) * s.quantity : 0);
-    }, 0);
+    const grossProfit =
+        sales.reduce((sum, s) => sum + Number(s.total_before_tax), 0) -
+        sales.reduce((sum, s) => {
+            const item = inventory.find(i => i.id === s.item_id);
+            return sum + (item ? Number(item.landed_cost) * s.quantity : 0);
+        }, 0);
+
+    const categoryBreakdown = (inventory || []).reduce((acc: Record<string, number>, item: any) => {
+        const category = item.category || "Uncategorized";
+        acc[category] = (acc[category] || 0) + Number(item.quantity || 0);
+        return acc;
+    }, {});
+
     return {
         totalUnits: inventory.reduce((sum, i) => sum + i.quantity, 0),
+        categoryBreakdown,
         finances: { revenue: totalRevenue, tax: totalTax, grossProfit, netIncome: grossProfit, monthlyBurn: 0 },
-        shopPerformance: shops.map(s => ({ id: s.id, name: s.name, revenue: sales.filter(sa => sa.shop_id === s.id).reduce((acc, sa) => acc + Number(sa.total_with_tax), 0), progress: 100 })),
-        deadCapital: 0, zombieCount: 0, recentEmails: []
+        shopPerformance: (shops || []).map((s: any) => ({
+            id: s.id,
+            name: s.name,
+            revenue: (sales || [])
+                .filter((sa: any) => sa.shop_id === s.id)
+                .reduce((acc: number, sa: any) => acc + Number(sa.total_with_tax), 0),
+            expenses: Object.values(s.expenses || {}).reduce(
+                (acc: number, val: any) => acc + Number(val || 0),
+                0
+            ),
+            progress: 100
+        })),
+        deadCapital: 0,
+        zombieCount: 0,
+        recentEmails: []
     };
 }
 

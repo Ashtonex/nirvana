@@ -17,6 +17,41 @@ import { Badge, Button } from "@/components/ui";
 export default async function IntelligencePage() {
     const pulse = await getOracleMasterPulse();
 
+    if (!pulse) {
+        return (
+            <div className="space-y-8 pb-32 pt-8">
+                <div className="space-y-2 text-center max-w-3xl mx-auto">
+                    <div className="flex justify-center mb-4">
+                        <div className="relative">
+                            <div className="absolute inset-0 bg-violet-500/20 blur-2xl rounded-full" />
+                            <Compass className="h-16 w-16 text-violet-500 relative animate-[spin_10s_linear_infinite]" />
+                        </div>
+                    </div>
+                    <h1 className="text-6xl font-black tracking-tighter uppercase italic text-white leading-none">
+                        Oracle's Eye
+                    </h1>
+                    <p className="text-slate-400 font-bold tracking-widest uppercase text-xs italic">
+                        Read-Only Master Intelligence Layer • Autonomous Operations Enabled
+                    </p>
+
+                    <div className="flex justify-center gap-3 pt-4">
+                        <Badge className="bg-emerald-500/10 text-emerald-500 border-emerald-500/20 px-3 py-1 font-black uppercase text-[10px] italic">
+                            <ShieldCheck className="h-3 w-3 mr-2" /> Live Synchronization
+                        </Badge>
+                        <Badge className="bg-sky-500/10 text-sky-500 border-sky-500/20 px-3 py-1 font-black uppercase text-[10px] italic">
+                            <Calendar className="h-3 w-3 mr-2" /> Daily Sync: 18:00
+                        </Badge>
+                    </div>
+                </div>
+
+                <div className="mt-12 text-center text-slate-500 text-sm">
+                    Oracle intelligence data is not yet available. Once inventory, sales, and settings are fully configured,
+                    this panel will activate with live insights.
+                </div>
+            </div>
+        );
+    }
+
     return (
         <div className="space-y-8 pb-32 pt-8">
             <div className="space-y-2 text-center max-w-3xl mx-auto">

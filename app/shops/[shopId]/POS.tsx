@@ -132,7 +132,7 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
                 });
                 setIsAddProductModalOpen(false);
                 setNewProduct({ name: "", category: "", landedCost: "", initialStock: "0" });
-                alert(`${addedItem.name} added to inventory system.`);
+                alert(`${newProduct.name} added to inventory system.`);
             } catch (error) {
                 alert("Failed to add product");
             }

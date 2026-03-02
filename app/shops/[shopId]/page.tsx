@@ -106,7 +106,7 @@ export default async function ShopPage({ params }: { params: { shopId: string } 
                         <div className="flex -space-x-2 overflow-hidden">
                             {shopEmployees.map((emp, i) => (
                                 <div key={emp.id} className="inline-block h-8 w-8 rounded-full ring-2 ring-slate-900 bg-gradient-to-br from-violet-600 to-indigo-600 flex items-center justify-center text-[10px] font-black text-white border-2 border-slate-950">
-                                    {emp.name.split(' ').map(n => n[0]).join('')}
+                                    {emp.name.split(' ').map((n: string) => n[0]).join('')}
                                 </div>
                             ))}
                         </div>
