@@ -411,3 +411,48 @@ Oracle Master Intelligence — Automated Report`;
         type: `automated_${type}`,
     });
 }
+
+export async function exportDatabase(): Promise<string> {
+    const [
+        { data: inventory },
+        { data: allocations },
+        { data: sales },
+        { data: shops },
+        { data: shipments },
+        { data: employees },
+        { data: ledger },
+        { data: auditLog },
+        { data: quotations },
+        { data: transfers },
+        { data: settings },
+    ] = await Promise.all([
+        supabaseAdmin.from('inventory_items').select('*'),
+        supabaseAdmin.from('inventory_allocations').select('*'),
+        supabaseAdmin.from('sales').select('*'),
+        supabaseAdmin.from('shops').select('*'),
+        supabaseAdmin.from('shipments').select('*'),
+        supabaseAdmin.from('employees').select('*'),
+        supabaseAdmin.from('ledger_entries').select('*'),
+        supabaseAdmin.from('audit_log').select('*'),
+        supabaseAdmin.from('quotations').select('*'),
+        supabaseAdmin.from('transfers').select('*'),
+        supabaseAdmin.from('oracle_settings').select('*').single(),
+    ]);
+
+    const snapshot = {
+        exportedAt: new Date().toISOString(),
+        inventory: inventory || [],
+        allocations: allocations || [],
+        sales: sales || [],
+        shops: shops || [],
+        shipments: shipments || [],
+        employees: employees || [],
+        ledger: ledger || [],
+        auditLog: auditLog || [],
+        quotations: quotations || [],
+        transfers: transfers || [],
+        settings: settings || {},
+    };
+
+    return JSON.stringify(snapshot, null, 2);
+}
