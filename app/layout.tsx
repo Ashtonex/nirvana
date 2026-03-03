@@ -3,6 +3,7 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "@/components/AuthProvider";
 import { AppShell } from "@/components/AppShell";
+import { StaffProvider } from "@/components/StaffProvider";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -45,7 +46,9 @@ export default function RootLayout({
       </head>
       <body className={`${inter.className} antialiased bg-background text-foreground`}>
         <AuthProvider>
-          <AppShell>{children}</AppShell>
+          <StaffProvider>
+            <AppShell>{children}</AppShell>
+          </StaffProvider>
         </AuthProvider>
       </body>
     </html>

@@ -4,7 +4,7 @@ import { readDb, writeDb, Database, InventoryItem, Sale, Shipment, FinancialEntr
 import { revalidatePath } from "next/cache";
 import { ORACLE_RECIPIENT } from "@/lib/resend";
 import { supabase, supabaseAdmin } from "@/lib/supabase";
-import { createHash } from "crypto";
+import { createHash, randomUUID } from "crypto";
 import { sendEmail } from "@/lib/email";
 
 export async function getDashboardData() {
@@ -520,26 +520,34 @@ export async function registerNewEmployee(employee: {
         const tempPassword = `${safe(employee.name)}.${safe(employee.surname)}123`;
         const passwordHash = createHash("sha256").update(tempPassword).digest("hex");
          
-        const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
-            email: workEmail,
-            password: tempPassword,
-            email_confirm: true,
-            user_metadata: {
-                name: employee.name,
-                surname: employee.surname,
-                shop_id: employee.shopId,
-                role: employee.role
+        // Owners authenticate via Supabase Auth.
+        // Staff authenticate via custom session (work email -> one-time code).
+        let userId: string;
+        if (employee.role === 'owner') {
+            const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
+                email: workEmail,
+                password: tempPassword,
+                email_confirm: true,
+                user_metadata: {
+                    name: employee.name,
+                    surname: employee.surname,
+                    shop_id: employee.shopId,
+                    role: employee.role
+                }
+            });
+
+            if (authError) {
+                console.error('[registerNewEmployee] createUser failed:', authError);
+                return { success: false, error: authError.message };
             }
-        });
 
-        if (authError) {
-            console.error('[registerNewEmployee] createUser failed:', authError);
-            return { success: false, error: authError.message };
-        }
-
-        const userId = authData.user?.id;
-        if (!userId) {
-            return { success: false, error: 'Failed to create user' };
+            const createdId = authData.user?.id;
+            if (!createdId) {
+                return { success: false, error: 'Failed to create owner user' };
+            }
+            userId = createdId;
+        } else {
+            userId = randomUUID();
         }
 
         const insertWithColumnFallback = async (row: Record<string, any>) => {
@@ -585,6 +593,15 @@ export async function registerNewEmployee(employee: {
         const shopName = employee.shopId === 'kipasa' ? 'Kipasa' : employee.shopId === 'dubdub' ? 'Dubdub' : 'Trade Center';
 
         try {
+            const isOwner = employee.role === 'owner';
+            const loginUrl = isOwner
+                ? 'https://nirvana-flectere.vercel.app/login'
+                : 'https://nirvana-flectere.vercel.app/staff-login';
+
+            const loginInstructions = isOwner
+                ? `<p>Login with your work email and the temporary password.</p>`
+                : `<p>Login is passwordless: enter your work email and we'll send a one-time code to this personal email.</p>`;
+
             await sendEmail({
                 to: employee.personalEmail,
                 subject: `Welcome to Nirvana - Your Work Login`,
@@ -592,16 +609,18 @@ export async function registerNewEmployee(employee: {
                 <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
                     <h1 style="color: #8b5cf6;">Welcome to Nirvana!</h1>
                     <p>Hi ${employee.name},</p>
-                    <p>Your employee account has been created. Use these credentials to log in:</p>
+                    <p>Your employee account has been created.</p>
+                    ${loginInstructions}
                     
                     <div style="background: #f1f5f9; padding: 20px; border-radius: 8px; margin: 20px 0;">
                             <p><strong>Work Email (Login):</strong> ${workEmail}</p>
-                            <p><strong>Temporary Password:</strong> ${tempPassword}</p>
+                            <p><strong>Default Password:</strong> ${tempPassword}</p>
+                            <p style="color:#64748b;font-size:12px;margin-top:8px;">(Owners use this to sign in. Staff may not need it unless instructed.)</p>
                             <p><strong>Shop:</strong> ${shopName}</p>
                             <p><strong>Role:</strong> ${employee.role}</p>
                     </div>
                         
-                        <p>Please login at: <a href="https://nirvana-flectere.vercel.app/login">https://nirvana-flectere.vercel.app/login</a></p>
+                        <p>Please login at: <a href="${loginUrl}">${loginUrl}</a></p>
                         
                         <p style="color: #64748b; font-size: 12px; margin-top: 30px;">
                             If you did not expect this email, please contact your administrator.
