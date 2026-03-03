@@ -1,12 +1,8 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
-import Sidebar from "@/components/Sidebar";
-import { AiChat } from "@/components/AiChat";
-import { MobileNav } from "@/components/MobileNav";
-import { ServiceWorkerRegistration } from "@/components/ServiceWorkerRegistration";
-import { Gatekeeper } from "@/components/Gatekeeper";
 import { AuthProvider } from "@/components/AuthProvider";
+import { AppShell } from "@/components/AppShell";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -49,17 +45,7 @@ export default function RootLayout({
       </head>
       <body className={`${inter.className} antialiased bg-background text-foreground`}>
         <AuthProvider>
-          <Gatekeeper>
-            <div className="flex h-screen overflow-hidden">
-              <Sidebar />
-              <main className="flex-1 overflow-y-auto px-4 py-4 md:px-8 md:py-8 pb-20 md:pb-8">
-                {children}
-              </main>
-              <AiChat />
-              <MobileNav />
-              <ServiceWorkerRegistration />
-            </div>
-          </Gatekeeper>
+          <AppShell>{children}</AppShell>
         </AuthProvider>
       </body>
     </html>

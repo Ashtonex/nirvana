@@ -26,21 +26,15 @@ const STAGES = [
 export function Gatekeeper({ children }: { children: React.ReactNode }) {
     const router = useRouter();
     const pathname = usePathname();
-    const { user, employee, loading, signIn, signOut } = useAuth();
-    
-    const [email, setEmail] = useState("");
-    const [password, setPassword] = useState("");
-    const [showPassword, setShowPassword] = useState(false);
-    const [error, setError] = useState("");
-    const [isAuthenticating, setIsAuthenticating] = useState(false);
+    const { user, employee, loading, signOut } = useAuth();
 
+    const isLoginPage = pathname?.startsWith('/login');
+    
     useEffect(() => {
-        if (!loading && !user) {
-            if (!pathname.startsWith('/login')) {
-                router.push('/login');
-            }
+        if (!loading && !user && !isLoginPage) {
+            router.push('/login');
         }
-    }, [user, loading, pathname, router]);
+    }, [user, loading, pathname, router, isLoginPage]);
 
     if (loading) {
         return (
@@ -53,20 +47,17 @@ export function Gatekeeper({ children }: { children: React.ReactNode }) {
         );
     }
 
+    // Allow login route to render even when unauthenticated.
+    if (!user && isLoginPage) {
+        return <>{children}</>;
+    }
+
     if (!user) {
-        router.push('/login');
         return null;
     }
 
-    const userRole = employee?.role;
-    const userShop = employee?.shop_id;
-
-    const getAccessibleStages = () => {
-        if (userRole === 'owner') {
-            return STAGES;
-        }
-        return STAGES.filter(s => s.allowedRoles.includes(userRole || 'sales'));
-    };
+    const userRole = employee?.role as string | undefined;
+    const userShop = employee?.shop_id as string | undefined;
 
     const getDefaultStage = () => {
         if (userRole === 'owner') {
@@ -78,14 +69,33 @@ export function Gatekeeper({ children }: { children: React.ReactNode }) {
         return '/';
     };
 
-    const accessibleStages = getAccessibleStages();
     const defaultStage = getDefaultStage();
 
+    // Route enforcement:
+    // - owners can access everything
+    // - managers can access ops pages + their shop
+    // - sales can access their shop + chat
     useEffect(() => {
-        if (user && employee) {
-            if (pathname === '/login') {
-                router.push(defaultStage);
-            }
+        if (!employee) return;
+
+        const role = userRole || 'sales';
+        const shopPath = userShop ? `/shops/${userShop}` : '/';
+
+        if (role === 'owner') return;
+
+        const allowedPrefixes = role === 'manager'
+            ? [shopPath, '/chat', '/transfers']
+            : [shopPath, '/chat'];
+
+        const ok = allowedPrefixes.some(p => pathname === p || pathname?.startsWith(`${p}/`));
+        if (!ok) {
+            router.push(shopPath);
+        }
+    }, [employee, userRole, userShop, pathname, router]);
+
+    useEffect(() => {
+        if (user && employee && pathname === '/login') {
+            router.push(defaultStage);
         }
     }, [user, employee, defaultStage, pathname, router]);
 
