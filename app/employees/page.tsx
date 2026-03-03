@@ -67,12 +67,13 @@ export default async function EmployeesPage() {
                 </CardHeader>
                 <CardContent>
                     <div className="text-xs text-amber-400 mb-4 font-bold">
-                        Note: Employee will receive login credentials via email after registration.
+                        Note: The generated work email is used for login; credentials are sent to the employee's personal email.
                     </div>
                     <form action={async (formData: FormData) => {
                         "use server";
                         const name = formData.get("name") as string;
                         const surname = formData.get("surname") as string;
+                        const personalEmail = formData.get("personalEmail") as string;
                         const mobile = formData.get("mobile") as string;
                         const role = formData.get("role") as string;
                         const shopId = formData.get("shopId") as string;
@@ -81,6 +82,7 @@ export default async function EmployeesPage() {
                         await registerNewEmployee({
                             name,
                             surname,
+                            personalEmail,
                             mobile,
                             role,
                             shopId,
@@ -95,6 +97,10 @@ export default async function EmployeesPage() {
                         <div className="w-40 space-y-1.5">
                             <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Surname</label>
                             <Input name="surname" placeholder="Doe" required className="h-10 bg-slate-950/50 border-slate-800 text-sm font-bold" />
+                        </div>
+                        <div className="w-48 space-y-1.5">
+                            <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Personal Email</label>
+                            <Input name="personalEmail" type="email" placeholder="employee@gmail.com" required className="h-10 bg-slate-950/50 border-slate-800 text-sm font-bold" />
                         </div>
                         <div className="w-48 space-y-1.5">
                             <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Mobile Number</label>

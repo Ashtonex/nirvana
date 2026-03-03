@@ -449,6 +449,7 @@ const SHOP_DOMAINS: Record<string, string> = {
 export async function registerNewEmployee(employee: {
     name: string;
     surname: string;
+    personalEmail: string;
     mobile: string;
     role: string;
     shopId: string;
@@ -478,7 +479,9 @@ export async function registerNewEmployee(employee: {
         throw new Error("Failed to create user");
     }
 
-    await supabaseAdmin.from('employees').insert({
+    // Insert into employees table. Some environments may not have personal_email yet;
+    // fall back gracefully to avoid breaking provisioning.
+    const baseEmployeeRow: any = {
         id: userId,
         name: employee.name,
         surname: employee.surname,
@@ -487,24 +490,36 @@ export async function registerNewEmployee(employee: {
         shop_id: employee.shopId,
         role: employee.role,
         is_active: true,
-        hire_date: employee.hireDate
-    });
+        hire_date: employee.hireDate,
+    };
+
+    const withPersonal = { ...baseEmployeeRow, personal_email: employee.personalEmail };
+    const insertAttempt = await supabaseAdmin.from('employees').insert(withPersonal);
+    if (insertAttempt.error) {
+        const msg = insertAttempt.error.message || '';
+        if (msg.toLowerCase().includes('personal_email') && msg.toLowerCase().includes('does not exist')) {
+            const retry = await supabaseAdmin.from('employees').insert(baseEmployeeRow);
+            if (retry.error) throw new Error(retry.error.message);
+        } else {
+            throw new Error(insertAttempt.error.message);
+        }
+    }
 
     const shopName = employee.shopId === 'kipasa' ? 'Kipasa' : employee.shopId === 'dubdub' ? 'Dubdub' : 'Trade Center';
 
     try {
         await resend.emails.send({
             from: 'Nirvana <onboarding@resend.dev>',
-            to: email,
-            subject: `Welcome to Nirvana - Your Login Credentials`,
+            to: employee.personalEmail,
+            subject: `Welcome to Nirvana - Your Work Login`,
             html: `
                 <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
                     <h1 style="color: #8b5cf6;">Welcome to Nirvana!</h1>
                     <p>Hi ${employee.name},</p>
-                    <p>Your employee account has been created. Here are your login details:</p>
+                    <p>Your employee account has been created. Use these credentials to log in:</p>
                     
                     <div style="background: #f1f5f9; padding: 20px; border-radius: 8px; margin: 20px 0;">
-                        <p><strong>Email:</strong> ${email}</p>
+                        <p><strong>Work Email (Login):</strong> ${email}</p>
                         <p><strong>Password:</strong> ${employee.password}</p>
                         <p><strong>Shop:</strong> ${shopName}</p>
                         <p><strong>Role:</strong> ${employee.role}</p>
