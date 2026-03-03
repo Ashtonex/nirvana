@@ -1,8 +1,7 @@
 "use client";
 
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
-import { useState } from 'react';
+import { usePathname, useRouter } from 'next/navigation';
 import {
     Home,
     Store,
@@ -18,8 +17,11 @@ import {
     Flame,
     ClipboardList,
     ShieldCheck,
-    Scale
+    Scale,
+    LogOut
 } from 'lucide-react';
+import { useAuth } from '@/components/AuthProvider';
+import { useStaff } from '@/components/StaffProvider';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
@@ -48,6 +50,26 @@ const navItems = [
 
 export default function Sidebar() {
     const pathname = usePathname();
+    const router = useRouter();
+
+    // Owner auth (Supabase) + Staff auth (custom session)
+    // These hooks are safe here; Sidebar is a client component.
+    const { signOut: ownerSignOut, user: ownerUser } = useAuth();
+    const { signOut: staffSignOut, staff } = useStaff();
+
+    const handleLogout = async () => {
+        try {
+            if (ownerUser) {
+                await ownerSignOut();
+                router.push('/login');
+            } else {
+                await staffSignOut();
+                router.push('/staff-login');
+            }
+        } catch {
+            router.push('/staff-login');
+        }
+    };
 
     return (
         <div className="hidden lg:flex h-full w-64 flex-col border-r border-slate-800 bg-slate-950/50 backdrop-blur-xl">
@@ -87,6 +109,14 @@ export default function Sidebar() {
                     <Settings className="mr-3 h-5 w-5" />
                     Settings
                 </Link>
+
+                <button
+                    onClick={handleLogout}
+                    className="mt-2 w-full flex items-center rounded-lg px-3 py-2 text-sm text-slate-400 hover:bg-slate-900 hover:text-rose-400 transition-colors"
+                >
+                    <LogOut className="mr-3 h-5 w-5" />
+                    Log Out
+                </button>
             </div>
         </div>
     );

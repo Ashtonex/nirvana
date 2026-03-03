@@ -32,7 +32,8 @@ import {
     History,
     Sparkles,
     Coins,
-    PackagePlus
+    PackagePlus,
+    Power
 } from "lucide-react";
 import { recordSale, recordQuotation, addNewProductFromPos } from "../../actions";
 import { clsx, type ClassValue } from 'clsx';
@@ -66,6 +67,8 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
     const [posMode, setPosMode] = useState<'sale' | 'quote'>('sale');
     const [clientName, setClientName] = useState("");
     const [selectedEmployeeId, setSelectedEmployeeId] = useState("");
+
+    const [isClosingDay, setIsClosingDay] = useState(false);
 
     // Ad-hoc Product Modal State
     const [isAddProductModalOpen, setIsAddProductModalOpen] = useState(false);
@@ -183,6 +186,30 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
         });
     };
 
+    const handleEndOfDayAndLogout = async () => {
+        if (!confirm('End of day: send report and log out?')) return;
+        setIsClosingDay(true);
+        try {
+            const res = await fetch('/api/eod', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ shopId })
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) {
+                console.error('EOD failed:', data);
+            }
+        } catch (e) {
+            console.error('EOD error:', e);
+        }
+
+        try {
+            await fetch('/api/staff/logout', { method: 'POST' });
+        } finally {
+            window.location.href = '/staff-login';
+        }
+    };
+
     const filteredInventory = inventory.filter(item =>
         item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         item.category.toLowerCase().includes(searchTerm.toLowerCase())
@@ -206,6 +233,16 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
                         className="bg-violet-600 hover:bg-violet-500 text-[10px] font-black uppercase italic h-10 px-4 flex items-center gap-2"
                     >
                         <PackagePlus className="h-4 w-4" /> Add Ad-hoc
+                    </Button>
+
+                    <Button
+                        onClick={handleEndOfDayAndLogout}
+                        disabled={isClosingDay}
+                        variant="outline"
+                        className="h-10 px-4 border-rose-500/30 text-rose-400 hover:bg-rose-500/10 text-[10px] font-black uppercase italic flex items-center gap-2"
+                        title="End of day + log out"
+                    >
+                        <Power className="h-4 w-4" /> {isClosingDay ? 'Closing...' : 'Power Off'}
                     </Button>
                     <div className="bg-slate-900 border border-slate-800 px-4 py-2 rounded-lg flex items-center gap-3 h-10 shadow-lg shrink-0">
                         <LayoutGrid className="h-4 w-4 text-violet-400" />
