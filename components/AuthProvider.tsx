@@ -51,12 +51,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }, []);
 
     const fetchEmployee = async (userId: string) => {
-        const { data } = await supabaseAuth
+        const { data, error } = await supabaseAuth
             .from('employees')
             .select('*')
             .eq('id', userId)
-            .single();
-        setEmployee(data);
+            .maybeSingle();
+
+        if (error) {
+            console.warn('[Auth] Failed to load employee profile:', error.message);
+            setEmployee(null);
+            return;
+        }
+
+        setEmployee(data ?? null);
     };
 
     const signIn = async (email: string, password: string) => {
