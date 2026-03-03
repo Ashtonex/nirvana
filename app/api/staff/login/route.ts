@@ -13,7 +13,7 @@ export async function POST(req: Request) {
 
   const { data: employee, error } = await supabaseAdmin
     .from("employees")
-    .select("id,email,shop_id,role,is_active,active")
+    .select("*")
     .ilike("email", email)
     .maybeSingle();
 
@@ -25,7 +25,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Employee not found" }, { status: 404 });
   }
 
-  const active = (employee as any).is_active ?? (employee as any).active ?? true;
+  const active = (employee as any).is_active ?? true;
   if (!active) {
     return NextResponse.json({ error: "Employee inactive" }, { status: 403 });
   }
