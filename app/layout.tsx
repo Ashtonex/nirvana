@@ -6,6 +6,7 @@ import { AiChat } from "@/components/AiChat";
 import { MobileNav } from "@/components/MobileNav";
 import { ServiceWorkerRegistration } from "@/components/ServiceWorkerRegistration";
 import { Gatekeeper } from "@/components/Gatekeeper";
+import { AuthProvider } from "@/components/AuthProvider";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -47,17 +48,19 @@ export default function RootLayout({
         <link rel="manifest" href="/manifest.json" crossOrigin="use-credentials" />
       </head>
       <body className={`${inter.className} antialiased bg-background text-foreground`}>
-        <Gatekeeper>
-          <div className="flex h-screen overflow-hidden">
-            <Sidebar />
-            <main className="flex-1 overflow-y-auto px-4 py-4 md:px-8 md:py-8 pb-20 md:pb-8">
-              {children}
-            </main>
-            <AiChat />
-            <MobileNav />
-            <ServiceWorkerRegistration />
-          </div>
-        </Gatekeeper>
+        <AuthProvider>
+          <Gatekeeper>
+            <div className="flex h-screen overflow-hidden">
+              <Sidebar />
+              <main className="flex-1 overflow-y-auto px-4 py-4 md:px-8 md:py-8 pb-20 md:pb-8">
+                {children}
+              </main>
+              <AiChat />
+              <MobileNav />
+              <ServiceWorkerRegistration />
+            </div>
+          </Gatekeeper>
+        </AuthProvider>
       </body>
     </html>
   );

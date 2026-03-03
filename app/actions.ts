@@ -436,6 +436,60 @@ export async function addEmployee(employee: any) {
     revalidatePath("/employees");
 }
 
+const SHOP_DOMAINS: Record<string, string> = {
+    kipasa: "kipasa.com",
+    dubdub: "dubdub.com",
+    tradecenter: "tc.com"
+};
+
+export async function registerNewEmployee(employee: {
+    name: string;
+    surname: string;
+    mobile: string;
+    role: string;
+    shopId: string;
+    password: string;
+    hireDate: string;
+}) {
+    const email = `${employee.name.toLowerCase()}.${employee.surname.toLowerCase()}@${SHOP_DOMAINS[employee.shopId] || "nirvana.com"}`;
+    
+    const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
+        email,
+        password: employee.password,
+        email_confirm: true,
+        user_metadata: {
+            name: employee.name,
+            surname: employee.surname,
+            shop_id: employee.shopId,
+            role: employee.role
+        }
+    });
+
+    if (authError) {
+        throw new Error(`Failed to create account: ${authError.message}`);
+    }
+
+    const userId = authData.user?.id;
+    if (!userId) {
+        throw new Error("Failed to create user");
+    }
+
+    await supabaseAdmin.from('employees').insert({
+        id: userId,
+        name: employee.name,
+        surname: employee.surname,
+        email,
+        mobile: employee.mobile,
+        shop_id: employee.shopId,
+        role: employee.role,
+        is_active: true,
+        hire_date: employee.hireDate
+    });
+
+    revalidatePath("/employees");
+    return { success: true, email };
+}
+
 export async function updateEmployee(id: string, updates: any) {
     const { shopId, ...rest } = updates;
     const supabaseUpdates = { ...rest, ...(shopId ? { shop_id: shopId } : {}) };
@@ -557,4 +611,75 @@ export async function exportDatabase(): Promise<string> {
     };
 
     return JSON.stringify(snapshot, null, 2);
+}
+
+export async function getStockRequests() {
+    const { data } = await supabaseAdmin
+        .from('stock_requests')
+        .select('*')
+        .order('created_at', { ascending: false });
+    return data || [];
+}
+
+export async function createStockRequest(request: {
+    itemName: string;
+    fromShopId: string;
+    toShopId: string;
+    quantity: number;
+    requestedBy: string;
+}) {
+    const { data: inventory } = await supabaseAdmin
+        .from('inventory_items')
+        .select('*')
+        .ilike('name', `%${request.itemName}%`)
+        .limit(1);
+    
+    const item = inventory?.[0];
+    
+    await supabaseAdmin.from('stock_requests').insert({
+        item_id: item?.id || request.itemName,
+        item_name: request.itemName,
+        from_shop_id: request.fromShopId,
+        to_shop_id: request.toShopId,
+        quantity: request.quantity,
+        requested_by: request.requestedBy,
+        status: 'pending'
+    });
+    
+    revalidatePath('/transfers');
+    return { success: true };
+}
+
+export async function updateStockRequestStatus(
+    requestId: string,
+    status: 'approved' | 'rejected' | 'completed',
+    approvedBy: string
+) {
+    const { data: request } = await supabaseAdmin
+        .from('stock_requests')
+        .select('*')
+        .eq('id', requestId)
+        .single();
+    
+    if (!request) throw new Error('Request not found');
+    
+    await supabaseAdmin.from('stock_requests').update({
+        status,
+        approved_by: approvedBy,
+        updated_at: new Date().toISOString()
+    }).eq('id', requestId);
+    
+    if (status === 'approved') {
+        await supabaseAdmin.from('transfers').insert({
+            item_id: request.item_id,
+            from_shop_id: request.from_shop_id,
+            to_shop_id: request.to_shop_id,
+            quantity: request.quantity,
+            status: 'pending',
+            requested_by: request.requested_by
+        });
+    }
+    
+    revalidatePath('/transfers');
+    return { success: true };
 }

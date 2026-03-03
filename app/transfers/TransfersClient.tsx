@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, useEffect } from "react";
 import {
     Card,
     CardContent,
@@ -8,16 +8,23 @@ import {
     CardTitle,
     CardDescription,
     Button,
-    Input
+    Input,
+    Badge
 } from "@/components/ui";
 import {
     ArrowRightLeft,
     ChevronRight,
     Package,
-    ArrowRight
+    ArrowRight,
+    Clock,
+    CheckCircle,
+    XCircle,
+    Loader2,
+    AlertCircle
 } from "lucide-react";
 
-import { transferInventory } from "../actions";
+import { transferInventory, getStockRequests, updateStockRequestStatus } from "../actions";
+import { useAuth } from "@/components/AuthProvider";
 
 export default function TransfersPage({ db }: { db: any }) {
     const [isPending, startTransition] = useTransition();
@@ -25,6 +32,37 @@ export default function TransfersPage({ db }: { db: any }) {
     const [toShop, setToShop] = useState("");
     const [selectedItem, setSelectedItem] = useState("");
     const [quantity, setQuantity] = useState(1);
+    const [stockRequests, setStockRequests] = useState<any[]>([]);
+    const { user } = useAuth();
+    const [currentUserId, setCurrentUserId] = useState<string>("");
+
+    useEffect(() => {
+        loadStockRequests();
+        if (user) {
+            setCurrentUserId(user.id);
+        }
+    }, [user]);
+
+    const loadStockRequests = async () => {
+        const requests = await getStockRequests();
+        setStockRequests(requests);
+    };
+
+    const canApprove = (role: string) => role === 'owner' || role === 'manager';
+
+    const handleApprove = (requestId: string) => {
+        startTransition(async () => {
+            await updateStockRequestStatus(requestId, 'approved', currentUserId);
+            loadStockRequests();
+        });
+    };
+
+    const handleReject = (requestId: string) => {
+        startTransition(async () => {
+            await updateStockRequestStatus(requestId, 'rejected', currentUserId);
+            loadStockRequests();
+        });
+    };
 
     const handleTransfer = () => {
         if (!fromShop || !toShop || !selectedItem || quantity <= 0) {
@@ -146,6 +184,67 @@ export default function TransfersPage({ db }: { db: any }) {
                     </CardContent>
                 </Card>
             </div>
+
+            <Card className="mt-6">
+                <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                        <Package className="h-5 w-5 text-amber-500" />
+                        Stock Transfer Requests
+                    </CardTitle>
+                    <CardDescription>Pending requests from team chat. Owner/Manager approval required.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <div className="space-y-3">
+                        {stockRequests.length === 0 ? (
+                            <div className="text-center py-8 text-slate-500">
+                                No pending stock requests. Use @shop need # item in chat to request stock.
+                            </div>
+                        ) : (
+                            stockRequests.map((req: any) => (
+                                <div key={req.id} className="p-4 rounded-lg bg-slate-900/50 border border-slate-800 flex items-center justify-between">
+                                    <div className="flex items-center gap-4">
+                                        {req.status === 'pending' && <Clock className="h-5 w-5 text-amber-500" />}
+                                        {req.status === 'approved' && <CheckCircle className="h-5 w-5 text-emerald-500" />}
+                                        {req.status === 'rejected' && <XCircle className="h-5 w-5 text-rose-500" />}
+                                        {req.status === 'completed' && <CheckCircle className="h-5 w-5 text-slate-500" />}
+                                        <div>
+                                            <p className="font-bold text-slate-200">
+                                                {req.quantity}x {req.item_name}
+                                            </p>
+                                            <p className="text-xs text-slate-500">
+                                                From: {req.from_shop_id} → To: {req.to_shop_id}
+                                            </p>
+                                            <p className="text-[10px] text-slate-600">
+                                                {new Date(req.created_at).toLocaleString()}
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <Badge className={`${
+                                            req.status === 'pending' ? 'bg-amber-500/20 text-amber-500' :
+                                            req.status === 'approved' ? 'bg-emerald-500/20 text-emerald-500' :
+                                            req.status === 'rejected' ? 'bg-rose-500/20 text-rose-500' :
+                                            'bg-slate-500/20 text-slate-500'
+                                        }`}>
+                                            {req.status}
+                                        </Badge>
+                                        {req.status === 'pending' && (
+                                            <div className="flex gap-2">
+                                                <Button size="sm" variant="outline" className="h-8 text-emerald-500 border-emerald-500/30" onClick={() => handleApprove(req.id)}>
+                                                    <CheckCircle className="h-4 w-4" />
+                                                </Button>
+                                                <Button size="sm" variant="outline" className="h-8 text-rose-500 border-rose-500/30" onClick={() => handleReject(req.id)}>
+                                                    <XCircle className="h-4 w-4" />
+                                                </Button>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            ))
+                        )}
+                    </div>
+                </CardContent>
+            </Card>
         </div>
     );
 }

@@ -1,6 +1,6 @@
 export const dynamic = 'force-dynamic';
 
-import { getDashboardData, addEmployee, updateEmployee, deleteEmployee } from "../actions";
+import { getDashboardData, registerNewEmployee, updateEmployee, deleteEmployee } from "../actions";
 import {
     Card,
     CardContent,
@@ -19,8 +19,21 @@ import {
     ShieldCheck,
     Calendar,
     MapPin,
-    Briefcase
+    Briefcase,
+    Phone,
+    Mail
 } from "lucide-react";
+
+const SHOP_DOMAINS: Record<string, string> = {
+    kipasa: "kipasa.com",
+    dubdub: "dubdub.com",
+    tradecenter: "tc.com"
+};
+
+function generateEmail(name: string, surname: string, shopId: string): string {
+    const domain = SHOP_DOMAINS[shopId] || "nirvana.com";
+    return `${name.toLowerCase()}.${surname.toLowerCase()}@${domain}`;
+}
 
 export default async function EmployeesPage() {
     const db = await getDashboardData();
@@ -53,21 +66,43 @@ export default async function EmployeesPage() {
                     </CardDescription>
                 </CardHeader>
                 <CardContent>
+                    <div className="text-xs text-amber-400 mb-4 font-bold">
+                        Note: Employee will receive login credentials via email after registration.
+                    </div>
                     <form action={async (formData: FormData) => {
                         "use server";
                         const name = formData.get("name") as string;
-                        const role = formData.get("role") as any;
+                        const surname = formData.get("surname") as string;
+                        const mobile = formData.get("mobile") as string;
+                        const role = formData.get("role") as string;
                         const shopId = formData.get("shopId") as string;
-                        await addEmployee({
+                        const password = formData.get("password") as string;
+                        
+                        await registerNewEmployee({
                             name,
+                            surname,
+                            mobile,
                             role,
                             shopId,
+                            password,
                             hireDate: new Date().toISOString().split('T')[0]
                         });
                     }} className="flex flex-wrap gap-4 items-end">
-                        <div className="flex-1 min-w-[200px] space-y-1.5">
-                            <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Legal Name</label>
-                            <Input name="name" placeholder="Enter Full Name" required className="h-10 bg-slate-950/50 border-slate-800 text-sm font-bold" />
+                        <div className="w-40 space-y-1.5">
+                            <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">First Name</label>
+                            <Input name="name" placeholder="John" required className="h-10 bg-slate-950/50 border-slate-800 text-sm font-bold" />
+                        </div>
+                        <div className="w-40 space-y-1.5">
+                            <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Surname</label>
+                            <Input name="surname" placeholder="Doe" required className="h-10 bg-slate-950/50 border-slate-800 text-sm font-bold" />
+                        </div>
+                        <div className="w-48 space-y-1.5">
+                            <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Mobile Number</label>
+                            <Input name="mobile" placeholder="+1234567890" required className="h-10 bg-slate-950/50 border-slate-800 text-sm font-bold" />
+                        </div>
+                        <div className="w-40 space-y-1.5">
+                            <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Password</label>
+                            <Input name="password" type="password" placeholder="Create password" required minLength={6} className="h-10 bg-slate-950/50 border-slate-800 text-sm font-bold" />
                         </div>
                         <div className="w-40 space-y-1.5">
                             <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Assignment Role</label>
@@ -84,7 +119,7 @@ export default async function EmployeesPage() {
                             </select>
                         </div>
                         <Button type="submit" className="bg-emerald-600 hover:bg-emerald-700 text-white font-black text-[10px] uppercase h-10 px-8 shadow-lg shadow-emerald-500/20 active:scale-95 transition-all">
-                            Finalize Recruitment
+                            Create Account
                         </Button>
                     </form>
                 </CardContent>
@@ -122,11 +157,18 @@ export default async function EmployeesPage() {
                                                 <td className="py-4">
                                                     <div className="flex items-center gap-3">
                                                         <div className="h-10 w-10 rounded-full bg-gradient-to-br from-violet-600 to-indigo-600 flex items-center justify-center text-xs font-black text-white border-2 border-slate-900 shadow-lg shadow-indigo-500/10">
-                                                            {emp.name.split(' ').map((n: string) => n[0]).join('')}
+                                                            {(emp.name?.[0] || '') + (emp.surname?.[0] || '')}
                                                         </div>
                                                         <div>
-                                                            <p className="text-sm font-black text-white">{emp.name}</p>
-                                                            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-tight">ID: {emp.id.toUpperCase()}</p>
+                                                            <p className="text-sm font-black text-white">{emp.name} {emp.surname}</p>
+                                                            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-tight flex items-center gap-2">
+                                                                <Mail className="h-3 w-3" /> {emp.email}
+                                                            </p>
+                                                            {emp.mobile && (
+                                                                <p className="text-[10px] font-bold text-slate-600 flex items-center gap-2">
+                                                                    <Phone className="h-3 w-3" /> {emp.mobile}
+                                                                </p>
+                                                            )}
                                                         </div>
                                                     </div>
                                                 </td>
