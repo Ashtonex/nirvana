@@ -35,14 +35,14 @@ export default async function TaxPage() {
     if (!settings) return <div>Data sync error. Settings not found.</div>;
 
     const sales = db.sales || [];
-    const totalSales = sales.reduce((sum, s) => sum + s.totalWithTax, 0);
+    const totalSales = sales.reduce((sum: number, s: any) => sum + s.totalWithTax, 0);
 
     // Theoretical Tax (15.5% flat)
     const flatTaxRate = 0.155;
-    const theoreticalTax = sales.reduce((sum, s) => sum + (s.totalBeforeTax * flatTaxRate), 0);
+    const theoreticalTax = sales.reduce((sum: number, s: any) => sum + (s.totalBeforeTax * flatTaxRate), 0);
 
     // Reported Tax (based on Oracle settings)
-    const reportedTax = sales.reduce((sum, s) => sum + s.tax, 0);
+    const reportedTax = sales.reduce((sum: number, s: any) => sum + s.tax, 0);
 
     // Effectiveness / Ratio
     const taxSaving = theoreticalTax - reportedTax;
@@ -136,9 +136,9 @@ export default async function TaxPage() {
                                         </TableCell>
                                     </TableRow>
                                 ) : (
-                                    sales.map((sale) => {
+                                    sales.map((sale: any) => {
                                         const standardTax = sale.totalBeforeTax * flatTaxRate;
-                                        const shopName = db.shops.find(s => s.id === sale.shopId)?.name || sale.shopId;
+                                        const shopName = db.shops.find((s: any) => s.id === sale.shopId)?.name || sale.shopId;
                                         const isUnderThreshold = settings.taxMode === 'above_threshold' && sale.totalBeforeTax <= settings.taxThreshold;
 
                                         return (

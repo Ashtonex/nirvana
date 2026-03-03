@@ -20,14 +20,14 @@ export default async function FinancePage() {
     const { ledger, sales, globalExpenses, shops } = await getFinancials();
 
     // Income Statement logic
-    const revenue = sales.reduce((sum, s) => sum + s.totalBeforeTax, 0); // Excluding tax for P&L
-    const cogs = ledger.filter(l => l.category === 'Inventory Acquisition').reduce((sum, l) => sum + l.amount, 0);
+    const revenue = sales.reduce((sum: number, s: any) => sum + s.totalBeforeTax, 0); // Excluding tax for P&L
+    const cogs = ledger.filter((l: any) => l.category === 'Inventory Acquisition').reduce((sum: number, l: any) => sum + l.amount, 0);
     const operatingExpenses =
-        Object.values(globalExpenses as Record<string, number>).reduce((a, b) => a + b, 0) +
+        Object.values(globalExpenses as Record<string, number>).reduce((a: number, b: number) => a + b, 0) +
         shops.reduce(
-            (sum, s) =>
+            (sum: number, s: any) =>
                 sum +
-                Object.values(s.expenses as Record<string, number>).reduce((a, b) => a + b, 0),
+                Object.values(s.expenses as Record<string, number>).reduce((a: number, b: number) => a + b, 0),
             0
         );
     const netIncome = revenue - (cogs + operatingExpenses);

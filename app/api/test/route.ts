@@ -1,23 +1,38 @@
+export const dynamic = 'force-dynamic';
 
 import { NextResponse } from 'next/server';
-import {
-    readDb,
-    writeDb
-} from '@/lib/db';
-import {
-    processShipment,
-    recordSale,
-    updateGlobalExpenses,
-    updateShopExpenses,
-    transferInventory
-} from '@/app/actions';
 
-export async function GET() {
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const RESEND_KEY = process.env.RESEND_API_KEY;
+
+async function runTest() {
+    if (!SUPABASE_URL || !RESEND_KEY) {
+        return {
+            success: false,
+            error: "Test endpoint requires SUPABASE_URL and RESEND_API_KEY to be configured",
+            configured: {
+                supabase: !!SUPABASE_URL,
+                resend: !!RESEND_KEY
+            }
+        };
+    }
+
+    const {
+        readDb,
+        writeDb
+    } = await import('@/lib/db');
+    const {
+        processShipment,
+        recordSale,
+        updateGlobalExpenses,
+        updateShopExpenses,
+        transferInventory
+    } = await import('@/app/actions');
+
     console.log("🌑 Starting Nirvana Internal System Test...");
     const results: string[] = [];
 
     try {
-        // 1. Setup
         results.push("Setting up overheads...");
         await updateGlobalExpenses({
             rent: 1200, salaries: 3000, utilities: 800, shipping: 0, duty: 0, misc: 0
@@ -28,7 +43,6 @@ export async function GET() {
         await updateShopExpenses("tradecenter", { rent: 300, salaries: 200, utilities: 0, misc: 0 });
         results.push("✅ Step 1 passed: Overheads & Weights initialized.");
 
-        // 2. Shipment
         results.push("Processing bulk shipment...");
         const shipmentData = {
             supplier: "Test Supplier",
@@ -45,14 +59,13 @@ export async function GET() {
         await processShipment(shipmentData);
 
         const db = await readDb();
-        const item = db.inventory.find(i => i.name === "Stress Test Hoodie");
+        const item = db.inventory.find((i: any) => i.name === "Stress Test Hoodie");
         if (item && item.landedCost === 24) {
             results.push(`✅ Step 2 passed: Landed Cost $${item.landedCost} verified.`);
         } else {
             throw new Error(`Landed cost mismatch: ${item?.landedCost}`);
         }
 
-        // 3. Sale
         results.push("Recording a sale...");
         await recordSale({
             shopId: "kipasa",
@@ -65,19 +78,24 @@ export async function GET() {
         });
         results.push("✅ Step 3 passed: Sale recorded & stock subtracted.");
 
-        // 4. Transfer
         results.push("Executing transfer...");
         await transferInventory(item.id, "kipasa", "dubdub", 20);
         results.push("✅ Step 4 passed: Inventory transfer verified.");
 
-        return NextResponse.json({ success: true, log: results });
+        return { success: true, log: results };
     } catch (err: any) {
         console.error("TEST API ERROR:", err);
-        return NextResponse.json({
+        return {
             success: false,
             error: err.message,
             stack: err.stack,
             log: results
-        }, { status: 500 });
+        };
     }
+}
+
+export async function GET() {
+    const result = await runTest();
+    const status = result.success ? 200 : (result.configured ? 503 : 500);
+    return NextResponse.json(result, { status });
 }

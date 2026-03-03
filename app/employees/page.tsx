@@ -37,7 +37,7 @@ export default async function EmployeesPage() {
                 <div className="flex gap-4">
                     <div className="text-right bg-slate-900/40 p-3 rounded-lg border border-slate-800">
                         <p className="text-[10px] text-slate-500 uppercase font-black tracking-widest">Active Force</p>
-                        <p className="text-2xl font-black text-violet-400 font-mono">{employees.filter(e => e.active).length} Members</p>
+                        <p className="text-2xl font-black text-violet-400 font-mono">{employees.filter((e: any) => e.active).length} Members</p>
                     </div>
                 </div>
             </div>
@@ -80,7 +80,7 @@ export default async function EmployeesPage() {
                         <div className="w-48 space-y-1.5">
                             <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Station Assignment</label>
                             <select name="shopId" className="w-full h-10 bg-slate-950/50 border-slate-800 rounded-md text-xs font-bold text-slate-200 px-3 outline-none focus:border-emerald-500 transition-all border cursor-pointer">
-                                {shops.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                                {shops.map((s: any) => <option key={s.id} value={s.id}>{s.name}</option>)}
                             </select>
                         </div>
                         <Button type="submit" className="bg-emerald-600 hover:bg-emerald-700 text-white font-black text-[10px] uppercase h-10 px-8 shadow-lg shadow-emerald-500/20 active:scale-95 transition-all">
@@ -115,8 +115,8 @@ export default async function EmployeesPage() {
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-800/50">
-                                    {employees.map((emp) => {
-                                        const shop = shops.find(s => s.id === emp.shopId);
+                                    {employees.map((emp: any) => {
+                                        const shop = shops.find((s: any) => s.id === emp.shopId);
                                         return (
                                             <tr key={emp.id} className="group hover:bg-slate-800/30 transition-colors">
                                                 <td className="py-4">
@@ -154,7 +154,7 @@ export default async function EmployeesPage() {
                                                     <div className="flex justify-end gap-3">
                                                         <form action={async () => {
                                                             "use server";
-                                                            const nextShop = shops.find(s => s.id !== emp.shopId)?.id || emp.shopId;
+                                                            const nextShop = shops.find((s: any) => s.id !== emp.shopId)?.id || emp.shopId;
                                                             await updateEmployee(emp.id, { shopId: nextShop });
                                                         }}>
                                                             <Button size="sm" variant="outline" className="h-8 text-[10px] font-black uppercase tracking-widest border-slate-800 hover:border-violet-500/50 hover:bg-violet-500/5 transition-all">

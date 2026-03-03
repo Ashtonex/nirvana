@@ -27,8 +27,8 @@ export default async function QuotationPage({ params }: { params: { quoteId: str
 
     if (!quotation) return <div className="p-20 text-center font-black uppercase italic text-slate-500">Quotation Not Found</div>;
 
-    const shop = db.shops.find(s => s.id === quotation.shopId);
-    const employee = (db.employees as Employee[])?.find(e => e.id === quotation.employeeId);
+    const shop = db.shops.find((s: any) => s.id === quotation.shopId);
+    const employee = (db.employees as Employee[])?.find((e: any) => e.id === quotation.employeeId);
 
     return (
         <div className="max-w-4xl mx-auto space-y-8 pb-32 pt-8 print:p-0 print:m-0 print:max-w-none">

@@ -41,7 +41,7 @@ export default async function OraclePage() {
     const netIncome = finances.netIncome || 0;
 
     const totalZombieCapital = deadCapital || 0;
-    const totalZombieBleed = zombies.reduce((acc, z) => acc + (z.totalBleed || 0), 0);
+    const totalZombieBleed = zombies.reduce((acc: number, z: any) => acc + (z.totalBleed || 0), 0);
 
     const profitMargin = revenue > 0 ? (grossProfit / revenue) * 100 : 0;
 
@@ -220,7 +220,7 @@ export default async function OraclePage() {
                                 </div>
                             ) : (
                                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                                    {zombies.map(z => (
+                                    {zombies.map((z: any) => (
                                         <div key={z.id} className="p-4 rounded-xl bg-slate-900/50 border border-slate-800 group hover:border-rose-500/30 transition-all">
                                             <div className="flex justify-between items-start mb-3">
                                                 <Badge className="bg-rose-500/10 text-rose-500 border-rose-500/10 text-[8px] font-black uppercase italic tracking-widest px-2">

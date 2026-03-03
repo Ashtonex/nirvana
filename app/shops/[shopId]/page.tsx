@@ -27,17 +27,17 @@ import {
 export default async function ShopPage({ params }: { params: { shopId: string } }) {
     const { shopId } = await params;
     const db = await getDashboardData();
-    const shop = db.shops.find(s => s.id === shopId);
+    const shop = db.shops.find((s: any) => s.id === shopId);
 
     if (!shop) return <div>Shop not found</div>;
 
-    const shopSales = db.sales.filter(s => s.shopId === shopId);
-    const shopQuotes = (db.quotations || []).filter(q => q.shopId === shopId && q.status === 'pending');
-    const shopEmployees = (db.employees || []).filter(e => e.shopId === shopId && e.active);
+    const shopSales = db.sales.filter((s: any) => s.shopId === shopId);
+    const shopQuotes = (db.quotations || []).filter((q: any) => q.shopId === shopId && q.status === 'pending');
+    const shopEmployees = (db.employees || []).filter((e: any) => e.shopId === shopId && e.active);
 
-    const totalRev = shopSales.reduce((sum, s) => sum + s.totalWithTax, 0);
-    const inventoryCount = db.inventory.reduce((sum, item) => {
-        const allocation = item.allocations.find(a => a.shopId === shopId);
+    const totalRev = shopSales.reduce((sum: number, s: any) => sum + s.totalWithTax, 0);
+    const inventoryCount = db.inventory.reduce((sum: number, item: any) => {
+        const allocation = item.allocations.find((a: any) => a.shopId === shopId);
         return sum + (allocation ? allocation.quantity : 0);
     }, 0);
 
@@ -104,14 +104,14 @@ export default async function ShopPage({ params }: { params: { shopId: string } 
                     </CardHeader>
                     <CardContent>
                         <div className="flex -space-x-2 overflow-hidden">
-                            {shopEmployees.map((emp, i) => (
+                            {shopEmployees.map((emp: any, i: any) => (
                                 <div key={emp.id} className="inline-block h-8 w-8 rounded-full ring-2 ring-slate-900 bg-gradient-to-br from-violet-600 to-indigo-600 flex items-center justify-center text-[10px] font-black text-white border-2 border-slate-950">
                                     {emp.name.split(' ').map((n: string) => n[0]).join('')}
                                 </div>
                             ))}
                         </div>
                         <p className="text-[10px] text-slate-400 font-bold uppercase mt-2 truncate">
-                            {shopEmployees.map(e => e.name).join(', ')}
+                            {shopEmployees.map((e: any) => e.name).join(', ')}
                         </p>
                     </CardContent>
                 </Card>
@@ -128,7 +128,7 @@ export default async function ShopPage({ params }: { params: { shopId: string } 
                         </h2>
                     </div>
                     <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                        {shopQuotes.map((quote) => (
+                        {shopQuotes.map((quote: any) => (
                             <Card key={quote.id} className="bg-slate-900/20 border-slate-800 hover:border-amber-500/30 transition-all">
                                 <CardHeader className="pb-2">
                                     <div className="flex justify-between items-start">

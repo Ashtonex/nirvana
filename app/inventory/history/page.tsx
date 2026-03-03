@@ -34,7 +34,7 @@ export default async function InventoryHistoryPage() {
                         <CardTitle className="text-xs font-bold text-slate-500 uppercase">Total Sourced</CardTitle>
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-bold text-slate-100">{inventory.reduce((sum, item) => sum + item.quantity, 0)}</div>
+                        <div className="text-2xl font-bold text-slate-100">{inventory.reduce((sum: number, item: any) => sum + item.quantity, 0)}</div>
                     </CardContent>
                 </Card>
                 <Card className="glass">
@@ -68,8 +68,8 @@ export default async function InventoryHistoryPage() {
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-800">
-                                {inventory.map((item) => {
-                                    const shipment = shipments.find(s => s.id === item.shipmentId);
+                                {inventory.map((item: any) => {
+                                    const shipment = shipments.find((s: any) => s.id === item.shipmentId);
                                     const supplier = shipment?.supplier || "Global Provider";
                                     return (
                                         <tr key={item.id} className="hover:bg-slate-800/40 transition-colors">

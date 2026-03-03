@@ -111,7 +111,7 @@ export default async function Home() {
             <Package className="h-4 w-4 text-violet-400" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">${(db?.ledger || []).filter(l => l.category === 'Inventory Acquisition').reduce((sum, l) => sum + l.amount, 0).toLocaleString()}</div>
+            <div className="text-2xl font-bold">${(db?.ledger || []).filter((l: any) => l.category === 'Inventory Acquisition').reduce((sum: number, l: any) => sum + l.amount, 0).toLocaleString()}</div>
             <p className="text-xs text-slate-400 mt-1">Total Assets (At Cost)</p>
           </CardContent>
         </Card>
@@ -137,7 +137,7 @@ export default async function Home() {
           </CardHeader>
           <CardContent>
             <div className="space-y-6 mt-4">
-              {shopTotals.map((shop) => {
+              {shopTotals.map((shop: any) => {
                 const percentage = grandTotalShopExpenses > 0
                   ? (shop.totalExpenses / grandTotalShopExpenses) * 100
                   : 0;

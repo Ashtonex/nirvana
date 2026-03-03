@@ -119,7 +119,15 @@ export async function processShipment(shipmentData: any) {
     });
 
     const { data: shops } = await supabase.from('shops').select('*');
-    const totalShopExpenses = (shops || []).reduce((sum, shop) => sum + Object.values(shop.expenses || {}).reduce((a: number, b: any) => a + Number(b), 0), 0);
+    const totalShopExpenses = (shops || []).reduce(
+        (sum: number, shop: any) =>
+            sum +
+            Object.values(shop.expenses || {}).reduce(
+                (a: number, b: any) => a + Number(b),
+                0
+            ),
+        0
+    );
 
     for (const itemData of shipmentData.items) {
         const itemId = Math.random().toString(36).substring(2, 9);
@@ -133,12 +141,20 @@ export async function processShipment(shipmentData: any) {
 
         if (totalShopExpenses > 0 && shops) {
             let allocatedSum = 0;
-            const allocations = shops.map((shop, idx) => {
-                const shopTotal = Object.values(shop.expenses || {}).reduce((a: number, b: any) => a + Number(b), 0);
-                let allocatedQty = idx === shops.length - 1 ? itemData.quantity - allocatedSum : Math.floor(itemData.quantity * (shopTotal / totalShopExpenses));
-                allocatedSum += allocatedQty;
-                return { item_id: itemId, shop_id: shop.id, quantity: allocatedQty };
-            }).filter(a => a.quantity > 0);
+            const allocations = shops
+                .map((shop: any, idx: number) => {
+                    const shopTotal = Object.values(shop.expenses || {}).reduce(
+                        (a: number, b: any) => a + Number(b),
+                        0
+                    );
+                    let allocatedQty =
+                        idx === shops.length - 1
+                            ? itemData.quantity - allocatedSum
+                            : Math.floor(itemData.quantity * (shopTotal / totalShopExpenses));
+                    allocatedSum += allocatedQty;
+                    return { item_id: itemId, shop_id: shop.id, quantity: allocatedQty };
+                })
+                .filter((a: { item_id: string; shop_id: string; quantity: number }) => a.quantity > 0);
             if (allocations.length > 0) await supabase.from('inventory_allocations').insert(allocations);
         }
     }
@@ -252,7 +268,9 @@ export async function getInventoryInsights(itemId: string) {
     const { data: settings } = await supabaseAdmin.from('oracle_settings').select('*').single();
     if (!item) return null;
     const thirtyDaysAgo = new Date(); thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-    const totalSold = (sales || []).filter(s => new Date(s.date) >= thirtyDaysAgo).reduce((acc, s) => acc + s.quantity, 0);
+    const totalSold = (sales || [])
+        .filter((s: any) => new Date(s.date) >= thirtyDaysAgo)
+        .reduce((acc: number, s: any) => acc + s.quantity, 0);
     const velocity = totalSold / 30;
     return { dailyVelocity: velocity, daysToZero: velocity > 0 ? Math.floor(item.quantity / velocity) : Infinity, totalSold30d: totalSold };
 }
@@ -310,12 +328,12 @@ export async function getOracleMasterPulse() {
     const { data: shops } = await supabaseAdmin.from('shops').select('*');
     if (!inventory || !sales || !shops || !settings) return null;
 
-    const totalRevenue = sales.reduce((sum, s) => sum + Number(s.total_with_tax), 0);
-    const totalTax = sales.reduce((sum, s) => sum + Number(s.tax), 0);
+    const totalRevenue = sales.reduce((sum: number, s: any) => sum + Number(s.total_with_tax), 0);
+    const totalTax = sales.reduce((sum: number, s: any) => sum + Number(s.tax), 0);
     const grossProfit =
-        sales.reduce((sum, s) => sum + Number(s.total_before_tax), 0) -
-        sales.reduce((sum, s) => {
-            const item = inventory.find(i => i.id === s.item_id);
+        sales.reduce((sum: number, s: any) => sum + Number(s.total_before_tax), 0) -
+        sales.reduce((sum: number, s: any) => {
+            const item = inventory.find((i: any) => i.id === s.item_id);
             return sum + (item ? Number(item.landed_cost) * s.quantity : 0);
         }, 0);
 
@@ -326,7 +344,7 @@ export async function getOracleMasterPulse() {
     }, {});
 
     return {
-        totalUnits: inventory.reduce((sum, i) => sum + i.quantity, 0),
+        totalUnits: inventory.reduce((sum: number, i: any) => sum + i.quantity, 0),
         categoryBreakdown,
         finances: { revenue: totalRevenue, tax: totalTax, grossProfit, netIncome: grossProfit, monthlyBurn: 0 },
         shopPerformance: (shops || []).map((s: any) => ({
@@ -351,10 +369,10 @@ export async function getZombieStockReport() {
     const { data: settings } = await supabaseAdmin.from('oracle_settings').select('zombie_days').single();
     const { data: inventory } = await supabaseAdmin.from('inventory_items').select('*');
     if (!inventory) return [];
-    return inventory.filter(i => {
+    return inventory.filter((i: any) => {
         const days = Math.floor((new Date().getTime() - new Date(i.date_added).getTime()) / (1000 * 3600 * 24));
         return days > (settings?.zombie_days || 60);
-    }).map(i => ({ ...i, daysInStock: Math.floor((new Date().getTime() - new Date(i.date_added).getTime()) / (1000 * 3600 * 24)), deadCapital: Number(i.landed_cost) * i.quantity }));
+    }).map((i: any) => ({ ...i, daysInStock: Math.floor((new Date().getTime() - new Date(i.date_added).getTime()) / (1000 * 3600 * 24)), deadCapital: Number(i.landed_cost) * i.quantity }));
 }
 
 export async function addEmployee(employee: any) {

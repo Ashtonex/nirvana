@@ -31,9 +31,9 @@ export default async function ReportsPage() {
             </div>
 
             <div className="grid gap-4 md:grid-cols-3">
-                {db.shops.map(shop => {
-                    const shopSales = sales.filter(s => s.shopId === shop.id);
-                    const total = shopSales.reduce((sum, s) => sum + s.totalWithTax, 0);
+                {db.shops.map((shop: any) => {
+                    const shopSales = sales.filter((s: any) => s.shopId === shop.id);
+                    const total = shopSales.reduce((sum: number, s: any) => sum + s.totalWithTax, 0);
                     return (
                         <Card key={shop.id} className="glass">
                             <CardHeader className="pb-2">
@@ -79,7 +79,7 @@ export default async function ReportsPage() {
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-800">
-                                {sales.map((sale) => (
+                                {sales.map((sale: any) => (
                                     <tr key={sale.id} className="hover:bg-slate-800/30 transition-colors">
                                         <td className="px-6 py-4">{new Date(sale.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</td>
                                         <td className="px-6 py-4 capitalize">{sale.shopId}</td>
