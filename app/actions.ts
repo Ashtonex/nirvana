@@ -6,20 +6,46 @@ import { resend, ORACLE_RECIPIENT } from "@/lib/resend";
 import { supabase, supabaseAdmin } from "@/lib/supabase";
 
 export async function getDashboardData() {
-    const { data: inventory } = await supabaseAdmin.from('inventory_items').select('*');
-    const { data: allocations } = await supabaseAdmin.from('inventory_allocations').select('*');
-    const { data: sales } = await supabaseAdmin.from('sales').select('*');
-    const { data: shops } = await supabaseAdmin.from('shops').select('*');
-    const { data: quotations } = await supabaseAdmin.from('quotations').select('*');
-    const { data: employees } = await supabaseAdmin.from('employees').select('*');
-    const { data: shipments } = await supabaseAdmin.from('shipments').select('*');
-    const { data: settings } = await supabaseAdmin.from('oracle_settings').select('*').single();
-    const { data: ledger } = await supabaseAdmin.from('ledger_entries').select('*');
-    const { data: auditLog } = await supabaseAdmin.from('audit_log').select('*');
-    const { data: transfers } = await supabaseAdmin.from('transfers').select('*');
-    const { data: emails } = await supabaseAdmin.from('oracle_emails').select('*');
+    // Guard: if Supabase env is missing/misconfigured, never crash the whole app.
+    // Return safe empty structures so pages can render and show UI.
+    const hasSupabase = Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY);
+    if (!hasSupabase) {
+        console.error('[getDashboardData] Supabase env vars are missing.');
+        return {
+            inventory: [],
+            sales: [],
+            shops: [
+                { id: 'kipasa', name: 'Kipasa', expenses: { rent: 0, salaries: 0, utilities: 0, misc: 0 } },
+                { id: 'dubdub', name: 'Dubdub', expenses: { rent: 0, salaries: 0, utilities: 0, misc: 0 } },
+                { id: 'tradecenter', name: 'Tradecenter', expenses: { rent: 0, salaries: 0, utilities: 0, misc: 0 } },
+            ],
+            quotations: [],
+            employees: [],
+            shipments: [],
+            ledger: [],
+            auditLog: [],
+            transfers: [],
+            emails: [],
+            settings: {},
+            globalExpenses: {},
+        };
+    }
 
-    return {
+    try {
+        const { data: inventory } = await supabaseAdmin.from('inventory_items').select('*');
+        const { data: allocations } = await supabaseAdmin.from('inventory_allocations').select('*');
+        const { data: sales } = await supabaseAdmin.from('sales').select('*');
+        const { data: shops } = await supabaseAdmin.from('shops').select('*');
+        const { data: quotations } = await supabaseAdmin.from('quotations').select('*');
+        const { data: employees } = await supabaseAdmin.from('employees').select('*');
+        const { data: shipments } = await supabaseAdmin.from('shipments').select('*');
+        const { data: settings } = await supabaseAdmin.from('oracle_settings').select('*').single();
+        const { data: ledger } = await supabaseAdmin.from('ledger_entries').select('*');
+        const { data: auditLog } = await supabaseAdmin.from('audit_log').select('*');
+        const { data: transfers } = await supabaseAdmin.from('transfers').select('*');
+        const { data: emails } = await supabaseAdmin.from('oracle_emails').select('*');
+
+        return {
         inventory: (inventory || []).map((i: any) => ({
             id: i.id,
             name: i.name || "Unknown Product",
@@ -85,7 +111,24 @@ export async function getDashboardData() {
             currencySymbol: settings?.currency_symbol || "$"
         },
         globalExpenses: settings?.global_expenses || {}
-    };
+        };
+    } catch (e: any) {
+        console.error('[getDashboardData] Failed:', e?.message || e);
+        return {
+            inventory: [],
+            sales: [],
+            shops: [],
+            quotations: [],
+            employees: [],
+            shipments: [],
+            ledger: [],
+            auditLog: [],
+            transfers: [],
+            emails: [],
+            settings: {},
+            globalExpenses: {},
+        };
+    }
 }
 
 export async function updateGlobalExpenses(expenses: Database['globalExpenses']) {
@@ -456,28 +499,30 @@ export async function registerNewEmployee(employee: {
     password: string;
     hireDate: string;
 }) {
-    const email = `${employee.name.toLowerCase()}.${employee.surname.toLowerCase()}@${SHOP_DOMAINS[employee.shopId] || "nirvana.com"}`;
-    
-    const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
-        email,
-        password: employee.password,
-        email_confirm: true,
-        user_metadata: {
-            name: employee.name,
-            surname: employee.surname,
-            shop_id: employee.shopId,
-            role: employee.role
+    try {
+        const email = `${employee.name.toLowerCase()}.${employee.surname.toLowerCase()}@${SHOP_DOMAINS[employee.shopId] || "nirvana.com"}`;
+        
+        const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
+            email,
+            password: employee.password,
+            email_confirm: true,
+            user_metadata: {
+                name: employee.name,
+                surname: employee.surname,
+                shop_id: employee.shopId,
+                role: employee.role
+            }
+        });
+
+        if (authError) {
+            console.error('[registerNewEmployee] createUser failed:', authError);
+            return { success: false, error: authError.message };
         }
-    });
 
-    if (authError) {
-        throw new Error(`Failed to create account: ${authError.message}`);
-    }
-
-    const userId = authData.user?.id;
-    if (!userId) {
-        throw new Error("Failed to create user");
-    }
+        const userId = authData.user?.id;
+        if (!userId) {
+            return { success: false, error: 'Failed to create user' };
+        }
 
     // Insert into employees table. Some environments may not have personal_email yet;
     // fall back gracefully to avoid breaking provisioning.
@@ -505,40 +550,44 @@ export async function registerNewEmployee(employee: {
         }
     }
 
-    const shopName = employee.shopId === 'kipasa' ? 'Kipasa' : employee.shopId === 'dubdub' ? 'Dubdub' : 'Trade Center';
+        const shopName = employee.shopId === 'kipasa' ? 'Kipasa' : employee.shopId === 'dubdub' ? 'Dubdub' : 'Trade Center';
 
-    try {
-        await resend.emails.send({
-            from: 'Nirvana <onboarding@resend.dev>',
-            to: employee.personalEmail,
-            subject: `Welcome to Nirvana - Your Work Login`,
-            html: `
-                <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
-                    <h1 style="color: #8b5cf6;">Welcome to Nirvana!</h1>
-                    <p>Hi ${employee.name},</p>
-                    <p>Your employee account has been created. Use these credentials to log in:</p>
-                    
-                    <div style="background: #f1f5f9; padding: 20px; border-radius: 8px; margin: 20px 0;">
-                        <p><strong>Work Email (Login):</strong> ${email}</p>
-                        <p><strong>Password:</strong> ${employee.password}</p>
-                        <p><strong>Shop:</strong> ${shopName}</p>
-                        <p><strong>Role:</strong> ${employee.role}</p>
+        try {
+            await resend.emails.send({
+                from: 'Nirvana <onboarding@resend.dev>',
+                to: employee.personalEmail,
+                subject: `Welcome to Nirvana - Your Work Login`,
+                html: `
+                    <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
+                        <h1 style="color: #8b5cf6;">Welcome to Nirvana!</h1>
+                        <p>Hi ${employee.name},</p>
+                        <p>Your employee account has been created. Use these credentials to log in:</p>
+                        
+                        <div style="background: #f1f5f9; padding: 20px; border-radius: 8px; margin: 20px 0;">
+                            <p><strong>Work Email (Login):</strong> ${email}</p>
+                            <p><strong>Password:</strong> ${employee.password}</p>
+                            <p><strong>Shop:</strong> ${shopName}</p>
+                            <p><strong>Role:</strong> ${employee.role}</p>
+                        </div>
+                        
+                        <p>Please login at: <a href="https://nirvana-flectere.vercel.app/login">https://nirvana-flectere.vercel.app/login</a></p>
+                        
+                        <p style="color: #64748b; font-size: 12px; margin-top: 30px;">
+                            If you did not expect this email, please contact your administrator.
+                        </p>
                     </div>
-                    
-                    <p>Please login at: <a href="https://nirvana-flectere.vercel.app/login">https://nirvana-flectere.vercel.app/login</a></p>
-                    
-                    <p style="color: #64748b; font-size: 12px; margin-top: 30px;">
-                        If you did not expect this email, please contact your administrator.
-                    </p>
-                </div>
-            `
-        });
-    } catch (emailError) {
-        console.error('Failed to send welcome email:', emailError);
-    }
+                `
+            });
+        } catch (emailError) {
+            console.error('[registerNewEmployee] Failed to send welcome email:', emailError);
+        }
 
-    revalidatePath("/employees");
-    return { success: true, email };
+        revalidatePath("/employees");
+        return { success: true, email };
+    } catch (e: any) {
+        console.error('[registerNewEmployee] Failed:', e?.message || e);
+        return { success: false, error: e?.message || 'Unknown error' };
+    }
 }
 
 export async function updateEmployee(id: string, updates: any) {
