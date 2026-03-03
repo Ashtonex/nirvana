@@ -2,9 +2,10 @@
 
 import { readDb, writeDb, Database, InventoryItem, Sale, Shipment, FinancialEntry, Quotation, Employee, AuditEntry, OracleEmail } from "@/lib/db";
 import { revalidatePath } from "next/cache";
-import { resend, ORACLE_RECIPIENT } from "@/lib/resend";
+import { ORACLE_RECIPIENT } from "@/lib/resend";
 import { supabase, supabaseAdmin } from "@/lib/supabase";
 import { createHash } from "crypto";
+import { sendEmail } from "@/lib/email";
 
 export async function getDashboardData() {
     // Guard: if Supabase env is missing/misconfigured, never crash the whole app.
@@ -250,7 +251,16 @@ export async function recordSale(sale: any) {
         const newQty = Math.max(0, item.quantity - sale.quantity);
         await supabase.from('inventory_items').update({ quantity: newQty }).eq('id', sale.itemId);
         if (newQty <= 0) {
-            try { await resend.emails.send({ from: "Oracle Alerts <alerts@nirvana-intel.com>", to: ORACLE_RECIPIENT, subject: `[ALERT] Stock Depleted: ${item.name}`, html: `<p>Product 0 units.</p>` }); } catch (e) { }
+            try {
+                await sendEmail({
+                    to: ORACLE_RECIPIENT,
+                    subject: `[ALERT] Stock Depleted: ${item.name}`,
+                    html: `<p>Product 0 units.</p>`
+                });
+            } catch (e) {
+                // Do not fail the sale flow if email fails
+                console.error('[Email] Stock depleted alert failed:', (e as any)?.message || e);
+            }
         }
     }
 
@@ -575,9 +585,7 @@ export async function registerNewEmployee(employee: {
         const shopName = employee.shopId === 'kipasa' ? 'Kipasa' : employee.shopId === 'dubdub' ? 'Dubdub' : 'Trade Center';
 
         try {
-            const from = process.env.RESEND_FROM || 'Nirvana <onboarding@resend.dev>';
-            const { data, error } = await resend.emails.send({
-                from,
+            await sendEmail({
                 to: employee.personalEmail,
                 subject: `Welcome to Nirvana - Your Work Login`,
                 html: `
@@ -601,14 +609,9 @@ export async function registerNewEmployee(employee: {
                     </div>
                 `
             });
-
-            if (error) {
-                console.error('[registerNewEmployee] Resend send failed:', error);
-            } else {
-                console.log('[registerNewEmployee] Resend sent:', data);
-            }
+            console.log('[registerNewEmployee] SendGrid sent onboarding email');
         } catch (emailError) {
-            console.error('[registerNewEmployee] Failed to send welcome email:', emailError);
+            console.error('[registerNewEmployee] SendGrid failed:', (emailError as any)?.message || emailError);
         }
 
         revalidatePath("/employees");
@@ -680,12 +683,15 @@ ${shopRows}
 ---
 Oracle Master Intelligence — Automated Report`;
 
-    await resend.emails.send({
-        from: 'Oracle Reports <alerts@nirvana-intel.com>',
-        to: ORACLE_RECIPIENT,
-        subject: `[${type.toUpperCase()}] ${label} — ${new Date().toLocaleDateString()}`,
-        text: body,
-    });
+    try {
+        await sendEmail({
+            to: ORACLE_RECIPIENT,
+            subject: `[${type.toUpperCase()}] ${label} — ${new Date().toLocaleDateString()}`,
+            html: `<pre style="white-space:pre-wrap;font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;">${body.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</pre>`,
+        });
+    } catch (e) {
+        console.error('[Email] Oracle report send failed:', (e as any)?.message || e);
+    }
 
     await supabase.from('oracle_emails').insert({
         id: Math.random().toString(36).substring(2, 9),
