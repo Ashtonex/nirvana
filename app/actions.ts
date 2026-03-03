@@ -544,7 +544,6 @@ export async function registerNewEmployee(employee: {
         shop_id: employee.shopId,
         role: employee.role,
         is_active: true,
-        active: true,
         hire_date: employee.hireDate,
     };
 
