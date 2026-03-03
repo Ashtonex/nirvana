@@ -106,7 +106,7 @@ export default async function EmployeesPage() {
                         </div>
                         <div className="w-56 space-y-1.5">
                             <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Temporary Password</label>
-                            <Input value="name.surname12345" readOnly className="h-10 bg-slate-950/50 border-slate-800 text-sm font-bold text-slate-400" />
+                            <Input value="name.surname123" readOnly className="h-10 bg-slate-950/50 border-slate-800 text-sm font-bold text-slate-400" />
                         </div>
                         <div className="w-40 space-y-1.5">
                             <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Assignment Role</label>

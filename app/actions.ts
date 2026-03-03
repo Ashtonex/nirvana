@@ -507,7 +507,7 @@ export async function registerNewEmployee(employee: {
             .replace(/[^a-z0-9._-]/g, "");
 
         const workEmail = `${safe(employee.name)}.${safe(employee.surname)}@${SHOP_DOMAINS[employee.shopId] || "nirvana.com"}`;
-        const tempPassword = `${safe(employee.name)}.${safe(employee.surname)}12345`;
+        const tempPassword = `${safe(employee.name)}.${safe(employee.surname)}123`;
         const passwordHash = createHash("sha256").update(tempPassword).digest("hex");
          
         const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
@@ -532,38 +532,52 @@ export async function registerNewEmployee(employee: {
             return { success: false, error: 'Failed to create user' };
         }
 
-    // Insert into employees table. Some environments may not have personal_email yet;
-    // fall back gracefully to avoid breaking provisioning.
-    const baseEmployeeRow: any = {
-        id: userId,
-        name: employee.name,
-        surname: employee.surname,
-        email: workEmail,
-        password_hash: passwordHash,
-        mobile: employee.mobile,
-        shop_id: employee.shopId,
-        role: employee.role,
-        is_active: true,
-        hire_date: employee.hireDate,
-    };
+        const insertWithColumnFallback = async (row: Record<string, any>) => {
+            // Try inserting; if PostgREST schema cache complains about missing columns,
+            // remove those keys and retry.
+            const working: Record<string, any> = { ...row };
+            for (let attempt = 0; attempt < 8; attempt++) {
+                const res = await supabaseAdmin.from('employees').insert(working);
+                if (!res.error) return;
 
-    const withPersonal = { ...baseEmployeeRow, personal_email: employee.personalEmail };
-    const insertAttempt = await supabaseAdmin.from('employees').insert(withPersonal);
-    if (insertAttempt.error) {
-        const msg = insertAttempt.error.message || '';
-        if (msg.toLowerCase().includes('personal_email') && msg.toLowerCase().includes('does not exist')) {
-            const retry = await supabaseAdmin.from('employees').insert(baseEmployeeRow);
-            if (retry.error) throw new Error(retry.error.message);
-        } else {
-            throw new Error(insertAttempt.error.message);
-        }
-    }
+                const msg = res.error.message || '';
+                const m1 = msg.match(/Could not find the '([^']+)' column/i);
+                const m2 = msg.match(/column "([^"]+)" of relation "employees" does not exist/i);
+                const missing = (m1 && m1[1]) || (m2 && m2[1]);
+                if (missing && Object.prototype.hasOwnProperty.call(working, missing)) {
+                    delete working[missing];
+                    continue;
+                }
+
+                throw new Error(res.error.message);
+            }
+
+            throw new Error('Failed to insert employee row after retries');
+        };
+
+        // Insert employee profile (support both legacy schemas and newer ones)
+        await insertWithColumnFallback({
+            id: userId,
+            name: employee.name,
+            surname: employee.surname,
+            email: workEmail,
+            personal_email: employee.personalEmail,
+            mobile: employee.mobile,
+            password_hash: passwordHash,
+            shop_id: employee.shopId,
+            role: employee.role,
+            // some schemas use active, some use is_active
+            is_active: true,
+            active: true,
+            hire_date: employee.hireDate,
+        });
 
         const shopName = employee.shopId === 'kipasa' ? 'Kipasa' : employee.shopId === 'dubdub' ? 'Dubdub' : 'Trade Center';
 
         try {
+            const from = process.env.RESEND_FROM || 'Nirvana <onboarding@resend.dev>';
             const { data, error } = await resend.emails.send({
-                from: 'Nirvana <onboarding@resend.dev>',
+                from,
                 to: employee.personalEmail,
                 subject: `Welcome to Nirvana - Your Work Login`,
                 html: `
