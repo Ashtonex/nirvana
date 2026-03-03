@@ -4,16 +4,16 @@ import { createHash, randomBytes } from "crypto";
 import { supabaseAdmin } from "@/lib/supabase";
 
 export async function POST(req: Request) {
-  const { workEmail } = await req.json();
-  if (!workEmail) {
-    return NextResponse.json({ error: "Missing workEmail" }, { status: 400 });
+  const { workEmail, pin } = await req.json();
+  if (!workEmail || !pin) {
+    return NextResponse.json({ error: "Missing workEmail or pin" }, { status: 400 });
   }
 
   const email = String(workEmail).trim().toLowerCase();
 
   const { data: employee, error } = await supabaseAdmin
     .from("employees")
-    .select("id,email,is_active,active")
+    .select("id,email,shop_id,is_active,active")
     .ilike("email", email)
     .maybeSingle();
 
@@ -28,6 +28,22 @@ export async function POST(req: Request) {
   const active = (employee as any).is_active ?? (employee as any).active ?? true;
   if (!active) {
     return NextResponse.json({ error: "Employee inactive" }, { status: 403 });
+  }
+
+  const shopId = (employee as any).shop_id;
+  const pinString = String(pin).trim();
+  const SHOP_PINS: Record<string, string> = {
+    kipasa: process.env.NIRVANA_PIN_KIPASA || "1234",
+    dubdub: process.env.NIRVANA_PIN_DUBDUB || "5678",
+    tradecenter: process.env.NIRVANA_PIN_TRADECENTER || "0000",
+  };
+
+  if (!shopId || !SHOP_PINS[shopId]) {
+    return NextResponse.json({ error: "Employee shop not configured" }, { status: 400 });
+  }
+
+  if (pinString !== SHOP_PINS[shopId]) {
+    return NextResponse.json({ error: "Invalid device PIN" }, { status: 401 });
   }
 
   // Create staff session
