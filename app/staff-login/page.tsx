@@ -23,7 +23,10 @@ export default function StaffLoginPage() {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || "Failed to log in");
-      router.push("/");
+
+      const shopId = data.shopId as string | undefined;
+      // Hard navigation so providers re-hydrate with new cookie.
+      window.location.href = shopId ? `/shops/${shopId}` : "/mobile-menu";
     } catch (e: any) {
       setError(e?.message || "Failed to log in");
     } finally {

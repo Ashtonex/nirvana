@@ -45,11 +45,8 @@ export default function LoginPage() {
       if (!res.ok) throw new Error(data.error || "Failed to log in");
 
       const shopId = data.shopId as string | undefined;
-      if (shopId) {
-        router.replace(`/shops/${shopId}`);
-      } else {
-        router.replace("/mobile-menu");
-      }
+      // Hard navigation so providers re-hydrate with new cookie.
+      window.location.href = shopId ? `/shops/${shopId}` : "/mobile-menu";
     } catch (e: any) {
       setError(e?.message || "Failed to log in");
     } finally {
