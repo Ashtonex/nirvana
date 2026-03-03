@@ -13,7 +13,7 @@ export async function POST(req: Request) {
 
   const { data: employee, error } = await supabaseAdmin
     .from("employees")
-    .select("id,email,shop_id,is_active,active")
+    .select("id,email,shop_id,role,is_active,active")
     .ilike("email", email)
     .maybeSingle();
 
@@ -69,5 +69,9 @@ export async function POST(req: Request) {
     maxAge: 14 * 24 * 60 * 60,
   });
 
-  return NextResponse.json({ success: true });
+  return NextResponse.json({
+    success: true,
+    shopId: (employee as any).shop_id,
+    role: (employee as any).role,
+  });
 }
