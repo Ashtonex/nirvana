@@ -57,8 +57,11 @@ export function AccessGate({ children }: { children: React.ReactNode }) {
 
     const shopPath = staff.shop_id ? `/shops/${staff.shop_id}` : "/staff-login";
 
-    // Staff can only access their shop POS (no chat/transfers/admin).
-    const ok = pathname === shopPath || pathname.startsWith(`${shopPath}/`);
+    // Staff can only access their shop POS + staff chat.
+    const ok =
+      pathname === shopPath ||
+      pathname.startsWith(`${shopPath}/`) ||
+      pathname.startsWith("/staff-chat");
     if (!ok) {
       router.replace(shopPath);
       return;

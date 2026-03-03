@@ -33,7 +33,8 @@ import {
     Sparkles,
     Coins,
     PackagePlus,
-    Power
+    Power,
+    MessageSquare
 } from "lucide-react";
 import { recordSale, recordQuotation, addNewProductFromPos } from "../../actions";
 import { clsx, type ClassValue } from 'clsx';
@@ -243,6 +244,15 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
                         title="End of day + log out"
                     >
                         <Power className="h-4 w-4" /> {isClosingDay ? 'Closing...' : 'Power Off'}
+                    </Button>
+
+                    <Button
+                        onClick={() => (window.location.href = '/staff-chat')}
+                        variant="outline"
+                        className="h-10 px-4 border-slate-700 text-slate-200 hover:bg-slate-800/60 text-[10px] font-black uppercase italic flex items-center gap-2"
+                        title="Open shop chat"
+                    >
+                        <MessageSquare className="h-4 w-4" /> Chat
                     </Button>
                     <div className="bg-slate-900 border border-slate-800 px-4 py-2 rounded-lg flex items-center gap-3 h-10 shadow-lg shrink-0">
                         <LayoutGrid className="h-4 w-4 text-violet-400" />
