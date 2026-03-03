@@ -486,6 +486,38 @@ export async function registerNewEmployee(employee: {
         hire_date: employee.hireDate
     });
 
+    const shopName = employee.shopId === 'kipasa' ? 'Kipasa' : employee.shopId === 'dubdub' ? 'Dubdub' : 'Trade Center';
+
+    try {
+        await resend.emails.send({
+            from: 'Nirvana <onboarding@resend.dev>',
+            to: email,
+            subject: `Welcome to Nirvana - Your Login Credentials`,
+            html: `
+                <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
+                    <h1 style="color: #8b5cf6;">Welcome to Nirvana!</h1>
+                    <p>Hi ${employee.name},</p>
+                    <p>Your employee account has been created. Here are your login details:</p>
+                    
+                    <div style="background: #f1f5f9; padding: 20px; border-radius: 8px; margin: 20px 0;">
+                        <p><strong>Email:</strong> ${email}</p>
+                        <p><strong>Password:</strong> ${employee.password}</p>
+                        <p><strong>Shop:</strong> ${shopName}</p>
+                        <p><strong>Role:</strong> ${employee.role}</p>
+                    </div>
+                    
+                    <p>Please login at: <a href="https://nirvana-flectere.vercel.app/login">https://nirvana-flectere.vercel.app/login</a></p>
+                    
+                    <p style="color: #64748b; font-size: 12px; margin-top: 30px;">
+                        If you did not expect this email, please contact your administrator.
+                    </p>
+                </div>
+            `
+        });
+    } catch (emailError) {
+        console.error('Failed to send welcome email:', emailError);
+    }
+
     revalidatePath("/employees");
     return { success: true, email };
 }
