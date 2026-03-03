@@ -52,10 +52,14 @@ export async function getDashboardData() {
         employees: (employees || []).map((e: any) => ({
             id: e.id,
             name: e.name || "New Recruit",
+            surname: e.surname || "",
+            email: e.email || "",
+            mobile: e.mobile || "",
             role: e.role || "sales",
             shopId: e.shop_id,
-            hireDate: e.hire_date || new Date().toISOString(),
-            active: Boolean(e.active)
+            hireDate: e.hire_date || e.hireDate || new Date().toISOString(),
+            active: Boolean(e.is_active ?? e.active ?? true),
+            mobileVerified: Boolean(e.mobile_verified ?? false),
         })),
         shipments: (shipments || []).map((sh: any) => ({
             id: sh.id, supplier: sh.supplier || "Internal Transfer", shipmentNumber: sh.shipment_number || "---", date: sh.date || new Date().toISOString()

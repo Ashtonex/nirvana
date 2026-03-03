@@ -11,11 +11,10 @@ import { Gatekeeper } from "@/components/Gatekeeper";
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
 
-  // Public route(s)
-  // Be permissive here: if pathname is temporarily unavailable during hydration,
-  // render children so the login page never blanks out.
+  // Login route renders without the full app shell, but still runs Gatekeeper
+  // so it can redirect after sign-in.
   if (!pathname || pathname.startsWith("/login")) {
-    return <>{children}</>;
+    return <Gatekeeper>{children}</Gatekeeper>;
   }
 
   // Protected app shell
