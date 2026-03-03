@@ -553,7 +553,7 @@ export async function registerNewEmployee(employee: {
         const shopName = employee.shopId === 'kipasa' ? 'Kipasa' : employee.shopId === 'dubdub' ? 'Dubdub' : 'Trade Center';
 
         try {
-            await resend.emails.send({
+            const { data, error } = await resend.emails.send({
                 from: 'Nirvana <onboarding@resend.dev>',
                 to: employee.personalEmail,
                 subject: `Welcome to Nirvana - Your Work Login`,
@@ -578,6 +578,12 @@ export async function registerNewEmployee(employee: {
                     </div>
                 `
             });
+
+            if (error) {
+                console.error('[registerNewEmployee] Resend send failed:', error);
+            } else {
+                console.log('[registerNewEmployee] Resend sent:', data);
+            }
         } catch (emailError) {
             console.error('[registerNewEmployee] Failed to send welcome email:', emailError);
         }
