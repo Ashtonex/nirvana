@@ -4,6 +4,7 @@ import { readDb, writeDb, Database, InventoryItem, Sale, Shipment, FinancialEntr
 import { revalidatePath } from "next/cache";
 import { resend, ORACLE_RECIPIENT } from "@/lib/resend";
 import { supabase, supabaseAdmin } from "@/lib/supabase";
+import { createHash } from "crypto";
 
 export async function getDashboardData() {
     // Guard: if Supabase env is missing/misconfigured, never crash the whole app.
@@ -496,15 +497,22 @@ export async function registerNewEmployee(employee: {
     mobile: string;
     role: string;
     shopId: string;
-    password: string;
     hireDate: string;
 }) {
     try {
-        const email = `${employee.name.toLowerCase()}.${employee.surname.toLowerCase()}@${SHOP_DOMAINS[employee.shopId] || "nirvana.com"}`;
-        
+        const safe = (s: string) => (s || "")
+            .trim()
+            .toLowerCase()
+            .replace(/\s+/g, "")
+            .replace(/[^a-z0-9._-]/g, "");
+
+        const workEmail = `${safe(employee.name)}.${safe(employee.surname)}@${SHOP_DOMAINS[employee.shopId] || "nirvana.com"}`;
+        const tempPassword = `${safe(employee.name)}.${safe(employee.surname)}12345`;
+        const passwordHash = createHash("sha256").update(tempPassword).digest("hex");
+         
         const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
-            email,
-            password: employee.password,
+            email: workEmail,
+            password: tempPassword,
             email_confirm: true,
             user_metadata: {
                 name: employee.name,
@@ -530,11 +538,13 @@ export async function registerNewEmployee(employee: {
         id: userId,
         name: employee.name,
         surname: employee.surname,
-        email,
+        email: workEmail,
+        password_hash: passwordHash,
         mobile: employee.mobile,
         shop_id: employee.shopId,
         role: employee.role,
         is_active: true,
+        active: true,
         hire_date: employee.hireDate,
     };
 
@@ -558,17 +568,17 @@ export async function registerNewEmployee(employee: {
                 to: employee.personalEmail,
                 subject: `Welcome to Nirvana - Your Work Login`,
                 html: `
-                    <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
-                        <h1 style="color: #8b5cf6;">Welcome to Nirvana!</h1>
-                        <p>Hi ${employee.name},</p>
-                        <p>Your employee account has been created. Use these credentials to log in:</p>
-                        
-                        <div style="background: #f1f5f9; padding: 20px; border-radius: 8px; margin: 20px 0;">
-                            <p><strong>Work Email (Login):</strong> ${email}</p>
-                            <p><strong>Password:</strong> ${employee.password}</p>
+                <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
+                    <h1 style="color: #8b5cf6;">Welcome to Nirvana!</h1>
+                    <p>Hi ${employee.name},</p>
+                    <p>Your employee account has been created. Use these credentials to log in:</p>
+                    
+                    <div style="background: #f1f5f9; padding: 20px; border-radius: 8px; margin: 20px 0;">
+                            <p><strong>Work Email (Login):</strong> ${workEmail}</p>
+                            <p><strong>Temporary Password:</strong> ${tempPassword}</p>
                             <p><strong>Shop:</strong> ${shopName}</p>
                             <p><strong>Role:</strong> ${employee.role}</p>
-                        </div>
+                    </div>
                         
                         <p>Please login at: <a href="https://nirvana-flectere.vercel.app/login">https://nirvana-flectere.vercel.app/login</a></p>
                         
@@ -589,7 +599,7 @@ export async function registerNewEmployee(employee: {
         }
 
         revalidatePath("/employees");
-        return { success: true, email };
+        return { success: true, email: workEmail };
     } catch (e: any) {
         console.error('[registerNewEmployee] Failed:', e?.message || e);
         return { success: false, error: e?.message || 'Unknown error' };

@@ -77,8 +77,7 @@ export default async function EmployeesPage() {
                         const mobile = formData.get("mobile") as string;
                         const role = formData.get("role") as string;
                         const shopId = formData.get("shopId") as string;
-                        const password = formData.get("password") as string;
-                        
+                         
                         await registerNewEmployee({
                             name,
                             surname,
@@ -86,7 +85,6 @@ export default async function EmployeesPage() {
                             mobile,
                             role,
                             shopId,
-                            password,
                             hireDate: new Date().toISOString().split('T')[0]
                         });
                     }} className="flex flex-wrap gap-4 items-end">
@@ -106,9 +104,9 @@ export default async function EmployeesPage() {
                             <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Mobile Number</label>
                             <Input name="mobile" placeholder="+1234567890" required className="h-10 bg-slate-950/50 border-slate-800 text-sm font-bold" />
                         </div>
-                        <div className="w-40 space-y-1.5">
-                            <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Password</label>
-                            <Input name="password" type="password" placeholder="Create password" required minLength={6} className="h-10 bg-slate-950/50 border-slate-800 text-sm font-bold" />
+                        <div className="w-56 space-y-1.5">
+                            <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Temporary Password</label>
+                            <Input value="name.surname12345" readOnly className="h-10 bg-slate-950/50 border-slate-800 text-sm font-bold text-slate-400" />
                         </div>
                         <div className="w-40 space-y-1.5">
                             <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Assignment Role</label>
