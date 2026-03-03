@@ -219,6 +219,61 @@ export async function registerInventoryItem(item: { name: string, category: stri
     return { id };
 }
 
+export async function registerBulkInventoryItems(
+    items: Array<{ name: string; category: string; quantity: number; price: number }>,
+    shopIds: string[],
+    landedCostMethod: 'flat' | 'auto',
+    globalExpenses: Record<string, number>
+) {
+    const timestamp = new Date().toISOString();
+    
+    const totalMonthlyExpenses = Object.values(globalExpenses).reduce((a: number, b: any) => a + Number(b), 0) as number;
+    
+    const results = [];
+    
+    for (const item of items) {
+        const id = Math.random().toString(36).substring(2, 9);
+        
+        let landedCost: number;
+        if (landedCostMethod === 'flat') {
+            landedCost = item.price;
+        } else {
+            const overheadPerPiece = totalMonthlyExpenses / 1000;
+            landedCost = item.price + overheadPerPiece;
+        }
+        
+        await supabaseAdmin.from('inventory_items').insert({
+            id,
+            name: item.name,
+            category: item.category,
+            quantity: item.quantity,
+            acquisition_price: item.price * item.quantity,
+            landed_cost: landedCost,
+            date_added: timestamp
+        });
+        
+        const quantityPerShop = Math.floor(item.quantity / shopIds.length);
+        const remainder = item.quantity % shopIds.length;
+        
+        for (let i = 0; i < shopIds.length; i++) {
+            const shopId = shopIds[i];
+            const qty = quantityPerShop + (i < remainder ? 1 : 0);
+            if (qty > 0) {
+                await supabaseAdmin.from('inventory_allocations').insert({
+                    item_id: id,
+                    shop_id: shopId,
+                    quantity: qty
+                });
+            }
+        }
+        
+        results.push({ id, name: item.name, quantity: item.quantity });
+    }
+    
+    revalidatePath("/inventory");
+    return { success: true, itemsAdded: results.length };
+}
+
 export async function updateInventoryItem(itemId: string, updates: any) {
     await supabaseAdmin.from('inventory_items').update(updates).eq('id', itemId);
     revalidatePath("/inventory");

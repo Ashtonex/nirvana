@@ -26,9 +26,14 @@ import {
     Scale,
     Clock,
     Target,
-    Store
+    Store,
+    Upload,
+    FileText,
+    X,
+    Check,
+    AlertCircle
 } from "lucide-react";
-import { updateGlobalExpenses, processShipment, registerInventoryItem, updateInventoryItem, deleteInventoryItem } from "../actions";
+import { updateGlobalExpenses, processShipment, registerInventoryItem, registerBulkInventoryItems, updateInventoryItem, deleteInventoryItem } from "../actions";
 
 export default function InventoryMaster({ db }: { db: any }) {
     const inventory = db?.inventory || [];
@@ -100,12 +105,98 @@ export default function InventoryMaster({ db }: { db: any }) {
     const [showAdHoc, setShowAdHoc] = useState(false);
     const [adHocItem, setAdHocItem] = useState({ name: "", category: "", quantity: 0, acquisitionPrice: 0, landedCost: 0 });
 
+    const [showBulkUpload, setShowBulkUpload] = useState(false);
+    const [bulkShops, setBulkShops] = useState<string[]>([]);
+    const [bulkLandedCostMethod, setBulkLandedCostMethod] = useState<'flat' | 'auto'>('flat');
+    const [bulkFile, setBulkFile] = useState<File | null>(null);
+    const [bulkParsedData, setBulkParsedData] = useState<Array<{ name: string; category: string; quantity: number; price: number }>>([]);
+    const [bulkError, setBulkError] = useState("");
+    const [isUploading, setIsUploading] = useState(false);
+
     const handleRegisterAdHoc = () => {
         startTransition(async () => {
             await registerInventoryItem(adHocItem);
             setShowAdHoc(false);
             setAdHocItem({ name: "", category: "", quantity: 0, acquisitionPrice: 0, landedCost: 0 });
         });
+    };
+
+    const parseCSV = (text: string): Array<{ name: string; category: string; quantity: number; price: number }> => {
+        const lines = text.trim().split('\n');
+        const results: Array<{ name: string; category: string; quantity: number; price: number }> = [];
+        
+        for (let i = 1; i < lines.length; i++) {
+            const line = lines[i].trim();
+            if (!line) continue;
+            
+            const parts = line.split(',').map(p => p.trim());
+            if (parts.length >= 4) {
+                const name = parts[0];
+                const category = parts[1];
+                const quantity = parseInt(parts[2]);
+                const price = parseFloat(parts[3]);
+                
+                if (name && category && !isNaN(quantity) && !isNaN(price)) {
+                    results.push({ name, category, quantity, price });
+                }
+            }
+        }
+        
+        return results;
+    };
+
+    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        
+        setBulkFile(file);
+        setBulkError("");
+        
+        const reader = new FileReader();
+        reader.onload = (event) => {
+            const text = event.target?.result as string;
+            const parsed = parseCSV(text);
+            
+            if (parsed.length === 0) {
+                setBulkError("No valid items found in CSV. Expected format: name,category,quantity,price");
+                setBulkParsedData([]);
+            } else {
+                setBulkParsedData(parsed);
+            }
+        };
+        reader.readAsText(file);
+    };
+
+    const handleBulkUpload = () => {
+        if (bulkShops.length === 0) {
+            setBulkError("Please select at least one shop");
+            return;
+        }
+        
+        if (bulkParsedData.length === 0) {
+            setBulkError("Please upload a valid CSV file");
+            return;
+        }
+        
+        setIsUploading(true);
+        startTransition(async () => {
+            await registerBulkInventoryItems(bulkParsedData, bulkShops, bulkLandedCostMethod, globalExpenses);
+            setShowBulkUpload(false);
+            setBulkFile(null);
+            setBulkParsedData([]);
+            setBulkShops([]);
+            setBulkError("");
+            setIsUploading(false);
+            alert(`Successfully added ${bulkParsedData.length} items to inventory!`);
+        });
+    };
+
+    const toggleShop = (shopId: string) => {
+        if (bulkShops.includes(shopId)) {
+            setBulkShops(bulkShops.filter(s => s !== shopId));
+        } else {
+            setBulkShops([...bulkShops, shopId]);
+        }
     };
 
     const [selectedShopId, setSelectedShopId] = useState(db.shops[0]?.id || "");
@@ -195,12 +286,21 @@ export default function InventoryMaster({ db }: { db: any }) {
                                         Ref #{shipment.shipmentNumber || "---"} | {shipment.manifestPieces || allocatedPieces} Pieces Expected
                                     </CardDescription>
                                 </div>
-                                <Button
-                                    onClick={() => setShowAdHoc(!showAdHoc)}
-                                    className={`font-black uppercase italic text-xs tracking-widest px-6 h-10 border-2 transition-all ${showAdHoc ? 'bg-rose-500/20 text-rose-500 border-rose-500/50' : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'}`}
-                                >
-                                    {showAdHoc ? "Close Ad-Hoc" : "Direct Ad-Hoc Add"}
-                                </Button>
+                                <div className="flex gap-3">
+                                    <Button
+                                        onClick={() => setShowBulkUpload(!showBulkUpload)}
+                                        className={`font-black uppercase italic text-xs tracking-widest px-4 h-10 border-2 transition-all flex items-center gap-2 ${showBulkUpload ? 'bg-violet-500/20 text-violet-500 border-violet-500/50' : 'bg-violet-500/10 text-violet-400 border-violet-500/30'}`}
+                                    >
+                                        <Upload className="h-4 w-4" />
+                                        {showBulkUpload ? "Close" : "Bulk CSV"}
+                                    </Button>
+                                    <Button
+                                        onClick={() => setShowAdHoc(!showAdHoc)}
+                                        className={`font-black uppercase italic text-xs tracking-widest px-6 h-10 border-2 transition-all ${showAdHoc ? 'bg-rose-500/20 text-rose-500 border-rose-500/50' : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'}`}
+                                    >
+                                        {showAdHoc ? "Close Ad-Hoc" : "Direct Ad-Hoc Add"}
+                                    </Button>
+                                </div>
                             </div>
                         </CardHeader>
                         <CardContent className="pt-8 space-y-10">
@@ -253,6 +353,148 @@ export default function InventoryMaster({ db }: { db: any }) {
                                         className="w-full mt-8 h-14 bg-emerald-600 hover:bg-emerald-500 text-white font-black uppercase italic tracking-widest rounded-xl shadow-[0_0_20px_rgba(16,185,129,0.2)] transition-all"
                                     >
                                         Commit Ad-Hoc Item to master ledger
+                                    </Button>
+                                </div>
+                            )}
+
+                            {showBulkUpload && (
+                                <div className="p-8 rounded-3xl bg-violet-500/5 border-2 border-violet-500/20 animate-in fade-in slide-in-from-top-4 duration-500">
+                                    <h3 className="text-violet-400 font-black uppercase italic tracking-widest text-sm mb-6 flex items-center gap-2">
+                                        <Upload className="h-5 w-5 animate-pulse" /> Bulk CSV Import
+                                    </h3>
+
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                                        <div className="space-y-3">
+                                            <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Select Shops</label>
+                                            <div className="flex flex-wrap gap-2">
+                                                {db.shops.map((shop: any) => (
+                                                    <button
+                                                        key={shop.id}
+                                                        onClick={() => toggleShop(shop.id)}
+                                                        className={`px-4 py-2 rounded-lg border-2 font-black uppercase text-xs tracking-widest transition-all ${
+                                                            bulkShops.includes(shop.id)
+                                                                ? 'bg-violet-500/20 border-violet-500 text-violet-400'
+                                                                : 'bg-slate-950 border-slate-800 text-slate-500 hover:border-slate-700'
+                                                        }`}
+                                                    >
+                                                        {shop.name}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+
+                                        <div className="space-y-3">
+                                            <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Landed Cost Method</label>
+                                            <div className="flex gap-2">
+                                                <button
+                                                    onClick={() => setBulkLandedCostMethod('flat')}
+                                                    className={`flex-1 px-4 py-2 rounded-lg border-2 font-black uppercase text-xs tracking-widest transition-all ${
+                                                        bulkLandedCostMethod === 'flat'
+                                                            ? 'bg-emerald-500/20 border-emerald-500 text-emerald-400'
+                                                            : 'bg-slate-950 border-slate-800 text-slate-500 hover:border-slate-700'
+                                                    }`}
+                                                >
+                                                    Flat Rate
+                                                </button>
+                                                <button
+                                                    onClick={() => setBulkLandedCostMethod('auto')}
+                                                    className={`flex-1 px-4 py-2 rounded-lg border-2 font-black uppercase text-xs tracking-widest transition-all ${
+                                                        bulkLandedCostMethod === 'auto'
+                                                            ? 'bg-amber-500/20 border-amber-500 text-amber-400'
+                                                            : 'bg-slate-950 border-slate-800 text-slate-500 hover:border-slate-700'
+                                                    }`}
+                                                >
+                                                    Auto-Calculate
+                                                </button>
+                                            </div>
+                                            <p className="text-[9px] text-slate-500">
+                                                {bulkLandedCostMethod === 'flat' 
+                                                    ? 'Uses price column as landed cost directly'
+                                                    : 'Adds overhead fraction to price based on monthly expenses'
+                                                }
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    <div className="space-y-3">
+                                        <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Upload CSV File</label>
+                                        <div className="border-2 border-dashed border-slate-800 rounded-xl p-6 text-center hover:border-violet-500/50 transition-colors">
+                                            <input
+                                                type="file"
+                                                accept=".csv"
+                                                onChange={handleFileChange}
+                                                className="hidden"
+                                                id="bulk-csv-upload"
+                                            />
+                                            <label htmlFor="bulk-csv-upload" className="cursor-pointer">
+                                                <FileText className="h-10 w-10 text-slate-600 mx-auto mb-2" />
+                                                <p className="text-sm font-black text-slate-400">
+                                                    {bulkFile ? bulkFile.name : "Click to upload CSV"}
+                                                </p>
+                                                <p className="text-[10px] text-slate-600 mt-1">
+                                                    Format: name, category, quantity, price
+                                                </p>
+                                            </label>
+                                        </div>
+                                    </div>
+
+                                    {bulkError && (
+                                        <div className="mt-4 p-3 rounded-lg bg-rose-500/10 border border-rose-500/20 flex items-center gap-2">
+                                            <AlertCircle className="h-4 w-4 text-rose-500" />
+                                            <p className="text-xs font-black text-rose-500">{bulkError}</p>
+                                        </div>
+                                    )}
+
+                                    {bulkParsedData.length > 0 && (
+                                        <div className="mt-6 space-y-3">
+                                            <div className="flex items-center justify-between">
+                                                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">
+                                                    Preview ({bulkParsedData.length} items)
+                                                </label>
+                                                <button
+                                                    onClick={() => { setBulkParsedData([]); setBulkFile(null); }}
+                                                    className="text-[10px] text-slate-500 hover:text-rose-500"
+                                                >
+                                                    Clear
+                                                </button>
+                                            </div>
+                                            <div className="max-h-48 overflow-y-auto border border-slate-800 rounded-lg">
+                                                <table className="w-full text-xs">
+                                                    <thead className="bg-slate-950 sticky top-0">
+                                                        <tr>
+                                                            <th className="text-left p-2 font-black text-slate-500 uppercase">Name</th>
+                                                            <th className="text-left p-2 font-black text-slate-500 uppercase">Category</th>
+                                                            <th className="text-right p-2 font-black text-slate-500 uppercase">Qty</th>
+                                                            <th className="text-right p-2 font-black text-slate-500 uppercase">Price</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody className="divide-y divide-slate-800">
+                                                        {bulkParsedData.map((item, idx) => (
+                                                            <tr key={idx} className="hover:bg-slate-800/30">
+                                                                <td className="p-2 font-bold text-slate-300">{item.name}</td>
+                                                                <td className="p-2 text-slate-400">{item.category}</td>
+                                                                <td className="p-2 text-right font-black text-emerald-400">{item.quantity}</td>
+                                                                <td className="p-2 text-right font-black text-slate-300">${item.price.toFixed(2)}</td>
+                                                            </tr>
+                                                        ))}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    <Button
+                                        onClick={handleBulkUpload}
+                                        disabled={isPending || isUploading || bulkParsedData.length === 0 || bulkShops.length === 0}
+                                        className="w-full mt-6 h-14 bg-violet-600 hover:bg-violet-500 text-white font-black uppercase italic tracking-widest rounded-xl shadow-[0_0_20px_rgba(139,92,246,0.2)] transition-all disabled:opacity-50"
+                                    >
+                                        {isUploading ? (
+                                            <>Processing...</>
+                                        ) : (
+                                            <>
+                                                <Check className="h-5 w-5 mr-2" /> Commit {bulkParsedData.length} Items to Inventory
+                                            </>
+                                        )}
                                     </Button>
                                 </div>
                             )}
