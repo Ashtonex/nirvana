@@ -57,6 +57,9 @@ export default function Sidebar() {
     const { signOut: ownerSignOut, user: ownerUser } = useAuth();
     const { signOut: staffSignOut, staff } = useStaff();
 
+    // Staff should only see POS. No sidebar navigation.
+    if (staff && !ownerUser) return null;
+
     const handleLogout = async () => {
         try {
             if (ownerUser) {

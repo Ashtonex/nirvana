@@ -55,21 +55,13 @@ export function AccessGate({ children }: { children: React.ReactNode }) {
     if (isOwner) return;
     if (!staff) return;
 
-    const role = staff.role || "sales";
     const shopPath = staff.shop_id ? `/shops/${staff.shop_id}` : "/staff-login";
 
-    if (pathname.startsWith("/transfers") && role !== "manager" && role !== "owner") {
+    // Staff can only access their shop POS (no chat/transfers/admin).
+    const ok = pathname === shopPath || pathname.startsWith(`${shopPath}/`);
+    if (!ok) {
       router.replace(shopPath);
       return;
-    }
-
-    // Sales cannot browse other shops
-    if (pathname.startsWith("/shops/") && staff.shop_id) {
-      const parts = pathname.split("/");
-      const shopId = parts[2];
-      if (shopId && shopId !== staff.shop_id) {
-        router.replace(shopPath);
-      }
     }
   }, [ownerLoading, staffLoading, isOwner, staff, pathname, router]);
 

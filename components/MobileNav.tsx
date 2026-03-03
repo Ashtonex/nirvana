@@ -3,6 +3,8 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Home, Package, ClipboardList, Users, Menu, MessageSquare, ArrowRightLeft } from 'lucide-react';
+import { useAuth } from '@/components/AuthProvider';
+import { useStaff } from '@/components/StaffProvider';
 
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -13,6 +15,11 @@ function cn(...inputs: ClassValue[]) {
 
 export function MobileNav() {
     const pathname = usePathname();
+    const { user: ownerUser } = useAuth();
+    const { staff } = useStaff();
+
+    // Staff should only see POS (no nav).
+    if (staff && !ownerUser) return null;
 
     const tabs = [
         { name: 'Home', href: '/', icon: Home },
