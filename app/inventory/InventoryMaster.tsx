@@ -125,7 +125,8 @@ export default function InventoryMaster({ db }: { db: any }) {
         const lines = text.trim().split('\n');
         const results: Array<{ name: string; category: string; quantity: number; price: number }> = [];
         
-        for (let i = 1; i < lines.length; i++) {
+        // Start at 0 - detect if first row is header or data
+        for (let i = 0; i < lines.length; i++) {
             const line = lines[i].trim();
             if (!line) continue;
             
@@ -135,6 +136,9 @@ export default function InventoryMaster({ db }: { db: any }) {
                 const category = parts[1];
                 const quantity = parseInt(parts[2]);
                 const price = parseFloat(parts[3]);
+                
+                // Skip if looks like a header (contains letters in qty/price)
+                if (isNaN(quantity) || isNaN(price)) continue;
                 
                 if (name && category && !isNaN(quantity) && !isNaN(price)) {
                     results.push({ name, category, quantity, price });
