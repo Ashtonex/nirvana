@@ -1,6 +1,7 @@
 export const dynamic = 'force-dynamic';
 
-import { getDashboardData, registerNewEmployee, updateEmployee, deleteEmployee } from "../actions";
+import { getDashboardData, updateEmployee, deleteEmployee } from "../actions";
+import QuickRecruitmentForm from "./QuickRecruitmentForm";
 import {
     Card,
     CardContent,
@@ -23,17 +24,6 @@ import {
     Phone,
     Mail
 } from "lucide-react";
-
-const SHOP_DOMAINS: Record<string, string> = {
-    kipasa: "kipasa.com",
-    dubdub: "dubdub.com",
-    tradecenter: "tc.com"
-};
-
-function generateEmail(name: string, surname: string, shopId: string): string {
-    const domain = SHOP_DOMAINS[shopId] || "nirvana.com";
-    return `${name.toLowerCase()}.${surname.toLowerCase()}@${domain}`;
-}
 
 export default async function EmployeesPage() {
     const db = await getDashboardData();
@@ -65,68 +55,7 @@ export default async function EmployeesPage() {
                         Onboard a new member to the NIRVANA network.
                     </CardDescription>
                 </CardHeader>
-                <CardContent>
-                    <div className="text-xs text-amber-400 mb-4 font-bold">
-                        Note: The generated work email is used for login; credentials are sent to the employee's personal email.
-                    </div>
-                    <form action={async (formData: FormData) => {
-                        "use server";
-                        const name = formData.get("name") as string;
-                        const surname = formData.get("surname") as string;
-                        const personalEmail = formData.get("personalEmail") as string;
-                        const mobile = formData.get("mobile") as string;
-                        const role = formData.get("role") as string;
-                        const shopId = formData.get("shopId") as string;
-                         
-                        await registerNewEmployee({
-                            name,
-                            surname,
-                            personalEmail,
-                            mobile,
-                            role,
-                            shopId,
-                            hireDate: new Date().toISOString().split('T')[0]
-                        });
-                    }} className="flex flex-wrap gap-4 items-end">
-                        <div className="w-40 space-y-1.5">
-                            <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">First Name</label>
-                            <Input name="name" placeholder="John" required className="h-10 bg-slate-950/50 border-slate-800 text-sm font-bold" />
-                        </div>
-                        <div className="w-40 space-y-1.5">
-                            <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Surname</label>
-                            <Input name="surname" placeholder="Doe" required className="h-10 bg-slate-950/50 border-slate-800 text-sm font-bold" />
-                        </div>
-                        <div className="w-48 space-y-1.5">
-                            <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Personal Email</label>
-                            <Input name="personalEmail" type="email" placeholder="employee@gmail.com" required className="h-10 bg-slate-950/50 border-slate-800 text-sm font-bold" />
-                        </div>
-                        <div className="w-48 space-y-1.5">
-                            <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Mobile Number</label>
-                            <Input name="mobile" placeholder="+1234567890" required className="h-10 bg-slate-950/50 border-slate-800 text-sm font-bold" />
-                        </div>
-                        <div className="w-56 space-y-1.5">
-                            <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Temporary Password</label>
-                            <Input value="name.surname123" readOnly className="h-10 bg-slate-950/50 border-slate-800 text-sm font-bold text-slate-400" />
-                        </div>
-                        <div className="w-40 space-y-1.5">
-                            <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Assignment Role</label>
-                            <select name="role" className="w-full h-10 bg-slate-950/50 border-slate-800 rounded-md text-xs font-bold text-slate-200 px-3 outline-none focus:border-emerald-500 transition-all border cursor-pointer">
-                                <option value="sales">Sales Associate</option>
-                                <option value="manager">Lead Manager</option>
-                                <option value="owner">Strategic Owner</option>
-                            </select>
-                        </div>
-                        <div className="w-48 space-y-1.5">
-                            <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Station Assignment</label>
-                            <select name="shopId" className="w-full h-10 bg-slate-950/50 border-slate-800 rounded-md text-xs font-bold text-slate-200 px-3 outline-none focus:border-emerald-500 transition-all border cursor-pointer">
-                                {shops.map((s: any) => <option key={s.id} value={s.id}>{s.name}</option>)}
-                            </select>
-                        </div>
-                        <Button type="submit" className="bg-emerald-600 hover:bg-emerald-700 text-white font-black text-[10px] uppercase h-10 px-8 shadow-lg shadow-emerald-500/20 active:scale-95 transition-all">
-                            Create Account
-                        </Button>
-                    </form>
-                </CardContent>
+                <QuickRecruitmentForm shops={shops} />
             </Card>
 
             <div className="grid gap-6">
