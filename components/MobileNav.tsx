@@ -2,9 +2,8 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useEffect, useState } from 'react';
 import { Home, Package, ClipboardList, Users, Menu, MessageSquare, ArrowRightLeft } from 'lucide-react';
-import { useAuth } from '@/components/AuthProvider';
-import { useStaff } from '@/components/StaffProvider';
 
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -15,11 +14,21 @@ function cn(...inputs: ClassValue[]) {
 
 export function MobileNav() {
     const pathname = usePathname();
-    const { user: ownerUser } = useAuth();
-    const { staff, loading: staffLoading } = useStaff();
+    const [isStaff, setIsStaff] = useState(false);
+    const [loading, setLoading] = useState(true);
 
-    // Staff should only see POS (no nav). Also hide while loading.
-    if ((staff && !ownerUser) || staffLoading) return null;
+    useEffect(() => {
+        fetch("/api/staff/me", { cache: "no-store" })
+            .then(res => res.json())
+            .then(data => {
+                setIsStaff(!!data?.staff?.shop_id);
+            })
+            .catch(() => setIsStaff(false))
+            .finally(() => setLoading(false));
+    }, []);
+
+    // Hide for staff or while loading
+    if (isStaff || loading) return null;
 
     const tabs = [
         { name: 'Home', href: '/', icon: Home },
@@ -28,8 +37,6 @@ export function MobileNav() {
         { name: 'Transfers', href: '/transfers', icon: ArrowRightLeft },
         { name: 'Menu', href: '/mobile-menu', icon: Menu },
     ];
-
-    // Hide if not on mobile? No, layout handles that.
 
     return (
         <div className="fixed bottom-0 left-0 right-0 z-40 h-16 border-t border-slate-800 bg-slate-950/80 backdrop-blur-lg lg:hidden">
