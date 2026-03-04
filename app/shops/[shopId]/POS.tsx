@@ -34,7 +34,8 @@ import {
     Coins,
     PackagePlus,
     Power,
-    MessageSquare
+    MessageSquare,
+    LogOut
 } from "lucide-react";
 import { recordSale, recordQuotation, addNewProductFromPos } from "../../actions";
 import { clsx, type ClassValue } from 'clsx';
@@ -294,7 +295,7 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
         try {
             await fetch('/api/staff/logout', { method: 'POST' });
         } finally {
-            window.location.href = '/staff-login';
+            window.location.href = '/login';
         }
     };
 
@@ -363,6 +364,20 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
                                 <span className="text-xs font-bold text-slate-200">{totalShopStock} Pieces</span>
                             </div>
                         </div>
+
+                        <Button
+                            onClick={async () => {
+                                if (confirm('Log out now?')) {
+                                    await fetch('/api/staff/logout', { method: 'POST' });
+                                    window.location.href = '/login';
+                                }
+                            }}
+                            variant="outline"
+                            className="h-10 px-3 border-slate-700 text-slate-200 hover:bg-slate-800/60 text-[10px] font-black uppercase italic flex items-center gap-2"
+                            title="Log out"
+                        >
+                            <LogOut className="h-4 w-4" /> Logout
+                        </Button>
                     </div>
                 </div>
 
