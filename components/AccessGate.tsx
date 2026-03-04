@@ -44,7 +44,7 @@ export function AccessGate({ children }: { children: React.ReactNode }) {
     }
 
     if (needsStaff && !(isOwner || isStaff)) {
-      router.replace("/staff-login");
+      router.replace("/login?mode=staff");
       return;
     }
   }, [ownerLoading, staffLoading, isPublic, needsOwner, needsStaff, isOwner, isStaff, router]);
