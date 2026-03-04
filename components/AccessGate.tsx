@@ -1,32 +1,64 @@
 "use client";
 
-import React, { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { useAuth } from "@/components/AuthProvider";
-import { useStaff } from "@/components/StaffProvider";
+import { supabaseAuth } from "@/components/AuthProvider";
 
 export function AccessGate({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname() || "";
 
-  const { user: ownerUser, employee: ownerEmployee, loading: ownerLoading } = useAuth();
-  const { staff, loading: staffLoading } = useStaff();
+  const [ownerData, setOwnerData] = useState<any>(null);
+  const [staffData, setStaffData] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
 
-  // Wait for BOTH providers to finish loading
-  const loading = ownerLoading || staffLoading;
+  // Check both auth states on mount
+  useEffect(() => {
+    async function checkAuth() {
+      try {
+        // Check owner auth
+        const { data: sessionData } = await supabaseAuth.auth.getSession();
+        if (sessionData?.session?.user) {
+          const { data: empData } = await supabaseAuth
+            .from('employees')
+            .select('*')
+            .eq('id', sessionData.session.user.id)
+            .single();
+          setOwnerData(empData);
+        } else {
+          setOwnerData(null);
+        }
+      } catch (e) {
+        setOwnerData(null);
+      }
 
-  // Determine auth state
-  const isOwner = Boolean(ownerUser) && ownerEmployee?.role === "owner";
-  const isStaff = Boolean(staff) && staff?.role !== "owner" && Boolean(staff?.shop_id);
+      try {
+        // Check staff cookie
+        const res = await fetch("/api/staff/me", { cache: "no-store" });
+        const data = await res.json();
+        setStaffData(data?.staff || null);
+      } catch (e) {
+        setStaffData(null);
+      }
+
+      setLoading(false);
+    }
+
+    checkAuth();
+  }, []);
+
+  // While loading, show nothing
+  if (loading) {
+    return null;
+  }
+
+  const isOwner = ownerData?.role === "owner";
+  const isStaff = Boolean(staffData?.shop_id) && staffData?.role !== "owner";
   
-  // Detect login pages
   const isLoginPage = pathname === "/login" || pathname === "/staff-login";
-  
-  // Detect page types
   const isShopPage = pathname.startsWith("/shops/");
   const isStaffChatPage = pathname === "/staff-chat";
   const isPOSPage = isShopPage || isStaffChatPage;
-  
   const isAdminPage = 
     pathname.startsWith("/admin") || 
     pathname.startsWith("/employees") || 
@@ -35,60 +67,45 @@ export function AccessGate({ children }: { children: React.ReactNode }) {
     pathname.startsWith("/reports") ||
     pathname === "/";
 
-  // DON'T redirect while still loading - wait for auth check to complete
-  useEffect(() => {
-    if (loading) return;
-
-    // If on login page and already authenticated, redirect to appropriate page
-    if (isLoginPage) {
-      if (isOwner) {
-        router.replace("/");
-        return;
-      }
-      if (isStaff && staff?.shop_id) {
-        router.replace(`/shops/${staff.shop_id}`);
-        return;
-      }
-      return; // Not authenticated, stay on login
+  // If on login page
+  if (isLoginPage) {
+    // Already logged in as owner -> go to dashboard
+    if (isOwner) {
+      router.replace("/");
+      return null;
     }
-
-    // If trying to access POS/chat without any auth, go to login
-    if (isPOSPage && !isOwner && !isStaff) {
-      router.replace("/login");
-      return;
+    // Already logged in as staff -> go to their shop
+    if (isStaff && staffData.shop_id) {
+      router.replace(`/shops/${staffData.shop_id}`);
+      return null;
     }
+    // Not logged in -> stay on login
+    return <>{children}</>;
+  }
 
-    // If trying to access admin pages without owner auth, go to login
-    if (isAdminPage && !isOwner) {
-      // If staff tries to access admin, send them to their shop
-      if (isStaff && staff?.shop_id) {
-        router.replace(`/shops/${staff.shop_id}`);
-        return;
-      }
-      router.replace("/login");
-      return;
-    }
-
-    // Staff trying to access wrong shop - send to their shop
-    if (isStaff && isShopPage && staff?.shop_id) {
-      if (!pathname.includes(`/${staff.shop_id}/`)) {
-        router.replace(`/shops/${staff.shop_id}`);
-        return;
-      }
-    }
-
-    // Staff trying to access admin from shop - redirect to their shop
-    if (isStaff && isAdminPage && staff?.shop_id) {
-      router.replace(`/shops/${staff.shop_id}`);
-      return;
-    }
-
-  }, [loading, isLoginPage, isOwner, isStaff, staff, isPOSPage, isAdminPage, isShopPage, pathname, router]);
-
-  // Show nothing while loading to prevent flash
-  if (loading) {
+  // If trying to access any protected page without auth -> go to login
+  if (!isOwner && !isStaff) {
+    router.replace("/login");
     return null;
   }
 
+  // Staff restrictions
+  if (isStaff) {
+    // Staff trying to access admin pages -> go to their shop
+    if (isAdminPage && staffData.shop_id) {
+      router.replace(`/shops/${staffData.shop_id}`);
+      return null;
+    }
+    
+    // Staff trying to access wrong shop -> go to their shop
+    if (isShopPage && staffData.shop_id) {
+      if (!pathname.includes(`/${staffData.shop_id}`)) {
+        router.replace(`/shops/${staffData.shop_id}`);
+        return null;
+      }
+    }
+  }
+
+  // Owner has full access - no restrictions
   return <>{children}</>;
 }
