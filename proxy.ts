@@ -51,7 +51,7 @@ function jsonForbidden() {
   return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 }
 
-export function middleware(req: NextRequest) {
+export function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
   // 1) Optional outer gate for test day (prevents public access to SSR data).
