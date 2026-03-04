@@ -12,63 +12,79 @@ export function AccessGate({ children }: { children: React.ReactNode }) {
   const { user: ownerUser, employee: ownerEmployee, loading: ownerLoading } = useAuth();
   const { staff, loading: staffLoading } = useStaff();
 
-  const isOwner = Boolean(ownerUser);
-  const isStaff = Boolean(staff);
+  const isOwner = Boolean(ownerUser) && ownerEmployee?.role === "owner";
+  const isStaff = Boolean(staff) && staff?.role !== "owner";
 
-  const isOwnerLogin = pathname.startsWith("/login");
-  const isStaffLogin = pathname.startsWith("/staff-login");
-  const isPublic = isOwnerLogin || isStaffLogin;
+  const isLoginPage = pathname === "/login" || pathname === "/staff-login";
+  const isPublic = isLoginPage;
 
-  const needsOwner = pathname.startsWith("/admin") || pathname.startsWith("/employees") || pathname.startsWith("/inventory") || pathname.startsWith("/finance") || pathname.startsWith("/reports") || pathname === "/";
-  const needsStaff = pathname.startsWith("/shops") || pathname.startsWith("/chat") || pathname.startsWith("/staff-chat") || pathname.startsWith("/transfers") || pathname.startsWith("/mobile-menu");
+  const isShopPage = pathname.startsWith("/shops/");
+  const isStaffChatPage = pathname === "/staff-chat";
+  const isPOSAccessible = isShopPage || isStaffChatPage;
 
-  // Redirect away from login pages if already authenticated
+  const isAdminPage = 
+    pathname.startsWith("/admin") || 
+    pathname.startsWith("/employees") || 
+    pathname.startsWith("/inventory") ||
+    pathname.startsWith("/finance") ||
+    pathname.startsWith("/reports") ||
+    pathname === "/";
+
+  const loading = ownerLoading || staffLoading;
+
+  // Redirect away from login if authenticated
   useEffect(() => {
-    if (ownerLoading || staffLoading) return;
-
-    if ((isOwnerLogin || isStaffLogin) && (isOwner || isStaff)) {
-      if (isOwner) router.replace("/");
-      else if (staff?.shop_id) router.replace(`/shops/${staff.shop_id}`);
-      else router.replace("/");
+    if (loading) return;
+    
+    if (isLoginPage) {
+      if (isOwner) {
+        router.replace("/");
+        return;
+      }
+      if (isStaff && staff?.shop_id) {
+        router.replace(`/shops/${staff.shop_id}`);
+        return;
+      }
     }
-  }, [ownerLoading, staffLoading, isOwnerLogin, isStaffLogin, isOwner, isStaff, staff, router]);
+  }, [loading, isLoginPage, isOwner, isStaff, staff, router]);
 
-  // Auth enforcement
+  // Owner has full access - no restrictions
+  // Staff can only access POS pages and staff chat
   useEffect(() => {
-    if (ownerLoading || staffLoading) return;
+    if (loading) return;
     if (isPublic) return;
-
-    if (needsOwner && !isOwner) {
-      router.replace("/login");
-      return;
+    
+    // Staff restrictions
+    if (isStaff) {
+      // Staff trying to access admin/owner pages - redirect to their shop
+      if (isAdminPage) {
+        if (staff?.shop_id) {
+          router.replace(`/shops/${staff.shop_id}`);
+        } else {
+          router.replace("/login?mode=staff");
+        }
+        return;
+      }
+      
+      // Staff trying to access other shops - redirect to their shop
+      if (isShopPage && !pathname.includes(`/${staff?.shop_id}/`)) {
+        if (staff?.shop_id) {
+          router.replace(`/shops/${staff.shop_id}`);
+        }
+        return;
+      }
     }
-
-    if (needsStaff && !(isOwner || isStaff)) {
-      router.replace("/login?mode=staff");
-      return;
+    
+    // Unauthenticated access to protected pages
+    if (!isOwner && !isStaff) {
+      if (isAdminPage || isPOSAccessible) {
+        router.replace("/login");
+        return;
+      }
     }
-  }, [ownerLoading, staffLoading, isPublic, needsOwner, needsStaff, isOwner, isStaff, router]);
+  }, [loading, isPublic, isOwner, isStaff, isAdminPage, isPOSAccessible, isShopPage, staff, router]);
 
-  // Staff role enforcement (owners bypass)
-  useEffect(() => {
-    if (ownerLoading || staffLoading) return;
-    if (isOwner) return;
-    if (!staff) return;
-
-    const shopPath = staff.shop_id ? `/shops/${staff.shop_id}` : "/staff-login";
-
-    // Staff can only access their shop POS + staff chat.
-    const ok =
-      pathname === shopPath ||
-      pathname.startsWith(`${shopPath}/`) ||
-      pathname.startsWith("/staff-chat");
-    if (!ok) {
-      router.replace(shopPath);
-      return;
-    }
-  }, [ownerLoading, staffLoading, isOwner, staff, pathname, router]);
-
-  if (ownerLoading || staffLoading) {
+  if (loading) {
     return null;
   }
 

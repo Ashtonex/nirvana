@@ -47,45 +47,13 @@ function isPublicAsset(pathname: string) {
   );
 }
 
-function jsonForbidden() {
-  return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-}
-
 export function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
-  // 1) Optional outer gate for test day (prevents public access to SSR data).
-  // Enable by setting NIRVANA_BASIC_AUTH_USER + NIRVANA_BASIC_AUTH_PASS.
+  // Optional outer gate for test day (prevents public access to SSR data)
   if (!isPublicAsset(pathname)) {
     const basic = checkBasicAuth(req);
     if (basic.enabled && !basic.ok) return unauthorizedBasicAuth();
-  }
-
-  // 2) Staff server-side route restriction (prevents staff hitting owner pages/API directly).
-  const staffToken = req.cookies.get("nirvana_staff")?.value;
-  if (staffToken) {
-    const staffAllowed =
-      pathname.startsWith("/shops") ||
-      pathname.startsWith("/staff-chat") ||
-      pathname.startsWith("/staff-login") ||
-      pathname === "/login" ||
-      pathname.startsWith("/_next/") ||
-      pathname === "/manifest.json" ||
-      pathname.startsWith("/icon-") ||
-      pathname === "/favicon.ico" ||
-      pathname.startsWith("/api/staff/") ||
-      pathname === "/api/eod" ||
-      pathname === "/api/returns" ||
-      pathname === "/api/docs/tax-guide" ||
-      pathname === "/api/stock-requests";
-
-    if (!staffAllowed) {
-      if (pathname.startsWith("/api/")) return jsonForbidden();
-      const url = req.nextUrl.clone();
-      url.pathname = "/staff-chat";
-      url.search = "";
-      return NextResponse.redirect(url);
-    }
   }
 
   return NextResponse.next();
