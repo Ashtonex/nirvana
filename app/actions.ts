@@ -318,7 +318,9 @@ export async function registerBulkInventoryItems(
         const id = Math.random().toString(36).substring(2, 9);
         
         let landedCost: number;
-        if (landedCostMethod === 'flat' || !hasExpenses) {
+        if (!hasExpenses) {
+            landedCost = item.price * (0.35 + Math.random() * 0.10);
+        } else if (landedCostMethod === 'flat') {
             landedCost = item.price;
         } else {
             const overheadPerPiece = totalMonthlyExpenses / 1000;
