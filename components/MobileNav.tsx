@@ -12,22 +12,25 @@ function cn(...inputs: ClassValue[]) {
     return twMerge(clsx(inputs));
 }
 
+const ALLOWED_EMAIL = "flectere@dev.com";
+
 export function MobileNav() {
     const pathname = usePathname();
-    const [isStaff, setIsStaff] = useState(false);
+    const [canShow, setCanShow] = useState(false);
 
     useEffect(() => {
-        // Check if staff - non-blocking, just set state
-        fetch("/api/staff/me", { cache: "no-store", credentials: "include" })
+        fetch("/api/auth/me", { cache: "no-store", credentials: "include" })
             .then(res => res.json())
             .then(data => {
-                setIsStaff(!!data?.staff?.shop_id);
+                if (data?.user?.email === ALLOWED_EMAIL) {
+                    setCanShow(true);
+                }
             })
             .catch(() => {});
     }, []);
 
-    // Hide for staff, show for everyone else (including owners and while loading)
-    if (isStaff) return null;
+    // Only show for specific allowed user
+    if (!canShow) return null;
 
     const tabs = [
         { name: 'Home', href: '/', icon: Home },
