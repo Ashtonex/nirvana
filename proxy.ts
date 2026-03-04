@@ -75,6 +75,7 @@ export function proxy(req: NextRequest) {
       pathname.startsWith("/api/staff/") ||
       pathname === "/api/eod" ||
       pathname === "/api/returns" ||
+      pathname === "/api/docs/tax-guide" ||
       pathname === "/api/stock-requests";
 
     if (!staffAllowed) {
