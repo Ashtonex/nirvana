@@ -16,10 +16,10 @@ function cn(...inputs: ClassValue[]) {
 export function MobileNav() {
     const pathname = usePathname();
     const { user: ownerUser } = useAuth();
-    const { staff } = useStaff();
+    const { staff, loading: staffLoading } = useStaff();
 
-    // Staff should only see POS (no nav).
-    if (staff && !ownerUser) return null;
+    // Staff should only see POS (no nav). Also hide while loading.
+    if ((staff && !ownerUser) || staffLoading) return null;
 
     const tabs = [
         { name: 'Home', href: '/', icon: Home },
