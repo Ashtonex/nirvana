@@ -2,7 +2,6 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useEffect, useState } from 'react';
 import { Home, Package, ClipboardList, Users, Menu, MessageSquare, ArrowRightLeft } from 'lucide-react';
 
 import { clsx, type ClassValue } from 'clsx';
@@ -14,20 +13,10 @@ function cn(...inputs: ClassValue[]) {
 
 export function MobileNav() {
     const pathname = usePathname();
-    // Default to hiding - only show after confirmed not staff
-    const [isStaff, setIsStaff] = useState<boolean | null>(null);
 
-    useEffect(() => {
-        fetch("/api/staff/me", { cache: "no-store", credentials: "include" })
-            .then(res => res.json())
-            .then(data => {
-                setIsStaff(!!data?.staff?.shop_id);
-            })
-            .catch(() => setIsStaff(false));
-    }, []);
-
-    // Hide while checking OR if staff
-    if (isStaff === null || isStaff === true) return null;
+    // MobileNav is hidden for now - staff can't access other pages anyway
+    // and owners can use the sidebar on desktop
+    return null;
 
     const tabs = [
         { name: 'Home', href: '/', icon: Home },
