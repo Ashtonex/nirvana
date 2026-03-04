@@ -310,6 +310,7 @@ export async function registerBulkInventoryItems(
     const timestamp = new Date().toISOString();
     
     const totalMonthlyExpenses = Object.values(globalExpenses).reduce((a: number, b: any) => a + Number(b), 0) as number;
+    const hasExpenses = totalMonthlyExpenses > 0;
     
     const results = [];
     
@@ -317,7 +318,7 @@ export async function registerBulkInventoryItems(
         const id = Math.random().toString(36).substring(2, 9);
         
         let landedCost: number;
-        if (landedCostMethod === 'flat') {
+        if (landedCostMethod === 'flat' || !hasExpenses) {
             landedCost = item.price;
         } else {
             const overheadPerPiece = totalMonthlyExpenses / 1000;
