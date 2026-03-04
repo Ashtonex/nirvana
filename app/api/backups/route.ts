@@ -8,7 +8,7 @@ export async function GET() {
         const files = await fs.readdir(libDir);
 
         // Filter for db.json.bak.*
-        const backupFiles = files.filter(f => f.startsWith('db.json.bak'));
+        const backupFiles = files.filter(f => /^db\.json\.bak\.[0-9]+$/.test(f));
 
         const backups = await Promise.all(backupFiles.map(async (file) => {
             const filePath = path.join(libDir, file);

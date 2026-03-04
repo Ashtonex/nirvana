@@ -20,7 +20,7 @@ export function AccessGate({ children }: { children: React.ReactNode }) {
   const isPublic = isOwnerLogin || isStaffLogin;
 
   const needsOwner = pathname.startsWith("/admin") || pathname.startsWith("/employees") || pathname.startsWith("/inventory") || pathname.startsWith("/finance") || pathname.startsWith("/reports") || pathname === "/";
-  const needsStaff = pathname.startsWith("/shops") || pathname.startsWith("/chat") || pathname.startsWith("/transfers") || pathname.startsWith("/mobile-menu");
+  const needsStaff = pathname.startsWith("/shops") || pathname.startsWith("/chat") || pathname.startsWith("/staff-chat") || pathname.startsWith("/transfers") || pathname.startsWith("/mobile-menu");
 
   // Redirect away from login pages if already authenticated
   useEffect(() => {

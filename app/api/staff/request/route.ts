@@ -19,7 +19,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Employee not found" }, { status: 404 });
   }
 
-  const active = (employee as any).is_active ?? true;
+  const active = (employee as any).is_active ?? (employee as any).active ?? true;
   if (!active) {
     return NextResponse.json({ error: "Employee inactive" }, { status: 403 });
   }

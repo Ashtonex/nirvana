@@ -10,12 +10,15 @@ export async function GET(req: NextRequest) {
         return NextResponse.json({ error: 'Filename is required' }, { status: 400 });
     }
 
-    // Security check: Allow only db.json.bak.* files
-    if (!items.startsWith('db.json.bak')) {
+    // Security: allowlist exact backup filename format.
+    // Prevents traversal like db.json.bak../.. and prevents arbitrary file reads.
+    const name = path.basename(items);
+    if (!/^db\.json\.bak\.[0-9]+$/.test(name)) {
         return NextResponse.json({ error: 'Invalid file request' }, { status: 403 });
     }
 
-    const filePath = path.join(process.cwd(), 'lib', items);
+    const libDir = path.join(process.cwd(), 'lib');
+    const filePath = path.join(libDir, name);
 
     try {
         await fs.access(filePath);
@@ -23,7 +26,7 @@ export async function GET(req: NextRequest) {
 
         return new NextResponse(fileBuffer, {
             headers: {
-                'Content-Disposition': `attachment; filename=${items}`,
+                'Content-Disposition': `attachment; filename=${name}`,
                 'Content-Type': 'application/json',
             },
         });

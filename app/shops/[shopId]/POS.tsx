@@ -67,6 +67,8 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
     const [isPending, startTransition] = useTransition();
     const [posMode, setPosMode] = useState<'sale' | 'quote'>('sale');
     const [clientName, setClientName] = useState("");
+    const [clientEmail, setClientEmail] = useState("");
+    const [clientPhone, setClientPhone] = useState("");
     const [selectedEmployeeId, setSelectedEmployeeId] = useState("");
 
     const [isClosingDay, setIsClosingDay] = useState(false);
@@ -168,6 +170,8 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
                 await recordQuotation({
                     shopId,
                     clientName: clientName || "Walk-in Customer",
+                    clientEmail: clientEmail || "",
+                    clientPhone: clientPhone || "",
                     items: cart.map(c => ({
                         itemId: c.item.id,
                         itemName: c.item.name,
@@ -184,6 +188,8 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
             }
             setCart([]);
             setClientName("");
+            setClientEmail("");
+            setClientPhone("");
         });
     };
 
@@ -404,6 +410,19 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
                             </div>
                             <Input placeholder="Identifying customer..." value={clientName} onChange={(e) => setClientName(e.target.value)} className="h-10 bg-slate-900 border-slate-800 text-xs" />
                         </div>
+
+                        {posMode === 'quote' && (
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Recipient Email</label>
+                                    <Input placeholder="customer@email.com" value={clientEmail} onChange={(e) => setClientEmail(e.target.value)} className="h-10 bg-slate-900 border-slate-800 text-xs" type="email" />
+                                </div>
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Recipient Phone</label>
+                                    <Input placeholder="+1234567890" value={clientPhone} onChange={(e) => setClientPhone(e.target.value)} className="h-10 bg-slate-900 border-slate-800 text-xs" />
+                                </div>
+                            </div>
+                        )}
                     </div>
 
                     <div className="space-y-3 max-h-[350px] overflow-y-auto pr-2">

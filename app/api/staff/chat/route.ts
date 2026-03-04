@@ -3,6 +3,13 @@ import { cookies } from "next/headers";
 import { createHash } from "crypto";
 import { supabaseAdmin } from "@/lib/supabase";
 
+type Actor = {
+  id: string;
+  name: string;
+  role: "staff" | "owner";
+  shop_id?: string;
+};
+
 async function getStaffFromCookie() {
   const token = (await cookies()).get("nirvana_staff")?.value;
   if (!token) return null;
@@ -26,16 +33,86 @@ async function getStaffFromCookie() {
   return staff || null;
 }
 
-export async function GET() {
+async function getOwnerFromBearer(req: Request) {
+  const auth = req.headers.get("authorization") || "";
+  const m = auth.match(/^Bearer\s+(.+)$/i);
+  const token = m?.[1];
+  if (!token) return null;
+
+  try {
+    const { data, error } = await supabaseAdmin.auth.getUser(token);
+    if (error) return null;
+    const user = data.user;
+    if (!user) return null;
+
+    // Prefer employee profile (for nicer names) if it exists.
+    const { data: emp } = await supabaseAdmin
+      .from("employees")
+      .select("id,name,surname,role")
+      .eq("id", user.id)
+      .maybeSingle();
+
+    const name = emp?.name
+      ? `${emp.name} ${emp.surname || ""}`.trim()
+      : (user.user_metadata as any)?.name
+        ? `${(user.user_metadata as any)?.name} ${(user.user_metadata as any)?.surname || ""}`.trim()
+        : (user.email || "Owner");
+
+    return {
+      id: user.id,
+      name,
+      role: "owner" as const,
+    };
+  } catch {
+    return null;
+  }
+}
+
+async function getActor(req: Request): Promise<Actor | null> {
   const staff = await getStaffFromCookie();
-  if (!staff) {
+  if (staff) {
+    const name = `${staff.name} ${staff.surname || ""}`.trim();
+    return { id: staff.id, name, role: "staff", shop_id: staff.shop_id };
+  }
+
+  const owner = await getOwnerFromBearer(req);
+  if (owner) return owner;
+
+  return null;
+}
+
+function getRoomParams(req: Request) {
+  const url = new URL(req.url);
+  const room = (url.searchParams.get("room") || "shop").toLowerCase();
+  const shopId = url.searchParams.get("shopId") || "";
+  return { room, shopId };
+}
+
+function resolveShopForRoom(actor: Actor, room: string, shopId: string) {
+  if (room === "universal") return "universal";
+  if (room !== "shop") return null;
+
+  if (actor.role === "staff") return actor.shop_id || null;
+  // Owners can read/write any shop room (provided explicitly)
+  return shopId || null;
+}
+
+export async function GET(req: Request) {
+  const actor = await getActor(req);
+  if (!actor) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const { room, shopId } = getRoomParams(req);
+  const targetShopId = resolveShopForRoom(actor, room, shopId);
+  if (!targetShopId) {
+    return NextResponse.json({ error: "Missing or invalid room/shopId" }, { status: 400 });
   }
 
   const { data, error } = await supabaseAdmin
     .from("staff_chat_messages")
     .select("id,shop_id,sender_name,message,created_at")
-    .eq("shop_id", staff.shop_id)
+    .eq("shop_id", targetShopId)
     .order("created_at", { ascending: true })
     .limit(200);
 
@@ -47,25 +124,31 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
-  const staff = await getStaffFromCookie();
-  if (!staff) {
+  const actor = await getActor(req);
+  if (!actor) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const { message } = await req.json();
+  const body = await req.json().catch(() => ({}));
+  const { message, room, shopId } = body || {};
   const text = String(message || "").trim();
   if (!text) {
     return NextResponse.json({ error: "Missing message" }, { status: 400 });
   }
 
-  const senderName = `${staff.name} ${staff.surname || ""}`.trim();
+  const targetShopId = resolveShopForRoom(actor, String(room || "shop").toLowerCase(), String(shopId || ""));
+  if (!targetShopId) {
+    return NextResponse.json({ error: "Missing or invalid room/shopId" }, { status: 400 });
+  }
+
+  const senderName = actor.name;
   const id = Math.random().toString(36).slice(2, 10);
   const createdAt = new Date().toISOString();
 
   const { error } = await supabaseAdmin.from("staff_chat_messages").insert({
     id,
-    shop_id: staff.shop_id,
-    sender_employee_id: staff.id,
+    shop_id: targetShopId,
+    sender_employee_id: actor.id,
     sender_name: senderName,
     message: text,
     created_at: createdAt,

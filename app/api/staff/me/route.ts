@@ -27,7 +27,7 @@ export async function GET() {
 
   const { data: staff } = await supabaseAdmin
     .from("employees")
-    .select("*")
+    .select("id,name,surname,shop_id,role,is_active,active")
     .eq("id", session.employee_id)
     .maybeSingle();
 

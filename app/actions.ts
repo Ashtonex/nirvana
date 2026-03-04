@@ -72,11 +72,25 @@ export async function getDashboardData() {
             id: sh.id, name: sh.name || "Unnamed Shop",
             expenses: sh.expenses || { rent: 0, salaries: 0, utilities: 0, misc: 0 }
         })),
-        quotations: (quotations || []).map((q: any) => ({
-            id: q.id, shopId: q.shop_id, clientName: q.client_name || "Guest",
-            totalWithTax: Number(q.total_with_tax || 0), status: q.status || 'pending',
-            date: q.date || new Date().toISOString()
-        })),
+        quotations: (quotations || []).map((q: any) => {
+            const in7Days = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+            const items = Array.isArray(q.items) ? q.items : [];
+            return {
+                id: q.id,
+                shopId: q.shop_id,
+                clientName: q.client_name || "Guest",
+                clientEmail: q.client_email || q.clientEmail || "",
+                clientPhone: q.client_phone || q.clientPhone || "",
+                items,
+                totalBeforeTax: Number(q.total_before_tax || 0),
+                tax: Number(q.tax || 0),
+                totalWithTax: Number(q.total_with_tax || 0),
+                status: q.status || 'pending',
+                date: q.date || new Date().toISOString(),
+                expiryDate: q.expiry_date || q.expiryDate || in7Days,
+                employeeId: q.employee_id || q.employeeId || "",
+            };
+        }),
         employees: (employees || []).map((e: any) => ({
             id: e.id,
             name: e.name || "New Recruit",
@@ -649,7 +663,59 @@ export async function updateEmployee(id: string, updates: any) {
 }
 
 export async function deleteEmployee(id: string) {
-    await supabase.from('employees').delete().eq('id', id);
+    // Use admin client to bypass RLS and clean up related records.
+    const { data: emp } = await supabaseAdmin.from('employees').select('*').eq('id', id).maybeSingle();
+
+    // Remove staff auth artifacts (if tables exist)
+    try { await supabaseAdmin.from('staff_sessions').delete().eq('employee_id', id); } catch { }
+    try { await supabaseAdmin.from('staff_login_codes').delete().eq('employee_id', id); } catch { }
+    try { await supabaseAdmin.from('staff_chat_messages').delete().eq('sender_employee_id', id); } catch { }
+
+    // If this user was an owner created in Supabase Auth, remove auth user too.
+    // (No-op for staff-only accounts.)
+    if (emp?.role === 'owner') {
+        try {
+            await supabaseAdmin.auth.admin.deleteUser(id);
+        } catch (e) {
+            console.error('[deleteEmployee] auth deleteUser failed:', (e as any)?.message || e);
+        }
+    }
+
+    const del = await supabaseAdmin.from('employees').delete().eq('id', id);
+    if (del.error) {
+        const msg = del.error.message || '';
+        const looksLikeFkViolation =
+            (del.error as any).code === '23503' ||
+            /foreign key constraint|violates foreign key/i.test(msg);
+
+        // If the employee row is referenced by historical records (sales/audit/etc),
+        // fall back to a soft deactivate so they can no longer log in.
+        if (looksLikeFkViolation) {
+            const working: Record<string, any> = { is_active: false, active: false };
+            for (let attempt = 0; attempt < 4; attempt++) {
+                const res = await supabaseAdmin
+                    .from('employees')
+                    .update(working)
+                    .eq('id', id);
+
+                if (!res.error) break;
+
+                const msg2 = res.error.message || '';
+                const m1 = msg2.match(/Could not find the '([^']+)' column/i);
+                const m2 = msg2.match(/column "([^"]+)" of relation "employees" does not exist/i);
+                const missing = (m1 && m1[1]) || (m2 && m2[1]);
+                if (missing && Object.prototype.hasOwnProperty.call(working, missing)) {
+                    delete working[missing];
+                    continue;
+                }
+
+                throw new Error(res.error.message);
+            }
+        } else {
+            throw new Error(del.error.message);
+        }
+    }
+
     revalidatePath("/employees");
 }
 
@@ -666,7 +732,37 @@ export async function transferInventory(itemId: string, fromShopId: string, toSh
 export async function recordQuotation(quotation: any) {
     const id = Math.random().toString(36).substring(2, 9);
     const date = new Date().toISOString();
-    await supabase.from('quotations').insert({ id, shop_id: quotation.shopId, items: quotation.items, total_before_tax: quotation.totalBeforeTax, tax: quotation.tax, total_with_tax: quotation.totalWithTax, client_name: quotation.clientName, employee_id: quotation.employeeId, date, status: 'pending' });
+    const base: any = {
+        id,
+        shop_id: quotation.shopId,
+        items: quotation.items,
+        total_before_tax: quotation.totalBeforeTax,
+        tax: quotation.tax,
+        total_with_tax: quotation.totalWithTax,
+        client_name: quotation.clientName,
+        client_email: quotation.clientEmail,
+        client_phone: quotation.clientPhone,
+        employee_id: quotation.employeeId,
+        date,
+        status: 'pending',
+    };
+
+    // Insert with column fallback (in case client_email/client_phone not in schema yet)
+    const working: any = { ...base };
+    for (let attempt = 0; attempt < 6; attempt++) {
+        const res = await supabase.from('quotations').insert(working);
+        if (!res.error) break;
+
+        const msg = res.error.message || '';
+        const m1 = msg.match(/Could not find the '([^']+)' column/i);
+        const m2 = msg.match(/column "([^"]+)" of relation "quotations" does not exist/i);
+        const missing = (m1 && m1[1]) || (m2 && m2[1]);
+        if (missing && Object.prototype.hasOwnProperty.call(working, missing)) {
+            delete working[missing];
+            continue;
+        }
+        throw new Error(res.error.message);
+    }
     revalidatePath(`/shops/${quotation.shopId}`);
     return { id, date };
 }

@@ -3,16 +3,22 @@ export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const RESEND_KEY = process.env.RESEND_API_KEY;
+const ENABLE = process.env.NIRVANA_ENABLE_INTERNAL_TESTS === 'true';
 
 async function runTest() {
-    if (!SUPABASE_URL || !RESEND_KEY) {
+    if (!ENABLE) {
         return {
             success: false,
-            error: "Test endpoint requires SUPABASE_URL and RESEND_API_KEY to be configured",
+            error: 'Internal test endpoint is disabled',
+        };
+    }
+
+    if (!SUPABASE_URL) {
+        return {
+            success: false,
+            error: "Test endpoint requires NEXT_PUBLIC_SUPABASE_URL to be configured",
             configured: {
                 supabase: !!SUPABASE_URL,
-                resend: !!RESEND_KEY
             }
         };
     }
@@ -96,6 +102,6 @@ async function runTest() {
 
 export async function GET() {
     const result = await runTest();
-    const status = result.success ? 200 : (result.configured ? 503 : 500);
+    const status = result.success ? 200 : (result.configured ? 503 : 404);
     return NextResponse.json(result, { status });
 }

@@ -6,12 +6,13 @@ export async function POST(req: NextRequest) {
     try {
         const { file } = await req.json();
 
-        if (!file || !file.startsWith('db.json.bak')) {
+        const name = file ? path.basename(String(file)) : "";
+        if (!name || !/^db\.json\.bak\.[0-9]+$/.test(name)) {
             return NextResponse.json({ error: 'Invalid file selection' }, { status: 400 });
         }
 
         const libDir = path.join(process.cwd(), 'lib');
-        const backupPath = path.join(libDir, file);
+        const backupPath = path.join(libDir, name);
         const dbPath = path.join(libDir, 'db.json');
 
         // Security: Ensure backup file exists
