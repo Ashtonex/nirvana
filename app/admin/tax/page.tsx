@@ -140,6 +140,7 @@ export default async function TaxPage() {
                                         const standardTax = sale.totalBeforeTax * flatTaxRate;
                                         const shopName = db.shops.find((s: any) => s.id === sale.shopId)?.name || sale.shopId;
                                         const isUnderThreshold = settings.taxMode === 'above_threshold' && sale.totalBeforeTax <= settings.taxThreshold;
+                                        const isCredit = Number(sale.totalWithTax || 0) < 0 || Number(sale.tax || 0) < 0;
 
                                         return (
                                             <TableRow key={sale.id} className="border-slate-800 hover:bg-slate-900/30 transition-colors">
@@ -166,7 +167,9 @@ export default async function TaxPage() {
                                                     ${sale.tax.toFixed(2)}
                                                 </TableCell>
                                                 <TableCell className="text-right">
-                                                    {isUnderThreshold ? (
+                                                    {isCredit ? (
+                                                        <Badge className="bg-rose-500/10 text-rose-500 border-rose-500/20 text-[8px] font-black italic">CREDIT</Badge>
+                                                    ) : isUnderThreshold ? (
                                                         <Badge className="bg-amber-500/10 text-amber-500 border-amber-500/20 text-[8px] font-black italic">EXEMPT</Badge>
                                                     ) : (
                                                         <Badge className="bg-emerald-500/10 text-emerald-500 border-emerald-500/20 text-[8px] font-black italic">FILED</Badge>

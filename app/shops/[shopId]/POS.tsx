@@ -76,6 +76,15 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
     const [eodShareUrl, setEodShareUrl] = useState<string>("");
     const [eodShareText, setEodShareText] = useState<string>("");
 
+    const [isReturnModalOpen, setIsReturnModalOpen] = useState(false);
+    const [returnSaleId, setReturnSaleId] = useState("");
+    const [returnQty, setReturnQty] = useState("1");
+    const [returnReason, setReturnReason] = useState("Customer return");
+    const [returnNotes, setReturnNotes] = useState("");
+    const [returnRestock, setReturnRestock] = useState(true);
+    const [returnBusy, setReturnBusy] = useState(false);
+    const [returnStatus, setReturnStatus] = useState<string>("");
+
     // Ad-hoc Product Modal State
     const [isAddProductModalOpen, setIsAddProductModalOpen] = useState(false);
     const [newProduct, setNewProduct] = useState({ name: "", category: "", landedCost: "", initialStock: "0" });
@@ -324,6 +333,18 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
                             title="End of day + log out"
                         >
                             <Power className="h-4 w-4" /> {isClosingDay ? 'Closing...' : 'Power Off'}
+                        </Button>
+
+                        <Button
+                            onClick={() => {
+                                setReturnStatus("");
+                                setIsReturnModalOpen(true);
+                            }}
+                            variant="outline"
+                            className="h-10 px-3 border-amber-500/30 text-amber-200 hover:bg-amber-500/10 text-[10px] font-black uppercase italic flex items-center gap-2"
+                            title="Issue return / credit note"
+                        >
+                            <Receipt className="h-4 w-4" /> Return
                         </Button>
 
                         <Button
@@ -625,6 +646,122 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
                             Logout
                         </Button>
                     </div>
+                </div>
+            </Modal>
+
+            <Modal
+                isOpen={isReturnModalOpen}
+                onClose={() => setIsReturnModalOpen(false)}
+                title="Return / Credit Note"
+            >
+                <div className="space-y-4">
+                    <p className="text-[10px] text-slate-500 font-bold uppercase">
+                        Manager-only. Enter the Sale ID (from Tax Ledger / Reports) and the quantity to reverse.
+                    </p>
+
+                    <div className="space-y-2">
+                        <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Sale ID</label>
+                        <Input
+                            value={returnSaleId}
+                            onChange={(e) => setReturnSaleId(e.target.value)}
+                            className="bg-slate-950"
+                            placeholder="e.g. ab12cd3"
+                        />
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div className="space-y-2">
+                            <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Quantity</label>
+                            <Input
+                                value={returnQty}
+                                onChange={(e) => setReturnQty(e.target.value)}
+                                className="bg-slate-950"
+                                inputMode="numeric"
+                                placeholder="1"
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Restock</label>
+                            <select
+                                value={returnRestock ? "yes" : "no"}
+                                onChange={(e) => setReturnRestock(e.target.value === "yes")}
+                                className="h-10 bg-slate-950 border border-slate-800 rounded-md text-xs font-bold text-slate-200 px-3 outline-none"
+                            >
+                                <option value="yes">Yes (resellable)</option>
+                                <option value="no">No (damaged)</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div className="space-y-2">
+                        <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Reason</label>
+                        <select
+                            value={returnReason}
+                            onChange={(e) => setReturnReason(e.target.value)}
+                            className="h-10 bg-slate-950 border border-slate-800 rounded-md text-xs font-bold text-slate-200 px-3 outline-none"
+                        >
+                            <option value="Customer return">Customer return</option>
+                            <option value="Damaged">Damaged</option>
+                            <option value="Wrong item">Wrong item</option>
+                            <option value="Warranty">Warranty</option>
+                            <option value="Price correction">Price correction</option>
+                            <option value="Goodwill">Goodwill</option>
+                        </select>
+                    </div>
+
+                    <div className="space-y-2">
+                        <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Notes (optional)</label>
+                        <Input
+                            value={returnNotes}
+                            onChange={(e) => setReturnNotes(e.target.value)}
+                            className="bg-slate-950"
+                            placeholder="Short context for audit trail"
+                        />
+                    </div>
+
+                    {returnStatus ? (
+                        <div className="text-xs font-bold text-slate-300 bg-slate-950/40 border border-slate-800 rounded-lg p-3 whitespace-pre-wrap">
+                            {returnStatus}
+                        </div>
+                    ) : null}
+
+                    <Button
+                        className="w-full h-12 font-black uppercase italic tracking-widest"
+                        disabled={returnBusy || !returnSaleId.trim()}
+                        onClick={async () => {
+                            setReturnBusy(true);
+                            setReturnStatus("");
+                            try {
+                                const qtyNum = Math.max(1, Number(returnQty || 1));
+                                const res = await fetch('/api/returns', {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({
+                                        saleId: returnSaleId.trim(),
+                                        quantity: qtyNum,
+                                        reason: returnReason,
+                                        notes: returnNotes,
+                                        restock: returnRestock,
+                                    })
+                                });
+                                const data = await res.json().catch(() => ({}));
+                                if (!res.ok) {
+                                    setReturnStatus(`ERROR: ${data?.error || 'Return failed'}`);
+                                    return;
+                                }
+                                setReturnStatus(`Return recorded. Credit note id: ${data?.returnId || 'OK'}`);
+                                setReturnSaleId("");
+                                setReturnQty("1");
+                                setReturnNotes("");
+                            } catch (e: any) {
+                                setReturnStatus(`ERROR: ${e?.message || 'Return failed'}`);
+                            } finally {
+                                setReturnBusy(false);
+                            }
+                        }}
+                    >
+                        {returnBusy ? <RefreshCcw className="h-4 w-4 animate-spin" /> : "Issue Credit Note"}
+                    </Button>
                 </div>
             </Modal>
         </div>

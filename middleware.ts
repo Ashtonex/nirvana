@@ -74,6 +74,7 @@ export function middleware(req: NextRequest) {
       pathname === "/favicon.ico" ||
       pathname.startsWith("/api/staff/") ||
       pathname === "/api/eod" ||
+      pathname === "/api/returns" ||
       pathname === "/api/stock-requests";
 
     if (!staffAllowed) {
