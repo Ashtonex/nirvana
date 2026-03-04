@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useEffect, useState } from 'react';
 import { Home, Package, ClipboardList, Users, Menu, MessageSquare, ArrowRightLeft } from 'lucide-react';
 
 import { clsx, type ClassValue } from 'clsx';
@@ -13,10 +14,35 @@ function cn(...inputs: ClassValue[]) {
 
 export function MobileNav() {
     const pathname = usePathname();
+    const [userRole, setUserRole] = useState<string | null>(null);
 
-    // MobileNav is hidden for now - staff can't access other pages anyway
-    // and owners can use the sidebar on desktop
-    return null;
+    useEffect(() => {
+        // Check if owner is logged in
+        fetch("/api/auth/me", { cache: "no-store", credentials: "include" })
+            .then(res => res.json())
+            .then(data => {
+                if (data?.employee?.role === "owner") {
+                    setUserRole("owner");
+                    return;
+                }
+            })
+            .catch(() => {});
+
+        // Check if staff is logged in
+        fetch("/api/staff/me", { cache: "no-store", credentials: "include" })
+            .then(res => res.json())
+            .then(data => {
+                if (data?.staff?.shop_id) {
+                    setUserRole("staff");
+                }
+            })
+            .catch(() => {});
+    }, []);
+
+    // Hide for staff, show for owners
+    if (userRole === "staff") return null;
+    // While checking, keep hidden
+    if (userRole === null) return null;
 
     const tabs = [
         { name: 'Home', href: '/', icon: Home },
