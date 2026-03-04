@@ -12,16 +12,21 @@ export function AccessGate({ children }: { children: React.ReactNode }) {
   const { user: ownerUser, employee: ownerEmployee, loading: ownerLoading } = useAuth();
   const { staff, loading: staffLoading } = useStaff();
 
+  // Wait for BOTH providers to finish loading
+  const loading = ownerLoading || staffLoading;
+
+  // Determine auth state
   const isOwner = Boolean(ownerUser) && ownerEmployee?.role === "owner";
-  const isStaff = Boolean(staff) && staff?.role !== "owner";
-
+  const isStaff = Boolean(staff) && staff?.role !== "owner" && Boolean(staff?.shop_id);
+  
+  // Detect login pages
   const isLoginPage = pathname === "/login" || pathname === "/staff-login";
-  const isPublic = isLoginPage;
-
+  
+  // Detect page types
   const isShopPage = pathname.startsWith("/shops/");
   const isStaffChatPage = pathname === "/staff-chat";
-  const isPOSAccessible = isShopPage || isStaffChatPage;
-
+  const isPOSPage = isShopPage || isStaffChatPage;
+  
   const isAdminPage = 
     pathname.startsWith("/admin") || 
     pathname.startsWith("/employees") || 
@@ -30,12 +35,11 @@ export function AccessGate({ children }: { children: React.ReactNode }) {
     pathname.startsWith("/reports") ||
     pathname === "/";
 
-  const loading = ownerLoading || staffLoading;
-
-  // Redirect away from login if authenticated
+  // DON'T redirect while still loading - wait for auth check to complete
   useEffect(() => {
     if (loading) return;
-    
+
+    // If on login page and already authenticated, redirect to appropriate page
     if (isLoginPage) {
       if (isOwner) {
         router.replace("/");
@@ -45,45 +49,43 @@ export function AccessGate({ children }: { children: React.ReactNode }) {
         router.replace(`/shops/${staff.shop_id}`);
         return;
       }
+      return; // Not authenticated, stay on login
     }
-  }, [loading, isLoginPage, isOwner, isStaff, staff, router]);
 
-  // Owner has full access - no restrictions
-  // Staff can only access POS pages and staff chat
-  useEffect(() => {
-    if (loading) return;
-    if (isPublic) return;
-    
-    // Staff restrictions
-    if (isStaff) {
-      // Staff trying to access admin/owner pages - redirect to their shop
-      if (isAdminPage) {
-        if (staff?.shop_id) {
-          router.replace(`/shops/${staff.shop_id}`);
-        } else {
-          router.replace("/login?mode=staff");
-        }
-        return;
-      }
-      
-      // Staff trying to access other shops - redirect to their shop
-      if (isShopPage && !pathname.includes(`/${staff?.shop_id}/`)) {
-        if (staff?.shop_id) {
-          router.replace(`/shops/${staff.shop_id}`);
-        }
-        return;
-      }
+    // If trying to access POS/chat without any auth, go to login
+    if (isPOSPage && !isOwner && !isStaff) {
+      router.replace("/login");
+      return;
     }
-    
-    // Unauthenticated access to protected pages
-    if (!isOwner && !isStaff) {
-      if (isAdminPage || isPOSAccessible) {
-        router.replace("/login");
-        return;
-      }
-    }
-  }, [loading, isPublic, isOwner, isStaff, isAdminPage, isPOSAccessible, isShopPage, staff, router]);
 
+    // If trying to access admin pages without owner auth, go to login
+    if (isAdminPage && !isOwner) {
+      // If staff tries to access admin, send them to their shop
+      if (isStaff && staff?.shop_id) {
+        router.replace(`/shops/${staff.shop_id}`);
+        return;
+      }
+      router.replace("/login");
+      return;
+    }
+
+    // Staff trying to access wrong shop - send to their shop
+    if (isStaff && isShopPage && staff?.shop_id) {
+      if (!pathname.includes(`/${staff.shop_id}/`)) {
+        router.replace(`/shops/${staff.shop_id}`);
+        return;
+      }
+    }
+
+    // Staff trying to access admin from shop - redirect to their shop
+    if (isStaff && isAdminPage && staff?.shop_id) {
+      router.replace(`/shops/${staff.shop_id}`);
+      return;
+    }
+
+  }, [loading, isLoginPage, isOwner, isStaff, staff, isPOSPage, isAdminPage, isShopPage, pathname, router]);
+
+  // Show nothing while loading to prevent flash
   if (loading) {
     return null;
   }
