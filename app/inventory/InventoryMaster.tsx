@@ -299,6 +299,23 @@ export default function InventoryMaster({ db }: { db: any }) {
                                         {showBulkUpload ? "Close" : "Bulk CSV"}
                                     </Button>
                                     <Button
+                                        variant="destructive"
+                                        onClick={() => {
+                                            if (confirm("Are you sure you want to PURGE ALL STOCK? This cannot be undone!")) {
+                                                if (prompt('Type "PURGE_ALL_STOCK" to confirm') === 'PURGE_ALL_STOCK') {
+                                                    fetch('/api/inventory/purge', {
+                                                        method: 'POST',
+                                                        headers: { 'Content-Type': 'application/json' },
+                                                        body: JSON.stringify({ confirm: 'PURGE_ALL_STOCK' })
+                                                    }).then(() => window.location.reload());
+                                                }
+                                            }
+                                        }}
+                                        className="font-black uppercase italic text-xs tracking-widest px-4 h-10 border-2 border-rose-500/50 bg-rose-500/10 text-rose-400"
+                                    >
+                                        Purge All Stock
+                                    </Button>
+                                    <Button
                                         onClick={() => setShowAdHoc(!showAdHoc)}
                                         className={`font-black uppercase italic text-xs tracking-widest px-6 h-10 border-2 transition-all ${showAdHoc ? 'bg-rose-500/20 text-rose-500 border-rose-500/50' : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'}`}
                                     >
