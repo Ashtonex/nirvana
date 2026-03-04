@@ -68,6 +68,7 @@ export function proxy(req: NextRequest) {
       pathname.startsWith("/shops") ||
       pathname.startsWith("/staff-chat") ||
       pathname.startsWith("/staff-login") ||
+      pathname === "/login" ||
       pathname.startsWith("/_next/") ||
       pathname === "/manifest.json" ||
       pathname.startsWith("/icon-") ||

@@ -63,7 +63,7 @@ export async function POST(req: Request) {
 
   (await cookies()).set("nirvana_staff", token, {
     httpOnly: true,
-    secure: true,
+    secure: process.env.NODE_ENV === "production",
     sameSite: "lax",
     path: "/",
     maxAge: 14 * 24 * 60 * 60,
