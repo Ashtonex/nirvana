@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/components/AuthProvider";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, Button, Input } from "@/components/ui";
@@ -8,7 +8,7 @@ import { Loader2, Mail, Lock, KeyRound, UserCheck, Shield } from "lucide-react";
 
 type Mode = "staff" | "owner";
 
-export default function LoginPage() {
+function LoginForm() {
   const router = useRouter();
   const params = useSearchParams();
   const initialMode = (params.get("mode") as Mode) || "staff";
@@ -215,5 +215,21 @@ export default function LoginPage() {
         </Card>
       </div>
     </div>
+  );
+}
+
+function LoginLoading() {
+  return (
+    <div className="min-h-[100svh] bg-slate-950 flex items-center justify-center p-4">
+      <Loader2 className="h-12 w-12 text-violet-500 animate-spin" />
+    </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<LoginLoading />}>
+      <LoginForm />
+    </Suspense>
   );
 }
