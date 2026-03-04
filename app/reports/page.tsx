@@ -20,12 +20,12 @@ export default async function ReportsPage() {
 
     return (
         <div className="space-y-8">
-            <div className="flex justify-between items-center">
+            <div className="flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-center">
                 <div>
                     <h1 className="text-3xl font-bold tracking-tight">Financial Reports</h1>
                     <p className="text-slate-400">Detailed breakdown of daily sales and shop performance.</p>
                 </div>
-                <button className="flex items-center gap-2 px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm hover:bg-slate-700 transition-colors">
+                <button className="flex items-center justify-center gap-2 px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm hover:bg-slate-700 transition-colors w-full sm:w-auto">
                     <Download className="h-4 w-4" /> Download CSV
                 </button>
             </div>

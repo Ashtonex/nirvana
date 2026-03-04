@@ -6,6 +6,16 @@ import { ORACLE_RECIPIENT } from "@/lib/resend";
 import { supabase, supabaseAdmin } from "@/lib/supabase";
 import { createHash, randomUUID } from "crypto";
 import { sendEmail } from "@/lib/email";
+import { sendWhatsAppMessage } from "@/lib/twilio";
+
+function getPublicBaseUrl() {
+    const url =
+        process.env.NIRVANA_PUBLIC_URL ||
+        process.env.NEXT_PUBLIC_APP_URL ||
+        process.env.NEXT_PUBLIC_SITE_URL ||
+        '';
+    return url ? String(url).replace(/\/$/, '') : '';
+}
 
 export async function getDashboardData() {
     // Guard: if Supabase env is missing/misconfigured, never crash the whole app.
@@ -749,9 +759,13 @@ export async function recordQuotation(quotation: any) {
 
     // Insert with column fallback (in case client_email/client_phone not in schema yet)
     const working: any = { ...base };
+    let inserted = false;
     for (let attempt = 0; attempt < 6; attempt++) {
         const res = await supabase.from('quotations').insert(working);
-        if (!res.error) break;
+        if (!res.error) {
+            inserted = true;
+            break;
+        }
 
         const msg = res.error.message || '';
         const m1 = msg.match(/Could not find the '([^']+)' column/i);
@@ -763,6 +777,67 @@ export async function recordQuotation(quotation: any) {
         }
         throw new Error(res.error.message);
     }
+
+    if (!inserted) {
+        throw new Error('Failed to create quotation');
+    }
+
+    // Best-effort notifications (do not block quote creation)
+    const baseUrl = getPublicBaseUrl();
+    const quotePath = `/quotations/${id}`;
+    const quoteUrl = baseUrl ? `${baseUrl}${quotePath}` : quotePath;
+    const total = Number(quotation.totalWithTax || 0);
+    const clientName = String(quotation.clientName || 'Customer');
+    const shopId = String(quotation.shopId || '');
+
+    const lines = Array.isArray(quotation.items) ? quotation.items : [];
+    const topLines = lines.slice(0, 10).map((i: any) => {
+        const name = String(i.itemName || i.name || 'Item');
+        const qty = Number(i.quantity || 0);
+        const t = Number(i.total || 0);
+        return `- ${name} x${qty} ($${t.toFixed(2)})`;
+    });
+    const more = lines.length > 10 ? `\n(+${lines.length - 10} more items)` : '';
+
+    const msg = [
+        `Hi ${clientName}, your Nirvana quote is ready.`,
+        shopId ? `Shop: ${shopId}` : null,
+        `Quote ID: ${id}`,
+        `Total: $${total.toFixed(2)}`,
+        topLines.length ? `Items:\n${topLines.join('\n')}${more}` : null,
+        `View: ${quoteUrl}`,
+    ].filter(Boolean).join('\n');
+
+    const emailTo = String(quotation.clientEmail || '').trim();
+    if (emailTo) {
+        try {
+            await sendEmail({
+                to: emailTo,
+                subject: `Your quote #${id} is ready`,
+                html: `
+<div style="font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Arial;line-height:1.5;color:#0f172a;">
+  <h2 style="margin:0 0 12px 0;">Quote ready</h2>
+  <p style="margin:0 0 12px 0;">Hi ${String(clientName).replace(/</g, '&lt;').replace(/>/g, '&gt;')}, your quote is ready.</p>
+  <p style="margin:0 0 12px 0;"><strong>Quote ID:</strong> ${id}<br/>
+  <strong>Total:</strong> $${total.toFixed(2)}</p>
+  <p style="margin:0 0 12px 0;"><a href="${quoteUrl}">View your quote</a></p>
+  <pre style="white-space:pre-wrap;background:#f1f5f9;padding:12px;border-radius:10px;">${msg.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</pre>
+</div>`,
+            });
+        } catch (e) {
+            console.error('[Email] Quote send failed:', (e as any)?.message || e);
+        }
+    }
+
+    const phone = String(quotation.clientPhone || '').trim();
+    if (phone) {
+        try {
+            await sendWhatsAppMessage(phone, msg);
+        } catch (e) {
+            console.error('[WhatsApp] Quote send failed:', (e as any)?.message || e);
+        }
+    }
+
     revalidatePath(`/shops/${quotation.shopId}`);
     return { id, date };
 }

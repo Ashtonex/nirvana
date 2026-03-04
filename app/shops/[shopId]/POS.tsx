@@ -72,6 +72,9 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
     const [selectedEmployeeId, setSelectedEmployeeId] = useState("");
 
     const [isClosingDay, setIsClosingDay] = useState(false);
+    const [isEodShareModalOpen, setIsEodShareModalOpen] = useState(false);
+    const [eodShareUrl, setEodShareUrl] = useState<string>("");
+    const [eodShareText, setEodShareText] = useState<string>("");
 
     // Ad-hoc Product Modal State
     const [isAddProductModalOpen, setIsAddProductModalOpen] = useState(false);
@@ -196,20 +199,89 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
     const handleEndOfDayAndLogout = async () => {
         if (!confirm('End of day: send report and log out?')) return;
         setIsClosingDay(true);
+
+        // Cleanup any previous blob url
+        if (eodShareUrl) {
+            try { URL.revokeObjectURL(eodShareUrl); } catch { }
+            setEodShareUrl("");
+        }
+
         try {
             const res = await fetch('/api/eod', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ shopId })
+                // Test day mode: do not email; we will share via WhatsApp
+                body: JSON.stringify({ shopId, sendEmail: false })
             });
             const data = await res.json().catch(() => ({}));
             if (!res.ok) {
                 console.error('EOD failed:', data);
             }
+
+            const totals = data?.totals;
+            const msgLines = [
+                `NIRVANA EOD — ${shopId.toUpperCase()}`,
+                `Date: ${new Date().toLocaleDateString()}`,
+                totals ? `Transactions: ${totals.count}` : null,
+                totals ? `Total (inc tax): $${Number(totals.totalWithTax || 0).toFixed(2)}` : null,
+                totals ? `Total (pre tax): $${Number(totals.totalBeforeTax || 0).toFixed(2)}` : null,
+                totals ? `Tax: $${Number(totals.totalTax || 0).toFixed(2)}` : null,
+                `Report PDF is attached.`
+            ].filter(Boolean);
+            setEodShareText(msgLines.join('\n'));
+
+            // Generate report PDF for sharing
+            try {
+                const pdfRes = await fetch(`/api/eod/pdf?shopId=${encodeURIComponent(shopId)}`, { cache: 'no-store' });
+                if (pdfRes.ok) {
+                    const blob = await pdfRes.blob();
+                    const url = URL.createObjectURL(blob);
+                    setEodShareUrl(url);
+                    setIsEodShareModalOpen(true);
+                } else {
+                    const err = await pdfRes.json().catch(() => ({}));
+                    console.error('EOD PDF failed:', err);
+                }
+            } catch (e) {
+                console.error('EOD PDF error:', e);
+            }
         } catch (e) {
             console.error('EOD error:', e);
         }
+    };
 
+    const shareEodToWhatsApp = async () => {
+        // Prefer native share sheet with file (WhatsApp selectable) on mobile.
+        if (eodShareUrl) {
+            try {
+                const r = await fetch(eodShareUrl);
+                const b = await r.blob();
+                const file = new File([b], `EOD_${shopId}_${new Date().toISOString().slice(0, 10)}.pdf`, { type: 'application/pdf' });
+                const nav: any = navigator as any;
+                if (nav?.canShare?.({ files: [file] }) && nav?.share) {
+                    await nav.share({
+                        title: `EOD ${shopId.toUpperCase()}`,
+                        text: eodShareText,
+                        files: [file],
+                    });
+                    return;
+                }
+            } catch (e) {
+                console.error('Share sheet failed:', e);
+            }
+        }
+
+        // Fallback: open WhatsApp with text only + open PDF in new tab for manual attach.
+        try {
+            if (eodShareUrl) window.open(eodShareUrl, '_blank', 'noopener,noreferrer');
+        } catch { }
+        try {
+            const link = `https://wa.me/?text=${encodeURIComponent(eodShareText || `NIRVANA EOD — ${shopId.toUpperCase()}`)}`;
+            window.open(link, '_blank', 'noopener,noreferrer');
+        } catch { }
+    };
+
+    const finalizeEodLogout = async () => {
         try {
             await fetch('/api/staff/logout', { method: 'POST' });
         } finally {
@@ -225,8 +297,8 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
     return (
         <div className="grid gap-6 md:grid-cols-12">
             <div className="md:col-span-8 space-y-4">
-                <div className="flex items-center justify-between gap-4">
-                    <div className="relative flex-1">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="relative flex-1 min-w-0">
                         <Search className="absolute left-3 top-3 h-4 w-4 text-slate-500" />
                         <Input
                             placeholder="Search products or classes..."
@@ -235,36 +307,40 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
                             onChange={(e) => setSearchTerm(e.target.value)}
                         />
                     </div>
-                    <Button
-                        onClick={() => setIsAddProductModalOpen(true)}
-                        className="bg-violet-600 hover:bg-violet-500 text-[10px] font-black uppercase italic h-10 px-4 flex items-center gap-2"
-                    >
-                        <PackagePlus className="h-4 w-4" /> Add Ad-hoc
-                    </Button>
 
-                    <Button
-                        onClick={handleEndOfDayAndLogout}
-                        disabled={isClosingDay}
-                        variant="outline"
-                        className="h-10 px-4 border-rose-500/30 text-rose-400 hover:bg-rose-500/10 text-[10px] font-black uppercase italic flex items-center gap-2"
-                        title="End of day + log out"
-                    >
-                        <Power className="h-4 w-4" /> {isClosingDay ? 'Closing...' : 'Power Off'}
-                    </Button>
+                    <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+                        <Button
+                            onClick={() => setIsAddProductModalOpen(true)}
+                            className="bg-violet-600 hover:bg-violet-500 text-[10px] font-black uppercase italic h-10 px-3 flex items-center gap-2"
+                        >
+                            <PackagePlus className="h-4 w-4" /> Add Ad-hoc
+                        </Button>
 
-                    <Button
-                        onClick={() => (window.location.href = '/staff-chat')}
-                        variant="outline"
-                        className="h-10 px-4 border-slate-700 text-slate-200 hover:bg-slate-800/60 text-[10px] font-black uppercase italic flex items-center gap-2"
-                        title="Open shop chat"
-                    >
-                        <MessageSquare className="h-4 w-4" /> Chat
-                    </Button>
-                    <div className="bg-slate-900 border border-slate-800 px-4 py-2 rounded-lg flex items-center gap-3 h-10 shadow-lg shrink-0">
-                        <LayoutGrid className="h-4 w-4 text-violet-400" />
-                        <div className="flex flex-col">
-                            <span className="text-[10px] text-slate-500 uppercase font-black leading-none">Shop Stock</span>
-                            <span className="text-xs font-bold text-slate-200">{totalShopStock} Pieces</span>
+                        <Button
+                            onClick={handleEndOfDayAndLogout}
+                            disabled={isClosingDay}
+                            variant="outline"
+                            className="h-10 px-3 border-rose-500/30 text-rose-400 hover:bg-rose-500/10 text-[10px] font-black uppercase italic flex items-center gap-2"
+                            title="End of day + log out"
+                        >
+                            <Power className="h-4 w-4" /> {isClosingDay ? 'Closing...' : 'Power Off'}
+                        </Button>
+
+                        <Button
+                            onClick={() => (window.location.href = '/staff-chat')}
+                            variant="outline"
+                            className="h-10 px-3 border-slate-700 text-slate-200 hover:bg-slate-800/60 text-[10px] font-black uppercase italic flex items-center gap-2"
+                            title="Open staff chat"
+                        >
+                            <MessageSquare className="h-4 w-4" /> Chat
+                        </Button>
+
+                        <div className="bg-slate-900 border border-slate-800 px-4 py-2 rounded-lg flex items-center gap-3 h-10 shadow-lg w-full sm:w-auto">
+                            <LayoutGrid className="h-4 w-4 text-violet-400" />
+                            <div className="flex flex-col">
+                                <span className="text-[10px] text-slate-500 uppercase font-black leading-none">Shop Stock</span>
+                                <span className="text-xs font-bold text-slate-200">{totalShopStock} Pieces</span>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -522,6 +598,33 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
                         {isPending ? <RefreshCcw className="h-4 w-4 animate-spin mr-2" /> : <PackagePlus className="h-4 w-4 mr-2" />}
                         Persist to Oracle
                     </Button>
+                </div>
+            </Modal>
+
+            <Modal
+                isOpen={isEodShareModalOpen}
+                onClose={() => setIsEodShareModalOpen(false)}
+                title="End of Day Report"
+            >
+                <div className="space-y-4">
+                    <p className="text-[10px] text-slate-500 font-bold uppercase">
+                        Share the EOD PDF via WhatsApp (or any app). After sharing, log out.
+                    </p>
+                    <div className="rounded-xl border border-slate-800 bg-slate-950/50 p-3 font-mono text-xs text-slate-200 whitespace-pre-wrap">
+                        {eodShareText || `NIRVANA EOD — ${shopId.toUpperCase()}`}
+                    </div>
+                    <div className="flex flex-col sm:flex-row gap-2">
+                        <Button onClick={shareEodToWhatsApp} className="flex-1 h-11 font-black uppercase italic tracking-widest">
+                            Share to WhatsApp
+                        </Button>
+                        <Button
+                            variant="outline"
+                            onClick={finalizeEodLogout}
+                            className="flex-1 h-11 border-slate-800 font-black uppercase italic tracking-widest"
+                        >
+                            Logout
+                        </Button>
+                    </div>
                 </div>
             </Modal>
         </div>

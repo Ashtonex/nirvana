@@ -33,13 +33,13 @@ export default async function QuotationPage({ params }: { params: { quoteId: str
     return (
         <div className="max-w-4xl mx-auto space-y-8 pb-32 pt-8 print:p-0 print:m-0 print:max-w-none">
             {/* Action Bar */}
-            <div className="flex justify-between items-center print:hidden">
+            <div className="flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-center print:hidden">
                 <Link href={`/shops/${quotation.shopId}`}>
                     <Button variant="outline" className="h-9 border-slate-800 text-[10px] font-black uppercase tracking-widest hover:bg-slate-900 transition-all">
                         <ArrowLeft className="h-4 w-4 mr-2" /> Back to Store
                     </Button>
                 </Link>
-                <div className="flex gap-4">
+                <div className="flex gap-3 sm:gap-4">
                     <Button
                         onClick={() => typeof window !== 'undefined' && window.print()}
                         className="bg-emerald-600 hover:bg-emerald-700 text-white font-black text-[10px] uppercase h-9 shadow-lg shadow-emerald-500/20"

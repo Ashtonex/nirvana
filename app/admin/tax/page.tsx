@@ -53,10 +53,10 @@ export default async function TaxPage() {
                 <div className="flex justify-center mb-4">
                     <div className="relative">
                         <div className="absolute inset-0 bg-emerald-500/20 blur-2xl rounded-full" />
-                        <Scale className="h-16 w-16 text-emerald-500 relative" />
+                        <Scale className="h-10 w-10 sm:h-16 sm:w-16 text-emerald-500 relative" />
                     </div>
                 </div>
-                <h1 className="text-5xl font-black tracking-tighter uppercase italic text-white leading-none">
+                <h1 className="text-3xl sm:text-5xl font-black tracking-tighter uppercase italic text-white leading-none">
                     Fiscal Governance
                 </h1>
                 <p className="text-slate-400 font-bold tracking-widest uppercase text-xs italic">

@@ -42,13 +42,13 @@ export default async function EmployeesPage() {
 
     return (
         <div className="space-y-8 pb-20">
-            <div className="flex justify-between items-end">
+            <div className="flex flex-col gap-4 sm:flex-row sm:justify-between sm:items-end">
                 <div className="space-y-1">
-                    <h1 className="text-4xl font-black tracking-tighter uppercase italic">Employee Registry</h1>
+                    <h1 className="text-3xl sm:text-4xl font-black tracking-tighter uppercase italic">Employee Registry</h1>
                     <p className="text-slate-400 font-medium tracking-tight">Central command for human resources across all locations.</p>
                 </div>
-                <div className="flex gap-4">
-                    <div className="text-right bg-slate-900/40 p-3 rounded-lg border border-slate-800">
+                <div className="flex gap-4 w-full sm:w-auto">
+                    <div className="text-right bg-slate-900/40 p-3 rounded-lg border border-slate-800 w-full sm:w-auto">
                         <p className="text-[10px] text-slate-500 uppercase font-black tracking-widest">Active Force</p>
                         <p className="text-2xl font-black text-violet-400 font-mono">{employees.filter((e: any) => e.active).length} Members</p>
                     </div>

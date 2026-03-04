@@ -78,8 +78,8 @@ export default function AuditPage() {
                 <Badge className="bg-emerald-600/10 text-emerald-400 border-emerald-500/20 px-4 py-1 mb-4 uppercase text-[10px] font-black">
                     <ShieldCheck className="h-3 w-3 mr-2" /> Immutable Governance Layer
                 </Badge>
-                <h1 className="text-5xl font-black tracking-tighter uppercase italic text-white flex items-center justify-center gap-4">
-                    Security Audit <Fingerprint className="h-10 w-10 text-emerald-500" />
+                <h1 className="text-3xl sm:text-5xl font-black tracking-tighter uppercase italic text-white flex items-center justify-center gap-3 sm:gap-4">
+                    Security Audit <Fingerprint className="h-7 w-7 sm:h-10 sm:w-10 text-emerald-500" />
                 </h1>
                 <p className="text-slate-400 font-medium tracking-tight uppercase text-xs">Full activity history and operational accountability ledger.</p>
 

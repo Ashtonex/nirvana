@@ -12,7 +12,9 @@ function startOfTodayUTC() {
 }
 
 export async function POST(req: Request) {
-  const { shopId } = await req.json();
+  const body = await req.json().catch(() => ({}));
+  const shopId = body?.shopId;
+  const sendEmailEnabled = body?.sendEmail !== false;
   if (!shopId) {
     return NextResponse.json({ error: "Missing shopId" }, { status: 400 });
   }
@@ -83,52 +85,59 @@ export async function POST(req: Request) {
   const recipient = process.env.EOD_REPORT_RECIPIENT || ORACLE_RECIPIENT;
 
   let emailed = false;
-  try {
-    await sendEmail({
-      to: recipient,
-      subject: `[EOD] ${shopId.toUpperCase()} — ${new Date().toLocaleDateString()}`,
-      html: `
-        <div style="font-family:sans-serif;max-width:680px;margin:0 auto;">
-          <h2 style="margin:0 0 12px;">End of Day Report — ${shopId.toUpperCase()}</h2>
-          <p style="color:#64748b;margin:0 0 16px;">Generated: ${new Date().toLocaleString()}</p>
+  if (sendEmailEnabled) {
+    try {
+      await sendEmail({
+        to: recipient,
+        subject: `[EOD] ${shopId.toUpperCase()} — ${new Date().toLocaleDateString()}`,
+        html: `
+          <div style="font-family:sans-serif;max-width:680px;margin:0 auto;">
+            <h2 style="margin:0 0 12px;">End of Day Report — ${shopId.toUpperCase()}</h2>
+            <p style="color:#64748b;margin:0 0 16px;">Generated: ${new Date().toLocaleString()}</p>
 
-          <div style="background:#f1f5f9;padding:16px;border-radius:12px;">
-            <p style="margin:0;"><b>Transactions:</b> ${rows.length}</p>
-            <p style="margin:4px 0 0;"><b>Total (inc tax):</b> $${totalWithTax.toFixed(2)}</p>
-            <p style="margin:4px 0 0;"><b>Total (pre tax):</b> $${totalBeforeTax.toFixed(2)}</p>
-            <p style="margin:4px 0 0;"><b>Tax:</b> $${totalTax.toFixed(2)}</p>
+            <div style="background:#f1f5f9;padding:16px;border-radius:12px;">
+              <p style="margin:0;"><b>Transactions:</b> ${rows.length}</p>
+              <p style="margin:4px 0 0;"><b>Total (inc tax):</b> $${totalWithTax.toFixed(2)}</p>
+              <p style="margin:4px 0 0;"><b>Total (pre tax):</b> $${totalBeforeTax.toFixed(2)}</p>
+              <p style="margin:4px 0 0;"><b>Tax:</b> $${totalTax.toFixed(2)}</p>
+            </div>
+
+            <h3 style="margin:18px 0 8px;">Top Items</h3>
+            <table style="width:100%;border-collapse:collapse;">
+              <thead>
+                <tr>
+                  <th style="text-align:left;border-bottom:1px solid #cbd5e1;padding:8px;">Item</th>
+                  <th style="text-align:right;border-bottom:1px solid #cbd5e1;padding:8px;">Qty</th>
+                  <th style="text-align:right;border-bottom:1px solid #cbd5e1;padding:8px;">Gross</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${topItems
+                  .map(
+                    (i) => `
+                      <tr>
+                        <td style="padding:8px;border-bottom:1px solid #e2e8f0;">${i.name}</td>
+                        <td style="padding:8px;border-bottom:1px solid #e2e8f0;text-align:right;">${i.qty}</td>
+                        <td style="padding:8px;border-bottom:1px solid #e2e8f0;text-align:right;">$${i.gross.toFixed(2)}</td>
+                      </tr>
+                    `
+                  )
+                  .join("")}
+              </tbody>
+            </table>
           </div>
-
-          <h3 style="margin:18px 0 8px;">Top Items</h3>
-          <table style="width:100%;border-collapse:collapse;">
-            <thead>
-              <tr>
-                <th style="text-align:left;border-bottom:1px solid #cbd5e1;padding:8px;">Item</th>
-                <th style="text-align:right;border-bottom:1px solid #cbd5e1;padding:8px;">Qty</th>
-                <th style="text-align:right;border-bottom:1px solid #cbd5e1;padding:8px;">Gross</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${topItems
-                .map(
-                  (i) => `
-                    <tr>
-                      <td style="padding:8px;border-bottom:1px solid #e2e8f0;">${i.name}</td>
-                      <td style="padding:8px;border-bottom:1px solid #e2e8f0;text-align:right;">${i.qty}</td>
-                      <td style="padding:8px;border-bottom:1px solid #e2e8f0;text-align:right;">$${i.gross.toFixed(2)}</td>
-                    </tr>
-                  `
-                )
-                .join("")}
-            </tbody>
-          </table>
-        </div>
-      `,
-    });
-    emailed = true;
-  } catch (e: any) {
-    console.error("[EOD] Email send failed:", e?.message || e);
+        `,
+      });
+      emailed = true;
+    } catch (e: any) {
+      console.error("[EOD] Email send failed:", e?.message || e);
+    }
   }
 
-  return NextResponse.json({ success: true, emailed, totals: { totalWithTax, totalBeforeTax, totalTax, count: rows.length } });
+  return NextResponse.json({
+    success: true,
+    emailed,
+    totals: { totalWithTax, totalBeforeTax, totalTax, count: rows.length },
+    topItems,
+  });
 }

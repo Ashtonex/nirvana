@@ -27,15 +27,15 @@ export default async function LeaderboardPage() {
     const stats = await getStaffLeaderboard();
 
     return (
-        <div className="space-y-8 pb-32 pt-8">
-            <div className="flex justify-between items-end">
+            <div className="space-y-8 pb-32 pt-8">
+            <div className="flex flex-col gap-4 sm:flex-row sm:justify-between sm:items-end">
                 <div className="space-y-1">
                     <Link href="/employees">
                         <Button variant="link" className="p-0 h-auto text-violet-400 text-[10px] font-black uppercase tracking-[0.2em] mb-2 hover:text-violet-300">
                             <ArrowLeft className="h-3 w-3 mr-1" /> Back to Registry
                         </Button>
                     </Link>
-                    <h1 className="text-5xl font-black tracking-tighter uppercase italic text-transparent bg-clip-text bg-gradient-to-r from-violet-400 to-indigo-500">
+                    <h1 className="text-3xl sm:text-5xl font-black tracking-tighter uppercase italic text-transparent bg-clip-text bg-gradient-to-r from-violet-400 to-indigo-500">
                         Performance Battleground
                     </h1>
                     <p className="text-slate-400 font-medium tracking-tight">Real-time operative rankings across the NIRVANA network.</p>

@@ -261,10 +261,10 @@ export default function InventoryMaster({ db }: { db: any }) {
 
     return (
         <div className="space-y-8 pb-32">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                 <div>
-                    <h1 className="text-4xl font-black tracking-tighter text-slate-100 uppercase italic flex items-center gap-3">
-                        <Truck className="text-violet-500 h-10 w-10" /> Inventory Master
+                    <h1 className="text-2xl sm:text-4xl font-black tracking-tighter text-slate-100 uppercase italic flex items-center gap-3">
+                        <Truck className="text-violet-500 h-7 w-7 sm:h-10 sm:w-10" /> Inventory Master
                     </h1>
                     <p className="text-slate-400 font-medium tracking-tight uppercase text-xs font-black">Central source of truth for global distribution and inventory reconciliation.</p>
                 </div>
@@ -277,7 +277,7 @@ export default function InventoryMaster({ db }: { db: any }) {
                     <Card className="border-slate-800 bg-slate-900/40 backdrop-blur-md shadow-2xl relative overflow-hidden group">
                         <div className="absolute top-0 left-0 w-1 h-full bg-violet-600 group-hover:bg-emerald-500 transition-colors" />
                         <CardHeader className="border-b border-slate-800/50">
-                            <div className="flex justify-between items-center">
+                            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                                 <div>
                                     <CardTitle className="flex items-center gap-3 text-2xl font-black uppercase italic text-white">
                                         <Truck className="h-6 w-6 text-violet-400" /> Manifest & Ad-Hoc Acquisition
@@ -286,7 +286,7 @@ export default function InventoryMaster({ db }: { db: any }) {
                                         Ref #{shipment.shipmentNumber || "---"} | {shipment.manifestPieces || allocatedPieces} Pieces Expected
                                     </CardDescription>
                                 </div>
-                                <div className="flex gap-3">
+                                <div className="flex flex-wrap gap-2">
                                     <Button
                                         onClick={() => setShowBulkUpload(!showBulkUpload)}
                                         className={`font-black uppercase italic text-xs tracking-widest px-4 h-10 border-2 transition-all flex items-center gap-2 ${showBulkUpload ? 'bg-violet-500/20 text-violet-500 border-violet-500/50' : 'bg-violet-500/10 text-violet-400 border-violet-500/30'}`}

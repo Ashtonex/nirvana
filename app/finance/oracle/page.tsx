@@ -59,8 +59,8 @@ export default async function OraclePage() {
                 <Badge className="bg-violet-600/10 text-violet-400 border-violet-500/20 px-4 py-1 mb-4">
                     <Compass className="h-3 w-3 mr-2" /> Financial Intelligence Layer
                 </Badge>
-                <h1 className="text-5xl font-black tracking-tighter uppercase italic text-white flex items-center justify-center gap-4">
-                    The Oracle <Flame className="h-10 w-10 text-orange-500 animate-pulse" />
+                <h1 className="text-3xl sm:text-5xl font-black tracking-tighter uppercase italic text-white flex items-center justify-center gap-3 sm:gap-4">
+                    The Oracle <Flame className="h-7 w-7 sm:h-10 sm:w-10 text-orange-500 animate-pulse" />
                 </h1>
                 <p className="text-slate-400 font-medium tracking-tight">Predictive forecasting based on current burn rates and market capture.</p>
             </div>
@@ -95,7 +95,7 @@ export default async function OraclePage() {
                         <div className="bg-white/5 p-6 rounded-2xl border border-white/10 backdrop-blur-xl relative">
                             <Rocket className="absolute -top-3 -right-3 h-8 w-8 text-violet-500 rotate-12" />
                             <p className="text-[10px] font-black text-violet-400 uppercase tracking-widest mb-1">Estimated Runway</p>
-                            <p className="text-4xl font-black text-white italic">
+                            <p className="text-2xl sm:text-4xl font-black text-white italic">
                                 {runwayMonths === Infinity ? "UNLIMITED" : `${runwayMonths.toFixed(1)} Mo`}
                             </p>
                             <p className="text-[10px] font-black text-slate-500 uppercase mt-2">At current velocity</p>
