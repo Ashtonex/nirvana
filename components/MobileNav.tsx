@@ -14,35 +14,20 @@ function cn(...inputs: ClassValue[]) {
 
 export function MobileNav() {
     const pathname = usePathname();
-    const [userRole, setUserRole] = useState<string | null>(null);
+    const [isStaff, setIsStaff] = useState(false);
 
     useEffect(() => {
-        // Check if owner is logged in
-        fetch("/api/auth/me", { cache: "no-store", credentials: "include" })
-            .then(res => res.json())
-            .then(data => {
-                if (data?.employee?.role === "owner") {
-                    setUserRole("owner");
-                    return;
-                }
-            })
-            .catch(() => {});
-
-        // Check if staff is logged in
+        // Check if staff - non-blocking, just set state
         fetch("/api/staff/me", { cache: "no-store", credentials: "include" })
             .then(res => res.json())
             .then(data => {
-                if (data?.staff?.shop_id) {
-                    setUserRole("staff");
-                }
+                setIsStaff(!!data?.staff?.shop_id);
             })
             .catch(() => {});
     }, []);
 
-    // Hide for staff, show for owners
-    if (userRole === "staff") return null;
-    // While checking, keep hidden
-    if (userRole === null) return null;
+    // Hide for staff, show for everyone else (including owners and while loading)
+    if (isStaff) return null;
 
     const tabs = [
         { name: 'Home', href: '/', icon: Home },
