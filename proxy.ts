@@ -66,12 +66,6 @@ export function proxy(req: NextRequest) {
     return NextResponse.redirect(new URL("/login", req.url));
   }
 
-  // Optional outer gate for test day (prevents public access to SSR data)
-  if (!isPublicAsset(pathname)) {
-    const basic = checkBasicAuth(req);
-    if (basic.enabled && !basic.ok) return unauthorizedBasicAuth();
-  }
-
   return NextResponse.next();
 }
 
