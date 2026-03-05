@@ -5,6 +5,8 @@ import { MessageCircle, X, Send, Sparkles } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui";
 import { usePathname } from 'next/navigation';
+import { useAuth } from '@/components/AuthProvider';
+import { useStaff } from '@/components/StaffProvider';
 
 type Message = {
     id: string;
@@ -12,12 +14,22 @@ type Message = {
     content: string;
 };
 
+function getGreeting(name: string | null, surname: string | null): string {
+    const firstName = name || 'there';
+    const lastName = surname || '';
+    const fullName = lastName ? `${firstName} ${lastName}` : firstName;
+    return `Good Day ${fullName}, let's get ready for the day!`;
+}
+
 export function AiChat() {
     const pathname = usePathname();
+    const { user, employee } = useAuth();
+    const { staff } = useStaff();
     const [messages, setMessages] = useState<Message[]>([]);
     const [input, setInput] = useState("");
     const [isOpen, setIsOpen] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
+    const [greetingSent, setGreetingSent] = useState(false);
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
@@ -25,6 +37,21 @@ export function AiChat() {
             messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
         }
     }, [messages]);
+
+    useEffect(() => {
+        if (isOpen && !greetingSent) {
+            const userName = employee?.name || staff?.name || user?.email?.split('@')[0] || null;
+            const userSurname = employee?.surname || staff?.surname || null;
+            const greeting = getGreeting(userName, userSurname);
+            
+            setMessages([{
+                id: Date.now().toString(),
+                role: 'assistant',
+                content: greeting
+            }]);
+            setGreetingSent(true);
+        }
+    }, [isOpen, greetingSent, employee, staff, user]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();

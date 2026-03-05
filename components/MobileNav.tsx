@@ -7,6 +7,7 @@ import { Home, Package, Menu, MessageSquare, ArrowRightLeft } from 'lucide-react
 
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
+import { useStaff } from '@/components/StaffProvider';
 
 function cn(...inputs: ClassValue[]) {
     return twMerge(clsx(inputs));
@@ -16,7 +17,11 @@ const ALLOWED_EMAIL = "flectere@dev.com";
 
 export function MobileNav() {
     const pathname = usePathname();
+    const { staff, loading: staffLoading } = useStaff();
     const [canShow, setCanShow] = useState(false);
+
+    // Don't show for staff
+    if (staffLoading || staff) return null;
 
     useEffect(() => {
         fetch("/api/auth/me", { cache: "no-store", credentials: "include" })

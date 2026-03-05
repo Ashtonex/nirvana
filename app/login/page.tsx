@@ -63,11 +63,13 @@ function LoginForm() {
       router.push("/");
     } catch (e: any) {
       setError(e?.message || "Failed to sign in");
+    } finally {
       setLoading(false);
     }
   };
 
-  const showSpinner = ownerAuthLoading;
+  // Don't block login form on auth loading - user needs to log in
+  const showSpinner = false;
 
   if (showSpinner) {
     return (
