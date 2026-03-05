@@ -1,4 +1,4 @@
-import { readDb, Database, Sale, InventoryItem } from "./db";
+import { supabaseAdmin } from "@/lib/supabase";
 
 export interface SalesMetric {
     itemId: string;
@@ -14,70 +14,80 @@ export interface TrendMetric {
     growth: number; // Percentage
 }
 
+export interface ReorderSuggestion {
+    itemId: string;
+    itemName: string;
+    currentStock: number;
+    dailyVelocity: number;
+    daysToZero: number;
+    suggestedReorder: number; // To reach 30 days coverage
+}
+
 /**
  * INTELLIGENCE ENGINE: "The Brain"
  * Processes raw JSON data into actionable business insights.
  */
 
 // 1. BEST SELLERS Logic
-export async function getBestSellers(daysBytes = 30): Promise<SalesMetric[]> {
-    const db = await readDb();
+export async function getBestSellers(daysBack = 30): Promise<SalesMetric[]> {
     const cutoffDate = new Date();
-    cutoffDate.setDate(cutoffDate.getDate() - daysBytes);
+    cutoffDate.setDate(cutoffDate.getDate() - daysBack);
 
+    const { data: sales } = await supabaseAdmin
+        .from('sales')
+        .select('*')
+        .gte('date', cutoffDate.toISOString());
+    
+    const { data: inventory } = await supabaseAdmin.from('inventory_items').select('id, name, landed_cost');
+
+    const invMap = new Map((inventory || []).map((i: any) => [i.id, i]));
     const salesMap = new Map<string, SalesMetric>();
 
-    // Aggregate Sales
-    db.sales.forEach(sale => {
-        if (new Date(sale.date) >= cutoffDate) {
-            const existing = salesMap.get(sale.itemId) || {
-                itemId: sale.itemId,
-                itemName: sale.itemName,
-                totalQuantity: 0,
-                totalRevenue: 0,
-                grossMargin: 0
-            };
+    (sales || []).forEach((sale: any) => {
+        const existing = salesMap.get(sale.item_id) || {
+            itemId: sale.item_id,
+            itemName: sale.item_name,
+            totalQuantity: 0,
+            totalRevenue: 0,
+            grossMargin: 0
+        };
 
-            existing.totalQuantity += sale.quantity;
-            existing.totalRevenue += sale.totalWithTax;
+        existing.totalQuantity += sale.quantity;
+        existing.totalRevenue += sale.total_with_tax;
 
-            // Calculate Margin (Simple: Sale Price - (Landed Cost * Qty))
-            // Note: In a real app, we'd look up the exact cost at time of sale, 
-            // but here we look up current cost which is a close approximation for MVP.
-            const item = db.inventory.find(i => i.id === sale.itemId);
-            if (item) {
-                const cost = item.landedCost * sale.quantity;
-                existing.grossMargin += (sale.totalBeforeTax - cost);
-            }
-
-            salesMap.set(sale.itemId, existing);
+        const item = invMap.get(sale.item_id) as any;
+        if (item) {
+            const cost = (item.landed_cost || 0) * sale.quantity;
+            existing.grossMargin += (sale.total_before_tax - cost);
         }
+
+        salesMap.set(sale.item_id, existing);
     });
 
     return Array.from(salesMap.values())
         .sort((a, b) => b.totalRevenue - a.totalRevenue)
-        .slice(0, 10); // Top 10
+        .slice(0, 10);
 }
 
 // 2. PERFORMANCE TRENDS
 export async function getPerformanceTrends() {
-    const db = await readDb();
     const now = new Date();
     const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
     const sixtyDaysAgo = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000);
 
+    const { data: sales } = await supabaseAdmin.from('sales').select('total_with_tax, date');
+
     let currentPeriodRevenue = 0;
     let previousPeriodRevenue = 0;
 
-    db.sales.forEach(sale => {
+    (sales || []).forEach((sale: any) => {
         const saleDate = new Date(sale.date);
         if (saleDate >= thirtyDaysAgo) {
-            currentPeriodRevenue += sale.totalWithTax;
+            currentPeriodRevenue += sale.total_with_tax;
         } else if (saleDate >= sixtyDaysAgo && saleDate < thirtyDaysAgo) {
-            previousPeriodRevenue += sale.totalWithTax;
+            previousPeriodRevenue += sale.total_with_tax;
         }
     });
-
 
     const growth = previousPeriodRevenue > 0
         ? ((currentPeriodRevenue - previousPeriodRevenue) / previousPeriodRevenue) * 100
@@ -91,38 +101,26 @@ export async function getPerformanceTrends() {
 }
 
 // 3. SMART REORDERING
-export interface ReorderSuggestion {
-    itemId: string;
-    itemName: string;
-    currentStock: number;
-    dailyVelocity: number;
-    daysToZero: number;
-    suggestedReorder: number; // To reach 30 days coverage
-}
-
 export async function getReorderSuggestions(): Promise<ReorderSuggestion[]> {
-    const db = await readDb();
+    const { data: inventory } = await supabaseAdmin.from('inventory_items').select('*');
+    const { data: sales } = await supabaseAdmin.from('sales').select('item_id, quantity, date');
+
     const suggestions: ReorderSuggestion[] = [];
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
-    for (const item of db.inventory) {
-        // Calculate Velocity (Last 30 Days)
-        const thirtyDaysAgo = new Date();
-        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-
-        const recentSales = db.sales.filter(s =>
-            s.itemId === item.id &&
+    for (const item of (inventory || [])) {
+        const recentSales = (sales || []).filter((s: any) =>
+            s.item_id === item.id &&
             new Date(s.date) >= thirtyDaysAgo
         );
 
-        const totalSold = recentSales.reduce((sum, s) => sum + s.quantity, 0);
+        const totalSold = recentSales.reduce((sum: number, s: any) => sum + s.quantity, 0);
         const dailyVelocity = totalSold / 30;
-
-        // Days until stockout
         const daysToZero = dailyVelocity > 0 ? item.quantity / dailyVelocity : Infinity;
 
-        // Logic: specific threshold (e.g. 14 days)
         if (daysToZero < 14 && dailyVelocity > 0) {
-            const targetStock = dailyVelocity * 30; // Aim for 30 days buffer
+            const targetStock = dailyVelocity * 30;
             const needed = Math.ceil(targetStock - item.quantity);
 
             if (needed > 0) {
@@ -138,7 +136,7 @@ export async function getReorderSuggestions(): Promise<ReorderSuggestion[]> {
         }
     }
 
-    return suggestions.sort((a, b) => a.daysToZero - b.daysToZero); // Critical first
+    return suggestions.sort((a, b) => a.daysToZero - b.daysToZero);
 }
 
 // 4. ZOMBIE/DEAD STOCK HUNTER
@@ -151,35 +149,34 @@ export interface DeadStockItem {
 }
 
 export async function getDeadStock(): Promise<DeadStockItem[]> {
-    const db = await readDb();
+    const { data: inventory } = await supabaseAdmin.from('inventory_items').select('*');
+    const { data: sales } = await supabaseAdmin.from('sales').select('item_id, date');
+
     const deadItems: DeadStockItem[] = [];
     const now = new Date().getTime();
+    const sixtyDaysAgo = new Date();
+    sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 60);
 
-    for (const item of db.inventory) {
-        // Check if sold in last 60 days
-        const sixtyDaysAgo = new Date();
-        sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 60);
-
-        const hasRecentSale = db.sales.some(s =>
-            s.itemId === item.id &&
+    for (const item of (inventory || [])) {
+        const hasRecentSale = (sales || []).some((s: any) =>
+            s.item_id === item.id &&
             new Date(s.date) >= sixtyDaysAgo
         );
 
-        const daysInStock = Math.floor((now - new Date(item.dateAdded).getTime()) / (1000 * 3600 * 24));
+        const daysInStock = Math.floor((now - new Date(item.date_added).getTime()) / (1000 * 3600 * 24));
 
         if (!hasRecentSale && daysInStock > 60) {
             deadItems.push({
                 itemId: item.id,
                 itemName: item.name,
                 quantity: item.quantity,
-                value: item.landedCost * item.quantity,
+                value: item.landed_cost * item.quantity,
                 daysInStock
             });
         }
     }
 
-
-    return deadItems.sort((a, b) => b.value - a.value); // Most expensive mistakes first
+    return deadItems.sort((a, b) => b.value - a.value);
 }
 
 // 5. SALES HISTORY (Visuals)
@@ -190,32 +187,33 @@ export interface DailySalesMetric {
 }
 
 export async function getSalesHistory(days = 30): Promise<DailySalesMetric[]> {
-    const db = await readDb();
+    const { data: sales } = await supabaseAdmin.from('sales').select('date, total_with_tax, total_before_tax, item_id, quantity');
+    const { data: inventory } = await supabaseAdmin.from('inventory_items').select('id, landed_cost');
+
+    const invMap = new Map((inventory || []).map((i: any) => [i.id, i.landed_cost]));
     const history: DailySalesMetric[] = [];
     const now = new Date();
 
     for (let i = days - 1; i >= 0; i--) {
         const d = new Date();
         d.setDate(now.getDate() - i);
-        const dateStr = d.toISOString().split('T')[0]; // YYYY-MM-DD
+        const dateStr = d.toISOString().split('T')[0];
 
-        const daySales = db.sales.filter(s => s.date.startsWith(dateStr));
-        const revenue = daySales.reduce((sum, s) => sum + s.totalWithTax, 0);
+        const daySales = (sales || []).filter((s: any) => s.date.startsWith(dateStr));
+        const revenue = daySales.reduce((sum: number, s: any) => sum + s.total_with_tax, 0);
 
-        // Approx profit (Revenue - Cost)
-        // Note: Cost lookup is simplified here
         let cost = 0;
-        daySales.forEach(s => {
-            const item = db.inventory.find(i => i.id === s.itemId);
-            if (item) {
-                cost += (item.landedCost * s.quantity);
+        daySales.forEach((s: any) => {
+            const itemCost = invMap.get(s.item_id) as any;
+            if (itemCost) {
+                cost += ((itemCost || 0) * s.quantity);
             }
         });
 
         history.push({
             date: d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
             revenue,
-            profit: revenue - cost // Simplified metric
+            profit: revenue - cost
         });
     }
 
@@ -236,30 +234,33 @@ export interface StaffMetric {
 }
 
 export async function getStaffLeaderboard(): Promise<StaffMetric[]> {
-    const db = await readDb();
-    const stats = db.employees.map(emp => {
-        const sales = db.sales.filter(s => s.employeeId === emp.id);
-        const quotes = db.quotations.filter(q => q.employeeId === emp.id);
+    const { data: employees } = await supabaseAdmin.from('employees').select('*');
+    const { data: sales } = await supabaseAdmin.from('sales').select('employee_id, total_with_tax');
+    const { data: quotations } = await supabaseAdmin.from('quotations').select('employee_id, status');
 
-        const revenue = sales.reduce((acc, s) => acc + s.totalWithTax, 0);
-        const conversionRate = quotes.length > 0
-            ? (quotes.filter(q => q.status === 'converted').length / quotes.length) * 100
+    const stats = (employees || []).map((emp: any) => {
+        const empSales = (sales || []).filter((s: any) => s.employee_id === emp.id);
+        const empQuotes = (quotations || []).filter((q: any) => q.employee_id === emp.id);
+
+        const revenue = empSales.reduce((acc: number, s: any) => acc + (s.total_with_tax || 0), 0);
+        const conversionRate = empQuotes.length > 0
+            ? (empQuotes.filter((q: any) => q.status === 'converted').length / empQuotes.length) * 100
             : 0;
 
         return {
             id: emp.id,
             name: emp.name,
             role: emp.role,
-            shopId: emp.shopId,
+            shopId: emp.shop_id,
             revenue,
-            salesCount: sales.length,
-            quoteCount: quotes.length,
+            salesCount: empSales.length,
+            quoteCount: empQuotes.length,
             conversionRate,
-            points: (sales.length * 10) + (quotes.length * 2) // Gaming logic
+            points: (empSales.length * 10) + (empQuotes.length * 2)
         };
     });
 
-    return stats.sort((a, b) => b.points - a.points);
+    return stats.sort((a: any, b: any) => b.points - a.points);
 }
 
 // 7. PREDICTIVE ANALYTICS (The Forecaster)
