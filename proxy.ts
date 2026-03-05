@@ -48,6 +48,8 @@ function isPublicAsset(pathname: string) {
     pathname.startsWith("/staff-login") ||
     pathname.startsWith("/api/staff/login") ||
     pathname.startsWith("/api/staff/request") ||
+    pathname.startsWith("/api/staff/logout") ||
+    pathname.startsWith("/api/staff/me") ||
     pathname.startsWith("/api/owner/login") ||
     pathname.startsWith("/api/owner/logout")
   );

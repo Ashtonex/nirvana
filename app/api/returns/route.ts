@@ -45,6 +45,13 @@ async function getStaffFromCookie(): Promise<Actor | null> {
 }
 
 async function getOwnerFromBearer(req: Request): Promise<Actor | null> {
+  // Check for custom owner cookie first
+  const ownerCookie = (await cookies()).get("nirvana_owner");
+  if (ownerCookie?.value) {
+    return { role: "owner", id: "owner-1", name: "Admin" };
+  }
+
+  // Check for Bearer token (Supabase)
   const token = getBearerToken(req);
   if (!token) return null;
 
