@@ -57,7 +57,7 @@ export async function POST(req: Request) {
   const since = startOfTodayUTC();
   const { data: sales, error } = await supabaseAdmin
     .from("sales")
-    .select("id,item_name,quantity,total_with_tax,total_before_tax,tax,date")
+    .select("id,item_name,quantity,total_with_tax,total_before_tax,tax,date,payment_method")
     .eq("shop_id", shopId)
     .gte("date", since);
 
@@ -69,6 +69,13 @@ export async function POST(req: Request) {
   const totalWithTax = rows.reduce((sum: number, s: any) => sum + Number(s.total_with_tax || 0), 0);
   const totalBeforeTax = rows.reduce((sum: number, s: any) => sum + Number(s.total_before_tax || 0), 0);
   const totalTax = rows.reduce((sum: number, s: any) => sum + Number(s.tax || 0), 0);
+
+  // Calculate payment method breakdown
+  const cashSales = rows.filter((s: any) => s.payment_method === 'cash');
+  const ecocashSales = rows.filter((s: any) => s.payment_method === 'ecocash');
+  
+  const totalCash = cashSales.reduce((sum: number, s: any) => sum + Number(s.total_with_tax || 0), 0);
+  const totalEcocash = ecocashSales.reduce((sum: number, s: any) => sum + Number(s.total_with_tax || 0), 0);
 
   const itemMap = new Map<string, { name: string; qty: number; gross: number }>();
   for (const s of rows as any[]) {
@@ -100,6 +107,10 @@ export async function POST(req: Request) {
               <p style="margin:4px 0 0;"><b>Total (inc tax):</b> $${totalWithTax.toFixed(2)}</p>
               <p style="margin:4px 0 0;"><b>Total (pre tax):</b> $${totalBeforeTax.toFixed(2)}</p>
               <p style="margin:4px 0 0;"><b>Tax:</b> $${totalTax.toFixed(2)}</p>
+              
+              <h4 style="margin:16px 0 8px;font-size:12px;">Payment Breakdown</h4>
+              <p style="margin:4px 0;"><b>Cash Sales:</b> $${totalCash.toFixed(2)} (${cashSales.length} transactions)</p>
+              <p style="margin:4px 0 0;"><b>EcoCash Sales:</b> $${totalEcocash.toFixed(2)} (${ecocashSales.length} transactions)</p>
             </div>
 
             <h3 style="margin:18px 0 8px;">Top Items</h3>
@@ -137,7 +148,16 @@ export async function POST(req: Request) {
   return NextResponse.json({
     success: true,
     emailed,
-    totals: { totalWithTax, totalBeforeTax, totalTax, count: rows.length },
+    totals: { 
+      totalWithTax, 
+      totalBeforeTax, 
+      totalTax, 
+      count: rows.length,
+      totalCash,
+      totalEcocash,
+      cashTransactionCount: cashSales.length,
+      ecocashTransactionCount: ecocashSales.length
+    },
     topItems,
   });
 }

@@ -53,7 +53,7 @@ export async function GET(req: Request) {
   const since = startOfTodayUTC();
   const { data: sales, error } = await supabaseAdmin
     .from("sales")
-    .select("id,item_name,quantity,total_with_tax,total_before_tax,tax,date")
+    .select("id,item_name,quantity,total_with_tax,total_before_tax,tax,date,payment_method")
     .eq("shop_id", shopId)
     .gte("date", since);
 
@@ -65,6 +65,13 @@ export async function GET(req: Request) {
   const totalWithTax = rows.reduce((sum: number, s: any) => sum + Number(s.total_with_tax || 0), 0);
   const totalBeforeTax = rows.reduce((sum: number, s: any) => sum + Number(s.total_before_tax || 0), 0);
   const totalTax = rows.reduce((sum: number, s: any) => sum + Number(s.tax || 0), 0);
+
+  // Calculate payment method breakdown
+  const cashSales = rows.filter((s: any) => s.payment_method === 'cash');
+  const ecocashSales = rows.filter((s: any) => s.payment_method === 'ecocash');
+  
+  const totalCash = cashSales.reduce((sum: number, s: any) => sum + Number(s.total_with_tax || 0), 0);
+  const totalEcocash = ecocashSales.reduce((sum: number, s: any) => sum + Number(s.total_with_tax || 0), 0);
 
   const itemMap = new Map<string, { name: string; qty: number; gross: number }>();
   for (const s of rows as any[]) {
@@ -102,7 +109,7 @@ export async function GET(req: Request) {
   y -= 8;
 
   const boxTop = y;
-  const boxHeight = 86;
+  const boxHeight = 120;
   page.drawRectangle({
     x: margin,
     y: boxTop - boxHeight,
@@ -120,6 +127,10 @@ export async function GET(req: Request) {
   page.drawText(`Total (pre tax): $${totalBeforeTax.toFixed(2)}`, { x: margin + 12, y, size: 11, font, color: rgb(0.1, 0.14, 0.22) });
   y -= 18;
   page.drawText(`Tax: $${totalTax.toFixed(2)}`, { x: margin + 12, y, size: 11, font, color: rgb(0.1, 0.14, 0.22) });
+  y -= 18;
+  page.drawText(`Cash Sales: $${totalCash.toFixed(2)} (${cashSales.length} txns)`, { x: margin + 12, y, size: 10, font, color: rgb(0.38, 0.45, 0.55) });
+  y -= 14;
+  page.drawText(`EcoCash Sales: $${totalEcocash.toFixed(2)} (${ecocashSales.length} txns)`, { x: margin + 12, y, size: 10, font, color: rgb(0.38, 0.45, 0.55) });
 
   y = boxTop - boxHeight - 24;
   drawText("Top Items", 12, true);

@@ -195,11 +195,13 @@ export async function getSalesHistory(days = 30): Promise<DailySalesMetric[]> {
     const now = new Date();
 
     for (let i = days - 1; i >= 0; i--) {
-        const d = new Date();
-        d.setDate(now.getDate() - i);
+        const d = new Date(now.getTime() - i * 24 * 60 * 60 * 1000);
         const dateStr = d.toISOString().split('T')[0];
 
-        const daySales = (sales || []).filter((s: any) => s.date.startsWith(dateStr));
+        const daySales = (sales || []).filter((s: any) => {
+            const saleDate = new Date(s.date).toISOString().split('T')[0];
+            return saleDate === dateStr;
+        });
         const revenue = daySales.reduce((sum: number, s: any) => sum + s.total_with_tax, 0);
 
         let cost = 0;

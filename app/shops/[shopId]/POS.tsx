@@ -71,6 +71,7 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
     const [clientEmail, setClientEmail] = useState("");
     const [clientPhone, setClientPhone] = useState("");
     const [selectedEmployeeId, setSelectedEmployeeId] = useState("");
+    const [paymentMethod, setPaymentMethod] = useState<'cash' | 'ecocash'>('cash');
 
     const [isClosingDay, setIsClosingDay] = useState(false);
     const [isEodShareModalOpen, setIsEodShareModalOpen] = useState(false);
@@ -185,7 +186,8 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
                         unitPrice: entry.price / 1.155,
                         totalBeforeTax: (entry.price / 1.155) * entry.quantity,
                         employeeId: selectedEmployeeId || "system",
-                        clientName: clientName || "General Walk-in"
+                        clientName: clientName || "General Walk-in",
+                        paymentMethod
                     });
                 }
                 alert("Sale recorded successfully!");
@@ -213,6 +215,7 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
             setClientName("");
             setClientEmail("");
             setClientPhone("");
+            setPaymentMethod('cash');
         });
     };
 
@@ -593,6 +596,38 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
                         <div className="flex justify-between text-[10px] font-bold text-slate-500 uppercase"><span>Subtotal</span><span>${totalBeforeTax.toFixed(2)}</span></div>
                         <div className="flex justify-between text-xl font-black text-white italic tracking-tighter uppercase"><span>Total Due</span><span className="text-emerald-400">${totalWithTax.toFixed(2)}</span></div>
                     </div>
+
+                    {posMode === 'sale' && (
+                        <div className="space-y-2 bg-slate-900/50 p-3 rounded-lg border border-slate-800">
+                            <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-2">
+                                <Coins className="h-3 w-3 text-amber-500" /> Payment Method
+                            </label>
+                            <div className="flex gap-2">
+                                <button
+                                    onClick={() => setPaymentMethod('cash')}
+                                    className={cn(
+                                        "flex-1 py-2 px-3 rounded-lg border font-black text-xs uppercase transition-all",
+                                        paymentMethod === 'cash'
+                                            ? "bg-emerald-600 border-emerald-500 text-white"
+                                            : "bg-slate-950 border-slate-800 text-slate-400 hover:border-slate-700"
+                                    )}
+                                >
+                                    Cash
+                                </button>
+                                <button
+                                    onClick={() => setPaymentMethod('ecocash')}
+                                    className={cn(
+                                        "flex-1 py-2 px-3 rounded-lg border font-black text-xs uppercase transition-all",
+                                        paymentMethod === 'ecocash'
+                                            ? "bg-blue-600 border-blue-500 text-white"
+                                            : "bg-slate-950 border-slate-800 text-slate-400 hover:border-slate-700"
+                                    )}
+                                >
+                                    EcoCash
+                                </button>
+                            </div>
+                        </div>
+                    )}
 
                     <Button className={cn("w-full h-14 font-black text-sm uppercase italic tracking-[0.2em] rounded-xl", posMode === 'sale' ? "bg-emerald-600" : "bg-amber-600")} disabled={cart.length === 0 || isPending} onClick={handleCheckout}>
                         {isPending ? <RefreshCcw className="h-5 w-5 animate-spin" /> : posMode === 'sale' ? "Execute Sale" : "Process Quote"}

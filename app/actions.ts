@@ -264,7 +264,8 @@ export async function recordSale(sale: any) {
     await supabase.from('sales').insert({
         id: saleId, shop_id: sale.shopId, item_id: sale.itemId, item_name: sale.itemName,
         quantity: sale.quantity, unit_price: sale.unitPrice, total_before_tax: sale.totalBeforeTax,
-        tax, total_with_tax: totalWithTax, date: timestamp, employee_id: sale.employeeId, client_name: sale.clientName
+        tax, total_with_tax: totalWithTax, date: timestamp, employee_id: sale.employeeId, client_name: sale.clientName,
+        payment_method: sale.paymentMethod || 'cash'
     });
 
     const { data: alloc } = await supabase.from('inventory_allocations').select('quantity').eq('item_id', sale.itemId).eq('shop_id', sale.shopId).single();

@@ -14,7 +14,9 @@ import {
   AlertTriangle,
   ArrowUpRight,
   TrendingDown,
-  LayoutGrid
+  LayoutGrid,
+  ShoppingCart,
+  ArrowRightLeft
 } from "lucide-react";
 
 export default async function Home() {
@@ -169,13 +171,35 @@ export default async function Home() {
           <CardHeader>
             <CardTitle>Recent Activity</CardTitle>
             <CardDescription>
-              Latest sales and transfers across Nirvana.
+              Latest sales across Nirvana.
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="text-center py-20 text-slate-500">
-              No recent activity recorded.
-            </div>
+            {salesHistory.length === 0 ? (
+              <div className="text-center py-20 text-slate-500">
+                No recent activity recorded.
+              </div>
+            ) : (
+              <div className="space-y-3 max-h-80 overflow-y-auto">
+                {salesHistory.slice(0, 10).map((day, idx) => (
+                  <div key={idx} className="flex items-center justify-between p-3 bg-slate-900/50 rounded-lg border border-slate-800">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 bg-emerald-500/10 rounded-lg">
+                        <ShoppingCart className="h-4 w-4 text-emerald-400" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-slate-200">{day.date}</p>
+                        <p className="text-xs text-slate-500">{day.revenue > 0 ? 'Sales recorded' : 'No sales'}</p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-sm font-bold text-emerald-400">${day.revenue.toFixed(2)}</p>
+                      <p className="text-xs text-slate-500">Revenue</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
