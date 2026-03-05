@@ -60,8 +60,14 @@ function LoginForm() {
     try {
       // Hardcoded admin/owner login
       if (ownerEmail.toLowerCase() === "flectere@dev.com" && ownerPassword === "Ashytana") {
+        console.log("Attempting hardcoded login...");
         const { error } = await signIn("flectere@dev.com", "Ashytana");
-        if (error) throw error;
+        console.log("Login result:", error);
+        if (error) {
+          setError(error.message);
+          setLoading(false);
+          return;
+        }
         router.push("/");
         return;
       }
@@ -70,6 +76,7 @@ function LoginForm() {
       if (error) throw error;
       router.push("/");
     } catch (e: any) {
+      console.log("Login error:", e);
       setError(e?.message || "Failed to sign in");
     } finally {
       setLoading(false);
