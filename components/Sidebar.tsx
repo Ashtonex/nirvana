@@ -53,12 +53,8 @@ export default function Sidebar() {
     const router = useRouter();
 
     // Owner auth (Supabase) + Staff auth (custom session)
-    // These hooks are safe here; Sidebar is a client component.
-    const { signOut: ownerSignOut, user: ownerUser, loading: ownerLoading } = useAuth();
-    const { signOut: staffSignOut, staff, loading: staffLoading } = useStaff();
-
-    // Don't render until auth is checked
-    if (ownerLoading || staffLoading) return null;
+    const { signOut: ownerSignOut, user: ownerUser } = useAuth();
+    const { signOut: staffSignOut, staff } = useStaff();
 
     // Staff should only see POS. No sidebar navigation.
     if (staff && !ownerUser) return null;

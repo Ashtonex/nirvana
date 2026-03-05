@@ -17,11 +17,11 @@ const ALLOWED_EMAIL = "flectere@dev.com";
 
 export function MobileNav() {
     const pathname = usePathname();
-    const { staff, loading: staffLoading } = useStaff();
+    const { staff } = useStaff();
     const [canShow, setCanShow] = useState(false);
 
     // Don't show for staff
-    if (staffLoading || staff) return null;
+    if (staff) return null;
 
     useEffect(() => {
         fetch("/api/auth/me", { cache: "no-store", credentials: "include" })
