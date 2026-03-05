@@ -2,17 +2,40 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useEffect, useState } from 'react';
 import { Home, Package, Menu, MessageSquare, ArrowRightLeft } from 'lucide-react';
 
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
+import { useStaff } from '@/components/StaffProvider';
 
 function cn(...inputs: ClassValue[]) {
     return twMerge(clsx(inputs));
 }
 
+const ALLOWED_EMAIL = "flectere@dev.com";
+
 export function MobileNav() {
     const pathname = usePathname();
+    const { staff, loading: staffLoading } = useStaff();
+    const [canShow, setCanShow] = useState(false);
+
+    // Don't show for staff
+    if (staffLoading || staff) return null;
+
+    useEffect(() => {
+        fetch("/api/auth/me", { cache: "no-store", credentials: "include" })
+            .then(res => res.json())
+            .then(data => {
+                if (data?.user?.email === ALLOWED_EMAIL) {
+                    setCanShow(true);
+                }
+            })
+            .catch(() => {});
+    }, []);
+
+    // Only show for specific allowed user
+    if (!canShow) return null;
 
     const tabs = [
         { name: 'Home', href: '/', icon: Home },
