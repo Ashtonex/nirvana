@@ -52,7 +52,7 @@ export default function Sidebar() {
     const pathname = usePathname();
     const router = useRouter();
 
-    // Owner auth (Supabase) + Staff auth (custom session)
+    // Owner auth (custom cookie) + Staff auth (custom session)
     const { signOut: ownerSignOut, user: ownerUser } = useAuth();
     const { signOut: staffSignOut, staff } = useStaff();
 
@@ -61,7 +61,10 @@ export default function Sidebar() {
 
     const handleLogout = async () => {
         try {
-            if (ownerUser) {
+            if (ownerUser?.email === "flectere@dev.com") {
+                await fetch("/api/owner/logout", { method: "POST" });
+                router.push('/login');
+            } else if (ownerUser) {
                 await ownerSignOut();
                 router.push('/login');
             } else {
@@ -69,7 +72,7 @@ export default function Sidebar() {
                 router.push('/staff-login');
             }
         } catch {
-            router.push('/staff-login');
+            router.push('/login');
         }
     };
 

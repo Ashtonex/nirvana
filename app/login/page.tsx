@@ -57,28 +57,15 @@ function LoginForm() {
     setLoading(true);
     setError(null);
     try {
-      // Hardcoded admin/owner login
-      if (ownerEmail.toLowerCase() === "flectere@dev.com" && ownerPassword === "Ashytana") {
-        console.log("Attempting hardcoded login...");
-        const { error } = await signIn("flectere@dev.com", "Ashytana");
-        console.log("Login result:", error);
-        if (error) {
-          setError(error.message);
-          setLoading(false);
-          return;
-        }
-        // Wait for cookie to settle then redirect
-        await new Promise(resolve => setTimeout(resolve, 500));
-        window.location.href = "/";
-        return;
-      }
-      
-      const { error } = await signIn(ownerEmail, ownerPassword);
-      if (error) throw error;
-      await new Promise(resolve => setTimeout(resolve, 500));
+      const res = await fetch("/api/owner/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: ownerEmail, password: ownerPassword }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Invalid credentials");
       window.location.href = "/";
     } catch (e: any) {
-      console.log("Login error:", e);
       setError(e?.message || "Failed to sign in");
     } finally {
       setLoading(false);

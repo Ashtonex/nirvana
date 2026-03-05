@@ -2,8 +2,19 @@ import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { supabaseAdmin } from "@/lib/supabase";
 
+const OWNER_EMAIL = "flectere@dev.com";
+
 export async function GET() {
   const cookieStore = await cookies();
+  const ownerToken = cookieStore.get("nirvana_owner");
+  
+  if (ownerToken?.value) {
+    return NextResponse.json({ 
+      user: { email: OWNER_EMAIL }, 
+      employee: { email: OWNER_EMAIL, role: "owner" } 
+    });
+  }
+
   const auth = cookieStore.get("sb-access-token");
   const authHeader = cookieStore.get("sb-refresh-token");
   

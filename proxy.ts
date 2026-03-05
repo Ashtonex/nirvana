@@ -47,7 +47,9 @@ function isPublicAsset(pathname: string) {
     pathname.startsWith("/login") ||
     pathname.startsWith("/staff-login") ||
     pathname.startsWith("/api/staff/login") ||
-    pathname.startsWith("/api/staff/request")
+    pathname.startsWith("/api/staff/request") ||
+    pathname.startsWith("/api/owner/login") ||
+    pathname.startsWith("/api/owner/logout")
   );
 }
 
@@ -55,7 +57,8 @@ function isAuthenticated(req: NextRequest) {
   const authToken = req.cookies.get("sb-access-token");
   const refreshToken = req.cookies.get("sb-refresh-token");
   const staffToken = req.cookies.get("nirvana_staff");
-  return !!(authToken?.value || refreshToken?.value || staffToken?.value);
+  const ownerToken = req.cookies.get("nirvana_owner");
+  return !!(authToken?.value || refreshToken?.value || staffToken?.value || ownerToken?.value);
 }
 
 export function proxy(req: NextRequest) {
