@@ -58,6 +58,14 @@ function LoginForm() {
     setLoading(true);
     setError(null);
     try {
+      // Hardcoded admin/owner login
+      if (ownerEmail.toLowerCase() === "flectere@dev.com" && ownerPassword === "Ashytana") {
+        const { error } = await signIn("flectere@dev.com", "Ashytana");
+        if (error) throw error;
+        router.push("/");
+        return;
+      }
+      
       const { error } = await signIn(ownerEmail, ownerPassword);
       if (error) throw error;
       router.push("/");
