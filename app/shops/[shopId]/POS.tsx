@@ -101,6 +101,10 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
     const [isAddProductModalOpen, setIsAddProductModalOpen] = useState(false);
     const [newProduct, setNewProduct] = useState({ name: "", category: "", landedCost: "", initialStock: "0" });
 
+    // Quick Sale Modal State (manual entry for untracked products)
+    const [isQuickSaleModalOpen, setIsQuickSaleModalOpen] = useState(false);
+    const [quickSale, setQuickSale] = useState({ name: "", quantity: "1", price: "0" });
+
     const employees = (db.employees || []).filter((e: any) => e.shopId === shopId && e.active);
     const shop = db.shops.find((s: any) => s.id === shopId);
     const shopExpenses = shop ? Object.values(shop.expenses).reduce((a: number, b: any) => a + Number(b), 0) : 0;
@@ -169,6 +173,39 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
         });
     };
 
+    const handleQuickSale = () => {
+        const qty = parseInt(quickSale.quantity) || 1;
+        const salePrice = parseFloat(quickSale.price) || 0;
+        
+        if (!quickSale.name || qty <= 0 || salePrice <= 0) {
+            alert("Please enter product name, quantity (>0), and price (>0)");
+            return;
+        }
+
+        // Try to find the product in inventory
+        const existingItem = inventory.find((item: any) => 
+            item.name.toLowerCase() === quickSale.name.toLowerCase()
+        );
+        
+        if (existingItem) {
+            // Add tracked product to cart
+            addToCart(existingItem, salePrice);
+        } else {
+            // Add untracked product to cart with fake ID
+            addToCart({
+                id: `QUICK_${Date.now()}`,
+                name: quickSale.name,
+                category: "Quick Sale",
+                quantity: 0,
+                landedCost: 0,
+                allocations: []
+            }, salePrice);
+        }
+        
+        setIsQuickSaleModalOpen(false);
+        setQuickSale({ name: "", quantity: "1", price: "0" });
+    };
+
     const taxRate = db.settings?.taxRate || 0.155;
     const totalBeforeTax = cart.reduce((sum, c) => sum + (c.price / (1 + taxRate)) * c.quantity, 0);
     const totalWithTax = cart.reduce((sum, c) => sum + c.price * c.quantity, 0);
@@ -178,17 +215,47 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
         startTransition(async () => {
             if (posMode === 'sale') {
                 for (const entry of cart) {
-                    await recordSale({
-                        shopId,
-                        itemId: entry.item.id,
-                        itemName: entry.item.name,
-                        quantity: entry.quantity,
-                        unitPrice: entry.price / 1.155,
-                        totalBeforeTax: (entry.price / 1.155) * entry.quantity,
-                        employeeId: selectedEmployeeId || "system",
-                        clientName: clientName || "General Walk-in",
-                        paymentMethod
-                    });
+                    const isUntracked = entry.item.id.startsWith('QUICK_');
+                    
+                    if (isUntracked) {
+                        // For untracked items, just record the sale without inventory reduction
+                        // This allows selling items that aren't in the system
+                        const saleId = Math.random().toString(36).substring(2, 9);
+                        const timestamp = new Date().toISOString();
+                        
+                        // Directly insert untracked sale
+                        await fetch('/api/sales/untracked', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                id: saleId,
+                                shop_id: shopId,
+                                item_name: entry.item.name,
+                                quantity: entry.quantity,
+                                unit_price: entry.price / (1 + taxRate),
+                                total_before_tax: (entry.price / (1 + taxRate)) * entry.quantity,
+                                total_with_tax: entry.price * entry.quantity,
+                                tax: entry.price * entry.quantity - ((entry.price / (1 + taxRate)) * entry.quantity),
+                                date: timestamp,
+                                employee_id: selectedEmployeeId || "system",
+                                client_name: clientName || "General Walk-in",
+                                payment_method: paymentMethod
+                            })
+                        });
+                    } else {
+                        // For tracked items, use normal recordSale which decrements inventory
+                        await recordSale({
+                            shopId,
+                            itemId: entry.item.id,
+                            itemName: entry.item.name,
+                            quantity: entry.quantity,
+                            unitPrice: entry.price / (1 + taxRate),
+                            totalBeforeTax: (entry.price / (1 + taxRate)) * entry.quantity,
+                            employeeId: selectedEmployeeId || "system",
+                            clientName: clientName || "General Walk-in",
+                            paymentMethod
+                        });
+                    }
                 }
                 alert("Sale recorded successfully!");
             } else {
@@ -201,7 +268,7 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
                         itemId: c.item.id,
                         itemName: c.item.name,
                         quantity: c.quantity,
-                        unitPrice: c.price / 1.155,
+                        unitPrice: c.price / (1 + taxRate),
                         total: c.price * c.quantity
                     })),
                     totalBeforeTax,
@@ -337,6 +404,13 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
                             className="bg-violet-600 hover:bg-violet-500 text-[10px] font-black uppercase italic h-10 px-3 flex items-center gap-2"
                         >
                             <PackagePlus className="h-4 w-4" /> Add Ad-hoc
+                        </Button>
+
+                        <Button
+                            onClick={() => setIsQuickSaleModalOpen(true)}
+                            className="bg-sky-600 hover:bg-sky-500 text-[10px] font-black uppercase italic h-10 px-3 flex items-center gap-2"
+                        >
+                            <ShoppingCart className="h-4 w-4" /> Quick Sale
                         </Button>
 
                         <Button
@@ -687,6 +761,57 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
                     >
                         {isPending ? <RefreshCcw className="h-4 w-4 animate-spin mr-2" /> : <PackagePlus className="h-4 w-4 mr-2" />}
                         Persist to Oracle
+                    </Button>
+                </div>
+            </Modal>
+
+            <Modal
+                isOpen={isQuickSaleModalOpen}
+                onClose={() => setIsQuickSaleModalOpen(false)}
+                title="Quick Sale (Manual Entry)"
+            >
+                <div className="space-y-4 pt-2">
+                    <p className="text-[10px] text-slate-500 font-bold uppercase">Enter product details to add to cart. If product exists in inventory, it will be tracked; otherwise, it will be recorded as untracked.</p>
+                    <div className="space-y-2">
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Product Name</label>
+                        <Input
+                            placeholder="e.g. Premium Hub Cap"
+                            value={quickSale.name}
+                            onChange={(e) => setQuickSale({ ...quickSale, name: e.target.value })}
+                            className="bg-slate-950"
+                        />
+                    </div>
+                    <div className="flex gap-2">
+                        <div className="space-y-2 flex-1">
+                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Quantity</label>
+                            <Input
+                                type="number"
+                                min="1"
+                                placeholder="1"
+                                value={quickSale.quantity}
+                                onChange={(e) => setQuickSale({ ...quickSale, quantity: e.target.value })}
+                                className="bg-slate-950"
+                            />
+                        </div>
+                        <div className="space-y-2 flex-1">
+                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Selling Price ($)</label>
+                            <Input
+                                type="number"
+                                min="0.01"
+                                step="0.01"
+                                placeholder="0.00"
+                                value={quickSale.price}
+                                onChange={(e) => setQuickSale({ ...quickSale, price: e.target.value })}
+                                className="bg-slate-950"
+                            />
+                        </div>
+                    </div>
+                    <Button
+                        onClick={handleQuickSale}
+                        className="w-full bg-sky-600 hover:bg-sky-500 font-black uppercase italic tracking-widest h-12 mt-4"
+                    >
+                        <ShoppingCart className="h-4 w-4 mr-2" />
+                        Add to Cart
                     </Button>
                 </div>
             </Modal>
