@@ -186,6 +186,15 @@ export interface DailySalesMetric {
     profit: number;
 }
 
+export interface TodaySaleMetric {
+    id: string;
+    itemName: string;
+    quantity: number;
+    totalWithTax: number;
+    clientName: string;
+    time: string;
+}
+
 export async function getSalesHistory(days = 30): Promise<DailySalesMetric[]> {
     const { data: sales } = await supabaseAdmin.from('sales').select('date, total_with_tax, total_before_tax, item_id, quantity');
     const { data: inventory } = await supabaseAdmin.from('inventory_items').select('id, landed_cost');
@@ -220,6 +229,26 @@ export async function getSalesHistory(days = 30): Promise<DailySalesMetric[]> {
     }
 
     return history;
+}
+
+// 5b. TODAY'S SALES (For Real-time Recent Activity)
+export async function getTodaysSales(): Promise<TodaySaleMetric[]> {
+    const today = new Date().toISOString().split('T')[0];
+    const { data: sales } = await supabaseAdmin
+        .from('sales')
+        .select('id, item_name, quantity, total_with_tax, client_name, date')
+        .gte('date', `${today}T00:00:00`)
+        .lte('date', `${today}T23:59:59`)
+        .order('date', { ascending: false });
+
+    return (sales || []).map((s: any) => ({
+        id: s.id,
+        itemName: s.item_name,
+        quantity: s.quantity,
+        totalWithTax: s.total_with_tax,
+        clientName: s.client_name,
+        time: new Date(s.date).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
+    }));
 }
 
 // 6. GAMIFIED LEADERBOARD
