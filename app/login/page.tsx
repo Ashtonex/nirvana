@@ -45,7 +45,6 @@ function LoginForm() {
       if (!res.ok) throw new Error(data.error || "Failed to log in");
 
       const shopId = data.shopId as string | undefined;
-      // Hard navigation so providers re-hydrate with new cookie.
       window.location.href = shopId ? `/shops/${shopId}` : "/mobile-menu";
     } catch (e: any) {
       setError(e?.message || "Failed to log in");
@@ -68,13 +67,13 @@ function LoginForm() {
           setLoading(false);
           return;
         }
-        router.push("/");
+        window.location.href = "/";
         return;
       }
       
       const { error } = await signIn(ownerEmail, ownerPassword);
       if (error) throw error;
-      router.push("/");
+      window.location.href = "/";
     } catch (e: any) {
       console.log("Login error:", e);
       setError(e?.message || "Failed to sign in");
