@@ -113,11 +113,28 @@ export default function InventoryMaster({ db }: { db: any }) {
     const [bulkError, setBulkError] = useState("");
     const [isUploading, setIsUploading] = useState(false);
 
+    // Search functionality
+    const [searchTerm, setSearchTerm] = useState("");
+    const [selectedShopsForAdHoc, setSelectedShopsForAdHoc] = useState<string[]>([]);
+
+    // Filter inventory based on search
+    const filteredInventory = inventory.filter((item: any) =>
+        item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        item.category.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (item.sku && item.sku.toLowerCase().includes(searchTerm.toLowerCase()))
+    );
+
     const handleRegisterAdHoc = () => {
+        if (selectedShopsForAdHoc.length === 0) {
+            alert("Please select at least one shop to allocate the product to");
+            return;
+        }
+        
         startTransition(async () => {
-            await registerInventoryItem(adHocItem);
+            await registerInventoryItem(adHocItem, selectedShopsForAdHoc);
             setShowAdHoc(false);
             setAdHocItem({ name: "", category: "", quantity: 0, acquisitionPrice: 0, landedCost: 0 });
+            setSelectedShopsForAdHoc([]);
         });
     };
 
@@ -200,6 +217,14 @@ export default function InventoryMaster({ db }: { db: any }) {
             setBulkShops(bulkShops.filter(s => s !== shopId));
         } else {
             setBulkShops([...bulkShops, shopId]);
+        }
+    };
+
+    const toggleAdHocShop = (shopId: string) => {
+        if (selectedShopsForAdHoc.includes(shopId)) {
+            setSelectedShopsForAdHoc(selectedShopsForAdHoc.filter(s => s !== shopId));
+        } else {
+            setSelectedShopsForAdHoc([...selectedShopsForAdHoc, shopId]);
         }
     };
 
@@ -330,7 +355,7 @@ export default function InventoryMaster({ db }: { db: any }) {
                                     <h3 className="text-emerald-400 font-black uppercase italic tracking-widest text-sm mb-6 flex items-center gap-2">
                                         <Plus className="h-5 w-5 animate-pulse" /> Instant Ledger Registration
                                     </h3>
-                                    <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
+                                    <div className="grid grid-cols-1 md:grid-cols-5 gap-6 mb-6">
                                         <div className="space-y-2 col-span-2">
                                             <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Product Name</label>
                                             <Input
@@ -368,10 +393,31 @@ export default function InventoryMaster({ db }: { db: any }) {
                                             />
                                         </div>
                                     </div>
+                                    
+                                    {/* Shop Selection */}
+                                    <div className="space-y-3 mb-6">
+                                        <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Allocate to Shops</label>
+                                        <div className="flex flex-wrap gap-2">
+                                            {db.shops.map((shop: any) => (
+                                                <button
+                                                    key={shop.id}
+                                                    onClick={() => toggleAdHocShop(shop.id)}
+                                                    className={`px-4 py-2 rounded-lg border-2 font-black uppercase text-xs tracking-widest transition-all ${
+                                                        selectedShopsForAdHoc.includes(shop.id)
+                                                            ? 'bg-emerald-500/20 border-emerald-500 text-emerald-400'
+                                                            : 'bg-slate-950 border-slate-800 text-slate-500 hover:border-slate-700'
+                                                    }`}
+                                                >
+                                                    {shop.name}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                    
                                     <Button
                                         onClick={handleRegisterAdHoc}
-                                        disabled={isPending || !adHocItem.name}
-                                        className="w-full mt-8 h-14 bg-emerald-600 hover:bg-emerald-500 text-white font-black uppercase italic tracking-widest rounded-xl shadow-[0_0_20px_rgba(16,185,129,0.2)] transition-all"
+                                        disabled={isPending || !adHocItem.name || selectedShopsForAdHoc.length === 0}
+                                        className="w-full h-14 bg-emerald-600 hover:bg-emerald-500 text-white font-black uppercase italic tracking-widest rounded-xl shadow-[0_0_20px_rgba(16,185,129,0.2)] transition-all disabled:opacity-50"
                                     >
                                         Commit Ad-Hoc Item to master ledger
                                     </Button>
@@ -653,9 +699,43 @@ export default function InventoryMaster({ db }: { db: any }) {
                                 <Zap className="h-6 w-6 text-yellow-500 animate-pulse" /> Live Master ledger inventory
                             </CardTitle>
                         </CardHeader>
-                        <CardContent className="p-0">
+                        <CardContent className="p-6 space-y-6">
+                            {/* Search Bar */}
+                            <div className="flex gap-3">
+                                <div className="flex-1 relative">
+                                    <Search className="absolute left-3 top-3 h-5 w-5 text-slate-500" />
+                                    <Input
+                                        placeholder="Search by product name, category, or SKU..."
+                                        value={searchTerm}
+                                        onChange={(e) => setSearchTerm(e.target.value)}
+                                        className="pl-10 h-11 bg-slate-950 border-slate-800 text-slate-200"
+                                    />
+                                </div>
+                                {searchTerm && (
+                                    <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        onClick={() => setSearchTerm("")}
+                                        className="h-11 w-11 text-slate-500 hover:text-slate-300"
+                                    >
+                                        <X className="h-4 w-4" />
+                                    </Button>
+                                )}
+                            </div>
+
+                            {/* Results info */}
+                            <div className="text-xs font-bold text-slate-500">
+                                Showing {filteredInventory.length} of {inventory.length} products
+                            </div>
+
+                            {/* Inventory List */}
                             <div className="divide-y divide-slate-800">
-                                {inventory.map((item: any) => {
+                                {filteredInventory.length === 0 ? (
+                                    <div className="text-center py-10 text-slate-500">
+                                        {searchTerm ? "No products match your search" : "No inventory items"}
+                                    </div>
+                                ) : (
+                                    filteredInventory.map((item: any) => {
                                     const insights = getInsights(item.id, item.quantity, item.landedCost, item.dateAdded);
                                     return (
                                         <div key={item.id} className="p-6 flex items-center justify-between group hover:bg-white/5 transition-all">
@@ -710,7 +790,8 @@ export default function InventoryMaster({ db }: { db: any }) {
                                             </div>
                                         </div>
                                     );
-                                })}
+                                })
+                                )}
                             </div>
                         </CardContent>
                     </Card>

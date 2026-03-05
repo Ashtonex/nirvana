@@ -294,10 +294,29 @@ export async function recordSale(sale: any) {
     revalidatePath(`/shops/${sale.shopId}`); revalidatePath("/inventory");
 }
 
-export async function registerInventoryItem(item: { name: string, category: string, quantity: number, acquisitionPrice: number, landedCost: number }) {
+export async function registerInventoryItem(item: { name: string, category: string, quantity: number, acquisitionPrice: number, landedCost: number }, shopIds?: string[]) {
     const id = Math.random().toString(36).substring(2, 9);
     const date_added = new Date().toISOString();
     await supabaseAdmin.from('inventory_items').insert({ id, ...item, date_added });
+    
+    // Create allocations for selected shops
+    if (shopIds && shopIds.length > 0) {
+        const quantityPerShop = Math.floor(item.quantity / shopIds.length);
+        const remainder = item.quantity % shopIds.length;
+        
+        for (let i = 0; i < shopIds.length; i++) {
+            const shopId = shopIds[i];
+            const qty = quantityPerShop + (i < remainder ? 1 : 0);
+            if (qty > 0) {
+                await supabaseAdmin.from('inventory_allocations').insert({
+                    item_id: id,
+                    shop_id: shopId,
+                    quantity: qty
+                });
+            }
+        }
+    }
+    
     revalidatePath("/inventory");
     return { id };
 }
@@ -453,11 +472,11 @@ export async function finalizeQuotation(quoteId: string) {
 export async function addNewProductFromPos(productData: any) {
     const id = Math.random().toString(36).substring(2, 9);
     const timestamp = new Date().toISOString();
-    await supabase.from('inventory_items').insert({
+    await supabaseAdmin.from('inventory_items').insert({
         id, shipment_id: 'POS-AD-HOC', name: productData.name, category: productData.category,
         quantity: productData.initialStock || 0, acquisition_price: productData.landedCost, landed_cost: productData.landedCost, date_added: timestamp
     });
-    await supabase.from('inventory_allocations').insert({ item_id: id, shop_id: productData.shopId, quantity: productData.initialStock || 0 });
+    await supabaseAdmin.from('inventory_allocations').insert({ item_id: id, shop_id: productData.shopId, quantity: productData.initialStock || 0 });
     revalidatePath("/inventory"); revalidatePath(`/shops/${productData.shopId}`);
     return { id };
 }
