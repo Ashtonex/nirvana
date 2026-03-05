@@ -67,12 +67,15 @@ function LoginForm() {
           setLoading(false);
           return;
         }
+        // Wait for cookie to settle then redirect
+        await new Promise(resolve => setTimeout(resolve, 500));
         window.location.href = "/";
         return;
       }
       
       const { error } = await signIn(ownerEmail, ownerPassword);
       if (error) throw error;
+      await new Promise(resolve => setTimeout(resolve, 500));
       window.location.href = "/";
     } catch (e: any) {
       console.log("Login error:", e);
