@@ -43,12 +43,28 @@ function isPublicAsset(pathname: string) {
     pathname.startsWith("/_next/") ||
     pathname === "/favicon.ico" ||
     pathname === "/manifest.json" ||
-    pathname.startsWith("/icon-")
+    pathname.startsWith("/icon-") ||
+    pathname.startsWith("/login") ||
+    pathname.startsWith("/staff-login") ||
+    pathname.startsWith("/api/staff/login") ||
+    pathname.startsWith("/api/staff/request")
   );
+}
+
+function isAuthenticated(req: NextRequest) {
+  const authToken = req.cookies.get("sb-access-token");
+  const refreshToken = req.cookies.get("sb-refresh-token");
+  const staffToken = req.cookies.get("nirvana_staff");
+  return !!(authToken?.value || refreshToken?.value || staffToken?.value);
 }
 
 export function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
+
+  // Check if authenticated for non-public routes
+  if (!isPublicAsset(pathname) && !isAuthenticated(req)) {
+    return NextResponse.redirect(new URL("/login", req.url));
+  }
 
   // Optional outer gate for test day (prevents public access to SSR data)
   if (!isPublicAsset(pathname)) {

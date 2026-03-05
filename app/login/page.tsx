@@ -60,7 +60,7 @@ function LoginForm() {
     try {
       const { error } = await signIn(ownerEmail, ownerPassword);
       if (error) throw error;
-      // AccessGate will redirect after auth state updates.
+      router.push("/");
     } catch (e: any) {
       setError(e?.message || "Failed to sign in");
       setLoading(false);

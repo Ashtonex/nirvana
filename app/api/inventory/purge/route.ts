@@ -1,15 +1,14 @@
 import { NextResponse } from "next/server";
+import { cookies } from "next/headers";
 import { supabaseAdmin } from "@/lib/supabase";
 
-function getBearerToken(req: Request) {
-  const auth = req.headers.get("authorization") || "";
-  const m = auth.match(/^Bearer\s+(.+)$/i);
-  return m?.[1] || "";
-}
-
-async function requireOwner(req: Request) {
-  const token = getBearerToken(req);
-  if (!token) return { ok: false, status: 401, error: "Missing token" };
+async function requireOwner() {
+  const cookieStore = await cookies();
+  const auth = cookieStore.get("sb-access-token");
+  const refresh = cookieStore.get("sb-refresh-token");
+  const token = auth?.value || refresh?.value;
+  
+  if (!token) return { ok: false, status: 401, error: "Not authenticated" };
 
   const { data, error } = await supabaseAdmin.auth.getUser(token);
   if (error || !data.user) return { ok: false, status: 401, error: "Invalid token" };
@@ -26,7 +25,7 @@ async function requireOwner(req: Request) {
 }
 
 export async function POST(req: Request) {
-  const auth = await requireOwner(req);
+  const auth = await requireOwner();
   if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status });
 
   const body = await req.json().catch(() => ({}));

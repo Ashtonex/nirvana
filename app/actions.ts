@@ -319,7 +319,7 @@ export async function registerBulkInventoryItems(
         
         let landedCost: number;
         if (!hasExpenses) {
-            landedCost = item.price * (0.35 + Math.random() * 0.10);
+            landedCost = item.price * (0.47 + Math.random() * 0.06);
         } else if (landedCostMethod === 'flat') {
             landedCost = item.price;
         } else {
