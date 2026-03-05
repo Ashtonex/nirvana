@@ -1,0 +1,76 @@
+
+> nirvana@0.1.0 build
+> next build
+
+▲ Next.js 16.1.6 (Turbopack)
+- Environments: .env.local
+
+  Creating an optimized production build ...
+✓ Compiled successfully in 45s
+  Running TypeScript ...
+  Collecting page data using 7 workers ...
+  Generating static pages using 7 workers (0/35) ...
+  Generating static pages using 7 workers (8/35) 
+  Generating static pages using 7 workers (17/35) 
+  Generating static pages using 7 workers (26/35) 
+✓ Generating static pages using 7 workers (35/35) in 1844.7ms
+  Finalizing page optimization ...
+
+Route (app)
+┌ ƒ /
+├ ○ /_not-found
+├ ○ /admin/audit
+├ ○ /admin/backups
+├ ƒ /admin/settings
+├ ƒ /admin/tax
+├ ƒ /api/admin/nuke
+├ ƒ /api/auth/me
+├ ƒ /api/backups
+├ ƒ /api/backups/download
+├ ƒ /api/backups/restore
+├ ƒ /api/chat
+├ ƒ /api/dashboard/realtime
+├ ƒ /api/docs/tax-guide
+├ ƒ /api/eod
+├ ƒ /api/eod/pdf
+├ ƒ /api/inventory/purge
+├ ƒ /api/notifications
+├ ƒ /api/notifications/[id]
+├ ƒ /api/owner/login
+├ ƒ /api/owner/logout
+├ ƒ /api/returns
+├ ƒ /api/staff/chat
+├ ƒ /api/staff/login
+├ ƒ /api/staff/logout
+├ ƒ /api/staff/me
+├ ƒ /api/staff/request
+├ ƒ /api/staff/status
+├ ƒ /api/staff/verify
+├ ƒ /api/stock-requests
+├ ƒ /api/test
+├ ƒ /api/verify-mobile
+├ ƒ /api/verify-mobile/confirm
+├ ○ /chat
+├ ƒ /employees
+├ ƒ /employees/leaderboard
+├ ƒ /finance
+├ ƒ /finance/oracle
+├ ƒ /intelligence
+├ ƒ /inventory
+├ ƒ /inventory/history
+├ ○ /inventory/stocktake
+├ ○ /login
+├ ƒ /mobile-menu
+├ ƒ /quotations/[quoteId]
+├ ƒ /reports
+├ ƒ /shops/[shopId]
+├ ○ /staff-chat
+├ ○ /staff-login
+└ ƒ /transfers
+
+
+ƒ Proxy (Middleware)
+
+○  (Static)   prerendered as static content
+ƒ  (Dynamic)  server-rendered on demand
+

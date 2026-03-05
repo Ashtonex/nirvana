@@ -130,11 +130,24 @@ export default function InventoryMaster({ db }: { db: any }) {
             return;
         }
         
+        if (!adHocItem.name || adHocItem.quantity <= 0 || adHocItem.landedCost <= 0) {
+            alert("Please fill all fields with valid values");
+            return;
+        }
+        
         startTransition(async () => {
-            await registerInventoryItem(adHocItem, selectedShopsForAdHoc);
+            // Calculate acquisition price as total cost (landed cost per unit × quantity)
+            const acquisitionPrice = adHocItem.landedCost * adHocItem.quantity;
+            const itemToRegister = {
+                ...adHocItem,
+                acquisitionPrice
+            };
+            
+            await registerInventoryItem(itemToRegister, selectedShopsForAdHoc);
             setShowAdHoc(false);
             setAdHocItem({ name: "", category: "", quantity: 0, acquisitionPrice: 0, landedCost: 0 });
             setSelectedShopsForAdHoc([]);
+            alert(`${adHocItem.name} added to master inventory and allocated to selected shops!`);
         });
     };
 
@@ -389,7 +402,7 @@ export default function InventoryMaster({ db }: { db: any }) {
                                                 type="number"
                                                 className="bg-slate-950 border-slate-800 text-emerald-400 font-black h-12"
                                                 value={adHocItem.landedCost}
-                                                onChange={(e) => setAdHocItem({ ...adHocItem, landedCost: Number(e.target.value), acquisitionPrice: Number(e.target.value) })}
+                                                onChange={(e) => setAdHocItem({ ...adHocItem, landedCost: Number(e.target.value) })}
                                             />
                                         </div>
                                     </div>
@@ -416,7 +429,7 @@ export default function InventoryMaster({ db }: { db: any }) {
                                     
                                     <Button
                                         onClick={handleRegisterAdHoc}
-                                        disabled={isPending || !adHocItem.name || selectedShopsForAdHoc.length === 0}
+                                        disabled={isPending || !adHocItem.name || adHocItem.quantity <= 0 || adHocItem.landedCost <= 0 || selectedShopsForAdHoc.length === 0}
                                         className="w-full h-14 bg-emerald-600 hover:bg-emerald-500 text-white font-black uppercase italic tracking-widest rounded-xl shadow-[0_0_20px_rgba(16,185,129,0.2)] transition-all disabled:opacity-50"
                                     >
                                         Commit Ad-Hoc Item to master ledger

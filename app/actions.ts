@@ -297,7 +297,15 @@ export async function recordSale(sale: any) {
 export async function registerInventoryItem(item: { name: string, category: string, quantity: number, acquisitionPrice: number, landedCost: number }, shopIds?: string[]) {
     const id = Math.random().toString(36).substring(2, 9);
     const date_added = new Date().toISOString();
-    await supabaseAdmin.from('inventory_items').insert({ id, ...item, date_added });
+    await supabaseAdmin.from('inventory_items').insert({
+        id,
+        name: item.name,
+        category: item.category,
+        quantity: item.quantity,
+        acquisition_price: item.acquisitionPrice,
+        landed_cost: item.landedCost,
+        date_added
+    });
     
     // Create allocations for selected shops
     if (shopIds && shopIds.length > 0) {
@@ -318,6 +326,13 @@ export async function registerInventoryItem(item: { name: string, category: stri
     }
     
     revalidatePath("/inventory");
+    revalidatePath("/");
+    // Revalidate all shop pages
+    if (shopIds) {
+        for (const shopId of shopIds) {
+            revalidatePath(`/shops/${shopId}`);
+        }
+    }
     return { id };
 }
 
@@ -382,11 +397,29 @@ export async function registerBulkInventoryItems(
 export async function updateInventoryItem(itemId: string, updates: any) {
     await supabaseAdmin.from('inventory_items').update(updates).eq('id', itemId);
     revalidatePath("/inventory");
+    revalidatePath("/");
+    
+    // Also revalidate all shop pages in case allocations are affected
+    const { data: shops } = await supabaseAdmin.from('shops').select('id');
+    if (shops) {
+        for (const shop of shops) {
+            revalidatePath(`/shops/${shop.id}`);
+        }
+    }
 }
 
 export async function deleteInventoryItem(itemId: string) {
     await supabaseAdmin.from('inventory_items').delete().eq('id', itemId);
     revalidatePath("/inventory");
+    revalidatePath("/");
+    
+    // Also revalidate all shop pages
+    const { data: shops } = await supabaseAdmin.from('shops').select('id');
+    if (shops) {
+        for (const shop of shops) {
+            revalidatePath(`/shops/${shop.id}`);
+        }
+    }
 }
 
 export async function recordStocktake(stocktakeData: any) {
@@ -477,7 +510,9 @@ export async function addNewProductFromPos(productData: any) {
         quantity: productData.initialStock || 0, acquisition_price: productData.landedCost, landed_cost: productData.landedCost, date_added: timestamp
     });
     await supabaseAdmin.from('inventory_allocations').insert({ item_id: id, shop_id: productData.shopId, quantity: productData.initialStock || 0 });
-    revalidatePath("/inventory"); revalidatePath(`/shops/${productData.shopId}`);
+    revalidatePath("/inventory"); 
+    revalidatePath("/");
+    revalidatePath(`/shops/${productData.shopId}`);
     return { id };
 }
 
