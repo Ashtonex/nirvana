@@ -41,6 +41,7 @@ export function AccessGate({ children }: { children: React.ReactNode }) {
   if (staffShopId) {
     const onTheirShop = pathname === `/shops/${staffShopId}` || pathname.startsWith(`/shops/${staffShopId}/`);
     const onStaffChat = pathname === "/staff-chat";
+    const onCommandCenter = pathname === "/";
     
     if (onTheirShop || onStaffChat) {
       return <>{children}</>;

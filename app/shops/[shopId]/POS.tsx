@@ -86,6 +86,16 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
     const [returnBusy, setReturnBusy] = useState(false);
     const [returnStatus, setReturnStatus] = useState<string>("");
 
+    // Today's receipts modal
+    const [isReceiptsModalOpen, setIsReceiptsModalOpen] = useState(false);
+
+    // Get today's sales for dropdown
+    const today = new Date().toISOString().split('T')[0];
+    const todaysSales = (db.sales || []).filter((s: any) => {
+        const saleDate = s.date?.split('T')[0];
+        return saleDate === today && s.shopId === shopId;
+    });
+
     // Ad-hoc Product Modal State
     const [isAddProductModalOpen, setIsAddProductModalOpen] = useState(false);
     const [newProduct, setNewProduct] = useState({ name: "", category: "", landedCost: "", initialStock: "0" });
@@ -346,6 +356,15 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
                             title="Issue return / credit note"
                         >
                             <Receipt className="h-4 w-4" /> Return
+                        </Button>
+
+                        <Button
+                            onClick={() => setIsReceiptsModalOpen(true)}
+                            variant="outline"
+                            className="h-10 px-3 border-emerald-500/30 text-emerald-200 hover:bg-emerald-500/10 text-[10px] font-black uppercase italic flex items-center gap-2"
+                            title="View today's receipts"
+                        >
+                            <FileText className="h-4 w-4" /> Receipts
                         </Button>
 
                         <Button
@@ -671,11 +690,27 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
             >
                 <div className="space-y-4">
                     <p className="text-[10px] text-slate-500 font-bold uppercase">
-                        Manager-only. Enter the Sale ID (from Tax Ledger / Reports) and the quantity to reverse.
+                        Manager-only. Select a Sale ID from today's sales or enter manually.
                     </p>
 
                     <div className="space-y-2">
-                        <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Sale ID</label>
+                        <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Select Sale (Today)</label>
+                        <select
+                            value={returnSaleId}
+                            onChange={(e) => setReturnSaleId(e.target.value)}
+                            className="h-10 bg-slate-950 border border-slate-800 rounded-md text-xs font-bold text-slate-200 px-3 outline-none w-full"
+                        >
+                            <option value="">-- Select a sale --</option>
+                            {todaysSales.map((sale: any) => (
+                                <option key={sale.id} value={sale.id}>
+                                    {sale.id} - {sale.clientName || 'Walk-in'} - ${(sale.totalWithTax || 0).toFixed(2)}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+
+                    <div className="space-y-2">
+                        <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Or Enter Sale ID Manually</label>
                         <Input
                             value={returnSaleId}
                             onChange={(e) => setReturnSaleId(e.target.value)}
@@ -777,6 +812,38 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
                     >
                         {returnBusy ? <RefreshCcw className="h-4 w-4 animate-spin" /> : "Issue Credit Note"}
                     </Button>
+                </div>
+            </Modal>
+
+            <Modal
+                isOpen={isReceiptsModalOpen}
+                onClose={() => setIsReceiptsModalOpen(false)}
+                title="Today's Receipts"
+            >
+                <div className="space-y-4 max-h-[60vh] overflow-y-auto">
+                    {todaysSales.length === 0 ? (
+                        <p className="text-slate-500 text-center py-8">No sales recorded today</p>
+                    ) : (
+                        <div className="space-y-2">
+                            <p className="text-[10px] text-slate-500 font-bold uppercase">
+                                {todaysSales.length} sale{todaysSales.length !== 1 ? 's' : ''} today
+                            </p>
+                            {todaysSales.map((sale: any) => (
+                                <div key={sale.id} className="bg-slate-950 border border-slate-800 rounded-lg p-3">
+                                    <div className="flex justify-between items-start">
+                                        <div>
+                                            <p className="text-xs font-bold text-slate-200">{sale.id}</p>
+                                            <p className="text-[10px] text-slate-500">{sale.clientName || 'Walk-in'}</p>
+                                        </div>
+                                        <div className="text-right">
+                                            <p className="text-xs font-bold text-emerald-400">${(sale.totalWithTax || 0).toFixed(2)}</p>
+                                            <p className="text-[10px] text-slate-500">{sale.items?.length || 0} items</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
                 </div>
             </Modal>
         </div>
