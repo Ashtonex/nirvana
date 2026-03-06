@@ -51,7 +51,7 @@ export default function InventoryMaster({ db }: { db: any }) {
         const daysToZero = velocity > 0 ? Math.floor(currentQty / velocity) : Infinity;
 
         // Aging & Bleed (Nirvana Logic)
-        const totalGlobalOverhead = Object.values(globalExpenses).reduce((a: any, b: any) => a + Number(b), 0) as number;
+        const totalGlobalOverhead = (globalExpenses && typeof globalExpenses === 'object') ? Object.values(globalExpenses).reduce((a: any, b: any) => a + Number(b), 0) as number : 0;
         const totalInventoryPieces = inventory.reduce((sum: number, i: any) => sum + i.quantity, 0);
         const dailyBleedPerPiece = totalInventoryPieces > 0 ? (totalGlobalOverhead / 30) / totalInventoryPieces : 0;
         const daysInStock = Math.floor((new Date().getTime() - new Date(dateAdded).getTime()) / (1000 * 3600 * 24));
@@ -129,12 +129,12 @@ export default function InventoryMaster({ db }: { db: any }) {
             alert("Please select at least one shop to allocate the product to");
             return;
         }
-        
+
         if (!adHocItem.name || adHocItem.quantity <= 0 || adHocItem.landedCost <= 0) {
             alert("Please fill all fields with valid values");
             return;
         }
-        
+
         startTransition(async () => {
             // Calculate acquisition price as total cost (landed cost per unit × quantity)
             const acquisitionPrice = adHocItem.landedCost * adHocItem.quantity;
@@ -142,7 +142,7 @@ export default function InventoryMaster({ db }: { db: any }) {
                 ...adHocItem,
                 acquisitionPrice
             };
-            
+
             await registerInventoryItem(itemToRegister, selectedShopsForAdHoc);
             setShowAdHoc(false);
             setAdHocItem({ name: "", category: "", quantity: 0, acquisitionPrice: 0, landedCost: 0 });
@@ -154,43 +154,43 @@ export default function InventoryMaster({ db }: { db: any }) {
     const parseCSV = (text: string): Array<{ name: string; category: string; quantity: number; price: number }> => {
         const lines = text.trim().split('\n');
         const results: Array<{ name: string; category: string; quantity: number; price: number }> = [];
-        
+
         // Start at 0 - detect if first row is header or data
         for (let i = 0; i < lines.length; i++) {
             const line = lines[i].trim();
             if (!line) continue;
-            
+
             const parts = line.split(',').map(p => p.trim());
             if (parts.length >= 4) {
                 const name = parts[0];
                 const category = parts[1];
                 const quantity = parseInt(parts[2]);
                 const price = parseFloat(parts[3]);
-                
+
                 // Skip if looks like a header (contains letters in qty/price)
                 if (isNaN(quantity) || isNaN(price)) continue;
-                
+
                 if (name && category && !isNaN(quantity) && !isNaN(price)) {
                     results.push({ name, category, quantity, price });
                 }
             }
         }
-        
+
         return results;
     };
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (!file) return;
-        
+
         setBulkFile(file);
         setBulkError("");
-        
+
         const reader = new FileReader();
         reader.onload = (event) => {
             const text = event.target?.result as string;
             const parsed = parseCSV(text);
-            
+
             if (parsed.length === 0) {
                 setBulkError("No valid items found in CSV. Expected format: name,category,quantity,price");
                 setBulkParsedData([]);
@@ -206,12 +206,12 @@ export default function InventoryMaster({ db }: { db: any }) {
             setBulkError("Please select at least one shop");
             return;
         }
-        
+
         if (bulkParsedData.length === 0) {
             setBulkError("Please upload a valid CSV file");
             return;
         }
-        
+
         setIsUploading(true);
         startTransition(async () => {
             await registerBulkInventoryItems(bulkParsedData, bulkShops, bulkLandedCostMethod, globalExpenses);
@@ -241,8 +241,8 @@ export default function InventoryMaster({ db }: { db: any }) {
         }
     };
 
-    const [selectedShopId, setSelectedShopId] = useState(db.shops[0]?.id || "");
-    const [localShopExpenses, setLocalShopExpenses] = useState(db.shops[0]?.expenses || { rent: 0, salaries: 0, utilities: 0, misc: 0 });
+    const [selectedShopId, setSelectedShopId] = useState(db?.shops?.[0]?.id || "");
+    const [localShopExpenses, setLocalShopExpenses] = useState(db?.shops?.[0]?.expenses || { rent: 0, salaries: 0, utilities: 0, misc: 0 });
 
     const itemsTotal = items.reduce((sum, item) => sum + (Number(item.acquisitionPrice) || 0), 0);
     const allocatedPieces = items.reduce((sum, item) => sum + (Number(item.quantity) || 0), 0);
@@ -406,7 +406,7 @@ export default function InventoryMaster({ db }: { db: any }) {
                                             />
                                         </div>
                                     </div>
-                                    
+
                                     {/* Shop Selection */}
                                     <div className="space-y-3 mb-6">
                                         <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Allocate to Shops</label>
@@ -415,18 +415,17 @@ export default function InventoryMaster({ db }: { db: any }) {
                                                 <button
                                                     key={shop.id}
                                                     onClick={() => toggleAdHocShop(shop.id)}
-                                                    className={`px-4 py-2 rounded-lg border-2 font-black uppercase text-xs tracking-widest transition-all ${
-                                                        selectedShopsForAdHoc.includes(shop.id)
-                                                            ? 'bg-emerald-500/20 border-emerald-500 text-emerald-400'
-                                                            : 'bg-slate-950 border-slate-800 text-slate-500 hover:border-slate-700'
-                                                    }`}
+                                                    className={`px-4 py-2 rounded-lg border-2 font-black uppercase text-xs tracking-widest transition-all ${selectedShopsForAdHoc.includes(shop.id)
+                                                        ? 'bg-emerald-500/20 border-emerald-500 text-emerald-400'
+                                                        : 'bg-slate-950 border-slate-800 text-slate-500 hover:border-slate-700'
+                                                        }`}
                                                 >
                                                     {shop.name}
                                                 </button>
                                             ))}
                                         </div>
                                     </div>
-                                    
+
                                     <Button
                                         onClick={handleRegisterAdHoc}
                                         disabled={isPending || !adHocItem.name || adHocItem.quantity <= 0 || adHocItem.landedCost <= 0 || selectedShopsForAdHoc.length === 0}
@@ -451,11 +450,10 @@ export default function InventoryMaster({ db }: { db: any }) {
                                                     <button
                                                         key={shop.id}
                                                         onClick={() => toggleShop(shop.id)}
-                                                        className={`px-4 py-2 rounded-lg border-2 font-black uppercase text-xs tracking-widest transition-all ${
-                                                            bulkShops.includes(shop.id)
-                                                                ? 'bg-violet-500/20 border-violet-500 text-violet-400'
-                                                                : 'bg-slate-950 border-slate-800 text-slate-500 hover:border-slate-700'
-                                                        }`}
+                                                        className={`px-4 py-2 rounded-lg border-2 font-black uppercase text-xs tracking-widest transition-all ${bulkShops.includes(shop.id)
+                                                            ? 'bg-violet-500/20 border-violet-500 text-violet-400'
+                                                            : 'bg-slate-950 border-slate-800 text-slate-500 hover:border-slate-700'
+                                                            }`}
                                                     >
                                                         {shop.name}
                                                     </button>
@@ -468,27 +466,25 @@ export default function InventoryMaster({ db }: { db: any }) {
                                             <div className="flex gap-2">
                                                 <button
                                                     onClick={() => setBulkLandedCostMethod('flat')}
-                                                    className={`flex-1 px-4 py-2 rounded-lg border-2 font-black uppercase text-xs tracking-widest transition-all ${
-                                                        bulkLandedCostMethod === 'flat'
-                                                            ? 'bg-emerald-500/20 border-emerald-500 text-emerald-400'
-                                                            : 'bg-slate-950 border-slate-800 text-slate-500 hover:border-slate-700'
-                                                    }`}
+                                                    className={`flex-1 px-4 py-2 rounded-lg border-2 font-black uppercase text-xs tracking-widest transition-all ${bulkLandedCostMethod === 'flat'
+                                                        ? 'bg-emerald-500/20 border-emerald-500 text-emerald-400'
+                                                        : 'bg-slate-950 border-slate-800 text-slate-500 hover:border-slate-700'
+                                                        }`}
                                                 >
                                                     Flat Rate
                                                 </button>
                                                 <button
                                                     onClick={() => setBulkLandedCostMethod('auto')}
-                                                    className={`flex-1 px-4 py-2 rounded-lg border-2 font-black uppercase text-xs tracking-widest transition-all ${
-                                                        bulkLandedCostMethod === 'auto'
-                                                            ? 'bg-amber-500/20 border-amber-500 text-amber-400'
-                                                            : 'bg-slate-950 border-slate-800 text-slate-500 hover:border-slate-700'
-                                                    }`}
+                                                    className={`flex-1 px-4 py-2 rounded-lg border-2 font-black uppercase text-xs tracking-widest transition-all ${bulkLandedCostMethod === 'auto'
+                                                        ? 'bg-amber-500/20 border-amber-500 text-amber-400'
+                                                        : 'bg-slate-950 border-slate-800 text-slate-500 hover:border-slate-700'
+                                                        }`}
                                                 >
                                                     Auto-Calculate
                                                 </button>
                                             </div>
                                             <p className="text-[9px] text-slate-500">
-                                                {bulkLandedCostMethod === 'flat' 
+                                                {bulkLandedCostMethod === 'flat'
                                                     ? 'Uses price column as landed cost directly'
                                                     : 'Adds overhead fraction to price based on monthly expenses'
                                                 }
@@ -749,61 +745,61 @@ export default function InventoryMaster({ db }: { db: any }) {
                                     </div>
                                 ) : (
                                     filteredInventory.map((item: any) => {
-                                    const insights = getInsights(item.id, item.quantity, item.landedCost, item.dateAdded);
-                                    return (
-                                        <div key={item.id} className="p-6 flex items-center justify-between group hover:bg-white/5 transition-all">
-                                            <div className="flex items-center gap-6">
-                                                <div className="h-12 w-12 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-center group-hover:border-violet-500/40 transition-colors">
-                                                    <Target className="h-6 w-6 text-slate-500 group-hover:text-violet-400" />
+                                        const insights = getInsights(item.id, item.quantity, item.landedCost, item.dateAdded);
+                                        return (
+                                            <div key={item.id} className="p-6 flex items-center justify-between group hover:bg-white/5 transition-all">
+                                                <div className="flex items-center gap-6">
+                                                    <div className="h-12 w-12 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-center group-hover:border-violet-500/40 transition-colors">
+                                                        <Target className="h-6 w-6 text-slate-500 group-hover:text-violet-400" />
+                                                    </div>
+                                                    <div>
+                                                        <p className="text-lg font-black uppercase tracking-tight text-white">{item.name}</p>
+                                                        <p className="text-[10px] font-black text-slate-600 uppercase tracking-widest">{item.sku} | {item.category} | Stock Age: {insights.daysInStock}d</p>
+                                                    </div>
                                                 </div>
-                                                <div>
-                                                    <p className="text-lg font-black uppercase tracking-tight text-white">{item.name}</p>
-                                                    <p className="text-[10px] font-black text-slate-600 uppercase tracking-widest">{item.sku} | {item.category} | Stock Age: {insights.daysInStock}d</p>
+                                                <div className="flex gap-8 items-center">
+                                                    <div className="text-right">
+                                                        <p className="text-[10px] font-black text-slate-600 uppercase mb-1">Bleed / Pc</p>
+                                                        <p className="text-xs font-black text-rose-500/80 italic">${insights.cumulativeBleed.toFixed(2)}</p>
+                                                    </div>
+                                                    <div className="text-right">
+                                                        <p className="text-[10px] font-black text-violet-500 uppercase mb-1">Target Price</p>
+                                                        <p className="text-lg font-black text-violet-400 italic">${insights.suggestedPrice.toFixed(2)}</p>
+                                                    </div>
+                                                    <div className="text-right min-w-[70px]">
+                                                        <p className="text-[10px] font-black text-slate-600 uppercase mb-1">Velocity</p>
+                                                        <p className="text-sm font-black text-emerald-400 italic">{insights.velocity.toFixed(2)}/d</p>
+                                                    </div>
+                                                    <div className="flex items-center gap-3 ml-4 pl-4 border-l border-slate-800">
+                                                        <button
+                                                            onClick={() => {
+                                                                const newName = prompt("Update Product Name:", item.name);
+                                                                const newQty = prompt("Override Total Quantity:", item.quantity);
+                                                                if (newName && newQty) {
+                                                                    startTransition(() => updateInventoryItem(item.id, { name: newName, quantity: Number(newQty) }));
+                                                                }
+                                                            }}
+                                                            title="Quick Edit Ledger Entry"
+                                                            className="p-2 rounded-lg bg-slate-900 text-slate-500 hover:text-sky-400 transition-colors border border-slate-800"
+                                                        >
+                                                            <Save className="h-4 w-4" />
+                                                        </button>
+                                                        <button
+                                                            onClick={() => {
+                                                                if (confirm(`CRITICAL: Purge ${item.name} from Master Ledger? This action is IRREVERSIBLE.`)) {
+                                                                    startTransition(() => deleteInventoryItem(item.id));
+                                                                }
+                                                            }}
+                                                            title="Purge Entry"
+                                                            className="p-2 rounded-lg bg-slate-900 text-slate-500 hover:text-rose-500 transition-colors border border-slate-800"
+                                                        >
+                                                            <Trash2 className="h-4 w-4" />
+                                                        </button>
+                                                    </div>
                                                 </div>
                                             </div>
-                                            <div className="flex gap-8 items-center">
-                                                <div className="text-right">
-                                                    <p className="text-[10px] font-black text-slate-600 uppercase mb-1">Bleed / Pc</p>
-                                                    <p className="text-xs font-black text-rose-500/80 italic">${insights.cumulativeBleed.toFixed(2)}</p>
-                                                </div>
-                                                <div className="text-right">
-                                                    <p className="text-[10px] font-black text-violet-500 uppercase mb-1">Target Price</p>
-                                                    <p className="text-lg font-black text-violet-400 italic">${insights.suggestedPrice.toFixed(2)}</p>
-                                                </div>
-                                                <div className="text-right min-w-[70px]">
-                                                    <p className="text-[10px] font-black text-slate-600 uppercase mb-1">Velocity</p>
-                                                    <p className="text-sm font-black text-emerald-400 italic">{insights.velocity.toFixed(2)}/d</p>
-                                                </div>
-                                                <div className="flex items-center gap-3 ml-4 pl-4 border-l border-slate-800">
-                                                    <button
-                                                        onClick={() => {
-                                                            const newName = prompt("Update Product Name:", item.name);
-                                                            const newQty = prompt("Override Total Quantity:", item.quantity);
-                                                            if (newName && newQty) {
-                                                                startTransition(() => updateInventoryItem(item.id, { name: newName, quantity: Number(newQty) }));
-                                                            }
-                                                        }}
-                                                        title="Quick Edit Ledger Entry"
-                                                        className="p-2 rounded-lg bg-slate-900 text-slate-500 hover:text-sky-400 transition-colors border border-slate-800"
-                                                    >
-                                                        <Save className="h-4 w-4" />
-                                                    </button>
-                                                    <button
-                                                        onClick={() => {
-                                                            if (confirm(`CRITICAL: Purge ${item.name} from Master Ledger? This action is IRREVERSIBLE.`)) {
-                                                                startTransition(() => deleteInventoryItem(item.id));
-                                                            }
-                                                        }}
-                                                        title="Purge Entry"
-                                                        className="p-2 rounded-lg bg-slate-900 text-slate-500 hover:text-rose-500 transition-colors border border-slate-800"
-                                                    >
-                                                        <Trash2 className="h-4 w-4" />
-                                                    </button>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    );
-                                })
+                                        );
+                                    })
                                 )}
                             </div>
                         </CardContent>

@@ -1,6 +1,6 @@
 "use server";
 
-import { readDb, writeDb, Database, InventoryItem, Sale, Shipment, FinancialEntry, Quotation, Employee, AuditEntry, OracleEmail } from "@/lib/db";
+import { Database, InventoryItem, Sale, Shipment, FinancialEntry, Quotation, Employee, AuditEntry, OracleEmail } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import { ORACLE_RECIPIENT } from "@/lib/resend";
 import { supabase, supabaseAdmin } from "@/lib/supabase";
@@ -163,7 +163,6 @@ export async function updateGlobalExpenses(expenses: Database['globalExpenses'])
         id: Math.random().toString(36).substring(2, 9), timestamp: new Date().toISOString(),
         employee_id: 'ADMIN', action: 'EXPENSES_UPDATED', details: `Updated global expenses`
     });
-    const db = await readDb(); db.globalExpenses = expenses; await writeDb(db);
     revalidatePath("/"); revalidatePath("/finance");
 }
 
@@ -173,8 +172,6 @@ export async function updateShopExpenses(shopId: string, expenses: { rent: numbe
         id: Math.random().toString(36).substring(2, 9), timestamp: new Date().toISOString(),
         employee_id: 'ADMIN', action: 'SHOP_EXPENSES_UPDATED', details: `Shop: ${shopId}`
     });
-    const db = await readDb(); const shop = db.shops.find(s => s.id === shopId);
-    if (shop) { shop.expenses = expenses; await writeDb(db); }
     revalidatePath("/"); revalidatePath("/inventory");
 }
 
