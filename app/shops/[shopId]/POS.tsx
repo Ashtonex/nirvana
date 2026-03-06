@@ -213,76 +213,92 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
 
     const handleCheckout = () => {
         startTransition(async () => {
-            if (posMode === 'sale') {
-                for (const entry of cart) {
-                    const isUntracked = entry.item.id.startsWith('QUICK_');
-                    
-                    if (isUntracked) {
-                        // For untracked items, just record the sale without inventory reduction
-                        // This allows selling items that aren't in the system
-                        const saleId = Math.random().toString(36).substring(2, 9);
-                        const timestamp = new Date().toISOString();
+            try {
+                if (posMode === 'sale') {
+                    for (const entry of cart) {
+                        const isUntracked = entry.item.id.startsWith('QUICK_');
                         
-                        // Directly insert untracked sale
-                        await fetch('/api/sales/untracked', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                                id: saleId,
-                                shop_id: shopId,
-                                item_name: entry.item.name,
+                        if (isUntracked) {
+                            // For untracked items, just record the sale without inventory reduction
+                            // This allows selling items that aren't in the system
+                            const saleId = Math.random().toString(36).substring(2, 9);
+                            const timestamp = new Date().toISOString();
+                            
+                            // Directly insert untracked sale
+                            try {
+                                const response = await fetch('/api/sales/untracked', {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({
+                                        id: saleId,
+                                        shop_id: shopId,
+                                        item_name: entry.item.name,
+                                        quantity: entry.quantity,
+                                        unit_price: entry.price / (1 + taxRate),
+                                        total_before_tax: (entry.price / (1 + taxRate)) * entry.quantity,
+                                        total_with_tax: entry.price * entry.quantity,
+                                        tax: entry.price * entry.quantity - ((entry.price / (1 + taxRate)) * entry.quantity),
+                                        date: timestamp,
+                                        employee_id: selectedEmployeeId || "system",
+                                        client_name: clientName || "General Walk-in",
+                                        payment_method: paymentMethod
+                                    })
+                                });
+                                
+                                if (!response.ok) {
+                                    const errorData = await response.json().catch(() => ({}));
+                                    throw new Error(errorData.error || `API error: ${response.status}`);
+                                }
+                            } catch (err) {
+                                console.error('Failed to record untracked sale:', err);
+                                alert(`Failed to record sale: ${err instanceof Error ? err.message : 'Unknown error'}`);
+                                throw err;  // Stop processing other items
+                            }
+                        } else {
+                            // For tracked items, use normal recordSale which decrements inventory
+                            await recordSale({
+                                shopId,
+                                itemId: entry.item.id,
+                                itemName: entry.item.name,
                                 quantity: entry.quantity,
-                                unit_price: entry.price / (1 + taxRate),
-                                total_before_tax: (entry.price / (1 + taxRate)) * entry.quantity,
-                                total_with_tax: entry.price * entry.quantity,
-                                tax: entry.price * entry.quantity - ((entry.price / (1 + taxRate)) * entry.quantity),
-                                date: timestamp,
-                                employee_id: selectedEmployeeId || "system",
-                                client_name: clientName || "General Walk-in",
-                                payment_method: paymentMethod
-                            })
-                        });
-                    } else {
-                        // For tracked items, use normal recordSale which decrements inventory
-                        await recordSale({
-                            shopId,
-                            itemId: entry.item.id,
-                            itemName: entry.item.name,
-                            quantity: entry.quantity,
-                            unitPrice: entry.price / (1 + taxRate),
-                            totalBeforeTax: (entry.price / (1 + taxRate)) * entry.quantity,
-                            employeeId: selectedEmployeeId || "system",
-                            clientName: clientName || "General Walk-in",
-                            paymentMethod
-                        });
+                                unitPrice: entry.price / (1 + taxRate),
+                                totalBeforeTax: (entry.price / (1 + taxRate)) * entry.quantity,
+                                employeeId: selectedEmployeeId || "system",
+                                clientName: clientName || "General Walk-in",
+                                paymentMethod
+                            });
+                        }
                     }
+                    alert("Sale recorded successfully!");
+                } else {
+                    await recordQuotation({
+                        shopId,
+                        clientName: clientName || "Walk-in Customer",
+                        clientEmail: clientEmail || "",
+                        clientPhone: clientPhone || "",
+                        items: cart.map(c => ({
+                            itemId: c.item.id,
+                            itemName: c.item.name,
+                            quantity: c.quantity,
+                            unitPrice: c.price / (1 + taxRate),
+                            total: c.price * c.quantity
+                        })),
+                        totalBeforeTax,
+                        tax: totalTax,
+                        totalWithTax,
+                        employeeId: selectedEmployeeId || "system"
+                    });
+                    alert("Quotation generated successfully!");
                 }
-                alert("Sale recorded successfully!");
-            } else {
-                await recordQuotation({
-                    shopId,
-                    clientName: clientName || "Walk-in Customer",
-                    clientEmail: clientEmail || "",
-                    clientPhone: clientPhone || "",
-                    items: cart.map(c => ({
-                        itemId: c.item.id,
-                        itemName: c.item.name,
-                        quantity: c.quantity,
-                        unitPrice: c.price / (1 + taxRate),
-                        total: c.price * c.quantity
-                    })),
-                    totalBeforeTax,
-                    tax: totalTax,
-                    totalWithTax,
-                    employeeId: selectedEmployeeId || "system"
-                });
-                alert("Quotation generated successfully!");
+                setCart([]);
+                setClientName("");
+                setClientEmail("");
+                setClientPhone("");
+                setPaymentMethod('cash');
+            } catch (error) {
+                console.error('Checkout failed:', error);
+                // Error already shown via alert above
             }
-            setCart([]);
-            setClientName("");
-            setClientEmail("");
-            setClientPhone("");
-            setPaymentMethod('cash');
         });
     };
 
