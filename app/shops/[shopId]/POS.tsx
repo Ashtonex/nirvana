@@ -90,14 +90,17 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
     // Today's receipts modal
     const [isReceiptsModalOpen, setIsReceiptsModalOpen] = useState(false);
 
-    // Get today's sales for dropdown
-    const today = new Date().toISOString().split('T')[0];
-    const todaysSales = (db.sales || []).filter((s: any) => {
-        const saleDate = s.date?.split('T')[0];
-        return saleDate === today && s.shopId === shopId;
-    });
+     // Get today's sales for dropdown
+     const today = new Date().toISOString().split('T')[0];
+     const todaysSales = (db.sales || []).filter((s: any) => {
+         const saleDate = s.date?.split('T')[0];
+         return saleDate === today && s.shopId === shopId;
+     });
+     
+     // Calculate total sales for today
+     const todaysTotalSales = todaysSales.reduce((sum: number, s: any) => sum + (s.totalWithTax || 0), 0);
 
-    // Ad-hoc Product Modal State
+     // Ad-hoc Product Modal State
     const [isAddProductModalOpen, setIsAddProductModalOpen] = useState(false);
     const [newProduct, setNewProduct] = useState({ name: "", category: "", landedCost: "", initialStock: "0" });
 
@@ -577,12 +580,19 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
                 )}
             </div>
 
-            <Card className="md:col-span-4 h-fit sticky top-6 border-slate-800 bg-slate-950/40 backdrop-blur-md">
-                <CardHeader>
-                    <div className="flex gap-2 mb-4">
-                        <Button variant={posMode === 'sale' ? 'default' : 'outline'} onClick={() => setPosMode('sale')} className={cn("flex-1 text-[10px] font-black uppercase italic h-8", posMode === 'sale' ? 'bg-emerald-600' : 'border-slate-800 text-slate-500')}>Direct Sale</Button>
-                        <Button variant={posMode === 'quote' ? 'default' : 'outline'} onClick={() => setPosMode('quote')} className={cn("flex-1 text-[10px] font-black uppercase italic h-8", posMode === 'quote' ? 'bg-amber-600' : 'border-slate-800 text-slate-500')}>Make Quote</Button>
-                    </div>
+             <Card className="md:col-span-4 h-fit sticky top-6 border-slate-800 bg-slate-950/40 backdrop-blur-md">
+                 <CardHeader>
+                     {/* Daily Sales Total Badge */}
+                     <div className="mb-3 p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
+                         <div className="text-[10px] font-black text-emerald-400 uppercase tracking-widest mb-1">Today's Sales</div>
+                         <div className="text-2xl font-black text-emerald-300 font-mono">${todaysTotalSales.toFixed(2)}</div>
+                         <div className="text-[9px] text-emerald-500 mt-1">{todaysSales.length} transaction{todaysSales.length !== 1 ? 's' : ''}</div>
+                     </div>
+                     
+                     <div className="flex gap-2 mb-4">
+                         <Button variant={posMode === 'sale' ? 'default' : 'outline'} onClick={() => setPosMode('sale')} className={cn("flex-1 text-[10px] font-black uppercase italic h-8", posMode === 'sale' ? 'bg-emerald-600' : 'border-slate-800 text-slate-500')}>Direct Sale</Button>
+                         <Button variant={posMode === 'quote' ? 'default' : 'outline'} onClick={() => setPosMode('quote')} className={cn("flex-1 text-[10px] font-black uppercase italic h-8", posMode === 'quote' ? 'bg-amber-600' : 'border-slate-800 text-slate-500')}>Make Quote</Button>
+                     </div>
                     <CardTitle className="flex items-center gap-2">
                         {posMode === 'sale' ? <ShoppingCart className="h-5 w-5 text-emerald-400" /> : <FileText className="h-5 w-5 text-amber-500" />}
                         {posMode === 'sale' ? "Active Cart" : "Quote Builder"}
