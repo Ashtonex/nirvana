@@ -289,9 +289,56 @@ export async function recordSale(sale: any) {
         }
     }
 
-    await supabase.from('audit_log').insert({ id: Math.random().toString(36).substring(2, 9), timestamp, employee_id: sale.employeeId, action: 'SALE_RECORDED', details: sale.itemName });
+     await supabase.from('audit_log').insert({ id: Math.random().toString(36).substring(2, 9), timestamp, employee_id: sale.employeeId, action: 'SALE_RECORDED', details: sale.itemName });
 
-    revalidatePath(`/shops/${sale.shopId}`); revalidatePath("/inventory");
+     revalidatePath(`/shops/${sale.shopId}`); revalidatePath("/inventory");
+}
+
+export async function recordUntrackedSale(sale: any) {
+     const { data: settings } = await supabase.from('oracle_settings').select('*').single();
+     if (!settings) throw new Error("Settings not found");
+
+     let tax = 0;
+     const taxRate = Number(settings.tax_rate) || 0.155;
+     if (settings.tax_mode === 'all') {
+         tax = sale.totalBeforeTax * taxRate;
+     } else if (settings.tax_mode === 'above_threshold') {
+         if ((sale.totalBeforeTax / sale.quantity) >= Number(settings.tax_threshold)) {
+             tax = sale.totalBeforeTax * taxRate;
+         }
+     }
+
+     const totalWithTax = sale.totalBeforeTax + tax;
+     const saleId = Math.random().toString(36).substring(2, 9);
+     const timestamp = new Date().toISOString();
+
+     await supabase.from('sales').insert({
+         id: saleId,
+         shop_id: sale.shopId,
+         item_id: "UNTRACKED",
+         item_name: sale.itemName,
+         quantity: sale.quantity,
+         unit_price: sale.unitPrice,
+         total_before_tax: sale.totalBeforeTax,
+         tax,
+         total_with_tax: totalWithTax,
+         date: timestamp,
+         employee_id: sale.employeeId,
+         client_name: sale.clientName,
+         payment_method: sale.paymentMethod || 'cash'
+     });
+
+     await supabase.from('audit_log').insert({
+         id: Math.random().toString(36).substring(2, 9),
+         timestamp,
+         employee_id: sale.employeeId,
+         action: 'UNTRACKED_SALE_RECORDED',
+         details: `Untracked sale: ${sale.itemName} x${sale.quantity}`
+     });
+
+     revalidatePath(`/shops/${sale.shopId}`);
+     revalidatePath("/inventory");
+     revalidatePath("/");
 }
 
 export async function registerInventoryItem(item: { name: string, category: string, quantity: number, acquisitionPrice: number, landedCost: number }, shopIds?: string[]) {

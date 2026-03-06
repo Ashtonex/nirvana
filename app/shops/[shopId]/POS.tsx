@@ -37,7 +37,7 @@ import {
     MessageSquare,
     LogOut
 } from "lucide-react";
-import { recordSale, recordQuotation, addNewProductFromPos } from "../../actions";
+import { recordSale, recordQuotation, addNewProductFromPos, recordUntrackedSale } from "../../actions";
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
@@ -219,41 +219,17 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
                         const isUntracked = entry.item.id.startsWith('QUICK_');
                         
                         if (isUntracked) {
-                            // For untracked items, just record the sale without inventory reduction
-                            // This allows selling items that aren't in the system
-                            const saleId = Math.random().toString(36).substring(2, 9);
-                            const timestamp = new Date().toISOString();
-                            
-                            // Directly insert untracked sale
-                            try {
-                                const response = await fetch('/api/sales/untracked', {
-                                    method: 'POST',
-                                    headers: { 'Content-Type': 'application/json' },
-                                    body: JSON.stringify({
-                                        id: saleId,
-                                        shop_id: shopId,
-                                        item_name: entry.item.name,
-                                        quantity: entry.quantity,
-                                        unit_price: entry.price / (1 + taxRate),
-                                        total_before_tax: (entry.price / (1 + taxRate)) * entry.quantity,
-                                        total_with_tax: entry.price * entry.quantity,
-                                        tax: entry.price * entry.quantity - ((entry.price / (1 + taxRate)) * entry.quantity),
-                                        date: timestamp,
-                                        employee_id: selectedEmployeeId || "system",
-                                        client_name: clientName || "General Walk-in",
-                                        payment_method: paymentMethod
-                                    })
-                                });
-                                
-                                if (!response.ok) {
-                                    const errorData = await response.json().catch(() => ({}));
-                                    throw new Error(errorData.error || `API error: ${response.status}`);
-                                }
-                            } catch (err) {
-                                console.error('Failed to record untracked sale:', err);
-                                alert(`Failed to record sale: ${err instanceof Error ? err.message : 'Unknown error'}`);
-                                throw err;  // Stop processing other items
-                            }
+                            // For untracked items, use the server action
+                            await recordUntrackedSale({
+                                shopId,
+                                itemName: entry.item.name,
+                                quantity: entry.quantity,
+                                unitPrice: entry.price / (1 + taxRate),
+                                totalBeforeTax: (entry.price / (1 + taxRate)) * entry.quantity,
+                                employeeId: selectedEmployeeId || "system",
+                                clientName: clientName || "General Walk-in",
+                                paymentMethod
+                            });
                         } else {
                             // For tracked items, use normal recordSale which decrements inventory
                             await recordSale({
@@ -297,7 +273,7 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
                 setPaymentMethod('cash');
             } catch (error) {
                 console.error('Checkout failed:', error);
-                // Error already shown via alert above
+                alert(`Checkout failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
             }
         });
     };
