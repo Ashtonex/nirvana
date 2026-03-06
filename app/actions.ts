@@ -261,20 +261,20 @@ export async function recordSale(sale: any) {
     const saleId = Math.random().toString(36).substring(2, 9);
     const timestamp = new Date().toISOString();
 
-    await supabase.from('sales').insert({
+    await supabaseAdmin.from('sales').insert({
         id: saleId, shop_id: sale.shopId, item_id: sale.itemId, item_name: sale.itemName,
         quantity: sale.quantity, unit_price: sale.unitPrice, total_before_tax: sale.totalBeforeTax,
         tax, total_with_tax: totalWithTax, date: timestamp, employee_id: sale.employeeId, client_name: sale.clientName,
         payment_method: sale.paymentMethod || 'cash'
     });
 
-    const { data: alloc } = await supabase.from('inventory_allocations').select('quantity').eq('item_id', sale.itemId).eq('shop_id', sale.shopId).single();
-    if (alloc) await supabase.from('inventory_allocations').update({ quantity: Math.max(0, alloc.quantity - sale.quantity) }).eq('item_id', sale.itemId).eq('shop_id', sale.shopId);
+    const { data: alloc } = await supabaseAdmin.from('inventory_allocations').select('quantity').eq('item_id', sale.itemId).eq('shop_id', sale.shopId).single();
+    if (alloc) await supabaseAdmin.from('inventory_allocations').update({ quantity: Math.max(0, alloc.quantity - sale.quantity) }).eq('item_id', sale.itemId).eq('shop_id', sale.shopId);
 
-    const { data: item } = await supabase.from('inventory_items').select('quantity, name').eq('id', sale.itemId).single();
+    const { data: item } = await supabaseAdmin.from('inventory_items').select('quantity, name').eq('id', sale.itemId).single();
     if (item) {
         const newQty = Math.max(0, item.quantity - sale.quantity);
-        await supabase.from('inventory_items').update({ quantity: newQty }).eq('id', sale.itemId);
+        await supabaseAdmin.from('inventory_items').update({ quantity: newQty }).eq('id', sale.itemId);
         if (newQty <= 0) {
             try {
                 await sendEmail({
@@ -289,13 +289,13 @@ export async function recordSale(sale: any) {
         }
     }
 
-     await supabase.from('audit_log').insert({ id: Math.random().toString(36).substring(2, 9), timestamp, employee_id: sale.employeeId, action: 'SALE_RECORDED', details: sale.itemName });
+     await supabaseAdmin.from('audit_log').insert({ id: Math.random().toString(36).substring(2, 9), timestamp, employee_id: sale.employeeId, action: 'SALE_RECORDED', details: sale.itemName });
 
      revalidatePath(`/shops/${sale.shopId}`); revalidatePath("/inventory");
 }
 
 export async function recordUntrackedSale(sale: any) {
-     const { data: settings } = await supabase.from('oracle_settings').select('*').single();
+     const { data: settings } = await supabaseAdmin.from('oracle_settings').select('*').single();
      if (!settings) throw new Error("Settings not found");
 
      let tax = 0;
@@ -312,7 +312,7 @@ export async function recordUntrackedSale(sale: any) {
      const saleId = Math.random().toString(36).substring(2, 9);
      const timestamp = new Date().toISOString();
 
-     await supabase.from('sales').insert({
+     await supabaseAdmin.from('sales').insert({
          id: saleId,
          shop_id: sale.shopId,
          item_id: "UNTRACKED",
