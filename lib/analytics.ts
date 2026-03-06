@@ -37,7 +37,7 @@ export async function getBestSellers(daysBack = 30): Promise<SalesMetric[]> {
         .from('sales')
         .select('*')
         .gte('date', cutoffDate.toISOString());
-    
+
     const { data: inventory } = await supabaseAdmin.from('inventory_items').select('id, name, landed_cost');
 
     const invMap = new Map((inventory || []).map((i: any) => [i.id, i]));
@@ -117,26 +117,94 @@ export async function getReorderSuggestions(): Promise<ReorderSuggestion[]> {
 
         const totalSold = recentSales.reduce((sum: number, s: any) => sum + s.quantity, 0);
         const dailyVelocity = totalSold / 30;
-        const daysToZero = dailyVelocity > 0 ? item.quantity / dailyVelocity : Infinity;
+        const daysToZero = dailyVelocity > 0 ? item.quantity / dailyVelocity : (item.quantity === 0 ? 0 : Infinity);
 
-        if (daysToZero < 14 && dailyVelocity > 0) {
-            const targetStock = dailyVelocity * 30;
-            const needed = Math.ceil(targetStock - item.quantity);
+        // Notify if quantity is 0 OR if running low based on velocity
+        if (item.quantity === 0 || (daysToZero < 14 && dailyVelocity > 0)) {
+            const targetStock = dailyVelocity > 0 ? dailyVelocity * 30 : 5; // Default to 5 if no velocity
+            const needed = Math.max(1, Math.ceil(targetStock - item.quantity));
 
-            if (needed > 0) {
-                suggestions.push({
-                    itemId: item.id,
-                    itemName: item.name,
-                    currentStock: item.quantity,
-                    dailyVelocity,
-                    daysToZero,
-                    suggestedReorder: needed
-                });
-            }
+            suggestions.push({
+                itemId: item.id,
+                itemName: item.name,
+                currentStock: item.quantity,
+                dailyVelocity,
+                daysToZero,
+                suggestedReorder: needed
+            });
         }
     }
 
     return suggestions.sort((a, b) => a.daysToZero - b.daysToZero);
+}
+
+export async function getPremiumStockValue() {
+    const { data: inventory } = await supabaseAdmin.from('inventory_items').select('landed_cost, quantity');
+    const totalCost = (inventory || []).reduce((sum: number, item: any) => sum + (item.landed_cost * item.quantity), 0);
+    // Calculate value at 1.65x Premium Multiplier
+    return totalCost * 1.65;
+}
+
+export async function getSalesVsOverheadsData() {
+    const now = new Date();
+    const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+    const currentDay = now.getDate();
+
+    const { data: shops } = await supabaseAdmin.from('shops').select('id, name, expenses');
+    const { data: settings } = await supabaseAdmin.from('oracle_settings').select('global_expenses').single();
+    const { data: sales } = await supabaseAdmin.from('sales').select('shop_id, total_with_tax, date');
+
+    const globalMonthlyOverhead = Object.values(settings?.global_expenses || {}).reduce((a: number, b: any) => a + Number(b), 0);
+    const shopList = shops || [];
+
+    const datasets: Record<string, any[]> = {
+        global: []
+    };
+
+    shopList.forEach((s: any) => datasets[s.id] = []);
+
+    // Daily calculation
+    for (let day = 1; day <= daysInMonth; day++) {
+        // Overheads Line (Cumulative Linear Growth)
+        // We only show up to today if we want "live" view, but linear overhead is fixed
+        const dailyGlobalOverhead = globalMonthlyOverhead / daysInMonth;
+        const cumulativeGlobalOverhead = dailyGlobalOverhead * day;
+
+        // Sales Line (Cumulative)
+        const dateStr = new Date(now.getFullYear(), now.getMonth(), day).toISOString().split('T')[0];
+
+        // Global Datapoint
+        const globalDaySales = (sales || []).filter((s: any) => s.date.startsWith(dateStr)).reduce((sum: number, s: any) => sum + s.total_with_tax, 0);
+        const prevGlobalSales = datasets.global[day - 2]?.sales || 0;
+        const cumulativeGlobalSales = day > currentDay ? null : prevGlobalSales + globalDaySales;
+
+        datasets.global.push({
+            day,
+            overhead: cumulativeGlobalOverhead,
+            sales: cumulativeGlobalSales,
+            profit: (cumulativeGlobalSales !== null && cumulativeGlobalSales > cumulativeGlobalOverhead) ? cumulativeGlobalSales - cumulativeGlobalOverhead : null
+        });
+
+        // Shop Datapoints
+        shopList.forEach((shop: any) => {
+            const shopMonthlyOverhead = Object.values(shop.expenses || {}).reduce((a: number, b: any) => a + Number(b), 0);
+            const dailyShopOverhead = (shopMonthlyOverhead + (globalMonthlyOverhead / shopList.length)) / daysInMonth;
+            const cumulativeShopOverhead = dailyShopOverhead * day;
+
+            const shopDaySales = (sales || []).filter((s: any) => s.shop_id === shop.id && s.date.startsWith(dateStr)).reduce((sum: number, s: any) => sum + s.total_with_tax, 0);
+            const prevShopSales = datasets[shop.id][day - 2]?.sales || 0;
+            const cumulativeShopSales = day > currentDay ? null : prevShopSales + shopDaySales;
+
+            datasets[shop.id].push({
+                day,
+                overhead: cumulativeShopOverhead,
+                sales: cumulativeShopSales,
+                profit: (cumulativeShopSales !== null && cumulativeShopSales > cumulativeShopOverhead) ? cumulativeShopSales - cumulativeShopOverhead : null
+            });
+        });
+    }
+
+    return datasets;
 }
 
 // 4. ZOMBIE/DEAD STOCK HUNTER

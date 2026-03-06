@@ -1,7 +1,8 @@
 "use client";
 
+import React, { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui";
-import { TrendingUp, TrendingDown, Award, AlertCircle, ShoppingCart, Skull } from "lucide-react";
+import { TrendingUp, TrendingDown, Award, AlertCircle, ShoppingCart, Skull, Zap, Target, Scale, DollarSign } from "lucide-react";
 
 interface IntelligenceDashboardProps {
     bestSellers: {
@@ -34,12 +35,58 @@ interface IntelligenceDashboardProps {
 
 export function IntelligenceDashboard({ bestSellers, trends, reorderSuggestions, deadStock }: IntelligenceDashboardProps) {
     const isGrowthPositive = trends.growth >= 0;
+    const [insightIndex, setInsightIndex] = useState(0);
+
+    const insights = [
+        {
+            title: "Inventory Alert",
+            icon: <AlertCircle className="text-rose-400" />,
+            content: reorderSuggestions.length > 0
+                ? `Stockout Risk: ${reorderSuggestions.length} items are critically low. Top priority: ${reorderSuggestions[0]?.itemName}.`
+                : "Inventory levels are currently stabilized across all categories."
+        },
+        {
+            title: "Revenue Pulse",
+            icon: <Zap className="text-amber-400" />,
+            content: isGrowthPositive
+                ? `Growth is at ${trends.growth.toFixed(1)}%. Maintain momentum by ensuring ${bestSellers[0]?.itemName || "top items"} are never out of stock.`
+                : `Revenue is down ${Math.abs(trends.growth).toFixed(1)}%. Consider a 15% markdown on low-velocity items to boost cash flow.`
+        },
+        {
+            title: "Capital Efficiency",
+            icon: <Scale className="text-sky-400" />,
+            content: deadStock.length > 0
+                ? `$${deadStock.reduce((s, i) => s + i.value, 0).toLocaleString()} is tied up in "Zombie Stock". Convert these to cash via bundle deals.`
+                : "Capital allocation is highly efficient. No significant dead stock detected."
+        },
+        {
+            title: "Margin Opportunity",
+            icon: <Target className="text-violet-400" />,
+            content: bestSellers[0]
+                ? `${bestSellers[0].itemName} has high velocity. A minor 2.5% price adjustment could yield significant monthly profit gains.`
+                : "Identify your highest velocity items to optimize price-to-demand elasticity."
+        },
+        {
+            title: "Operational Focus",
+            icon: <DollarSign className="text-emerald-400" />,
+            content: "Break-even target is approaching. Monitor daily cumulative sales vs. overhead alignment in the trajectory chart below."
+        }
+    ];
+
+    useEffect(() => {
+        const timer = setInterval(() => {
+            setInsightIndex((prev) => (prev + 1) % insights.length);
+        }, 60000); // Change every minute
+        return () => clearInterval(timer);
+    }, [insights.length]);
+
+    const activeInsight = insights[insightIndex];
 
     return (
         <div className="space-y-6">
             <div className="grid gap-4 md:grid-cols-2">
                 {/* TRENDS CARD */}
-                <Card className="border-l-4 border-l-primary">
+                <Card className="border-l-4 border-l-primary bg-slate-900/50 backdrop-blur-sm">
                     <CardHeader>
                         <CardTitle className="flex items-center gap-2">
                             {isGrowthPositive ? <TrendingUp className="text-emerald-400" /> : <TrendingDown className="text-rose-400" />}
@@ -62,33 +109,29 @@ export function IntelligenceDashboard({ bestSellers, trends, reorderSuggestions,
                 </Card>
 
                 {/* INSIGHTS CARD */}
-                <Card className="border-l-4 border-l-violet-500">
+                <Card className="border-l-4 border-l-violet-500 bg-slate-900/50 backdrop-blur-sm relative overflow-hidden">
+                    <div className="absolute top-0 right-0 p-2 opacity-10">
+                        <span className="text-[60px] font-black italic uppercase">Oracle</span>
+                    </div>
                     <CardHeader>
                         <CardTitle className="flex items-center gap-2">
-                            <AlertCircle className="text-violet-400" />
-                            Strategic Insight
+                            {activeInsight.icon}
+                            {activeInsight.title}
                         </CardTitle>
-                        <CardDescription>System generated advice</CardDescription>
+                        <CardDescription>Dynamic Strategic Intelligence</CardDescription>
                     </CardHeader>
                     <CardContent>
-                        {reorderSuggestions.length > 0 ? (
-                            <p className="text-sm">
-                                <span className="text-rose-400 font-bold">Action Required:</span> You have {reorderSuggestions.length} items approaching stockout.
-                                Review the "Smart Reorder" list below immediately.
-                            </p>
-                        ) : isGrowthPositive ? (
-                            <p className="text-sm">
-                                Revenue is trending up! Consider increasing stock for your top performer,
-                                <span className="font-bold text-primary"> {bestSellers[0]?.itemName || "Unknown"}</span>,
-                                to maintain momentum.
-                            </p>
-                        ) : (
-                            <p className="text-sm">
-                                Revenue is softening. Review pricing or run a promotion on
-                                <span className="font-bold text-primary"> {bestSellers[0]?.itemName || "current stock"} </span>
-                                to clear inventory.
-                            </p>
-                        )}
+                        <p className="text-sm animate-in fade-in slide-in-from-right-2 duration-500">
+                            {activeInsight.content}
+                        </p>
+                        <div className="mt-4 flex gap-1">
+                            {insights.map((_, i) => (
+                                <div
+                                    key={i}
+                                    className={`h-1 flex-1 rounded-full transition-all duration-300 ${i === insightIndex ? 'bg-violet-500' : 'bg-slate-800'}`}
+                                />
+                            ))}
+                        </div>
                     </CardContent>
                 </Card>
             </div>

@@ -19,23 +19,39 @@ import {
 export default async function FinancePage() {
     const { ledger, sales, globalExpenses, shops } = await getFinancials();
 
-    // Income Statement logic
-    const revenue = sales.reduce((sum: number, s: any) => sum + s.totalBeforeTax, 0); // Excluding tax for P&L
+    // --- STRATEGIC VIEW (Inventory-Based) ---
+    const revenue = sales.reduce((sum: number, s: any) => sum + s.totalBeforeTax, 0);
     const cogs = ledger.filter((l: any) => l.category === 'Inventory Acquisition').reduce((sum: number, l: any) => sum + l.amount, 0);
     const operatingExpenses =
-        Object.values(globalExpenses as Record<string, number>).reduce((a: number, b: number) => a + b, 0) +
+        Object.values(globalExpenses as Record<string, number>).reduce((a: number, b: number) => a + Number(b), 0) +
         shops.reduce(
             (sum: number, s: any) =>
                 sum +
-                Object.values(s.expenses as Record<string, number>).reduce((a: number, b: number) => a + b, 0),
+                Object.values(s.expenses as Record<string, number>).reduce((a: number, b: number) => a + Number(b), 0),
             0
         );
     const netIncome = revenue - (cogs + operatingExpenses);
 
-    // Balance Sheet logic
-    const inventoryAssetValue = cogs; // Simplified: cumulative inventory cost as asset
-    const cashAtHand = revenue; // Simplified
+    const inventoryAssetValue = cogs;
+    const cashAtHand = revenue;
     const totalAssets = inventoryAssetValue + cashAtHand;
+
+    // --- OPERATIONAL VIEW (POS-Based) ---
+    // Revenue from final sales only
+    const posRevenue = sales.reduce((sum: number, s: any) => sum + s.total_with_tax, 0);
+
+    // Expenses from ledger (Operational costs like lunch, petrol logged at POS)
+    const posExpenses = ledger
+        .filter((l: any) => l.category === 'POS Expense' || l.category === 'Operational Expense')
+        .reduce((sum: number, l: any) => sum + l.amount, 0);
+
+    // Opening balance + sales - expenses
+    const posCashOpening = ledger
+        .filter((l: any) => l.category === 'Cash Drawer Opening')
+        .reduce((sum: number, l: any) => sum + l.amount, 0);
+
+    const posNetIncome = posRevenue - posExpenses;
+    const posAvailableCash = posCashOpening + posRevenue - posExpenses;
 
     return (
         <div className="space-y-8">
@@ -47,70 +63,117 @@ export default async function FinancePage() {
             </div>
 
             <div className="grid gap-6 md:grid-cols-2">
-                {/* Income Statement */}
-                <Card className="glass border-emerald-500/20">
-                    <CardHeader className="border-b border-slate-800 bg-emerald-500/5">
-                        <CardTitle className="text-xl font-bold text-emerald-400">Income Statement</CardTitle>
-                        <CardDescription>Profit & Loss breakdown (Monthly Performance)</CardDescription>
-                    </CardHeader>
-                    <CardContent className="pt-6 space-y-4">
-                        <div className="flex justify-between items-center py-2 border-b border-slate-800">
-                            <span className="text-slate-300">Total Revenue (excl. Tax)</span>
-                            <span className="text-emerald-400 font-bold">${revenue.toLocaleString()}</span>
-                        </div>
-                        <div className="flex justify-between items-center py-2 border-b border-slate-800">
-                            <span className="text-slate-300 text-sm">Cost of Goods Sold (Shipments)</span>
-                            <span className="text-rose-400 font-medium">-${cogs.toLocaleString()}</span>
-                        </div>
-                        <div className="flex justify-between items-center py-2 border-b border-slate-800">
-                            <span className="text-slate-300 text-sm font-bold">Gross Profit</span>
-                            <span className="text-slate-100 font-bold">${(revenue - cogs).toLocaleString()}</span>
-                        </div>
-                        <div className="flex justify-between items-center py-2 border-b border-slate-800">
-                            <span className="text-slate-300 text-sm">Total Operating Expenses (Rent/Salary)</span>
-                            <span className="text-rose-400 font-medium">-${operatingExpenses.toLocaleString()}</span>
-                        </div>
-                        <div className="flex justify-between items-center pt-4 mt-2">
-                            <span className="text-xl font-bold text-slate-100">Net Income</span>
-                            <span className={`text-2xl font-black ${netIncome >= 0 ? 'text-emerald-400' : 'text-rose-500'}`}>
-                                ${netIncome.toLocaleString()}
-                            </span>
-                        </div>
-                    </CardContent>
-                </Card>
+                <div className="space-y-6">
+                    <div className="flex items-center gap-2 mb-2">
+                        <DollarSign className="text-emerald-500 h-5 w-5" />
+                        <h2 className="text-sm font-black uppercase tracking-widest text-slate-500">Inventory-Based Strategic View</h2>
+                    </div>
+                    {/* Income Statement 1 */}
+                    <Card className="glass border-emerald-500/20">
+                        <CardHeader className="border-b border-slate-800 bg-emerald-500/5">
+                            <CardTitle className="text-xl font-bold text-emerald-400">Income Statement (Strategic)</CardTitle>
+                            <CardDescription>P&L based on global inventory acquisitions</CardDescription>
+                        </CardHeader>
+                        <CardContent className="pt-6 space-y-4">
+                            <div className="flex justify-between items-center py-2 border-b border-slate-800">
+                                <span className="text-slate-300">Revenue (Pre-Tax)</span>
+                                <span className="text-emerald-400 font-bold">${revenue.toLocaleString()}</span>
+                            </div>
+                            <div className="flex justify-between items-center py-2 border-b border-slate-800">
+                                <span className="text-slate-300 text-sm">Cost of Goods (Acquired)</span>
+                                <span className="text-rose-400 font-medium">-${cogs.toLocaleString()}</span>
+                            </div>
+                            <div className="flex justify-between items-center py-2 border-b border-slate-800">
+                                <span className="text-slate-300 text-sm">Operating Overhead</span>
+                                <span className="text-rose-400 font-medium">-${operatingExpenses.toLocaleString()}</span>
+                            </div>
+                            <div className="flex justify-between items-center pt-4 mt-2">
+                                <span className="text-xl font-bold text-slate-100">Strategic Net</span>
+                                <span className={`text-2xl font-black ${netIncome >= 0 ? 'text-emerald-400' : 'text-rose-500'}`}>
+                                    ${netIncome.toLocaleString()}
+                                </span>
+                            </div>
+                        </CardContent>
+                    </Card>
 
-                {/* Balance Sheet */}
-                <Card className="glass border-violet-500/20">
-                    <CardHeader className="border-b border-slate-800 bg-violet-500/5">
-                        <CardTitle className="text-xl font-bold text-violet-400">Balance Sheet</CardTitle>
-                        <CardDescription>Current Assets & Liabilities</CardDescription>
-                    </CardHeader>
-                    <CardContent className="pt-6 space-y-4">
-                        <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest pb-1 border-b border-slate-800">Assets</h3>
-                        <div className="flex justify-between items-center text-sm py-1">
-                            <span className="text-slate-300">Inventory Valuation</span>
-                            <span className="text-slate-100">${inventoryAssetValue.toLocaleString()}</span>
-                        </div>
-                        <div className="flex justify-between items-center text-sm py-1">
-                            <span className="text-slate-300">Cash / Receivables</span>
-                            <span className="text-slate-100">${cashAtHand.toLocaleString()}</span>
-                        </div>
-                        <div className="flex justify-between items-center pt-4 border-t border-slate-800">
-                            <span className="text-lg font-bold text-slate-100">Total Assets</span>
-                            <span className="text-lg font-bold text-violet-400">${totalAssets.toLocaleString()}</span>
-                        </div>
+                    {/* Balance Sheet 1 */}
+                    <Card className="glass border-violet-500/20">
+                        <CardHeader className="border-b border-slate-800 bg-violet-500/5">
+                            <CardTitle className="text-xl font-bold text-violet-400">Balance Sheet (Assets)</CardTitle>
+                            <CardDescription>Inventory & Strategic Valuation</CardDescription>
+                        </CardHeader>
+                        <CardContent className="pt-6 space-y-4">
+                            <div className="flex justify-between items-center text-sm py-1">
+                                <span className="text-slate-300">Inventory Asset Value</span>
+                                <span className="text-slate-100">${inventoryAssetValue.toLocaleString()}</span>
+                            </div>
+                            <div className="flex justify-between items-center text-sm py-1">
+                                <span className="text-slate-300">Projected Receivables</span>
+                                <span className="text-slate-100">${cashAtHand.toLocaleString()}</span>
+                            </div>
+                            <div className="flex justify-between items-center pt-4 border-t border-slate-800 mt-4">
+                                <span className="text-lg font-bold text-slate-100">Total Assets</span>
+                                <span className="text-lg font-bold text-violet-400">${totalAssets.toLocaleString()}</span>
+                            </div>
+                        </CardContent>
+                    </Card>
+                </div>
 
-                        <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest pt-6 pb-1 border-b border-slate-800">Liabilities & Equity</h3>
-                        <div className="flex justify-between items-center text-sm py-1">
-                            <span className="text-slate-300">Operating Liabilities (Accounts Payable)</span>
-                            <span className="text-slate-100">$0</span>
-                        </div>
-                        <div className="flex justify-between items-center text-sm py-1">
-                            <span className="text-slate-300">Owner's Equity</span>
-                            <span className="text-slate-100">${totalAssets.toLocaleString()}</span>
-                        </div>
-                    </CardContent>
-                </Card>
+                <div className="space-y-6">
+                    <div className="flex items-center gap-2 mb-2">
+                        <PieChart className="text-blue-500 h-5 w-5" />
+                        <h2 className="text-sm font-black uppercase tracking-widest text-slate-500">POS-Controlled Operational View</h2>
+                    </div>
+                    {/* Income Statement 2 */}
+                    <Card className="glass border-blue-500/20">
+                        <CardHeader className="border-b border-slate-800 bg-blue-500/5">
+                            <CardTitle className="text-xl font-bold text-blue-400">Income Statement (POS)</CardTitle>
+                            <CardDescription>Direct cash flow performance</CardDescription>
+                        </CardHeader>
+                        <CardContent className="pt-6 space-y-4">
+                            <div className="flex justify-between items-center py-2 border-b border-slate-800">
+                                <span className="text-slate-300">POS Sales (Inc. Tax)</span>
+                                <span className="text-emerald-400 font-bold">${posRevenue.toLocaleString()}</span>
+                            </div>
+                            <div className="flex justify-between items-center py-2 border-b border-slate-800">
+                                <span className="text-slate-300 text-sm">Direct POS Expenses</span>
+                                <span className="text-rose-400 font-medium">-${posExpenses.toLocaleString()}</span>
+                            </div>
+                            <div className="flex justify-between items-center pt-4 mt-2">
+                                <span className="text-xl font-bold text-slate-100">Operational Net</span>
+                                <span className={`text-2xl font-black ${posNetIncome >= 0 ? 'text-blue-400' : 'text-rose-500'}`}>
+                                    ${posNetIncome.toLocaleString()}
+                                </span>
+                            </div>
+                        </CardContent>
+                    </Card>
+
+                    {/* Balance Sheet 2 */}
+                    <Card className="glass border-sky-500/20">
+                        <CardHeader className="border-b border-slate-800 bg-sky-500/5">
+                            <CardTitle className="text-xl font-bold text-sky-400">Balance Sheet (Cash)</CardTitle>
+                            <CardDescription>Daily Liquidity Snapshot</CardDescription>
+                        </CardHeader>
+                        <CardContent className="pt-6 space-y-4">
+                            <div className="flex justify-between items-center text-sm py-1">
+                                <span className="text-slate-300">Opening Cash Balance</span>
+                                <span className="text-slate-100">${posCashOpening.toLocaleString()}</span>
+                            </div>
+                            <div className="flex justify-between items-center text-sm py-1">
+                                <span className="text-slate-300">Unrestricted Sales Revenue</span>
+                                <span className="text-emerald-400">${posRevenue.toLocaleString()}</span>
+                            </div>
+                            <div className="flex justify-between items-center text-sm py-1">
+                                <span className="text-slate-300">Cash Outflow</span>
+                                <span className="text-rose-400">-${posExpenses.toLocaleString()}</span>
+                            </div>
+                            <div className="flex justify-between items-center pt-4 border-t border-slate-800 mt-4">
+                                <span className="text-lg font-bold text-slate-100">Total Cash in Hand</span>
+                                <span className="text-lg font-bold text-sky-400">${posAvailableCash.toLocaleString()}</span>
+                            </div>
+                        </CardContent>
+                    </Card>
+                </div>
             </div>
 
             <Card className="bg-slate-900 shadow-xl">

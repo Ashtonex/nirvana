@@ -241,6 +241,7 @@ export const TableHead = React.forwardRef<
 ));
 TableHead.displayName = "TableHead";
 
+
 export const TableCell = React.forwardRef<
     HTMLTableCellElement,
     React.TdHTMLAttributes<HTMLTableCellElement>
@@ -252,3 +253,48 @@ export const TableCell = React.forwardRef<
     />
 ));
 TableCell.displayName = "TableCell";
+
+// --- TABS COMPONENTS ---
+
+interface TabsProps {
+    value: string;
+    onValueChange: (value: string) => void;
+    children: React.ReactNode;
+    className?: string;
+}
+
+export const Tabs = ({ value, onValueChange, children, className }: TabsProps) => {
+    return (
+        <div className={cn("inline-flex h-10 items-center justify-center rounded-md bg-muted p-1 text-muted-foreground", className)}>
+            {React.Children.map(children, (child) => {
+                if (React.isValidElement(child)) {
+                    const childElement = child as React.ReactElement<{ value: string; _active?: boolean; _onClick?: () => void }>;
+                    return React.cloneElement(childElement, {
+                        _active: childElement.props.value === value,
+                        _onClick: () => onValueChange(childElement.props.value)
+                    });
+                }
+                return child;
+            })}
+        </div>
+    );
+};
+
+export const TabsList = ({ children, className }: { children: React.ReactNode; className?: string }) => {
+    return <div className={cn("inline-flex items-center justify-center", className)}>{children}</div>;
+};
+
+export const TabsTrigger = ({ value, children, className, _active, _onClick }: any) => {
+    return (
+        <button
+            onClick={_onClick}
+            className={cn(
+                "inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50",
+                _active ? "bg-background text-foreground shadow-sm" : "hover:text-foreground",
+                className
+            )}
+        >
+            {children}
+        </button>
+    );
+};

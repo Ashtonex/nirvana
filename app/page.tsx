@@ -1,9 +1,10 @@
 export const dynamic = 'force-dynamic';
 
 import { getDashboardData } from "./actions";
-import { getBestSellers, getPerformanceTrends, getReorderSuggestions, getDeadStock, getSalesHistory, getStaffLeaderboard, getRevenueForecast } from "@/lib/analytics";
+import { getBestSellers, getPerformanceTrends, getReorderSuggestions, getDeadStock, getSalesHistory, getStaffLeaderboard, getRevenueForecast, getPremiumStockValue, getSalesVsOverheadsData } from "@/lib/analytics";
 import { IntelligenceDashboard } from "@/components/IntelligenceDashboard";
 import { SalesChart } from "@/components/SalesChart";
+import { BreakEvenChart } from "@/components/BreakEvenChart";
 import { Leaderboard } from "@/components/Leaderboard";
 import { RealtimeDashboard } from "@/components/RealtimeDashboard";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui";
@@ -30,7 +31,9 @@ export default async function Home() {
     deadStock,
     salesHistory,
     leaderboard,
-    forecast
+    forecast,
+    premiumStockValue,
+    breakEvenData
   ] = await Promise.all([
     getBestSellers(),
     getPerformanceTrends(),
@@ -38,7 +41,9 @@ export default async function Home() {
     getDeadStock(),
     getSalesHistory(),
     getStaffLeaderboard(),
-    getRevenueForecast()
+    getRevenueForecast(),
+    getPremiumStockValue(),
+    getSalesVsOverheadsData()
   ]);
 
   const totalExpenses = Object.values(db?.globalExpenses || {}).reduce((a: number, b: any) => a + Number(b), 0);
@@ -52,6 +57,7 @@ export default async function Home() {
   });
 
   const grandTotalShopExpenses = shopTotals.reduce((sum: number, s: any) => sum + Number(s.totalExpenses || 0), 0);
+  const totalMonthlyOverheads = totalExpenses + grandTotalShopExpenses;
 
   return (
     <div className="space-y-8">
@@ -104,8 +110,8 @@ export default async function Home() {
             <TrendingDown className="h-4 w-4 text-rose-400" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">${totalExpenses.toLocaleString()}</div>
-            <p className="text-xs text-slate-400 mt-1">Rent, Salaries, Utilities</p>
+            <div className="text-2xl font-bold">${totalMonthlyOverheads.toLocaleString()}</div>
+            <p className="text-xs text-slate-400 mt-1">Consolidated (Global + Shops)</p>
           </CardContent>
         </Card>
         <Card>
@@ -114,8 +120,8 @@ export default async function Home() {
             <Package className="h-4 w-4 text-violet-400" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">${(db?.ledger || []).filter((l: any) => l.category === 'Inventory Acquisition').reduce((sum: number, l: any) => sum + l.amount, 0).toLocaleString()}</div>
-            <p className="text-xs text-slate-400 mt-1">Total Assets (At Cost)</p>
+            <div className="text-2xl font-bold">${premiumStockValue.toLocaleString()}</div>
+            <p className="text-xs text-slate-400 mt-1">Total Assets (At Premium)</p>
           </CardContent>
         </Card>
         <Card>
@@ -128,6 +134,10 @@ export default async function Home() {
             <p className="text-xs text-slate-400 mt-1">Pieces across all shops</p>
           </CardContent>
         </Card>
+      </div>
+
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
+        <BreakEvenChart datasets={breakEvenData} />
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
