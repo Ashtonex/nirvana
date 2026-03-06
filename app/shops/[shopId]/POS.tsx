@@ -35,7 +35,8 @@ import {
     PackagePlus,
     Power,
     MessageSquare,
-    LogOut
+    LogOut,
+    Printer
 } from "lucide-react";
 import { recordSale, recordQuotation, addNewProductFromPos, recordUntrackedSale, openCashRegister, recordPosExpense } from "../../actions";
 import { clsx, type ClassValue } from 'clsx';
