@@ -117,8 +117,9 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
     const [expenseAmount, setExpenseAmount] = useState("");
     const [expenseDescription, setExpenseDescription] = useState("");
 
-    // Receipt Printing State
+    // Receipt context & Modal state
     const [activeReceipt, setActiveReceipt] = useState<any | null>(null);
+    const [isSuccessModalOpen, setIsSuccessModalOpen] = useState(false);
 
     const employees = (db.employees || []).filter((e: any) => e.shopId === shopId && e.active);
     const shop = db.shops.find((s: any) => s.id === shopId);
@@ -173,18 +174,15 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
 
     const liveCashInDrawer = (todaysOpening ? Number(todaysOpening.amount) : 0) + todaysCashSales - todaysExpenses;
 
-    // Trigger print when activeReceipt is set
+    // Trigger auto-print when success modal opens
     React.useEffect(() => {
-        if (activeReceipt) {
+        if (isSuccessModalOpen && activeReceipt) {
             const timer = setTimeout(() => {
                 window.print();
-                // Clear receipt after print dialog closes to avoid re-prints if page re-renders
-                // Delay clearing to ensure print dialog captures content
-                setTimeout(() => setActiveReceipt(null), 1000);
-            }, 500);
+            }, 800);
             return () => clearTimeout(timer);
         }
-    }, [activeReceipt]);
+    }, [isSuccessModalOpen, activeReceipt]);
 
     // Trigger open modal on load if missing
     React.useEffect(() => {
@@ -377,7 +375,7 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
                         paymentMethod
                     });
 
-                    alert("Sale recorded successfully! Printing receipt...");
+                    setIsSuccessModalOpen(true);
                 } else {
                     await recordQuotation({
                         shopId,
@@ -1362,6 +1360,56 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
                     </div>
                 </div>
             )}
+
+            {/* Transaction Success Modal */}
+            <Modal
+                isOpen={isSuccessModalOpen}
+                onClose={() => setIsSuccessModalOpen(false)}
+                title="Transaction Confirmed"
+            >
+                <div className="space-y-6 pt-2 text-center">
+                    <div className="flex justify-center flex-col items-center gap-2">
+                        <div className="h-16 w-16 bg-emerald-500/10 rounded-full flex items-center justify-center border-4 border-emerald-500/20">
+                            <BadgeCheck className="h-10 w-10 text-emerald-400" />
+                        </div>
+                        <h2 className="text-2xl font-black italic uppercase tracking-tighter text-emerald-400">Sale Recorded</h2>
+                        <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Receipt #RCT-{activeReceipt?.transactionId}</p>
+                    </div>
+
+                    <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-2 text-left">
+                        <div className="flex justify-between text-xs">
+                            <span className="text-slate-500">Total Charged:</span>
+                            <span className="font-mono font-black text-white">${activeReceipt?.total.toFixed(2)}</span>
+                        </div>
+                        <div className="flex justify-between text-xs">
+                            <span className="text-slate-500">Payment:</span>
+                            <span className="font-bold uppercase text-slate-300">{activeReceipt?.paymentMethod}</span>
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                        <Button
+                            onClick={() => window.print()}
+                            className="bg-emerald-600 hover:bg-emerald-700 text-white font-black uppercase italic tracking-widest h-12"
+                        >
+                            <Printer className="h-4 w-4 mr-2" /> Print Again
+                        </Button>
+                        <Button
+                            variant="outline"
+                            onClick={() => {
+                                setIsSuccessModalOpen(false);
+                                setCart([]);
+                                // Reset other states
+                            }}
+                            className="border-slate-800 font-black uppercase italic tracking-widest h-12"
+                        >
+                            Done
+                        </Button>
+                    </div>
+
+                    <p className="text-[8px] text-slate-600 font-bold uppercase tracking-tight">Receipt triggered for thermal printer at 58mm width.</p>
+                </div>
+            </Modal>
         </div>
     );
 }
