@@ -325,15 +325,19 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
 
                     for (const entry of cart) {
                         const isUntracked = entry.item.id.startsWith('QUICK_');
-                        const itemTax = (entry.price - (entry.price / (1 + taxRate))) * entry.quantity;
+                        const netPrice = entry.price / (1 + taxRate);
+                        const grossPrice = entry.price;
+                        const lineNet = netPrice * entry.quantity;
+                        const lineGross = grossPrice * entry.quantity;
+                        const itemTax = lineGross - lineNet;
 
                         if (isUntracked) {
                             await recordUntrackedSale({
                                 shopId,
                                 itemName: entry.item.name,
                                 quantity: entry.quantity,
-                                unitPrice: entry.price / (1 + taxRate),
-                                totalBeforeTax: (entry.price / (1 + taxRate)) * entry.quantity,
+                                unitPrice: netPrice,
+                                totalBeforeTax: lineNet,
                                 employeeId: selectedEmployeeId || "system",
                                 clientName: clientName || "General Walk-in",
                                 paymentMethod
@@ -344,8 +348,8 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
                                 itemId: entry.item.id,
                                 itemName: entry.item.name,
                                 quantity: entry.quantity,
-                                unitPrice: entry.price / (1 + taxRate),
-                                totalBeforeTax: (entry.price / (1 + taxRate)) * entry.quantity,
+                                unitPrice: netPrice,
+                                totalBeforeTax: lineNet,
                                 employeeId: selectedEmployeeId || "system",
                                 clientName: clientName || "General Walk-in",
                                 paymentMethod
@@ -355,7 +359,10 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
                         receiptItems.push({
                             name: entry.item.name,
                             quantity: entry.quantity,
-                            price: entry.price,
+                            priceNet: netPrice,
+                            priceGross: grossPrice,
+                            totalNet: lineNet,
+                            totalGross: lineGross,
                             tax: itemTax
                         });
                     }
@@ -363,6 +370,8 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
                     // Prepare receipt for printing
                     const cashier = employees.find((e: any) => e.id === selectedEmployeeId)?.name || "System";
                     setActiveReceipt({
+                        orderId: `ORD-${transactionId}`,
+                        receiptNo: `#RCT-${transactionId}`,
                         transactionId,
                         shopName: shop?.name || "NIRVANA STORE",
                         cashier,
@@ -372,7 +381,8 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
                         subtotal: totalBeforeTax,
                         tax: totalTax,
                         total: totalWithTax,
-                        date: new Date().toLocaleString(),
+                        dateStamp: new Date().toLocaleDateString(),
+                        timeStamp: new Date().toLocaleTimeString(),
                         paymentMethod
                     });
 
@@ -1285,7 +1295,7 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
                     <div className="text-center space-y-1 mb-4 border-b border-black pb-2">
                         <h1 className="text-sm font-bold uppercase">{activeReceipt.shopName}</h1>
                         <p className="text-[8px] uppercase tracking-tighter">NIRVANA PREMIUM NETWORK</p>
-                        <p className="text-[8px]">{activeReceipt.date}</p>
+                        <p className="text-[7px] font-bold uppercase">{activeReceipt.dateStamp} | {activeReceipt.timeStamp}</p>
                     </div>
 
                     <div className="space-y-1 mb-4">
@@ -1298,51 +1308,62 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
                             <span className="font-bold truncate max-w-[30mm]">{activeReceipt.clientName}</span>
                         </div>
                         <div className="flex justify-between">
-                            <span>ORDER NO:</span>
-                            <span className="font-bold">ORD-{activeReceipt.transactionId}</span>
+                            <span>ORDER ID:</span>
+                            <span className="font-bold">{activeReceipt.orderId}</span>
                         </div>
                         <div className="flex justify-between">
-                            <span>RECEIPT:</span>
-                            <span className="font-bold">#RCT-{activeReceipt.transactionId}</span>
+                            <span>RECEIPT NO:</span>
+                            <span className="font-bold">{activeReceipt.receiptNo}</span>
                         </div>
                     </div>
 
                     <div className="border-b border-dashed border-black mb-2 opacity-50" />
 
-                    <table className="w-full mb-4">
-                        <thead>
-                            <tr className="text-left border-b border-black font-bold">
-                                <th className="pb-1">ITEM</th>
-                                <th className="pb-1 text-center">QTY</th>
-                                <th className="pb-1 text-right">TOTAL</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-dotted divide-black">
-                            {activeReceipt.items.map((item: any, i: number) => (
-                                <tr key={i} className="py-1">
-                                    <td className="py-1 max-w-[30mm] truncate">{item.name}</td>
-                                    <td className="py-1 text-center font-bold">x{item.quantity}</td>
-                                    <td className="py-1 text-right font-bold">${item.price.toFixed(2)}</td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
+                    <div className="space-y-3 mb-4">
+                        {activeReceipt.items.map((item: any, i: number) => (
+                            <div key={i} className="space-y-1">
+                                <div className="flex justify-between font-bold">
+                                    <span className="max-w-[40mm] truncate">{item.name}</span>
+                                    <span>x{item.quantity}</span>
+                                </div>
+                                <div className="grid grid-cols-2 gap-x-2 text-[7px] opacity-80">
+                                    <div className="flex justify-between">
+                                        <span>COST/1 (NET):</span>
+                                        <span>${item.priceNet.toFixed(2)}</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                        <span>COST/1 (GROSS):</span>
+                                        <span>${item.priceGross.toFixed(2)}</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                        <span>ITEM TAX:</span>
+                                        <span>${item.tax.toFixed(2)}</span>
+                                    </div>
+                                    <div className="flex justify-between font-bold">
+                                        <span>LINE TOTAL:</span>
+                                        <span>${item.totalGross.toFixed(2)}</span>
+                                    </div>
+                                </div>
+                                <div className="border-b border-dotted border-black/20" />
+                            </div>
+                        ))}
+                    </div>
 
                     <div className="border-t border-black pt-2 space-y-1">
                         <div className="flex justify-between text-[8px]">
-                            <span>SUBTOTAL:</span>
-                            <span>${activeReceipt.subtotal.toFixed(2)}</span>
+                            <span>TOTAL (WITHOUT TAX):</span>
+                            <span className="font-bold">${activeReceipt.subtotal.toFixed(2)}</span>
                         </div>
                         <div className="flex justify-between text-[8px]">
-                            <span>TAX (15.5%):</span>
-                            <span>${activeReceipt.tax.toFixed(2)}</span>
+                            <span>SALES TAX (15.5%):</span>
+                            <span className="font-bold">${activeReceipt.tax.toFixed(2)}</span>
                         </div>
-                        <div className="flex justify-between text-base font-bold pt-1 border-t border-double border-black">
-                            <span>TOTAL:</span>
+                        <div className="flex justify-between text-[11px] font-black pt-2 mt-1 border-t-2 border-black">
+                            <span>TOTAL PAID:</span>
                             <span>${activeReceipt.total.toFixed(2)}</span>
                         </div>
-                        <div className="text-[8px] italic mt-1 font-bold">
-                            PAYMENT: {activeReceipt.paymentMethod.toUpperCase()}
+                        <div className="text-[7px] italic mt-2 font-bold uppercase text-center">
+                            PAYMENT METHOD: {activeReceipt.paymentMethod}
                         </div>
                     </div>
 
@@ -1356,7 +1377,11 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
                         <p className="text-[6px] text-center opacity-70">Thank you for choosing NIRVANA. For returns, bring this original receipt.</p>
                     </div>
 
-                    <div className="mt-6 text-center text-[8px] font-bold pb-8">
+                    <div className="mt-4 text-center text-[7px] font-black tracking-widest uppercase py-2 border-y border-black/10">
+                        KIPASA_DUB DUB_TRADECENTER
+                    </div>
+
+                    <div className="mt-4 text-center text-[8px] font-bold pb-8">
                         *** END OF RECEIPT ***
                     </div>
                 </div>
