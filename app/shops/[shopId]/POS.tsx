@@ -172,14 +172,14 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
     // 3. Current Live Drawer (Today's Opening + Today's Cash Sales - Today's Expenses)
     const openingTimestamp = todaysOpening ? new Date(todaysOpening.date).getTime() : 0;
 
-    const cashSalesAfterOpening = (db.sales || []).filter((s: any) =>
+    const todaysCashSales = (db.sales || []).filter((s: any) =>
         s.shopId === shopId &&
         s.paymentMethod === 'cash' &&
         String(s.date).startsWith(todayStr) &&
         (!openingTimestamp || new Date(s.date).getTime() > openingTimestamp)
     ).reduce((sum: number, s: any) => sum + Number(s.totalWithTax || 0), 0);
 
-    const expensesAfterOpening = ledger.filter((l: any) =>
+    const todaysExpenses = ledger.filter((l: any) =>
         l.category === 'POS Expense' &&
         l.shopId === shopId &&
         String(l.date).startsWith(todayStr) &&
@@ -187,7 +187,7 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
     ).reduce((sum: number, l: any) => sum + Number(l.amount || 0), 0);
 
     const baseBalance = hasOpenedRegister ? Number(todaysOpening.amount) : expectedOpeningCash;
-    const liveCashInDrawer = baseBalance + cashSalesAfterOpening - expensesAfterOpening;
+    const liveCashInDrawer = baseBalance + todaysCashSales - todaysExpenses;
 
     // Trigger auto-print when success modal opens
     React.useEffect(() => {
