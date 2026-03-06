@@ -519,19 +519,19 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
 
     return (
         <div className="grid gap-6 md:grid-cols-12">
-            <div className="md:col-span-8 space-y-4">
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                    <div className="relative flex-1 min-w-0">
-                        <Search className="absolute left-3 top-3 h-4 w-4 text-slate-500" />
-                        <Input
-                            placeholder="Search products or classes..."
-                            className="pl-10 h-10 bg-slate-900 border-slate-800"
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                        />
-                    </div>
+            <div className="md:col-span-8 space-y-6">
+                {/* Full-width Search Bar */}
+                <div className="relative w-full group">
+                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-500 group-focus-within:text-violet-400 transition-colors" />
+                    <Input
+                        placeholder="Search products, categories, or suppliers..."
+                        className="pl-12 h-14 bg-slate-900/50 border-slate-800 text-base focus:bg-slate-900 focus:border-violet-500/50 transition-all rounded-2xl shadow-2xl"
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                    />
+                </div>
 
-                    <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+                <div className="flex flex-wrap items-center gap-2">
                         <Button
                             onClick={() => setIsAddProductModalOpen(true)}
                             className="bg-violet-600 hover:bg-violet-500 text-[10px] font-black uppercase italic h-10 px-3 flex items-center gap-2"
@@ -932,119 +932,119 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
                 </div>
             </Modal>
 
-            {/* Quick Sale Modal */}
-            <Modal
-                isOpen={isQuickSaleModalOpen}
-                onClose={() => setIsQuickSaleModalOpen(false)}
-                title="Quick Sale Request"
-            >
-                <div className="space-y-4 pt-2">
-                    <p className="text-sm text-slate-400 font-medium">Record a sale for a product not in the system yet.</p>
-                    <div>
-                        <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Product Name</label>
+            {/* Quick Sale Modal */ }
+    <Modal
+        isOpen={isQuickSaleModalOpen}
+        onClose={() => setIsQuickSaleModalOpen(false)}
+        title="Quick Sale Request"
+    >
+        <div className="space-y-4 pt-2">
+            <p className="text-sm text-slate-400 font-medium">Record a sale for a product not in the system yet.</p>
+            <div>
+                <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Product Name</label>
+                <Input
+                    placeholder="e.g. Wireless Mouse"
+                    className="bg-slate-950 border-slate-800 mt-1 placeholder:text-slate-700 font-bold"
+                    value={quickSale.name}
+                    onChange={(e) => setQuickSale({ ...quickSale, name: e.target.value })}
+                />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+                <div>
+                    <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Quantity</label>
+                    <Input
+                        type="number"
+                        min="1"
+                        className="bg-slate-950 border-slate-800 mt-1 font-mono font-bold"
+                        value={quickSale.quantity}
+                        onChange={(e) => setQuickSale({ ...quickSale, quantity: e.target.value })}
+                    />
+                </div>
+                <div>
+                    <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Sale Price (Each)</label>
+                    <div className="relative mt-1">
+                        <span className="absolute left-3 top-[10px] text-slate-500 font-mono">$</span>
                         <Input
-                            placeholder="e.g. Wireless Mouse"
-                            className="bg-slate-950 border-slate-800 mt-1 placeholder:text-slate-700 font-bold"
-                            value={quickSale.name}
-                            onChange={(e) => setQuickSale({ ...quickSale, name: e.target.value })}
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            className="pl-7 bg-slate-950 border-slate-800 font-mono font-bold"
+                            value={quickSale.price}
+                            onChange={(e) => setQuickSale({ ...quickSale, price: e.target.value })}
                         />
                     </div>
-                    <div className="grid grid-cols-2 gap-4">
-                        <div>
-                            <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Quantity</label>
-                            <Input
-                                type="number"
-                                min="1"
-                                className="bg-slate-950 border-slate-800 mt-1 font-mono font-bold"
-                                value={quickSale.quantity}
-                                onChange={(e) => setQuickSale({ ...quickSale, quantity: e.target.value })}
-                            />
-                        </div>
-                        <div>
-                            <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Sale Price (Each)</label>
-                            <div className="relative mt-1">
-                                <span className="absolute left-3 top-[10px] text-slate-500 font-mono">$</span>
-                                <Input
-                                    type="number"
-                                    min="0"
-                                    step="0.01"
-                                    className="pl-7 bg-slate-950 border-slate-800 font-mono font-bold"
-                                    value={quickSale.price}
-                                    onChange={(e) => setQuickSale({ ...quickSale, price: e.target.value })}
-                                />
-                            </div>
-                        </div>
-                    </div>
-                    <Button
-                        className="w-full bg-violet-600 hover:bg-violet-700 text-white font-black uppercase italic tracking-wider h-12 mt-4"
-                        onClick={handleQuickSale}
-                    >
-                        Add to Cart
-                    </Button>
                 </div>
-            </Modal>
-
-            {/* Cash Register Modal (Force Open on Load) */}
-            <Modal
-                isOpen={isCashRegisterModalOpen}
-                onClose={() => {
-                    if (!hasOpenedRegister) {
-                        alert("You must open the register to proceed.");
-                    } else {
-                        setIsCashRegisterModalOpen(false);
-                    }
-                }}
-                title={hasOpenedRegister ? "View Register" : "Open Register"}
+            </div>
+            <Button
+                className="w-full bg-violet-600 hover:bg-violet-700 text-white font-black uppercase italic tracking-wider h-12 mt-4"
+                onClick={handleQuickSale}
             >
-                <div className="space-y-4 pt-2">
-                    <p className="text-sm text-slate-400 font-medium">Please enter the actual physical cash currently in the drawer to start your shift.</p>
+                Add to Cart
+            </Button>
+        </div>
+    </Modal>
 
-                    <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 relative overflow-hidden">
-                        <div className="absolute top-0 right-0 w-24 h-24 bg-rose-500/10 rounded-full blur-2xl pointer-events-none" />
-                        <div className="text-[10px] font-black uppercase text-slate-500 tracking-widest mb-1">Expected Opening Baseline</div>
-                        <div className="text-2xl font-black font-mono text-white">${expectedOpeningCash.toFixed(2)}</div>
-                        <div className="text-[10px] text-slate-400 mt-2 flex items-center gap-1">
-                            <History className="h-3 w-3" /> Derived from yesterday's close + recent sales.
-                        </div>
-                    </div>
+    {/* Cash Register Modal (Force Open on Load) */ }
+    <Modal
+        isOpen={isCashRegisterModalOpen}
+        onClose={() => {
+            if (!hasOpenedRegister) {
+                alert("You must open the register to proceed.");
+            } else {
+                setIsCashRegisterModalOpen(false);
+            }
+        }}
+        title={hasOpenedRegister ? "View Register" : "Open Register"}
+    >
+        <div className="space-y-4 pt-2">
+            <p className="text-sm text-slate-400 font-medium">Please enter the actual physical cash currently in the drawer to start your shift.</p>
 
-                    <div>
-                        <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Actual Cash Counted</label>
-                        <div className="relative mt-1">
-                            <span className="absolute left-3 top-[10px] text-slate-500 font-mono font-bold text-lg">$</span>
-                            <Input
-                                type="number"
-                                placeholder="0.00"
-                                step="0.01"
-                                className="pl-8 bg-slate-950 border-violet-500/30 text-lg font-mono font-black h-12"
-                                value={cashRegisterAmount}
-                                onChange={(e) => setCashRegisterAmount(e.target.value)}
-                            />
-                        </div>
-                        {cashRegisterAmount && parseFloat(cashRegisterAmount) - expectedOpeningCash !== 0 && (
-                            <div className={cn(
-                                "text-xs font-black uppercase italic mt-2 p-2 rounded",
-                                parseFloat(cashRegisterAmount) - expectedOpeningCash > 0 ? "bg-emerald-500/10 text-emerald-400" : "bg-rose-500/10 text-rose-400"
-                            )}>
-                                {parseFloat(cashRegisterAmount) - expectedOpeningCash > 0 ? "Register Overflow By " : "Register Short By "}
-                                ${Math.abs(parseFloat(cashRegisterAmount) - expectedOpeningCash).toFixed(2)}
-                            </div>
-                        )}
-                    </div>
-
-                    {!hasOpenedRegister && (
-                        <Button
-                            className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-black uppercase italic tracking-wider h-12 mt-4"
-                            onClick={handleOpenRegister}
-                            disabled={isPending}
-                        >
-                            {isPending ? "Recording..." : "Start Shift"}
-                        </Button>
-                    )}
+            <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-24 h-24 bg-rose-500/10 rounded-full blur-2xl pointer-events-none" />
+                <div className="text-[10px] font-black uppercase text-slate-500 tracking-widest mb-1">Expected Opening Baseline</div>
+                <div className="text-2xl font-black font-mono text-white">${expectedOpeningCash.toFixed(2)}</div>
+                <div className="text-[10px] text-slate-400 mt-2 flex items-center gap-1">
+                    <History className="h-3 w-3" /> Derived from yesterday's close + recent sales.
                 </div>
-            </Modal>
+            </div>
 
-            {/* Expense Modal */}
+            <div>
+                <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Actual Cash Counted</label>
+                <div className="relative mt-1">
+                    <span className="absolute left-3 top-[10px] text-slate-500 font-mono font-bold text-lg">$</span>
+                    <Input
+                        type="number"
+                        placeholder="0.00"
+                        step="0.01"
+                        className="pl-8 bg-slate-950 border-violet-500/30 text-lg font-mono font-black h-12"
+                        value={cashRegisterAmount}
+                        onChange={(e) => setCashRegisterAmount(e.target.value)}
+                    />
+                </div>
+                {cashRegisterAmount && parseFloat(cashRegisterAmount) - expectedOpeningCash !== 0 && (
+                    <div className={cn(
+                        "text-xs font-black uppercase italic mt-2 p-2 rounded",
+                        parseFloat(cashRegisterAmount) - expectedOpeningCash > 0 ? "bg-emerald-500/10 text-emerald-400" : "bg-rose-500/10 text-rose-400"
+                    )}>
+                        {parseFloat(cashRegisterAmount) - expectedOpeningCash > 0 ? "Register Overflow By " : "Register Short By "}
+                        ${Math.abs(parseFloat(cashRegisterAmount) - expectedOpeningCash).toFixed(2)}
+                    </div>
+                )}
+            </div>
+
+            {!hasOpenedRegister && (
+                <Button
+                    className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-black uppercase italic tracking-wider h-12 mt-4"
+                    onClick={handleOpenRegister}
+                    disabled={isPending}
+                >
+                    {isPending ? "Recording..." : "Start Shift"}
+                </Button>
+            )}
+        </div>
+    </Modal>
+
+    {/* Expense Modal */ }
             <Modal
                 isOpen={isExpenseModalOpen}
                 onClose={() => setIsExpenseModalOpen(false)}
@@ -1279,11 +1279,12 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
                 </div>
             </Modal>
 
-            {/* Thermal Receipt (Hidden from screen, visible only for print) */}
-            {activeReceipt && (
-                <div id="thermal-receipt" className="hidden print:block w-[58mm] bg-white text-black p-4 font-mono text-[10px] leading-tight mx-auto">
-                    <style dangerouslySetInnerHTML={{
-                        __html: `
+    {/* Thermal Receipt (Hidden from screen, visible only for print) */ }
+    {
+        activeReceipt && (
+            <div id="thermal-receipt" className="hidden print:block w-[58mm] bg-white text-black p-4 font-mono text-[10px] leading-tight mx-auto">
+                <style dangerouslySetInnerHTML={{
+                    __html: `
                         @media print {
                             @page { size: 58mm auto; margin: 0; }
                             body * { visibility: hidden; }
@@ -1292,150 +1293,151 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
                         }
                     `}} />
 
-                    <div className="text-center space-y-1 mb-4 border-b border-black pb-2">
-                        <h1 className="text-sm font-bold uppercase">{activeReceipt.shopName}</h1>
-                        <p className="text-[8px] uppercase tracking-tighter">NIRVANA PREMIUM NETWORK</p>
-                        <p className="text-[7px] font-bold uppercase">{activeReceipt.dateStamp} | {activeReceipt.timeStamp}</p>
+                <div className="text-center space-y-1 mb-4 border-b border-black pb-2">
+                    <h1 className="text-sm font-bold uppercase">{activeReceipt.shopName}</h1>
+                    <p className="text-[8px] uppercase tracking-tighter">NIRVANA PREMIUM NETWORK</p>
+                    <p className="text-[7px] font-bold uppercase">{activeReceipt.dateStamp} | {activeReceipt.timeStamp}</p>
+                </div>
+
+                <div className="space-y-1 mb-4">
+                    <div className="flex justify-between">
+                        <span>CASHIER:</span>
+                        <span className="font-bold">{activeReceipt.cashier}</span>
                     </div>
-
-                    <div className="space-y-1 mb-4">
-                        <div className="flex justify-between">
-                            <span>CASHIER:</span>
-                            <span className="font-bold">{activeReceipt.cashier}</span>
-                        </div>
-                        <div className="flex justify-between">
-                            <span>CLIENT:</span>
-                            <span className="font-bold truncate max-w-[30mm]">{activeReceipt.clientName}</span>
-                        </div>
-                        <div className="flex justify-between">
-                            <span>ORDER ID:</span>
-                            <span className="font-bold">{activeReceipt.orderId}</span>
-                        </div>
-                        <div className="flex justify-between">
-                            <span>RECEIPT NO:</span>
-                            <span className="font-bold">{activeReceipt.receiptNo}</span>
-                        </div>
+                    <div className="flex justify-between">
+                        <span>CLIENT:</span>
+                        <span className="font-bold truncate max-w-[30mm]">{activeReceipt.clientName}</span>
                     </div>
+                    <div className="flex justify-between">
+                        <span>ORDER ID:</span>
+                        <span className="font-bold">{activeReceipt.orderId}</span>
+                    </div>
+                    <div className="flex justify-between">
+                        <span>RECEIPT NO:</span>
+                        <span className="font-bold">{activeReceipt.receiptNo}</span>
+                    </div>
+                </div>
 
-                    <div className="border-b border-dashed border-black mb-2 opacity-50" />
+                <div className="border-b border-dashed border-black mb-2 opacity-50" />
 
-                    <div className="space-y-3 mb-4">
-                        {activeReceipt.items.map((item: any, i: number) => (
-                            <div key={i} className="space-y-1">
-                                <div className="flex justify-between font-bold">
-                                    <span className="max-w-[40mm] truncate">{item.name}</span>
-                                    <span>x{item.quantity}</span>
-                                </div>
-                                <div className="grid grid-cols-2 gap-x-2 text-[7px] opacity-80">
-                                    <div className="flex justify-between">
-                                        <span>COST/1 (NET):</span>
-                                        <span>${item.priceNet.toFixed(2)}</span>
-                                    </div>
-                                    <div className="flex justify-between">
-                                        <span>COST/1 (GROSS):</span>
-                                        <span>${item.priceGross.toFixed(2)}</span>
-                                    </div>
-                                    <div className="flex justify-between">
-                                        <span>ITEM TAX:</span>
-                                        <span>${item.tax.toFixed(2)}</span>
-                                    </div>
-                                    <div className="flex justify-between font-bold">
-                                        <span>LINE TOTAL:</span>
-                                        <span>${item.totalGross.toFixed(2)}</span>
-                                    </div>
-                                </div>
-                                <div className="border-b border-dotted border-black/20" />
+                <div className="space-y-3 mb-4">
+                    {activeReceipt.items.map((item: any, i: number) => (
+                        <div key={i} className="space-y-1">
+                            <div className="flex justify-between font-bold">
+                                <span className="max-w-[40mm] truncate">{item.name}</span>
+                                <span>x{item.quantity}</span>
                             </div>
-                        ))}
-                    </div>
-
-                    <div className="border-t border-black pt-2 space-y-1">
-                        <div className="flex justify-between text-[8px]">
-                            <span>TOTAL (WITHOUT TAX):</span>
-                            <span className="font-bold">${activeReceipt.subtotal.toFixed(2)}</span>
+                            <div className="grid grid-cols-2 gap-x-2 text-[7px] opacity-80">
+                                <div className="flex justify-between">
+                                    <span>COST/1 (NET):</span>
+                                    <span>${item.priceNet.toFixed(2)}</span>
+                                </div>
+                                <div className="flex justify-between">
+                                    <span>COST/1 (GROSS):</span>
+                                    <span>${item.priceGross.toFixed(2)}</span>
+                                </div>
+                                <div className="flex justify-between">
+                                    <span>ITEM TAX:</span>
+                                    <span>${item.tax.toFixed(2)}</span>
+                                </div>
+                                <div className="flex justify-between font-bold">
+                                    <span>LINE TOTAL:</span>
+                                    <span>${item.totalGross.toFixed(2)}</span>
+                                </div>
+                            </div>
+                            <div className="border-b border-dotted border-black/20" />
                         </div>
-                        <div className="flex justify-between text-[8px]">
-                            <span>SALES TAX (15.5%):</span>
-                            <span className="font-bold">${activeReceipt.tax.toFixed(2)}</span>
-                        </div>
-                        <div className="flex justify-between text-[11px] font-black pt-2 mt-1 border-t-2 border-black">
-                            <span>TOTAL PAID:</span>
-                            <span>${activeReceipt.total.toFixed(2)}</span>
-                        </div>
-                        <div className="text-[7px] italic mt-2 font-bold uppercase text-center">
-                            PAYMENT METHOD: {activeReceipt.paymentMethod}
-                        </div>
-                    </div>
+                    ))}
+                </div>
 
-                    <div className="flex flex-col items-center mt-6 pt-4 border-t border-dashed border-black space-y-2">
-                        <img
-                            src={`https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=VERIFY_NIRVANA_${activeReceipt.transactionId}`}
-                            alt="Verification QR"
-                            className="w-24 h-24 grayscale"
-                        />
-                        <p className="text-[7px] text-center font-bold uppercase tracking-widest">Scan to Verify Authentic Purchase</p>
-                        <p className="text-[6px] text-center opacity-70">Thank you for choosing NIRVANA. For returns, bring this original receipt.</p>
+                <div className="border-t border-black pt-2 space-y-1">
+                    <div className="flex justify-between text-[8px]">
+                        <span>TOTAL (WITHOUT TAX):</span>
+                        <span className="font-bold">${activeReceipt.subtotal.toFixed(2)}</span>
                     </div>
-
-                    <div className="mt-4 text-center text-[7px] font-black tracking-widest uppercase py-2 border-y border-black/10">
-                        KIPASA_DUB DUB_TRADECENTER
+                    <div className="flex justify-between text-[8px]">
+                        <span>SALES TAX (15.5%):</span>
+                        <span className="font-bold">${activeReceipt.tax.toFixed(2)}</span>
                     </div>
-
-                    <div className="mt-4 text-center text-[8px] font-bold pb-8">
-                        *** END OF RECEIPT ***
+                    <div className="flex justify-between text-[11px] font-black pt-2 mt-1 border-t-2 border-black">
+                        <span>TOTAL PAID:</span>
+                        <span>${activeReceipt.total.toFixed(2)}</span>
+                    </div>
+                    <div className="text-[7px] italic mt-2 font-bold uppercase text-center">
+                        PAYMENT METHOD: {activeReceipt.paymentMethod}
                     </div>
                 </div>
-            )}
 
-            {/* Transaction Success Modal */}
-            <Modal
-                isOpen={isSuccessModalOpen}
-                onClose={() => setIsSuccessModalOpen(false)}
-                title="Transaction Confirmed"
-            >
-                <div className="space-y-6 pt-2 text-center">
-                    <div className="flex justify-center flex-col items-center gap-2">
-                        <div className="h-16 w-16 bg-emerald-500/10 rounded-full flex items-center justify-center border-4 border-emerald-500/20">
-                            <BadgeCheck className="h-10 w-10 text-emerald-400" />
-                        </div>
-                        <h2 className="text-2xl font-black italic uppercase tracking-tighter text-emerald-400">Sale Recorded</h2>
-                        <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Receipt #RCT-{activeReceipt?.transactionId}</p>
-                    </div>
-
-                    <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-2 text-left">
-                        <div className="flex justify-between text-xs">
-                            <span className="text-slate-500">Total Charged:</span>
-                            <span className="font-mono font-black text-white">${activeReceipt?.total.toFixed(2)}</span>
-                        </div>
-                        <div className="flex justify-between text-xs">
-                            <span className="text-slate-500">Payment:</span>
-                            <span className="font-bold uppercase text-slate-300">{activeReceipt?.paymentMethod}</span>
-                        </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-3">
-                        <Button
-                            onClick={() => window.print()}
-                            className="bg-emerald-600 hover:bg-emerald-700 text-white font-black uppercase italic tracking-widest h-12"
-                        >
-                            <Printer className="h-4 w-4 mr-2" /> Print Again
-                        </Button>
-                        <Button
-                            variant="outline"
-                            onClick={() => {
-                                setIsSuccessModalOpen(false);
-                                setCart([]);
-                                // Reset other states
-                            }}
-                            className="border-slate-800 font-black uppercase italic tracking-widest h-12"
-                        >
-                            Done
-                        </Button>
-                    </div>
-
-                    <p className="text-[8px] text-slate-600 font-bold uppercase tracking-tight">Receipt triggered for thermal printer at 58mm width.</p>
+                <div className="flex flex-col items-center mt-6 pt-4 border-t border-dashed border-black space-y-2">
+                    <img
+                        src={`https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=VERIFY_NIRVANA_${activeReceipt.transactionId}`}
+                        alt="Verification QR"
+                        className="w-24 h-24 grayscale"
+                    />
+                    <p className="text-[7px] text-center font-bold uppercase tracking-widest">Scan to Verify Authentic Purchase</p>
+                    <p className="text-[6px] text-center opacity-70">Thank you for choosing NIRVANA. For returns, bring this original receipt.</p>
                 </div>
-            </Modal>
+
+                <div className="mt-4 text-center text-[7px] font-black tracking-widest uppercase py-2 border-y border-black/10">
+                    KIPASA_DUB DUB_TRADECENTER
+                </div>
+
+                <div className="mt-4 text-center text-[8px] font-bold pb-8">
+                    *** END OF RECEIPT ***
+                </div>
+            </div>
+        )
+    }
+
+    {/* Transaction Success Modal */ }
+    <Modal
+        isOpen={isSuccessModalOpen}
+        onClose={() => setIsSuccessModalOpen(false)}
+        title="Transaction Confirmed"
+    >
+        <div className="space-y-6 pt-2 text-center">
+            <div className="flex justify-center flex-col items-center gap-2">
+                <div className="h-16 w-16 bg-emerald-500/10 rounded-full flex items-center justify-center border-4 border-emerald-500/20">
+                    <BadgeCheck className="h-10 w-10 text-emerald-400" />
+                </div>
+                <h2 className="text-2xl font-black italic uppercase tracking-tighter text-emerald-400">Sale Recorded</h2>
+                <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Receipt #RCT-{activeReceipt?.transactionId}</p>
+            </div>
+
+            <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-2 text-left">
+                <div className="flex justify-between text-xs">
+                    <span className="text-slate-500">Total Charged:</span>
+                    <span className="font-mono font-black text-white">${activeReceipt?.total.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between text-xs">
+                    <span className="text-slate-500">Payment:</span>
+                    <span className="font-bold uppercase text-slate-300">{activeReceipt?.paymentMethod}</span>
+                </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+                <Button
+                    onClick={() => window.print()}
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white font-black uppercase italic tracking-widest h-12"
+                >
+                    <Printer className="h-4 w-4 mr-2" /> Print Again
+                </Button>
+                <Button
+                    variant="outline"
+                    onClick={() => {
+                        setIsSuccessModalOpen(false);
+                        setCart([]);
+                        // Reset other states
+                    }}
+                    className="border-slate-800 font-black uppercase italic tracking-widest h-12"
+                >
+                    Done
+                </Button>
+            </div>
+
+            <p className="text-[8px] text-slate-600 font-bold uppercase tracking-tight">Receipt triggered for thermal printer at 58mm width.</p>
         </div>
+    </Modal>
+        </div >
     );
 }
