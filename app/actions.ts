@@ -589,6 +589,67 @@ export async function addNewProductFromPos(productData: any) {
     return { id };
 }
 
+export async function openCashRegister(shopId: string, expectedAmount: number, actualAmount: number) {
+    const timestamp = new Date().toISOString();
+    const id = Math.random().toString(36).substring(2, 9);
+
+    // Log the actual opening amount as an asset
+    await supabaseAdmin.from('ledger_entries').insert([{
+        id,
+        shop_id: shopId,
+        type: 'asset',
+        category: 'Cash Drawer Opening',
+        amount: actualAmount,
+        date: timestamp,
+        description: `Register Opened - Expected: $${expectedAmount.toFixed(2)} | Actual: $${actualAmount.toFixed(2)}`
+    }]);
+
+    // If there's a discrepancy, log it as an adjustment
+    const discrepancy = actualAmount - expectedAmount;
+    if (Math.abs(discrepancy) > 0.01) {
+        await supabaseAdmin.from('ledger_entries').insert([{
+            id: Math.random().toString(36).substring(2, 9),
+            shop_id: shopId,
+            type: discrepancy < 0 ? 'expense' : 'income',
+            category: 'Cash Drawer Adjustment',
+            amount: Math.abs(discrepancy),
+            date: timestamp,
+            description: `Register ${discrepancy < 0 ? 'Short' : 'Over'} by $${Math.abs(discrepancy).toFixed(2)}`
+        }]);
+    }
+
+    revalidatePath(`/shops/${shopId}`);
+}
+
+export async function recordPosExpense(shopId: string, amount: number, description: string, employeeId: string) {
+    const timestamp = new Date().toISOString();
+    const id = Math.random().toString(36).substring(2, 9);
+
+    // Log expense to ledger
+    await supabaseAdmin.from('ledger_entries').insert([{
+        id,
+        shop_id: shopId,
+        type: 'expense',
+        category: 'POS Expense',
+        amount: amount,
+        date: timestamp,
+        description: description
+    }]);
+
+    // Optional: Log to audit trail
+    await supabaseAdmin.from('audit_log').insert([{
+        id: Math.random().toString(36).substring(2, 9),
+        action: 'record_pos_expense',
+        shop_id: shopId,
+        employee_id: employeeId,
+        details: { amount, description },
+        timestamp
+    }]);
+
+    revalidatePath(`/shops/${shopId}`);
+    revalidatePath('/');
+}
+
 export async function getOracleMasterPulse() {
     const { data: settings } = await supabaseAdmin.from('oracle_settings').select('*').single();
     const { data: inventory } = await supabaseAdmin.from('inventory_items').select('*, inventory_allocations(*)');

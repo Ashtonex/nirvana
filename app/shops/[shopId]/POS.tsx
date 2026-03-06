@@ -37,7 +37,7 @@ import {
     MessageSquare,
     LogOut
 } from "lucide-react";
-import { recordSale, recordQuotation, addNewProductFromPos, recordUntrackedSale } from "../../actions";
+import { recordSale, recordQuotation, addNewProductFromPos, recordUntrackedSale, openCashRegister, recordPosExpense } from "../../actions";
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
@@ -108,6 +108,15 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
     const [isQuickSaleModalOpen, setIsQuickSaleModalOpen] = useState(false);
     const [quickSale, setQuickSale] = useState({ name: "", quantity: "1", price: "0" });
 
+    // Cash Register Logic
+    const [isCashRegisterModalOpen, setIsCashRegisterModalOpen] = useState(false);
+    const [cashRegisterAmount, setCashRegisterAmount] = useState("");
+
+    // Expense Tracking
+    const [isExpenseModalOpen, setIsExpenseModalOpen] = useState(false);
+    const [expenseAmount, setExpenseAmount] = useState("");
+    const [expenseDescription, setExpenseDescription] = useState("");
+
     const employees = (db.employees || []).filter((e: any) => e.shopId === shopId && e.active);
     const shop = db.shops.find((s: any) => s.id === shopId);
     const shopExpenses = shop ? Object.values(shop.expenses).reduce((a: number, b: any) => a + Number(b), 0) : 0;
@@ -124,6 +133,84 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
     };
 
     const clientLTV = getClientLTV(clientName);
+
+    // Calculate Cash Drawer Math
+    const ledger = db.ledger || [];
+    const todayStr = new Date().toISOString().split('T')[0];
+
+    // 1. Did we open today?
+    const todaysOpening = ledger.find((l: any) => l.category === 'Cash Drawer Opening' && l.shopId === shopId && String(l.date).startsWith(todayStr));
+    const hasOpenedRegister = !!todaysOpening;
+
+    // 2. What was yesterday's exact closing?
+    // Last Opening + All Cash Sales since then - All POS Expenses since then
+    let expectedOpeningCash = 0;
+
+    // Find the very last opening before today
+    const pastOpenings = ledger.filter((l: any) => l.category === 'Cash Drawer Opening' && l.shopId === shopId && !String(l.date).startsWith(todayStr));
+    const lastOpening = pastOpenings.sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime())[0];
+
+    if (lastOpening) {
+        const lastOpenDate = new Date(lastOpening.date).getTime();
+
+        // Sales after the last opening, but before today started
+        const salesSinceLastOpen = (db.sales || []).filter((s: any) => s.shopId === shopId && s.paymentMethod === 'cash' && new Date(s.date).getTime() >= lastOpenDate && !String(s.date).startsWith(todayStr));
+        const cashSalesVal = salesSinceLastOpen.reduce((sum: number, s: any) => sum + Number(s.totalWithTax || 0), 0);
+
+        // POS Expenses after last opening, before today
+        const expensesSinceLastOpen = ledger.filter((l: any) => l.category === 'POS Expense' && l.shopId === shopId && new Date(l.date).getTime() >= lastOpenDate && !String(l.date).startsWith(todayStr));
+        const expenseVal = expensesSinceLastOpen.reduce((sum: number, l: any) => sum + Number(l.amount || 0), 0);
+
+        expectedOpeningCash = Number(lastOpening.amount) + cashSalesVal - expenseVal;
+    }
+
+    // 3. Current Live Drawer (Today's Opening + Today's Cash Sales - Today's Expenses)
+    const todaysCashSales = todaysSales.filter((s: any) => s.paymentMethod === 'cash').reduce((sum: number, s: any) => sum + Number(s.totalWithTax || 0), 0);
+    const todaysExpenses = ledger.filter((l: any) => l.category === 'POS Expense' && l.shopId === shopId && String(l.date).startsWith(todayStr)).reduce((sum: number, l: any) => sum + Number(l.amount || 0), 0);
+
+    const liveCashInDrawer = (todaysOpening ? Number(todaysOpening.amount) : 0) + todaysCashSales - todaysExpenses;
+
+    // Trigger open modal on load if missing
+    React.useEffect(() => {
+        if (!hasOpenedRegister && !isCashRegisterModalOpen) {
+            setIsCashRegisterModalOpen(true);
+        }
+    }, [hasOpenedRegister, isCashRegisterModalOpen]);
+
+    const handleOpenRegister = async () => {
+        const val = parseFloat(cashRegisterAmount);
+        if (isNaN(val) || val < 0) {
+            alert("Please enter a valid cash amount.");
+            return;
+        }
+        startTransition(async () => {
+            try {
+                await openCashRegister(shopId, expectedOpeningCash, val);
+                setIsCashRegisterModalOpen(false);
+            } catch (e) {
+                alert("Failed to open register.");
+            }
+        });
+    };
+
+    const handleRecordExpense = async () => {
+        const val = parseFloat(expenseAmount);
+        if (isNaN(val) || val <= 0 || !expenseDescription) {
+            alert("Please provide a valid amount and description.");
+            return;
+        }
+        startTransition(async () => {
+            try {
+                await recordPosExpense(shopId, val, expenseDescription, selectedEmployeeId || "system");
+                setIsExpenseModalOpen(false);
+                setExpenseAmount("");
+                setExpenseDescription("");
+                alert("Expense recorded successfully.");
+            } catch (e) {
+                alert("Failed to record expense.");
+            }
+        });
+    };
 
     const addToCart = (item: any, price: number, qtyToAdd: number = 1) => {
         const existing = cart.find(c => c.item.id === item.id);
@@ -419,6 +506,15 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
                         </Button>
 
                         <Button
+                            onClick={() => setIsExpenseModalOpen(true)}
+                            variant="outline"
+                            className="h-10 px-3 border-rose-500/30 text-rose-300 hover:bg-rose-500/10 text-[10px] font-black uppercase italic flex items-center gap-2"
+                            title="Record shop expense"
+                        >
+                            <Minus className="h-4 w-4" /> Add Exp.
+                        </Button>
+
+                        <Button
                             onClick={() => {
                                 setReturnStatus("");
                                 setIsReturnModalOpen(true);
@@ -470,6 +566,24 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
                             <LogOut className="h-4 w-4" /> Logout
                         </Button>
                     </div>
+
+                    <div className="flex gap-2 w-full mt-4 sm:mt-0 sm:w-auto overflow-x-auto pb-2 scrollbar-hide">
+                        <div className="bg-slate-900 border border-slate-800 px-4 py-2 rounded-lg flex items-center gap-3 h-10 shadow-lg min-w-max">
+                            <Coins className="h-4 w-4 text-emerald-400" />
+                            <div className="flex flex-col">
+                                <span className="text-[10px] text-slate-500 uppercase font-black leading-none">Drawer Cash</span>
+                                <span className="text-xs font-bold text-slate-200">${liveCashInDrawer.toFixed(2)}</span>
+                            </div>
+                        </div>
+
+                        <div className="bg-slate-900 border border-slate-800 px-4 py-2 rounded-lg flex items-center gap-3 h-10 shadow-lg min-w-max">
+                            <AlertCircle className="h-4 w-4 text-rose-400" />
+                            <div className="flex flex-col">
+                                <span className="text-[10px] text-slate-500 uppercase font-black leading-none">Today's Exp.</span>
+                                <span className="text-xs font-bold text-slate-200">${todaysExpenses.toFixed(2)}</span>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
                 {filteredInventory.length === 0 && searchTerm ? (
@@ -489,7 +603,7 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
                     </div>
                 ) : (
                     <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
-                        {filteredInventory.map((item) => {
+                        {(searchTerm ? filteredInventory : filteredInventory.slice(0, 6)).map((item) => {
                             const allocation = item.allocations.find((a: any) => a.shopId === shopId);
                             const qtyAtShop = (allocation ? allocation.quantity : 0);
                             const totalNetworkStock = item.quantity || 0;
@@ -767,53 +881,158 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
                 </div>
             </Modal>
 
+            {/* Quick Sale Modal */}
             <Modal
                 isOpen={isQuickSaleModalOpen}
                 onClose={() => setIsQuickSaleModalOpen(false)}
-                title="Quick Sale (Manual Entry)"
+                title="Quick Sale Request"
             >
                 <div className="space-y-4 pt-2">
-                    <p className="text-[10px] text-slate-500 font-bold uppercase">Enter product details to add to cart. If product exists in inventory, it will be tracked; otherwise, it will be recorded as untracked.</p>
-                    <div className="space-y-2">
-                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Product Name</label>
+                    <p className="text-sm text-slate-400 font-medium">Record a sale for a product not in the system yet.</p>
+                    <div>
+                        <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Product Name</label>
                         <Input
-                            placeholder="e.g. Premium Hub Cap"
+                            placeholder="e.g. Wireless Mouse"
+                            className="bg-slate-950 border-slate-800 mt-1 placeholder:text-slate-700 font-bold"
                             value={quickSale.name}
                             onChange={(e) => setQuickSale({ ...quickSale, name: e.target.value })}
-                            className="bg-slate-950"
                         />
                     </div>
-                    <div className="flex gap-2">
-                        <div className="space-y-2 flex-1">
-                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Quantity</label>
+                    <div className="grid grid-cols-2 gap-4">
+                        <div>
+                            <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Quantity</label>
                             <Input
                                 type="number"
                                 min="1"
-                                placeholder="1"
+                                className="bg-slate-950 border-slate-800 mt-1 font-mono font-bold"
                                 value={quickSale.quantity}
                                 onChange={(e) => setQuickSale({ ...quickSale, quantity: e.target.value })}
-                                className="bg-slate-950"
                             />
                         </div>
-                        <div className="space-y-2 flex-1">
-                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Selling Price ($)</label>
-                            <Input
-                                type="number"
-                                min="0.01"
-                                step="0.01"
-                                placeholder="0.00"
-                                value={quickSale.price}
-                                onChange={(e) => setQuickSale({ ...quickSale, price: e.target.value })}
-                                className="bg-slate-950"
-                            />
+                        <div>
+                            <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Sale Price (Each)</label>
+                            <div className="relative mt-1">
+                                <span className="absolute left-3 top-[10px] text-slate-500 font-mono">$</span>
+                                <Input
+                                    type="number"
+                                    min="0"
+                                    step="0.01"
+                                    className="pl-7 bg-slate-950 border-slate-800 font-mono font-bold"
+                                    value={quickSale.price}
+                                    onChange={(e) => setQuickSale({ ...quickSale, price: e.target.value })}
+                                />
+                            </div>
                         </div>
                     </div>
                     <Button
+                        className="w-full bg-violet-600 hover:bg-violet-700 text-white font-black uppercase italic tracking-wider h-12 mt-4"
                         onClick={handleQuickSale}
-                        className="w-full bg-sky-600 hover:bg-sky-500 font-black uppercase italic tracking-widest h-12 mt-4"
                     >
-                        <ShoppingCart className="h-4 w-4 mr-2" />
                         Add to Cart
+                    </Button>
+                </div>
+            </Modal>
+
+            {/* Cash Register Modal (Force Open on Load) */}
+            <Modal
+                isOpen={isCashRegisterModalOpen}
+                onClose={() => {
+                    if (!hasOpenedRegister) {
+                        alert("You must open the register to proceed.");
+                    } else {
+                        setIsCashRegisterModalOpen(false);
+                    }
+                }}
+                title={hasOpenedRegister ? "View Register" : "Open Register"}
+            >
+                <div className="space-y-4 pt-2">
+                    <p className="text-sm text-slate-400 font-medium">Please enter the actual physical cash currently in the drawer to start your shift.</p>
+
+                    <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 relative overflow-hidden">
+                        <div className="absolute top-0 right-0 w-24 h-24 bg-rose-500/10 rounded-full blur-2xl pointer-events-none" />
+                        <div className="text-[10px] font-black uppercase text-slate-500 tracking-widest mb-1">Expected Opening Baseline</div>
+                        <div className="text-2xl font-black font-mono text-white">${expectedOpeningCash.toFixed(2)}</div>
+                        <div className="text-[10px] text-slate-400 mt-2 flex items-center gap-1">
+                            <History className="h-3 w-3" /> Derived from yesterday's close + recent sales.
+                        </div>
+                    </div>
+
+                    <div>
+                        <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Actual Cash Counted</label>
+                        <div className="relative mt-1">
+                            <span className="absolute left-3 top-[10px] text-slate-500 font-mono font-bold text-lg">$</span>
+                            <Input
+                                type="number"
+                                placeholder="0.00"
+                                step="0.01"
+                                className="pl-8 bg-slate-950 border-violet-500/30 text-lg font-mono font-black h-12"
+                                value={cashRegisterAmount}
+                                onChange={(e) => setCashRegisterAmount(e.target.value)}
+                            />
+                        </div>
+                        {cashRegisterAmount && parseFloat(cashRegisterAmount) - expectedOpeningCash !== 0 && (
+                            <div className={cn(
+                                "text-xs font-black uppercase italic mt-2 p-2 rounded",
+                                parseFloat(cashRegisterAmount) - expectedOpeningCash > 0 ? "bg-emerald-500/10 text-emerald-400" : "bg-rose-500/10 text-rose-400"
+                            )}>
+                                {parseFloat(cashRegisterAmount) - expectedOpeningCash > 0 ? "Register Overflow By " : "Register Short By "}
+                                ${Math.abs(parseFloat(cashRegisterAmount) - expectedOpeningCash).toFixed(2)}
+                            </div>
+                        )}
+                    </div>
+
+                    {!hasOpenedRegister && (
+                        <Button
+                            className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-black uppercase italic tracking-wider h-12 mt-4"
+                            onClick={handleOpenRegister}
+                            disabled={isPending}
+                        >
+                            {isPending ? "Recording..." : "Start Shift"}
+                        </Button>
+                    )}
+                </div>
+            </Modal>
+
+            {/* Expense Modal */}
+            <Modal
+                isOpen={isExpenseModalOpen}
+                onClose={() => setIsExpenseModalOpen(false)}
+                title="Record Shop Expense"
+            >
+                <div className="space-y-4 pt-2">
+                    <p className="text-sm text-slate-400 font-medium">Record money taken out of the drawer for day-to-day shop expenses.</p>
+
+                    <div>
+                        <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Expense Amount</label>
+                        <div className="relative mt-1">
+                            <span className="absolute left-3 top-[10px] text-slate-500 font-mono font-bold text-lg">$</span>
+                            <Input
+                                type="number"
+                                placeholder="0.00"
+                                step="0.01"
+                                className="pl-8 bg-slate-950 border-rose-500/30 text-lg font-mono font-black h-12 text-rose-400"
+                                value={expenseAmount}
+                                onChange={(e) => setExpenseAmount(e.target.value)}
+                            />
+                        </div>
+                    </div>
+
+                    <div>
+                        <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Description / Reason</label>
+                        <Input
+                            placeholder="e.g. Lunch for staff"
+                            className="bg-slate-950 border-slate-800 mt-1 placeholder:text-slate-700 font-bold h-12"
+                            value={expenseDescription}
+                            onChange={(e) => setExpenseDescription(e.target.value)}
+                        />
+                    </div>
+
+                    <Button
+                        className="w-full bg-rose-600 hover:bg-rose-700 text-white font-black uppercase italic tracking-wider h-12 mt-4"
+                        onClick={handleRecordExpense}
+                        disabled={isPending}
+                    >
+                        {isPending ? "Recording..." : "Deduct from Drawer"}
                     </Button>
                 </div>
             </Modal>
