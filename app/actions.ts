@@ -58,85 +58,85 @@ export async function getDashboardData() {
         const { data: emails } = await supabaseAdmin.from('oracle_emails').select('*');
 
         return {
-        inventory: (inventory || []).map((i: any) => ({
-            id: i.id,
-            name: i.name || "Unknown Product",
-            category: i.category || "General",
-            quantity: Number(i.quantity || 0),
-            landedCost: Number(i.landed_cost || 0),
-            acquisitionPrice: Number(i.acquisition_price || 0),
-            dateAdded: i.date_added || new Date().toISOString(),
-            sku: i.sku || i.id,
-            allocations: (allocations || []).filter((a: any) => a.item_id === i.id).map((a: any) => ({
-                shopId: a.shop_id,
-                quantity: Number(a.quantity || 0)
-            }))
-        })),
-        sales: (sales || []).map((s: any) => ({
-            id: s.id, shopId: s.shop_id, itemId: s.item_id, itemName: s.item_name || "Unknown Item",
-            quantity: Number(s.quantity || 0), unitPrice: Number(s.unit_price || 0),
-            totalWithTax: Number(s.total_with_tax || 0), totalBeforeTax: Number(s.total_before_tax || 0),
-            tax: Number(s.tax || 0), date: s.date || new Date().toISOString(), employeeId: s.employee_id
-        })),
-        shops: (shops || []).map((sh: any) => ({
-            id: sh.id, name: sh.name || "Unnamed Shop",
-            expenses: sh.expenses || { rent: 0, salaries: 0, utilities: 0, misc: 0 }
-        })),
-        quotations: (quotations || []).map((q: any) => {
-            const in7Days = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
-            const items = Array.isArray(q.items) ? q.items : [];
-            return {
-                id: q.id,
-                shopId: q.shop_id,
-                clientName: q.client_name || "Guest",
-                clientEmail: q.client_email || q.clientEmail || "",
-                clientPhone: q.client_phone || q.clientPhone || "",
-                items,
-                totalBeforeTax: Number(q.total_before_tax || 0),
-                tax: Number(q.tax || 0),
-                totalWithTax: Number(q.total_with_tax || 0),
-                status: q.status || 'pending',
-                date: q.date || new Date().toISOString(),
-                expiryDate: q.expiry_date || q.expiryDate || in7Days,
-                employeeId: q.employee_id || q.employeeId || "",
-            };
-        }),
-        employees: (employees || []).map((e: any) => ({
-            id: e.id,
-            name: e.name || "New Recruit",
-            surname: e.surname || "",
-            email: e.email || "",
-            mobile: e.mobile || "",
-            role: e.role || "sales",
-            shopId: e.shop_id,
-            hireDate: e.hire_date || e.hireDate || new Date().toISOString(),
-            active: Boolean(e.is_active ?? e.active ?? true),
-            mobileVerified: Boolean(e.mobile_verified ?? false),
-        })),
-        shipments: (shipments || []).map((sh: any) => ({
-            id: sh.id, supplier: sh.supplier || "Internal Transfer", shipmentNumber: sh.shipment_number || "---", date: sh.date || new Date().toISOString()
-        })),
-        ledger: (ledger || []).map((l: any) => ({
-            id: l.id, type: l.type || 'expense', category: l.category || 'General', amount: Number(l.amount || 0),
-            date: l.date || new Date().toISOString(), description: l.description || "", shopId: l.shop_id
-        })),
-        auditLog: (auditLog || []).map((a: any) => ({
-            id: a.id, timestamp: a.timestamp || new Date().toISOString(), employeeId: a.employee_id || "SYSTEM", action: a.action, details: a.details, changes: a.changes
-        })),
-        transfers: (transfers || []).map((t: any) => ({
-            id: t.id, itemId: t.item_id, itemName: t.item_name, fromShopId: t.from_shop_id, toShopId: t.to_shop_id, quantity: Number(t.quantity || 0), date: t.date || new Date().toISOString()
-        })),
-        oracleEmails: (emails || []).map((em: any) => ({
-            id: em.id, timestamp: em.timestamp || new Date().toISOString(), to: em.recipient, subject: em.subject, body: em.body, type: em.type
-        })),
-        settings: {
-            taxRate: Number(settings?.tax_rate || 0.155),
-            taxThreshold: Number(settings?.tax_threshold || 100),
-            taxMode: settings?.tax_mode || 'all',
-            zombieDays: Number(settings?.zombie_days || 60),
-            currencySymbol: settings?.currency_symbol || "$"
-        },
-        globalExpenses: settings?.global_expenses || {}
+            inventory: (inventory || []).map((i: any) => ({
+                id: i.id,
+                name: i.name || "Unknown Product",
+                category: i.category || "General",
+                quantity: Number(i.quantity || 0),
+                landedCost: Number(i.landed_cost || 0),
+                acquisitionPrice: Number(i.acquisition_price || 0),
+                dateAdded: i.date_added || new Date().toISOString(),
+                sku: i.sku || i.id,
+                allocations: (allocations || []).filter((a: any) => a.item_id === i.id).map((a: any) => ({
+                    shopId: a.shop_id,
+                    quantity: Number(a.quantity || 0)
+                }))
+            })),
+            sales: (sales || []).map((s: any) => ({
+                id: s.id, shopId: s.shop_id, itemId: s.item_id, itemName: s.item_name || "Unknown Item",
+                quantity: Number(s.quantity || 0), unitPrice: Number(s.unit_price || 0),
+                totalWithTax: Number(s.total_with_tax || 0), totalBeforeTax: Number(s.total_before_tax || 0),
+                tax: Number(s.tax || 0), date: s.date || new Date().toISOString(), employeeId: s.employee_id
+            })),
+            shops: (shops || []).map((sh: any) => ({
+                id: sh.id, name: sh.name || "Unnamed Shop",
+                expenses: sh.expenses || { rent: 0, salaries: 0, utilities: 0, misc: 0 }
+            })),
+            quotations: (quotations || []).map((q: any) => {
+                const in7Days = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+                const items = Array.isArray(q.items) ? q.items : [];
+                return {
+                    id: q.id,
+                    shopId: q.shop_id,
+                    clientName: q.client_name || "Guest",
+                    clientEmail: q.client_email || q.clientEmail || "",
+                    clientPhone: q.client_phone || q.clientPhone || "",
+                    items,
+                    totalBeforeTax: Number(q.total_before_tax || 0),
+                    tax: Number(q.tax || 0),
+                    totalWithTax: Number(q.total_with_tax || 0),
+                    status: q.status || 'pending',
+                    date: q.date || new Date().toISOString(),
+                    expiryDate: q.expiry_date || q.expiryDate || in7Days,
+                    employeeId: q.employee_id || q.employeeId || "",
+                };
+            }),
+            employees: (employees || []).map((e: any) => ({
+                id: e.id,
+                name: e.name || "New Recruit",
+                surname: e.surname || "",
+                email: e.email || "",
+                mobile: e.mobile || "",
+                role: e.role || "sales",
+                shopId: e.shop_id,
+                hireDate: e.hire_date || e.hireDate || new Date().toISOString(),
+                active: Boolean(e.is_active ?? e.active ?? true),
+                mobileVerified: Boolean(e.mobile_verified ?? false),
+            })),
+            shipments: (shipments || []).map((sh: any) => ({
+                id: sh.id, supplier: sh.supplier || "Internal Transfer", shipmentNumber: sh.shipment_number || "---", date: sh.date || new Date().toISOString()
+            })),
+            ledger: (ledger || []).map((l: any) => ({
+                id: l.id, type: l.type || 'expense', category: l.category || 'General', amount: Number(l.amount || 0),
+                date: l.date || new Date().toISOString(), description: l.description || "", shopId: l.shop_id
+            })),
+            auditLog: (auditLog || []).map((a: any) => ({
+                id: a.id, timestamp: a.timestamp || new Date().toISOString(), employeeId: a.employee_id || "SYSTEM", action: a.action, details: a.details, changes: a.changes
+            })),
+            transfers: (transfers || []).map((t: any) => ({
+                id: t.id, itemId: t.item_id, itemName: t.item_name, fromShopId: t.from_shop_id, toShopId: t.to_shop_id, quantity: Number(t.quantity || 0), date: t.date || new Date().toISOString()
+            })),
+            oracleEmails: (emails || []).map((em: any) => ({
+                id: em.id, timestamp: em.timestamp || new Date().toISOString(), to: em.recipient, subject: em.subject, body: em.body, type: em.type
+            })),
+            settings: {
+                taxRate: Number(settings?.tax_rate || 0.155),
+                taxThreshold: Number(settings?.tax_threshold || 100),
+                taxMode: settings?.tax_mode || 'all',
+                zombieDays: Number(settings?.zombie_days || 60),
+                currencySymbol: settings?.currency_symbol || "$"
+            },
+            globalExpenses: settings?.global_expenses || {}
         };
     } catch (e: any) {
         console.error('[getDashboardData] Failed:', e?.message || e);
@@ -269,11 +269,11 @@ export async function recordSale(sale: any) {
     });
 
     const { data: alloc } = await supabaseAdmin.from('inventory_allocations').select('quantity').eq('item_id', sale.itemId).eq('shop_id', sale.shopId).single();
-    if (alloc) await supabaseAdmin.from('inventory_allocations').update({ quantity: Math.max(0, alloc.quantity - sale.quantity) }).eq('item_id', sale.itemId).eq('shop_id', sale.shopId);
+    if (alloc) await supabaseAdmin.from('inventory_allocations').update({ quantity: alloc.quantity - sale.quantity }).eq('item_id', sale.itemId).eq('shop_id', sale.shopId);
 
     const { data: item } = await supabaseAdmin.from('inventory_items').select('quantity, name').eq('id', sale.itemId).single();
     if (item) {
-        const newQty = Math.max(0, item.quantity - sale.quantity);
+        const newQty = item.quantity - sale.quantity;
         await supabaseAdmin.from('inventory_items').update({ quantity: newQty }).eq('id', sale.itemId);
         if (newQty <= 0) {
             try {
@@ -289,56 +289,56 @@ export async function recordSale(sale: any) {
         }
     }
 
-     await supabaseAdmin.from('audit_log').insert({ id: Math.random().toString(36).substring(2, 9), timestamp, employee_id: sale.employeeId, action: 'SALE_RECORDED', details: sale.itemName });
+    await supabaseAdmin.from('audit_log').insert({ id: Math.random().toString(36).substring(2, 9), timestamp, employee_id: sale.employeeId, action: 'SALE_RECORDED', details: sale.itemName });
 
-     revalidatePath(`/shops/${sale.shopId}`); revalidatePath("/inventory");
+    revalidatePath(`/shops/${sale.shopId}`); revalidatePath("/inventory");
+    revalidatePath("/");
 }
 
 export async function recordUntrackedSale(sale: any) {
-     const { data: settings } = await supabaseAdmin.from('oracle_settings').select('*').single();
-     if (!settings) throw new Error("Settings not found");
+    const timestamp = new Date().toISOString();
 
-     let tax = 0;
-     const taxRate = Number(settings.tax_rate) || 0.155;
-     if (settings.tax_mode === 'all') {
-         tax = sale.totalBeforeTax * taxRate;
-     } else if (settings.tax_mode === 'above_threshold') {
-         if ((sale.totalBeforeTax / sale.quantity) >= Number(settings.tax_threshold)) {
-             tax = sale.totalBeforeTax * taxRate;
-         }
-     }
+    // Check if product exists by name in database
+    const { data: existingItems } = await supabaseAdmin.from('inventory_items')
+        .select('id, name')
+        .ilike('name', sale.itemName);
 
-     const totalWithTax = sale.totalBeforeTax + tax;
-     const saleId = Math.random().toString(36).substring(2, 9);
-     const timestamp = new Date().toISOString();
+    let itemId = "UNTRACKED";
+    let actualItemName = sale.itemName;
 
-     await supabaseAdmin.from('sales').insert({
-         id: saleId,
-         shop_id: sale.shopId,
-         item_id: "UNTRACKED",
-         item_name: sale.itemName,
-         quantity: sale.quantity,
-         unit_price: sale.unitPrice,
-         total_before_tax: sale.totalBeforeTax,
-         tax,
-         total_with_tax: totalWithTax,
-         date: timestamp,
-         employee_id: sale.employeeId,
-         client_name: sale.clientName,
-         payment_method: sale.paymentMethod || 'cash'
-     });
+    if (existingItems && existingItems.length > 0) {
+        // Exact or close match found
+        const matchedItem = existingItems.find((i: any) => i.name.toLowerCase() === sale.itemName.toLowerCase()) || existingItems[0];
+        itemId = matchedItem.id;
+        actualItemName = matchedItem.name;
+    } else {
+        // It genuinely doesn't exist. Create it on the fly.
+        itemId = `adhoc_${Math.random().toString(36).substring(2, 9)}`;
 
-     await supabase.from('audit_log').insert({
-         id: Math.random().toString(36).substring(2, 9),
-         timestamp,
-         employee_id: sale.employeeId,
-         action: 'UNTRACKED_SALE_RECORDED',
-         details: `Untracked sale: ${sale.itemName} x${sale.quantity}`
-     });
+        await supabaseAdmin.from('inventory_items').insert({
+            id: itemId,
+            shipment_id: 'QUICK-SALE-AUTO',
+            name: sale.itemName,
+            category: 'Quick Sale',
+            quantity: 0,
+            acquisition_price: 0,
+            landed_cost: 0,
+            date_added: timestamp
+        });
 
-     revalidatePath(`/shops/${sale.shopId}`);
-     revalidatePath("/inventory");
-     revalidatePath("/");
+        await supabaseAdmin.from('inventory_allocations').insert({
+            item_id: itemId,
+            shop_id: sale.shopId,
+            quantity: 0
+        });
+    }
+
+    // Delegate to standard recordSale logic
+    return recordSale({
+        ...sale,
+        itemId,
+        itemName: actualItemName
+    });
 }
 
 export async function registerInventoryItem(item: { name: string, category: string, quantity: number, acquisitionPrice: number, landedCost: number }, shopIds?: string[]) {
@@ -353,12 +353,12 @@ export async function registerInventoryItem(item: { name: string, category: stri
         landed_cost: item.landedCost,
         date_added
     });
-    
+
     // Create allocations for selected shops
     if (shopIds && shopIds.length > 0) {
         const quantityPerShop = Math.floor(item.quantity / shopIds.length);
         const remainder = item.quantity % shopIds.length;
-        
+
         for (let i = 0; i < shopIds.length; i++) {
             const shopId = shopIds[i];
             const qty = quantityPerShop + (i < remainder ? 1 : 0);
@@ -371,7 +371,7 @@ export async function registerInventoryItem(item: { name: string, category: stri
             }
         }
     }
-    
+
     revalidatePath("/inventory");
     revalidatePath("/");
     // Revalidate all shop pages
@@ -390,15 +390,15 @@ export async function registerBulkInventoryItems(
     globalExpenses: Record<string, number>
 ) {
     const timestamp = new Date().toISOString();
-    
+
     const totalMonthlyExpenses = Object.values(globalExpenses).reduce((a: number, b: any) => a + Number(b), 0) as number;
     const hasExpenses = totalMonthlyExpenses > 0;
-    
+
     const results = [];
-    
+
     for (const item of items) {
         const id = Math.random().toString(36).substring(2, 9);
-        
+
         let landedCost: number;
         if (!hasExpenses) {
             landedCost = item.price * (0.47 + Math.random() * 0.06);
@@ -408,7 +408,7 @@ export async function registerBulkInventoryItems(
             const overheadPerPiece = totalMonthlyExpenses / 1000;
             landedCost = item.price + overheadPerPiece;
         }
-        
+
         await supabaseAdmin.from('inventory_items').insert({
             id,
             name: item.name,
@@ -418,10 +418,10 @@ export async function registerBulkInventoryItems(
             landed_cost: landedCost,
             date_added: timestamp
         });
-        
+
         const quantityPerShop = Math.floor(item.quantity / shopIds.length);
         const remainder = item.quantity % shopIds.length;
-        
+
         for (let i = 0; i < shopIds.length; i++) {
             const shopId = shopIds[i];
             const qty = quantityPerShop + (i < remainder ? 1 : 0);
@@ -433,10 +433,10 @@ export async function registerBulkInventoryItems(
                 });
             }
         }
-        
+
         results.push({ id, name: item.name, quantity: item.quantity });
     }
-    
+
     revalidatePath("/inventory");
     return { success: true, itemsAdded: results.length };
 }
@@ -445,7 +445,7 @@ export async function updateInventoryItem(itemId: string, updates: any) {
     await supabaseAdmin.from('inventory_items').update(updates).eq('id', itemId);
     revalidatePath("/inventory");
     revalidatePath("/");
-    
+
     // Also revalidate all shop pages in case allocations are affected
     const { data: shops } = await supabaseAdmin.from('shops').select('id');
     if (shops) {
@@ -459,7 +459,7 @@ export async function deleteInventoryItem(itemId: string) {
     await supabaseAdmin.from('inventory_items').delete().eq('id', itemId);
     revalidatePath("/inventory");
     revalidatePath("/");
-    
+
     // Also revalidate all shop pages
     const { data: shops } = await supabaseAdmin.from('shops').select('id');
     if (shops) {
@@ -547,6 +547,8 @@ export async function finalizeQuotation(quoteId: string) {
     }
     await supabase.from('quotations').update({ status: 'converted' }).eq('id', quoteId);
     revalidatePath(`/shops/${quote.shop_id}`);
+    revalidatePath("/inventory");
+    revalidatePath("/");
 }
 
 export async function addNewProductFromPos(productData: any) {
@@ -557,7 +559,7 @@ export async function addNewProductFromPos(productData: any) {
         quantity: productData.initialStock || 0, acquisition_price: productData.landedCost, landed_cost: productData.landedCost, date_added: timestamp
     });
     await supabaseAdmin.from('inventory_allocations').insert({ item_id: id, shop_id: productData.shopId, quantity: productData.initialStock || 0 });
-    revalidatePath("/inventory"); 
+    revalidatePath("/inventory");
     revalidatePath("/");
     revalidatePath(`/shops/${productData.shopId}`);
     return { id };
@@ -648,7 +650,7 @@ export async function registerNewEmployee(employee: {
         const workEmail = `${safe(employee.name)}.${safe(employee.surname)}@${SHOP_DOMAINS[employee.shopId] || "nirvana.com"}`;
         const tempPassword = `${safe(employee.name)}.${safe(employee.surname)}123`;
         const passwordHash = createHash("sha256").update(tempPassword).digest("hex");
-         
+
         // Owners authenticate via Supabase Auth.
         // Staff authenticate via custom session (work email -> one-time code).
         let userId: string;
@@ -1063,9 +1065,9 @@ export async function createStockRequest(request: {
         .select('*')
         .ilike('name', `%${request.itemName}%`)
         .limit(1);
-    
+
     const item = inventory?.[0];
-    
+
     await supabaseAdmin.from('stock_requests').insert({
         item_id: item?.id || request.itemName,
         item_name: request.itemName,
@@ -1075,7 +1077,7 @@ export async function createStockRequest(request: {
         requested_by: request.requestedBy,
         status: 'pending'
     });
-    
+
     revalidatePath('/transfers');
     return { success: true };
 }
@@ -1090,15 +1092,15 @@ export async function updateStockRequestStatus(
         .select('*')
         .eq('id', requestId)
         .single();
-    
+
     if (!request) throw new Error('Request not found');
-    
+
     await supabaseAdmin.from('stock_requests').update({
         status,
         approved_by: approvedBy,
         updated_at: new Date().toISOString()
     }).eq('id', requestId);
-    
+
     if (status === 'approved') {
         await supabaseAdmin.from('transfers').insert({
             item_id: request.item_id,
@@ -1109,7 +1111,7 @@ export async function updateStockRequestStatus(
             requested_by: request.requested_by
         });
     }
-    
+
     revalidatePath('/transfers');
     return { success: true };
 }
