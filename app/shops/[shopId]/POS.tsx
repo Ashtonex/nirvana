@@ -170,10 +170,24 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
     }
 
     // 3. Current Live Drawer (Today's Opening + Today's Cash Sales - Today's Expenses)
-    const todaysCashSales = todaysSales.filter((s: any) => s.paymentMethod === 'cash').reduce((sum: number, s: any) => sum + Number(s.totalWithTax || 0), 0);
-    const todaysExpenses = ledger.filter((l: any) => l.category === 'POS Expense' && l.shopId === shopId && String(l.date).startsWith(todayStr)).reduce((sum: number, l: any) => sum + Number(l.amount || 0), 0);
+    const openingTimestamp = todaysOpening ? new Date(todaysOpening.date).getTime() : 0;
 
-    const liveCashInDrawer = (todaysOpening ? Number(todaysOpening.amount) : 0) + todaysCashSales - todaysExpenses;
+    const cashSalesAfterOpening = (db.sales || []).filter((s: any) =>
+        s.shopId === shopId &&
+        s.paymentMethod === 'cash' &&
+        String(s.date).startsWith(todayStr) &&
+        (!openingTimestamp || new Date(s.date).getTime() > openingTimestamp)
+    ).reduce((sum: number, s: any) => sum + Number(s.totalWithTax || 0), 0);
+
+    const expensesAfterOpening = ledger.filter((l: any) =>
+        l.category === 'POS Expense' &&
+        l.shopId === shopId &&
+        String(l.date).startsWith(todayStr) &&
+        (!openingTimestamp || new Date(l.date).getTime() > openingTimestamp)
+    ).reduce((sum: number, l: any) => sum + Number(l.amount || 0), 0);
+
+    const baseBalance = hasOpenedRegister ? Number(todaysOpening.amount) : expectedOpeningCash;
+    const liveCashInDrawer = baseBalance + cashSalesAfterOpening - expensesAfterOpening;
 
     // Trigger auto-print when success modal opens
     React.useEffect(() => {
