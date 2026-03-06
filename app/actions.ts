@@ -372,6 +372,18 @@ export async function registerInventoryItem(item: { name: string, category: stri
         }
     }
 
+    const totalCost = item.quantity * item.landedCost;
+    if (totalCost > 0) {
+        await supabaseAdmin.from('ledger_entries').insert([{
+            id: Math.random().toString(36).substring(2, 9),
+            type: 'asset',
+            category: 'Inventory Acquisition',
+            amount: totalCost,
+            date: date_added,
+            description: `Ad-Hoc Master Addition: ${item.name}`
+        }]);
+    }
+
     revalidatePath("/inventory");
     revalidatePath("/");
     // Revalidate all shop pages
@@ -559,6 +571,18 @@ export async function addNewProductFromPos(productData: any) {
         quantity: productData.initialStock || 0, acquisition_price: productData.landedCost, landed_cost: productData.landedCost, date_added: timestamp
     });
     await supabaseAdmin.from('inventory_allocations').insert({ item_id: id, shop_id: productData.shopId, quantity: productData.initialStock || 0 });
+
+    const totalCost = (productData.initialStock || 0) * productData.landedCost;
+    if (totalCost > 0) {
+        await supabaseAdmin.from('ledger_entries').insert([{
+            id: Math.random().toString(36).substring(2, 9),
+            type: 'asset',
+            category: 'Inventory Acquisition',
+            amount: totalCost,
+            date: timestamp,
+            description: `Ad-Hoc POS Addition: ${productData.name}`
+        }]);
+    }
     revalidatePath("/inventory");
     revalidatePath("/");
     revalidatePath(`/shops/${productData.shopId}`);
