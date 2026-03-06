@@ -117,6 +117,9 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
     const [expenseAmount, setExpenseAmount] = useState("");
     const [expenseDescription, setExpenseDescription] = useState("");
 
+    // Receipt Printing State
+    const [activeReceipt, setActiveReceipt] = useState<any | null>(null);
+
     const employees = (db.employees || []).filter((e: any) => e.shopId === shopId && e.active);
     const shop = db.shops.find((s: any) => s.id === shopId);
     const shopExpenses = shop ? Object.values(shop.expenses).reduce((a: number, b: any) => a + Number(b), 0) : 0;
@@ -169,6 +172,19 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
     const todaysExpenses = ledger.filter((l: any) => l.category === 'POS Expense' && l.shopId === shopId && String(l.date).startsWith(todayStr)).reduce((sum: number, l: any) => sum + Number(l.amount || 0), 0);
 
     const liveCashInDrawer = (todaysOpening ? Number(todaysOpening.amount) : 0) + todaysCashSales - todaysExpenses;
+
+    // Trigger print when activeReceipt is set
+    React.useEffect(() => {
+        if (activeReceipt) {
+            const timer = setTimeout(() => {
+                window.print();
+                // Clear receipt after print dialog closes to avoid re-prints if page re-renders
+                // Delay clearing to ensure print dialog captures content
+                setTimeout(() => setActiveReceipt(null), 1000);
+            }, 500);
+            return () => clearTimeout(timer);
+        }
+    }, [activeReceipt]);
 
     // Trigger open modal on load if missing
     React.useEffect(() => {
@@ -305,11 +321,14 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
         startTransition(async () => {
             try {
                 if (posMode === 'sale') {
+                    const transactionId = Math.random().toString(36).substring(2, 9).toUpperCase();
+                    const receiptItems = [];
+
                     for (const entry of cart) {
                         const isUntracked = entry.item.id.startsWith('QUICK_');
+                        const itemTax = (entry.price - (entry.price / (1 + taxRate))) * entry.quantity;
 
                         if (isUntracked) {
-                            // For untracked items, use the server action
                             await recordUntrackedSale({
                                 shopId,
                                 itemName: entry.item.name,
@@ -321,7 +340,6 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
                                 paymentMethod
                             });
                         } else {
-                            // For tracked items, use normal recordSale which decrements inventory
                             await recordSale({
                                 shopId,
                                 itemId: entry.item.id,
@@ -334,8 +352,32 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
                                 paymentMethod
                             });
                         }
+
+                        receiptItems.push({
+                            name: entry.item.name,
+                            quantity: entry.quantity,
+                            price: entry.price,
+                            tax: itemTax
+                        });
                     }
-                    alert("Sale recorded successfully!");
+
+                    // Prepare receipt for printing
+                    const cashier = employees.find((e: any) => e.id === selectedEmployeeId)?.name || "System";
+                    setActiveReceipt({
+                        transactionId,
+                        shopName: shop?.name || "NIRVANA STORE",
+                        cashier,
+                        clientName: clientName || "Walk-in Customer",
+                        clientPhone: clientPhone || "N/A",
+                        items: receiptItems,
+                        subtotal: totalBeforeTax,
+                        tax: totalTax,
+                        total: totalWithTax,
+                        date: new Date().toLocaleString(),
+                        paymentMethod
+                    });
+
+                    alert("Sale recorded successfully! Printing receipt...");
                 } else {
                     await recordQuotation({
                         shopId,
@@ -1227,6 +1269,99 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
                     )}
                 </div>
             </Modal>
+
+            {/* Thermal Receipt (Hidden from screen, visible only for print) */}
+            {activeReceipt && (
+                <div id="thermal-receipt" className="hidden print:block w-[58mm] bg-white text-black p-4 font-mono text-[10px] leading-tight mx-auto">
+                    <style dangerouslySetInnerHTML={{
+                        __html: `
+                        @media print {
+                            @page { size: 58mm auto; margin: 0; }
+                            body * { visibility: hidden; }
+                            #thermal-receipt, #thermal-receipt * { visibility: visible; }
+                            #thermal-receipt { position: absolute; left: 0; top: 0; width: 58mm; }
+                        }
+                    `}} />
+
+                    <div className="text-center space-y-1 mb-4 border-b border-black pb-2">
+                        <h1 className="text-sm font-bold uppercase">{activeReceipt.shopName}</h1>
+                        <p className="text-[8px] uppercase tracking-tighter">NIRVANA PREMIUM NETWORK</p>
+                        <p className="text-[8px]">{activeReceipt.date}</p>
+                    </div>
+
+                    <div className="space-y-1 mb-4">
+                        <div className="flex justify-between">
+                            <span>CASHIER:</span>
+                            <span className="font-bold">{activeReceipt.cashier}</span>
+                        </div>
+                        <div className="flex justify-between">
+                            <span>CLIENT:</span>
+                            <span className="font-bold truncate max-w-[30mm]">{activeReceipt.clientName}</span>
+                        </div>
+                        <div className="flex justify-between">
+                            <span>ORDER NO:</span>
+                            <span className="font-bold">ORD-{activeReceipt.transactionId}</span>
+                        </div>
+                        <div className="flex justify-between">
+                            <span>RECEIPT:</span>
+                            <span className="font-bold">#RCT-{activeReceipt.transactionId}</span>
+                        </div>
+                    </div>
+
+                    <div className="border-b border-dashed border-black mb-2 opacity-50" />
+
+                    <table className="w-full mb-4">
+                        <thead>
+                            <tr className="text-left border-b border-black font-bold">
+                                <th className="pb-1">ITEM</th>
+                                <th className="pb-1 text-center">QTY</th>
+                                <th className="pb-1 text-right">TOTAL</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-dotted divide-black">
+                            {activeReceipt.items.map((item: any, i: number) => (
+                                <tr key={i} className="py-1">
+                                    <td className="py-1 max-w-[30mm] truncate">{item.name}</td>
+                                    <td className="py-1 text-center font-bold">x{item.quantity}</td>
+                                    <td className="py-1 text-right font-bold">${item.price.toFixed(2)}</td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+
+                    <div className="border-t border-black pt-2 space-y-1">
+                        <div className="flex justify-between text-[8px]">
+                            <span>SUBTOTAL:</span>
+                            <span>${activeReceipt.subtotal.toFixed(2)}</span>
+                        </div>
+                        <div className="flex justify-between text-[8px]">
+                            <span>TAX (15.5%):</span>
+                            <span>${activeReceipt.tax.toFixed(2)}</span>
+                        </div>
+                        <div className="flex justify-between text-base font-bold pt-1 border-t border-double border-black">
+                            <span>TOTAL:</span>
+                            <span>${activeReceipt.total.toFixed(2)}</span>
+                        </div>
+                        <div className="text-[8px] italic mt-1 font-bold">
+                            PAYMENT: {activeReceipt.paymentMethod.toUpperCase()}
+                        </div>
+                    </div>
+
+                    <div className="flex flex-col items-center mt-6 pt-4 border-t border-dashed border-black space-y-2">
+                        <img
+                            src={`https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=VERIFY_NIRVANA_${activeReceipt.transactionId}`}
+                            alt="Verification QR"
+                            className="w-24 h-24 grayscale"
+                        />
+                        <p className="text-[7px] text-center font-bold uppercase tracking-widest">Scan to Verify Authentic Purchase</p>
+                        <p className="text-[6px] text-center opacity-70">Thank you for choosing NIRVANA. For returns, bring this original receipt.</p>
+                    </div>
+
+                    <div className="mt-6 text-center text-[8px] font-bold pb-8">
+                        *** END OF RECEIPT ***
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
