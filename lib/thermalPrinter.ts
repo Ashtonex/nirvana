@@ -66,22 +66,46 @@ export class ThermalPrinterService {
 
     async connectBluetooth() {
         try {
+            console.log("Requesting Bluetooth device...");
+            // Many thermal printers don't advertise their primary service UUID.
+            // Using acceptAllDevices makes it much easier to find them.
             const device = await (navigator as any).bluetooth.requestDevice({
-                filters: [{ services: this.BLE_SERVICE_UUIDS.concat(['000018f0-0000-1000-8000-00805f9b34fb']) }],
-                optionalServices: this.BLE_SERVICE_UUIDS
+                acceptAllDevices: true,
+                optionalServices: [
+                    ...this.BLE_SERVICE_UUIDS,
+                    '000018f0-0000-1000-8000-00805f9b34fb', // Generic printer
+                    '000018f1-0000-1000-8000-00805f9b34fb',
+                    '00001101-0000-1000-8000-00805f9b34fb', // Serial Port Profile
+                    '0000ff00-0000-1000-8000-00805f9b34fb',
+                ]
             });
 
+            console.log("Connecting to GATT Server...");
             const server = await device.gatt.connect();
 
-            // Try known services
+            console.log("Searching for services...");
+            // Try known services first
             let characteristic = null;
-            for (const serviceUuid of this.BLE_SERVICE_UUIDS) {
+
+            // Re-merge UUIDs for more thorough search
+            const allServiceUuids = [
+                ...this.BLE_SERVICE_UUIDS,
+                '000018f0-0000-1000-8000-00805f9b34fb',
+                '000018f1-0000-1000-8000-00805f9b34fb',
+                '0000ff00-0000-1000-8000-00805f9b34fb'
+            ];
+
+            for (const serviceUuid of allServiceUuids) {
                 try {
                     const service = await server.getPrimaryService(serviceUuid);
+                    console.log(`Found service: ${serviceUuid}`);
                     for (const charUuid of this.BLE_CHARACTERISTIC_UUIDS) {
                         try {
                             characteristic = await service.getCharacteristic(charUuid);
-                            if (characteristic) break;
+                            if (characteristic) {
+                                console.log(`Found characteristic: ${charUuid}`);
+                                break;
+                            }
                         } catch (e) { }
                     }
                     if (characteristic) break;
