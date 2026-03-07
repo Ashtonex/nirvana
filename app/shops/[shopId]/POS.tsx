@@ -445,8 +445,7 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
                     }
 
                     // Prepare receipt for printing
-                    const cashier = employees.find((e: any) => e.id === selectedEmployeeId)?.name || "System";
-                    setActiveReceipt({
+                    const receiptData = {
                         orderId: `ORD-${transactionId}`,
                         receiptNo: `#RCT-${transactionId}`,
                         transactionId,
@@ -461,9 +460,21 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
                         dateStamp: new Date().toLocaleDateString(),
                         timeStamp: new Date().toLocaleTimeString(),
                         paymentMethod
-                    });
+                    };
 
+                    setActiveReceipt(receiptData);
                     setIsSuccessModalOpen(true);
+
+                    // Automate printing if connected
+                    if (isPrinterConnected) {
+                        try {
+                            await thermalPrinter.printReceipt(receiptData);
+                        } catch (printError) {
+                            console.error("Auto-print failed:", printError);
+                            // We don't alert here to avoid interrupting the success state, 
+                            // the user can still manual print from the modal.
+                        }
+                    }
                 } else {
                     await recordQuotation({
                         shopId,
