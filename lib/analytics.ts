@@ -149,13 +149,31 @@ export async function getSalesVsOverheadsData() {
     const now = new Date();
     const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
     const currentDay = now.getDate();
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+    const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString();
 
     const { data: shops } = await supabaseAdmin.from('shops').select('id, name, expenses');
-    const { data: settings } = await supabaseAdmin.from('oracle_settings').select('global_expenses').single();
+    const { data: ledger } = await supabaseAdmin.from('ledger_entries').select('shop_id, type, amount, date')
+        .eq('type', 'expense')
+        .gte('date', monthStart)
+        .lte('date', monthEnd);
     const { data: sales } = await supabaseAdmin.from('sales').select('shop_id, total_with_tax, date');
 
-    const globalMonthlyOverhead = Object.values(settings?.global_expenses || {}).reduce((a: number, b: any) => a + Number(b), 0);
     const shopList = shops || [];
+    const ledgerExpenses = ledger || [];
+
+    // Compute global monthly overhead:
+    // = sum of all shop structured expenses (rent, salaries, utilities, misc)
+    // + sum of all this month's ledger expenses (POS expenses, ad-hoc)
+    const shopStructuredTotal = shopList.reduce((sum: number, shop: any) => {
+        const exp = shop.expenses || {};
+        return sum + Object.values(exp).reduce((a: number, b: any) => a + Number(b || 0), 0);
+    }, 0);
+
+    const ledgerExpenseTotal = ledgerExpenses.reduce((sum: number, l: any) => sum + Number(l.amount || 0), 0);
+
+    // If we have structured expenses, use them. Otherwise fall back to ledger. Always show something.
+    const globalMonthlyOverhead = shopStructuredTotal > 0 ? shopStructuredTotal + ledgerExpenseTotal : ledgerExpenseTotal;
 
     const datasets: Record<string, any[]> = {
         global: []
@@ -163,43 +181,60 @@ export async function getSalesVsOverheadsData() {
 
     shopList.forEach((s: any) => datasets[s.id] = []);
 
-    // Daily calculation
     for (let day = 1; day <= daysInMonth; day++) {
-        // Overheads Line (Cumulative Linear Growth)
-        // We only show up to today if we want "live" view, but linear overhead is fixed
-        const dailyGlobalOverhead = globalMonthlyOverhead / daysInMonth;
-        const cumulativeGlobalOverhead = dailyGlobalOverhead * day;
-
-        // Sales Line (Cumulative)
         const dateStr = new Date(now.getFullYear(), now.getMonth(), day).toISOString().split('T')[0];
 
-        // Global Datapoint
-        const globalDaySales = (sales || []).filter((s: any) => s.date.startsWith(dateStr)).reduce((sum: number, s: any) => sum + s.total_with_tax, 0);
+        // Overhead grows linearly across the month (fixed cost projection)
+        const dailyGlobalOverhead = daysInMonth > 0 ? globalMonthlyOverhead / daysInMonth : 0;
+        const cumulativeGlobalOverhead = Math.round(dailyGlobalOverhead * day * 100) / 100;
+
+        // Sales are cumulative up to today; future days are null
+        const globalDaySales = (sales || [])
+            .filter((s: any) => (s.date || '').startsWith(dateStr))
+            .reduce((sum: number, s: any) => sum + Number(s.total_with_tax || 0), 0);
         const prevGlobalSales = datasets.global[day - 2]?.sales || 0;
-        const cumulativeGlobalSales = day > currentDay ? null : prevGlobalSales + globalDaySales;
+        const cumulativeGlobalSales = day > currentDay ? null : Math.round((prevGlobalSales + globalDaySales) * 100) / 100;
+
+        // Profit = sales - overhead (show always, even negative, so chart shows the relationship)
+        const profitVal = cumulativeGlobalSales !== null
+            ? Math.round((cumulativeGlobalSales - cumulativeGlobalOverhead) * 100) / 100
+            : null;
 
         datasets.global.push({
             day,
             overhead: cumulativeGlobalOverhead,
             sales: cumulativeGlobalSales,
-            profit: (cumulativeGlobalSales !== null && cumulativeGlobalSales > cumulativeGlobalOverhead) ? cumulativeGlobalSales - cumulativeGlobalOverhead : null
+            profit: profitVal
         });
 
-        // Shop Datapoints
+        // Per-shop datasets
         shopList.forEach((shop: any) => {
-            const shopMonthlyOverhead = Object.values(shop.expenses || {}).reduce((a: number, b: any) => a + Number(b), 0);
-            const dailyShopOverhead = (shopMonthlyOverhead + (globalMonthlyOverhead / shopList.length)) / daysInMonth;
-            const cumulativeShopOverhead = dailyShopOverhead * day;
+            const shopStructExpenses = Object.values(shop.expenses || {})
+                .reduce((a: number, b: any) => a + Number(b || 0), 0);
+            const shopLedgerExpenses = ledgerExpenses
+                .filter((l: any) => l.shop_id === shop.id)
+                .reduce((sum: number, l: any) => sum + Number(l.amount || 0), 0);
 
-            const shopDaySales = (sales || []).filter((s: any) => s.shop_id === shop.id && s.date.startsWith(dateStr)).reduce((sum: number, s: any) => sum + s.total_with_tax, 0);
-            const prevShopSales = datasets[shop.id][day - 2]?.sales || 0;
-            const cumulativeShopSales = day > currentDay ? null : prevShopSales + shopDaySales;
+            // Shop overhead = shop's own structured + its share of global + its own ledger expenses
+            const shopMonthlyOverhead = shopStructExpenses + shopLedgerExpenses;
+            const dailyShopOverhead = daysInMonth > 0 ? shopMonthlyOverhead / daysInMonth : 0;
+            const cumulativeShopOverhead = Math.round(dailyShopOverhead * day * 100) / 100;
+
+            const shopDaySales = (sales || [])
+                .filter((s: any) => s.shop_id === shop.id && (s.date || '').startsWith(dateStr))
+                .reduce((sum: number, s: any) => sum + Number(s.total_with_tax || 0), 0);
+            const prevShopSales = datasets[shop.id]?.[day - 2]?.sales || 0;
+            const cumulativeShopSales = day > currentDay ? null : Math.round((prevShopSales + shopDaySales) * 100) / 100;
+
+            const shopProfitVal = cumulativeShopSales !== null
+                ? Math.round((cumulativeShopSales - cumulativeShopOverhead) * 100) / 100
+                : null;
 
             datasets[shop.id].push({
                 day,
                 overhead: cumulativeShopOverhead,
                 sales: cumulativeShopSales,
-                profit: (cumulativeShopSales !== null && cumulativeShopSales > cumulativeShopOverhead) ? cumulativeShopSales - cumulativeShopOverhead : null
+                profit: shopProfitVal
             });
         });
     }
