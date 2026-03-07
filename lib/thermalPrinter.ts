@@ -121,6 +121,38 @@ export class ThermalPrinterService {
 
         await this.printRaw(combined);
     }
+
+    async printTest() {
+        const encoder = new TextEncoder();
+        const init = new Uint8Array([0x1b, 0x40]);
+        const center = new Uint8Array([0x1b, 0x61, 0x01]);
+        const boldOn = new Uint8Array([0x1b, 0x45, 0x01]);
+        const boldOff = new Uint8Array([0x1b, 0x45, 0x00]);
+        const cut = new Uint8Array([0x1d, 0x56, 0x41, 0x03]);
+
+        const date = new Date().toLocaleString();
+        const chunks: Uint8Array[] = [
+            init,
+            center,
+            boldOn,
+            encoder.encode("GAME TIME\n"),
+            boldOff,
+            encoder.encode("Direct USB Printing Test\n"),
+            encoder.encode(`${date}\n\n`),
+            encoder.encode("Ready for Business!\n\n\n"),
+            cut
+        ];
+
+        const totalLength = chunks.reduce((acc, chunk) => acc + chunk.length, 0);
+        const combined = new Uint8Array(totalLength);
+        let offset = 0;
+        chunks.forEach(chunk => {
+            combined.set(chunk, offset);
+            offset += chunk.length;
+        });
+
+        await this.printRaw(combined);
+    }
 }
 
 export const thermalPrinter = new ThermalPrinterService();

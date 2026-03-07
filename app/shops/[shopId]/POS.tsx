@@ -599,6 +599,19 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
                     </Button>
 
                     <Button
+                        onClick={async () => {
+                            try {
+                                await thermalPrinter.printTest();
+                            } catch (e: any) {
+                                alert("Test print failed: " + e.message);
+                            }
+                        }}
+                        className="bg-emerald-600 hover:bg-emerald-500 text-[10px] font-black uppercase italic h-10 px-3 flex items-center gap-2"
+                    >
+                        <Printer className="h-4 w-4" /> Test Print
+                    </Button>
+
+                    <Button
                         onClick={handleEndOfDayAndLogout}
                         disabled={isClosingDay}
                         variant="outline"
