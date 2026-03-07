@@ -177,39 +177,74 @@ export class ThermalPrinterService {
         const cut = new Uint8Array([0x1d, 0x56, 0x41, 0x03]); // GS V A 3 (Paper Cut)
 
         const chunks: Uint8Array[] = [init, center, boldOn];
+
+        // Header
         chunks.push(encoder.encode(receipt.shopName.toUpperCase() + "\n"));
         chunks.push(boldOff);
         chunks.push(encoder.encode("NIRVANA PREMIUM NETWORK\n"));
         chunks.push(encoder.encode(`${receipt.dateStamp} ${receipt.timeStamp}\n`));
+        chunks.push(encoder.encode(`CASHIER: ${receipt.cashier.toUpperCase()}\n`));
         chunks.push(encoder.encode("--------------------------------\n"));
         chunks.push(left);
 
+        // Column Headers
+        chunks.push(encoder.encode("ITEM x QTY       TAX     TOTAL\n"));
+        chunks.push(encoder.encode("--------------------------------\n"));
+
         receipt.items.forEach((item: any) => {
-            // Main Line: Item x Qty
+            // Line 1: Item Name
+            const itemName = item.name.substring(0, 24);
             chunks.push(boldOn);
-            chunks.push(encoder.encode(`${item.name.substring(0, 24)} x${item.quantity}\n`));
+            chunks.push(encoder.encode(itemName + "\n"));
             chunks.push(boldOff);
 
-            // Detail Lines (Indented/Smaller feel)
-            chunks.push(encoder.encode(`  Net: $${item.priceNet.toFixed(2)} | Tax: $${item.tax.toFixed(2)}\n`));
+            // Line 2: Qty x Net   Tax   Total
+            const qtyStr = `${item.quantity} x ${item.priceNet.toFixed(2)}`;
+            const taxStr = item.tax.toFixed(2);
+            const totalStr = item.totalGross.toFixed(2);
 
-            const lineTotal = `Line Total: $${item.totalGross.toFixed(2)}`;
-            const spaces = " ".repeat(Math.max(0, 32 - lineTotal.length));
-            chunks.push(encoder.encode(spaces + lineTotal + "\n"));
+            // Layout: Qty x Price (14) | Tax (8) | Total (10) = 32 chars
+            const row = `${qtyStr.padEnd(14)} ${taxStr.padStart(7)} ${totalStr.padStart(9)}\n`;
+            chunks.push(encoder.encode(row));
             chunks.push(encoder.encode(" . . . . . . . . . . . . . . . .\n"));
         });
 
         chunks.push(encoder.encode("--------------------------------\n"));
-        chunks.push(encoder.encode(`SUBTOTAL:           $${receipt.subtotal.toFixed(2)}\n`));
-        chunks.push(encoder.encode(`TAX (15.5%):        $${receipt.tax.toFixed(2)}\n`));
+
+        // Totals
+        const subtotalStr = `$${receipt.subtotal.toFixed(2)}`;
+        const taxTotalStr = `$${receipt.tax.toFixed(2)}`;
+        const totalStr = `$${receipt.total.toFixed(2)}`;
+
+        chunks.push(encoder.encode(`SUBTOTAL (PRE-TAX): ${subtotalStr.padStart(12)}\n`));
+        chunks.push(encoder.encode(`TAX (15.5%):        ${taxTotalStr.padStart(12)}\n`));
         chunks.push(boldOn);
-        chunks.push(encoder.encode(`TOTAL:              $${receipt.total.toFixed(2)}\n`));
+        chunks.push(encoder.encode(`TOTAL DUE:          ${totalStr.padStart(12)}\n`));
         chunks.push(boldOff);
         chunks.push(encoder.encode("--------------------------------\n"));
+
         chunks.push(center);
-        chunks.push(encoder.encode(`ORDER ID: ${receipt.orderId}\n`));
         chunks.push(encoder.encode(`PAYMENT: ${receipt.paymentMethod.toUpperCase()}\n`));
-        chunks.push(encoder.encode("\nTHANK YOU FOR SHOPPING!\n\n\n\n"));
+        chunks.push(encoder.encode(`ORDER: ${receipt.orderId}\n`));
+
+        // QR Code
+        const qrData = `VERIFY_NIRVANA_${receipt.transactionId || receipt.orderId}`;
+        chunks.push(new Uint8Array([0x1d, 0x28, 0x6b, 0x03, 0x00, 0x31, 0x43, 0x06])); // Set QR size (6)
+        chunks.push(new Uint8Array([0x1d, 0x28, 0x6b, 0x03, 0x00, 0x31, 0x45, 0x30])); // Set error correction
+
+        const dataBytes = encoder.encode(qrData);
+        const pL = (dataBytes.length + 3) % 256;
+        const pH = Math.floor((dataBytes.length + 3) / 256);
+        chunks.push(new Uint8Array([0x1d, 0x28, 0x6b, pL, pH, 0x31, 0x50, 0x30])); // Store data
+        chunks.push(dataBytes);
+        chunks.push(new Uint8Array([0x1d, 0x28, 0x6b, 0x03, 0x00, 0x31, 0x51, 0x30])); // Print QR
+
+        chunks.push(encoder.encode("\nTHANK YOU FOR SHOPPING!\n"));
+
+        // Footer (Small print feel via normal text at bottom)
+        chunks.push(encoder.encode("--------------------------------\n"));
+        chunks.push(encoder.encode("FLECTERE TECHNOLOGIES\n"));
+        chunks.push(encoder.encode("\n\n\n\n"));
         chunks.push(cut);
 
         // Combine all chunks
@@ -225,35 +260,24 @@ export class ThermalPrinterService {
     }
 
     async printTest() {
-        const encoder = new TextEncoder();
-        const init = new Uint8Array([0x1b, 0x40]);
-        const center = new Uint8Array([0x1b, 0x61, 0x01]);
-        const boldOn = new Uint8Array([0x1b, 0x45, 0x01]);
-        const boldOff = new Uint8Array([0x1b, 0x45, 0x00]);
-        const cut = new Uint8Array([0x1d, 0x56, 0x41, 0x03]);
-
-        const date = new Date().toLocaleString();
-        const chunks: Uint8Array[] = [
-            init,
-            center,
-            boldOn,
-            encoder.encode("GAME TIME\n"),
-            boldOff,
-            encoder.encode("Direct USB Printing Test\n"),
-            encoder.encode(`${date}\n\n`),
-            encoder.encode("Ready for Business!\n\n\n"),
-            cut
-        ];
-
-        const totalLength = chunks.reduce((acc, chunk) => acc + chunk.length, 0);
-        const combined = new Uint8Array(totalLength);
-        let offset = 0;
-        chunks.forEach(chunk => {
-            combined.set(chunk, offset);
-            offset += chunk.length;
-        });
-
-        await this.printRaw(combined);
+        // Just a dummy receipt to test the layout
+        const mockReceipt = {
+            shopName: "Nirvana Test Shop",
+            cashier: "Admin",
+            dateStamp: new Date().toLocaleDateString(),
+            timeStamp: new Date().toLocaleTimeString(),
+            items: [
+                { name: "Test Product 1", quantity: 2, priceNet: 10.00, tax: 3.10, totalGross: 23.10 },
+                { name: "Test Product 2", quantity: 1, priceNet: 5.00, tax: 0.78, totalGross: 5.78 }
+            ],
+            subtotal: 15.00,
+            tax: 3.88,
+            total: 28.88,
+            orderId: "TEST-0001",
+            paymentMethod: "Cash",
+            transactionId: "MOCK-12345"
+        };
+        await this.printReceipt(mockReceipt);
     }
 }
 

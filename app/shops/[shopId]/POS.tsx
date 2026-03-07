@@ -651,14 +651,51 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
                     <Button
                         onClick={async () => {
                             try {
-                                await thermalPrinter.printTest();
+                                if (cart.length > 0) {
+                                    // Generate preview receipt from live cart
+                                    const previewItems = cart.map(entry => {
+                                        const netPrice = entry.price / (1 + taxRate);
+                                        const grossPrice = entry.price;
+                                        const lineNet = netPrice * entry.quantity;
+                                        const lineGross = grossPrice * entry.quantity;
+                                        const itemTax = lineGross - lineNet;
+
+                                        return {
+                                            name: entry.item.name,
+                                            quantity: entry.quantity,
+                                            priceNet: netPrice,
+                                            priceGross: grossPrice,
+                                            totalNet: lineNet,
+                                            totalGross: lineGross,
+                                            tax: itemTax
+                                        };
+                                    });
+
+                                    const cashier = employees.find((e: any) => e.id === selectedEmployeeId)?.name || "System";
+                                    const previewReceipt = {
+                                        orderId: "PREVIEW",
+                                        transactionId: "PREVIEW-" + Math.random().toString(36).substring(2, 6).toUpperCase(),
+                                        shopName: shop?.name || "NIRVANA STORE",
+                                        cashier,
+                                        dateStamp: new Date().toLocaleDateString(),
+                                        timeStamp: new Date().toLocaleTimeString(),
+                                        items: previewItems,
+                                        subtotal: totalBeforeTax,
+                                        tax: totalTax,
+                                        total: totalWithTax,
+                                        paymentMethod: paymentMethod.toUpperCase()
+                                    };
+                                    await thermalPrinter.printReceipt(previewReceipt);
+                                } else {
+                                    await thermalPrinter.printTest();
+                                }
                             } catch (e: any) {
-                                alert("Test print failed: " + e.message);
+                                alert("Print failed: " + e.message);
                             }
                         }}
                         className="bg-emerald-600 hover:bg-emerald-500 text-[10px] font-black uppercase italic h-10 px-3 flex items-center gap-2"
                     >
-                        <Printer className="h-4 w-4" /> Test Print
+                        <Printer className="h-4 w-4" /> {cart.length > 0 ? "Print Preview" : "Test Print"}
                     </Button>
 
                     <Button
