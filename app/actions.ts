@@ -1203,3 +1203,136 @@ export async function updateStockRequestStatus(
     revalidatePath('/transfers');
     return { success: true };
 }
+
+export async function recordLayby(layby: {
+    shopId: string;
+    items: any[];
+    totalBeforeTax: number;
+    tax: number;
+    totalWithTax: number;
+    deposit: number;
+    clientName: string;
+    clientPhone: string;
+    employeeId: string;
+}) {
+    const id = Math.random().toString(36).substring(2, 9);
+    const date = new Date().toISOString();
+
+    // 1. Create the Lay-by record in quotations table
+    await supabaseAdmin.from('quotations').insert({
+        id,
+        shop_id: layby.shopId,
+        items: layby.items,
+        total_before_tax: layby.totalBeforeTax,
+        tax: layby.tax,
+        total_with_tax: layby.totalWithTax,
+        paid_amount: layby.deposit,
+        client_name: layby.clientName,
+        client_phone: layby.clientPhone,
+        employee_id: layby.employeeId,
+        date,
+        status: 'layby'
+    });
+
+    // 2. Record the deposit in the ledger (Cash inflow)
+    await supabaseAdmin.from('ledger_entries').insert({
+        id: Math.random().toString(36).substring(2, 9),
+        shop_id: layby.shopId,
+        type: 'income',
+        category: 'Lay-by Deposit',
+        amount: layby.deposit,
+        date,
+        description: `Deposit for Lay-by #${id} - ${layby.clientName}`
+    });
+
+    // 3. Reserve Inventory (Reduce stock immediately)
+    for (const item of layby.items) {
+        if (item.itemId?.startsWith('service_')) continue;
+
+        // Reduce Shop Allocation
+        const { data: alloc } = await supabaseAdmin.from('inventory_allocations')
+            .select('quantity')
+            .eq('item_id', item.itemId)
+            .eq('shop_id', layby.shopId)
+            .single();
+
+        if (alloc) {
+            await supabaseAdmin.from('inventory_allocations')
+                .update({ quantity: alloc.quantity - item.quantity })
+                .eq('item_id', item.itemId)
+                .eq('shop_id', layby.shopId);
+        }
+
+        // Reduce Global Stock
+        const { data: invItem } = await supabaseAdmin.from('inventory_items')
+            .select('quantity')
+            .eq('id', item.itemId)
+            .single();
+
+        if (invItem) {
+            await supabaseAdmin.from('inventory_items')
+                .update({ quantity: invItem.quantity - item.quantity })
+                .eq('id', item.itemId);
+        }
+    }
+
+    revalidatePath(`/shops/${layby.shopId}`);
+    revalidatePath('/inventory');
+    return { id, date };
+}
+
+export async function updateLaybyPayment(laybyId: string, amount: number, shopId: string, employeeId: string) {
+    const { data: layby } = await supabaseAdmin.from('quotations')
+        .select('*')
+        .eq('id', laybyId)
+        .single();
+
+    if (!layby || layby.status !== 'layby') throw new Error('Lay-by not found');
+
+    const date = new Date().toISOString();
+    const newPaidAmount = Number(layby.paid_amount || 0) + amount;
+    const isFullyPaid = newPaidAmount >= Number(layby.total_with_tax);
+
+    // 1. Update the Lay-by record
+    await supabaseAdmin.from('quotations').update({
+        paid_amount: newPaidAmount,
+        status: isFullyPaid ? 'converted' : 'layby'
+    }).eq('id', laybyId);
+
+    // 2. Record payment in ledger
+    await supabaseAdmin.from('ledger_entries').insert({
+        id: Math.random().toString(36).substring(2, 9),
+        shop_id: shopId,
+        type: 'income',
+        category: isFullyPaid ? 'Lay-by Final Payment' : 'Lay-by installment',
+        amount: amount,
+        date,
+        description: `Payment for Lay-by #${laybyId} - ${layby.client_name}`
+    });
+
+    // 3. If fully paid, record as a Sale for reporting
+    if (isFullyPaid) {
+        // Record each item as a sale, but SKIP inventory reduction because it was reserved at start
+        for (const item of (layby.items as any[])) {
+            const saleId = Math.random().toString(36).substring(2, 9);
+            await supabaseAdmin.from('sales').insert({
+                id: saleId,
+                shop_id: shopId,
+                item_id: item.itemId,
+                item_name: item.itemName,
+                quantity: item.quantity,
+                unit_price: item.unitPrice,
+                total_before_tax: (item.unitPrice * item.quantity),
+                tax: (item.total - (item.unitPrice * item.quantity)),
+                total_with_tax: item.total,
+                date,
+                employee_id: employeeId,
+                client_name: layby.client_name,
+                payment_method: 'cash' // Assuming cash for lay-by payments
+            });
+        }
+    }
+
+    revalidatePath(`/shops/${shopId}`);
+    return { success: true, fullyPaid: isFullyPaid };
+}

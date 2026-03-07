@@ -38,7 +38,16 @@ import {
     LogOut,
     Printer
 } from "lucide-react";
-import { recordSale, recordQuotation, addNewProductFromPos, recordUntrackedSale, openCashRegister, recordPosExpense } from "../../actions";
+import {
+    recordSale,
+    recordQuotation,
+    addNewProductFromPos,
+    recordUntrackedSale,
+    openCashRegister,
+    recordPosExpense,
+    recordLayby,
+    updateLaybyPayment
+} from "../../actions";
 import { thermalPrinter } from "@/lib/thermalPrinter";
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -68,13 +77,22 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
     const [cart, setCart] = useState<{ item: any, quantity: number, price: number }[]>([]);
     const [searchTerm, setSearchTerm] = useState("");
     const [isPending, startTransition] = useTransition();
-    const [posMode, setPosMode] = useState<'sale' | 'quote'>('sale');
+
+    // POS Modes
+    const [posMode, setPosMode] = useState<'sale' | 'quote' | 'layby'>('sale');
+    const [laybyDeposit, setLaybyDeposit] = useState("");
+    const [isLaybyModalOpen, setIsLaybyModalOpen] = useState(false);
+    const [selectedLaybyId, setSelectedLaybyId] = useState("");
+    const [laybyPaymentAmount, setLaybyPaymentAmount] = useState("");
+
+    // Client Info
     const [clientName, setClientName] = useState("");
     const [clientEmail, setClientEmail] = useState("");
     const [clientPhone, setClientPhone] = useState("");
     const [selectedEmployeeId, setSelectedEmployeeId] = useState("");
     const [paymentMethod, setPaymentMethod] = useState<'cash' | 'ecocash'>('cash');
 
+    // UI States
     const [isClosingDay, setIsClosingDay] = useState(false);
     const [isEodShareModalOpen, setIsEodShareModalOpen] = useState(false);
     const [eodShareUrl, setEodShareUrl] = useState<string>("");
@@ -92,17 +110,14 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
     // Today's receipts modal
     const [isReceiptsModalOpen, setIsReceiptsModalOpen] = useState(false);
 
-    // Get today's sales for dropdown
+    // Get today's sales for calculations
     const today = new Date().toISOString().split('T')[0];
     const todaysSales = (db.sales || []).filter((s: any) => {
         const saleDate = s.date?.split('T')[0];
         return saleDate === today && s.shopId === shopId;
     });
-
-    // Calculate total sales for today
     const todaysTotalSales = todaysSales.reduce((sum: number, s: any) => sum + (s.totalWithTax || 0), 0);
 
-    // Ad-hoc Product Modal State
     const [isAddProductModalOpen, setIsAddProductModalOpen] = useState(false);
     const [newProduct, setNewProduct] = useState({ name: "", category: "", landedCost: "", initialStock: "0" });
 
@@ -402,7 +417,62 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
     const handleCheckout = () => {
         startTransition(async () => {
             try {
-                if (posMode === 'sale') {
+                const cashier = employees.find((e: any) => e.id === selectedEmployeeId)?.name || "System";
+                let currentReceiptData: any = null;
+
+                if (posMode === 'layby') {
+                    const deposit = parseFloat(laybyDeposit);
+                    if (isNaN(deposit) || deposit <= 0 || !clientName || !clientPhone) {
+                        alert("Lay-by requires a valid deposit, client name, and phone number.");
+                        return;
+                    }
+
+                    const res = await recordLayby({
+                        shopId,
+                        items: cart.map(c => ({
+                            itemId: c.item.id,
+                            itemName: c.item.name,
+                            quantity: c.quantity,
+                            unitPrice: c.price / (1 + taxRate),
+                            total: c.price * c.quantity
+                        })),
+                        totalBeforeTax,
+                        tax: totalTax,
+                        totalWithTax,
+                        deposit,
+                        clientName,
+                        clientPhone,
+                        employeeId: selectedEmployeeId || "system"
+                    });
+
+                    currentReceiptData = {
+                        orderId: `LAY-${res.id}`,
+                        receiptNo: `#LAY-${res.id}`,
+                        transactionId: res.id,
+                        shopName: shop?.name || "NIRVANA STORE",
+                        cashier,
+                        clientName,
+                        clientPhone,
+                        items: cart.map(c => ({
+                            name: c.item.name,
+                            quantity: c.quantity,
+                            priceGross: c.price,
+                            totalGross: c.price * c.quantity
+                        })),
+                        subtotal: totalBeforeTax,
+                        tax: totalTax,
+                        total: totalWithTax,
+                        paidAmount: deposit,
+                        balanceRemaining: totalWithTax - deposit,
+                        dateStamp: new Date().toLocaleDateString(),
+                        timeStamp: new Date().toLocaleTimeString(),
+                        paymentMethod: 'cash',
+                        isLayby: true
+                    };
+
+                    setActiveReceipt(currentReceiptData);
+                    setIsSuccessModalOpen(true);
+                } else if (posMode === 'sale') {
                     const transactionId = Math.random().toString(36).substring(2, 9).toUpperCase();
                     const receiptItems = [];
 
@@ -450,9 +520,7 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
                         });
                     }
 
-                    // Prepare receipt for printing
-                    const cashier = employees.find((e: any) => e.id === selectedEmployeeId)?.name || "System";
-                    const receiptData = {
+                    currentReceiptData = {
                         orderId: `ORD-${transactionId}`,
                         receiptNo: `#RCT-${transactionId}`,
                         transactionId,
@@ -469,20 +537,10 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
                         paymentMethod
                     };
 
-                    setActiveReceipt(receiptData);
+                    setActiveReceipt(currentReceiptData);
                     setIsSuccessModalOpen(true);
-
-                    // Automate printing if connected
-                    if (isPrinterConnected) {
-                        try {
-                            await thermalPrinter.printReceipt(receiptData);
-                        } catch (printError) {
-                            console.error("Auto-print failed:", printError);
-                            // We don't alert here to avoid interrupting the success state, 
-                            // the user can still manual print from the modal.
-                        }
-                    }
                 } else {
+                    // QUOTE MODE
                     await recordQuotation({
                         shopId,
                         clientName: clientName || "Walk-in Customer",
@@ -502,11 +560,23 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
                     });
                     alert("Quotation generated successfully!");
                 }
+
+                // Shared cleanup for all modes
                 setCart([]);
                 setClientName("");
                 setClientEmail("");
                 setClientPhone("");
+                setLaybyDeposit("");
                 setPaymentMethod('cash');
+
+                // Auto-print if a receipt was generated and printer is connected
+                if (currentReceiptData && isPrinterConnected) {
+                    try {
+                        await thermalPrinter.printReceipt(currentReceiptData);
+                    } catch (printErr) {
+                        console.error("Auto-print failed:", printErr);
+                    }
+                }
             } catch (error) {
                 console.error('Checkout failed:', error);
                 alert(`Checkout failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -607,7 +677,7 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
         }
     };
 
-    const filteredInventory = inventory.filter(item =>
+    const filteredInventory = inventory.filter((item: any) =>
         item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         item.category.toLowerCase().includes(searchTerm.toLowerCase())
     );
@@ -754,6 +824,15 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
                         title="View today's receipts"
                     >
                         <FileText className="h-4 w-4" /> Receipts
+                    </Button>
+
+                    <Button
+                        onClick={() => setIsLaybyModalOpen(true)}
+                        variant="outline"
+                        className="h-10 px-3 border-sky-500/30 text-sky-200 hover:bg-sky-500/10 text-[10px] font-black uppercase italic flex items-center gap-2"
+                        title="Manage pending Lay-bys"
+                    >
+                        <RefreshCcw className="h-4 w-4 text-sky-400" /> Lay-bys
                     </Button>
 
                     <Button
@@ -948,8 +1027,9 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
                         <div className="text-[9px] text-emerald-500 mt-1">{todaysSales.length} transaction{todaysSales.length !== 1 ? 's' : ''}</div>
                     </div>
 
-                    <div className="flex gap-2 mb-4">
+                    <div className="flex flex-wrap gap-2 mb-4">
                         <Button variant={posMode === 'sale' ? 'default' : 'outline'} onClick={() => setPosMode('sale')} className={cn("flex-1 text-[10px] font-black uppercase italic h-8", posMode === 'sale' ? 'bg-emerald-600' : 'border-slate-800 text-slate-500')}>Direct Sale</Button>
+                        <Button variant={posMode === 'layby' ? 'default' : 'outline'} onClick={() => setPosMode('layby')} className={cn("flex-1 text-[10px] font-black uppercase italic h-8", posMode === 'layby' ? 'bg-sky-600' : 'border-slate-800 text-slate-500')}>Lay-by</Button>
                         <Button variant={posMode === 'quote' ? 'default' : 'outline'} onClick={() => setPosMode('quote')} className={cn("flex-1 text-[10px] font-black uppercase italic h-8", posMode === 'quote' ? 'bg-amber-600' : 'border-slate-800 text-slate-500')}>Make Quote</Button>
                     </div>
                     <CardTitle className="flex items-center gap-2">
@@ -1073,11 +1153,138 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
                         </div>
                     )}
 
-                    <Button className={cn("w-full h-14 font-black text-sm uppercase italic tracking-[0.2em] rounded-xl", posMode === 'sale' ? "bg-emerald-600" : "bg-amber-600")} disabled={cart.length === 0 || isPending} onClick={handleCheckout}>
-                        {isPending ? <RefreshCcw className="h-5 w-5 animate-spin" /> : posMode === 'sale' ? "Execute Sale" : "Process Quote"}
+                    {posMode === 'layby' && (
+                        <div className="space-y-3 p-3 bg-sky-500/5 rounded-lg border border-sky-500/20">
+                            <p className="text-[10px] font-black text-sky-400 uppercase tracking-widest">Lay-by Agreement</p>
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Client Phone (Required)</label>
+                                <Input
+                                    placeholder="+263 77 xxx xxxx"
+                                    value={clientPhone}
+                                    onChange={(e) => setClientPhone(e.target.value)}
+                                    className="h-10 bg-slate-900 border-sky-500/30 text-xs"
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Deposit Amount ($)</label>
+                                <Input
+                                    type="number"
+                                    placeholder="0.00"
+                                    value={laybyDeposit}
+                                    onChange={(e) => setLaybyDeposit(e.target.value)}
+                                    className="h-10 bg-slate-900 border-sky-500/30 font-mono font-bold text-sky-400"
+                                />
+                                {laybyDeposit && !isNaN(parseFloat(laybyDeposit)) && (
+                                    <p className="text-[10px] text-slate-500 font-bold">
+                                        Balance remaining: <span className="text-rose-400">${Math.max(0, totalWithTax - parseFloat(laybyDeposit)).toFixed(2)}</span>
+                                    </p>
+                                )}
+                            </div>
+                        </div>
+                    )}
+
+                    <Button
+                        className={cn(
+                            "w-full h-14 font-black text-sm uppercase italic tracking-[0.2em] rounded-xl",
+                            posMode === 'sale' ? "bg-emerald-600 hover:bg-emerald-500" :
+                                posMode === 'layby' ? "bg-sky-600 hover:bg-sky-500" :
+                                    "bg-amber-600 hover:bg-amber-500"
+                        )}
+                        disabled={cart.length === 0 || isPending}
+                        onClick={handleCheckout}
+                    >
+                        {isPending ? <RefreshCcw className="h-5 w-5 animate-spin" /> :
+                            posMode === 'sale' ? "Execute Sale" :
+                                posMode === 'layby' ? "Confirm Lay-by" :
+                                    "Process Quote"
+                        }
                     </Button>
                 </CardContent>
             </Card>
+
+            {/* Lay-by Management Modal */}
+            <Modal isOpen={isLaybyModalOpen} onClose={() => setIsLaybyModalOpen(false)} title="Pending Lay-bys">
+                <div className="space-y-4">
+                    {(db.quotations || []).filter((q: any) => q.status === 'layby' && q.shopId === shopId).length === 0 ? (
+                        <p className="text-center text-slate-500 text-xs py-6">No pending lay-bys for this shop.</p>
+                    ) : (
+                        <div className="space-y-2">
+                            <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Select a Lay-by</label>
+                            <select
+                                value={selectedLaybyId}
+                                onChange={(e) => setSelectedLaybyId(e.target.value)}
+                                className="w-full h-12 bg-slate-950 border border-slate-800 rounded-xl text-xs font-bold text-slate-200 px-4 outline-none focus:border-sky-500/50 transition-all"
+                            >
+                                <option value="">Choose a lay-by...</option>
+                                {(db.quotations || []).filter((q: any) => q.status === 'layby' && q.shopId === shopId).map((q: any) => {
+                                    const balance = Number(q.total_with_tax || 0) - Number(q.paid_amount || 0);
+                                    return (
+                                        <option key={q.id} value={q.id}>
+                                            #{q.id} — {q.client_name || q.clientName} (Bal: ${balance.toFixed(2)})
+                                        </option>
+                                    );
+                                })}
+                            </select>
+                        </div>
+                    )}
+
+                    {selectedLaybyId && (() => {
+                        const lb = (db.quotations || []).find((q: any) => q.id === selectedLaybyId);
+                        if (!lb) return null;
+                        const total = Number(lb.total_with_tax || lb.totalWithTax || 0);
+                        const paid = Number(lb.paid_amount || 0);
+                        const balance = total - paid;
+                        return (
+                            <div className="space-y-3 p-4 bg-slate-950 rounded-xl border border-slate-800">
+                                <div className="flex justify-between text-xs">
+                                    <span className="text-slate-500">Total Amount:</span>
+                                    <span className="font-bold text-white">${total.toFixed(2)}</span>
+                                </div>
+                                <div className="flex justify-between text-xs">
+                                    <span className="text-slate-500">Already Paid:</span>
+                                    <span className="font-bold text-emerald-400">${paid.toFixed(2)}</span>
+                                </div>
+                                <div className="flex justify-between text-xs pt-2 border-t border-slate-800">
+                                    <span className="text-slate-500 font-black uppercase">Balance Due:</span>
+                                    <span className="font-black text-rose-400">${balance.toFixed(2)}</span>
+                                </div>
+
+                                <div className="pt-4 space-y-2">
+                                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Payment Amount</label>
+                                    <Input
+                                        value={laybyPaymentAmount}
+                                        onChange={(e) => setLaybyPaymentAmount(e.target.value)}
+                                        placeholder={balance.toFixed(2)}
+                                        className="bg-slate-900 border-slate-800 font-mono"
+                                        type="number"
+                                    />
+                                    <Button
+                                        onClick={() => {
+                                            const amt = parseFloat(laybyPaymentAmount);
+                                            if (isNaN(amt) || amt <= 0) return alert("Enter a valid payment amount.");
+                                            startTransition(async () => {
+                                                try {
+                                                    await updateLaybyPayment(selectedLaybyId, amt, shopId, selectedEmployeeId || "system");
+                                                    setLaybyPaymentAmount("");
+                                                    setSelectedLaybyId("");
+                                                    setIsLaybyModalOpen(false);
+                                                    alert(amt >= balance ? "Lay-by fully settled!" : "Payment recorded. Balance updated.");
+                                                } catch (e) {
+                                                    alert("Failed to record payment. Please try again.");
+                                                }
+                                            });
+                                        }}
+                                        disabled={isPending}
+                                        className="w-full bg-sky-600 hover:bg-sky-500 text-xs font-black uppercase italic h-12 mt-2"
+                                    >
+                                        {isPending ? <RefreshCcw className="h-4 w-4 animate-spin" /> : 'Record Payment'}
+                                    </Button>
+                                </div>
+                            </div>
+                        );
+                    })()}
+                </div>
+            </Modal>
 
             <Modal
                 isOpen={isAddProductModalOpen}
