@@ -172,66 +172,62 @@ export class ThermalPrinterService {
         const init = new Uint8Array([0x1b, 0x40]); // ESC @ (Initialize)
         const center = new Uint8Array([0x1b, 0x61, 0x01]); // ESC a 1 (Center)
         const left = new Uint8Array([0x1b, 0x61, 0x00]); // ESC a 0 (Left)
-        const boldOn = new Uint8Array([0x1b, 0x45, 0x01]); // ESC E 1 (Bold On)
-        const boldOff = new Uint8Array([0x1b, 0x45, 0x00]); // ESC E 0 (Bold Off)
+        const fontB = new Uint8Array([0x1b, 0x4d, 0x01]); // ESC M 1 (Select Font B)
         const cut = new Uint8Array([0x1d, 0x56, 0x41, 0x03]); // GS V A 3 (Paper Cut)
 
-        const chunks: Uint8Array[] = [init, center, boldOn];
+        // Font B typically allows ~42 characters on 58mm paper
+        const width = 42;
+        const line = "-".repeat(width) + "\n";
+        const dotLine = ". ".repeat(width / 2) + "\n";
+
+        const chunks: Uint8Array[] = [init, fontB, center];
 
         // Header
         chunks.push(encoder.encode(receipt.shopName.toUpperCase() + "\n"));
-        chunks.push(boldOff);
         chunks.push(encoder.encode("NIRVANA PREMIUM NETWORK\n"));
-        chunks.push(encoder.encode(`${receipt.dateStamp} ${receipt.timeStamp}\n`));
+        chunks.push(encoder.encode(`${receipt.dateStamp} | ${receipt.timeStamp}\n`));
         chunks.push(encoder.encode(`CASHIER: ${receipt.cashier.toUpperCase()}\n`));
-        chunks.push(encoder.encode("--------------------------------\n"));
-        chunks.push(left);
+        chunks.push(encoder.encode(line));
 
+        chunks.push(left);
         // Column Headers
-        chunks.push(encoder.encode("ITEM x QTY       TAX     TOTAL\n"));
-        chunks.push(encoder.encode("--------------------------------\n"));
+        chunks.push(encoder.encode("ITEM x QTY              PRICE      TAX     TOTAL\n"));
+        chunks.push(encoder.encode(line));
 
         receipt.items.forEach((item: any) => {
-            // Line 1: Item Name
-            const itemName = item.name.substring(0, 24);
-            chunks.push(boldOn);
+            const itemName = item.name.substring(0, width).toUpperCase();
             chunks.push(encoder.encode(itemName + "\n"));
-            chunks.push(boldOff);
 
-            // Line 2: Qty x Net   Tax   Total
             const qtyStr = `${item.quantity} x ${item.priceNet.toFixed(2)}`;
+            const priceStr = item.priceNet.toFixed(2);
             const taxStr = item.tax.toFixed(2);
             const totalStr = item.totalGross.toFixed(2);
 
-            // Layout: Qty x Price (14) | Tax (8) | Total (10) = 32 chars
-            const row = `${qtyStr.padEnd(14)} ${taxStr.padStart(7)} ${totalStr.padStart(9)}\n`;
+            const row = `${qtyStr.padEnd(14)} ${priceStr.padStart(8)} ${taxStr.padStart(8)} ${totalStr.padStart(9)}\n`;
             chunks.push(encoder.encode(row));
-            chunks.push(encoder.encode(" . . . . . . . . . . . . . . . .\n"));
+            chunks.push(encoder.encode(dotLine));
         });
 
-        chunks.push(encoder.encode("--------------------------------\n"));
+        chunks.push(encoder.encode(line));
 
-        // Totals
         const subtotalStr = `$${receipt.subtotal.toFixed(2)}`;
         const taxTotalStr = `$${receipt.tax.toFixed(2)}`;
         const totalStr = `$${receipt.total.toFixed(2)}`;
 
-        chunks.push(encoder.encode(`SUBTOTAL (PRE-TAX): ${subtotalStr.padStart(12)}\n`));
-        chunks.push(encoder.encode(`TAX (15.5%):        ${taxTotalStr.padStart(12)}\n`));
-        chunks.push(boldOn);
-        chunks.push(encoder.encode(`TOTAL DUE:          ${totalStr.padStart(12)}\n`));
-        chunks.push(boldOff);
-        chunks.push(encoder.encode("--------------------------------\n"));
+        const labelWidth = 28;
+        chunks.push(encoder.encode(`SUBTOTAL (PRE-TAX):`.padEnd(labelWidth) + subtotalStr.padStart(width - labelWidth) + "\n"));
+        chunks.push(encoder.encode(`TAX (15.5%):`.padEnd(labelWidth) + taxTotalStr.padStart(width - labelWidth) + "\n"));
+        chunks.push(encoder.encode(`TOTAL DUE:`.padEnd(labelWidth) + totalStr.padStart(width - labelWidth) + "\n"));
+        chunks.push(encoder.encode(line));
 
         chunks.push(center);
         chunks.push(encoder.encode(`PAYMENT: ${receipt.paymentMethod.toUpperCase()}\n`));
-        chunks.push(encoder.encode(`ORDER: ${receipt.orderId}\n`));
+        chunks.push(encoder.encode(`ORDER ID: ${receipt.orderId}\n`));
 
         // QR Code
         const qrData = `VERIFY_NIRVANA_${receipt.transactionId || receipt.orderId}`;
-        chunks.push(new Uint8Array([0x1d, 0x28, 0x6b, 0x03, 0x00, 0x31, 0x43, 0x06])); // Set QR size (6)
+        chunks.push(new Uint8Array([0x1d, 0x28, 0x6b, 0x03, 0x00, 0x31, 0x43, 0x05])); // Set QR size (5)
         chunks.push(new Uint8Array([0x1d, 0x28, 0x6b, 0x03, 0x00, 0x31, 0x45, 0x30])); // Set error correction
-
         const dataBytes = encoder.encode(qrData);
         const pL = (dataBytes.length + 3) % 256;
         const pH = Math.floor((dataBytes.length + 3) / 256);
@@ -240,14 +236,11 @@ export class ThermalPrinterService {
         chunks.push(new Uint8Array([0x1d, 0x28, 0x6b, 0x03, 0x00, 0x31, 0x51, 0x30])); // Print QR
 
         chunks.push(encoder.encode("\nTHANK YOU FOR SHOPPING!\n"));
-
-        // Footer (Small print feel via normal text at bottom)
-        chunks.push(encoder.encode("--------------------------------\n"));
+        chunks.push(encoder.encode(line));
         chunks.push(encoder.encode("FLECTERE TECHNOLOGIES\n"));
         chunks.push(encoder.encode("\n\n\n\n"));
         chunks.push(cut);
 
-        // Combine all chunks
         const totalLength = chunks.reduce((acc, chunk) => acc + chunk.length, 0);
         const combined = new Uint8Array(totalLength);
         let offset = 0;
