@@ -826,7 +826,12 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
                     </div>
                 </div>
 
-                {filteredInventory.length === 0 && searchTerm ? (
+                {!searchTerm ? (
+                    <div className="flex flex-col items-center justify-center py-12 bg-slate-900/20 border border-dashed border-slate-800 rounded-2xl">
+                        <Search className="h-8 w-8 text-slate-700 mb-3" />
+                        <p className="text-[10px] text-slate-500 font-black uppercase tracking-widest">Search for a product to add to cart</p>
+                    </div>
+                ) : filteredInventory.length === 0 ? (
                     <div className="flex flex-col items-center justify-center py-20 bg-slate-900/40 border border-dashed border-slate-800 rounded-2xl">
                         <PackagePlus className="h-12 w-12 text-slate-700 mb-4" />
                         <p className="text-slate-400 font-bold uppercase text-xs">No products found for "{searchTerm}"</p>
@@ -843,7 +848,7 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
                     </div>
                 ) : (
                     <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
-                        {(searchTerm ? filteredInventory : defaultDisplayItems).map((item) => {
+                        {filteredInventory.map((item) => {
                             const allocation = item.allocations.find((a: any) => a.shopId === shopId);
                             const qtyAtShop = (allocation ? allocation.quantity : 0);
                             const totalNetworkStock = item.quantity || 0;
