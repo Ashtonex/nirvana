@@ -102,7 +102,7 @@ export async function POST(req: Request) {
 
   const { data: sale, error: saleErr } = await supabaseAdmin
     .from("sales")
-    .select("id,shop_id,item_id,item_name,quantity,unit_price,total_before_tax,tax,total_with_tax,date,employee_id,client_name")
+    .select("id,shop_id,item_id,item_name,quantity,unit_price,total_before_tax,tax,total_with_tax,date,employee_id,client_name,payment_method")
     .eq("id", saleId)
     .maybeSingle();
 
@@ -143,6 +143,7 @@ export async function POST(req: Request) {
     date: timestamp,
     employee_id: actor.role === "owner" ? (sale.employee_id || actor.id) : actor.id,
     client_name: `CREDIT NOTE (${reason})${notes ? ` — ${notes}` : ""}`,
+    payment_method: sale.payment_method || 'cash',
     // Optional columns (if you add them later)
     transaction_type: "refund",
     original_sale_id: sale.id,
@@ -215,7 +216,7 @@ export async function POST(req: Request) {
       action: "RETURN_RECORDED",
       details: `Sale ${sale.id} -> Return ${id} (${quantity}) ${reason}`,
     });
-  } catch {}
+  } catch { }
 
   return NextResponse.json({ success: true, returnId: id });
 }

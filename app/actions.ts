@@ -76,7 +76,9 @@ export async function getDashboardData() {
                 id: s.id, shopId: s.shop_id, itemId: s.item_id, itemName: s.item_name || "Unknown Item",
                 quantity: Number(s.quantity || 0), unitPrice: Number(s.unit_price || 0),
                 totalWithTax: Number(s.total_with_tax || 0), totalBeforeTax: Number(s.total_before_tax || 0),
-                tax: Number(s.tax || 0), date: s.date || new Date().toISOString(), employeeId: s.employee_id
+                tax: Number(s.tax || 0), date: s.date || new Date().toISOString(), employeeId: s.employee_id,
+                paymentMethod: s.payment_method || 'cash',
+                clientName: s.client_name || 'General Walk-in'
             })),
             shops: (shops || []).map((sh: any) => ({
                 id: sh.id, name: sh.name || "Unnamed Shop",
