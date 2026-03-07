@@ -445,6 +445,7 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
                     }
 
                     // Prepare receipt for printing
+                    const cashier = employees.find((e: any) => e.id === selectedEmployeeId)?.name || "System";
                     const receiptData = {
                         orderId: `ORD-${transactionId}`,
                         receiptNo: `#RCT-${transactionId}`,
