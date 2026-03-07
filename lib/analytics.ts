@@ -179,7 +179,7 @@ export async function getSalesVsOverheadsData() {
         global: []
     };
 
-    shopList.forEach((s: any) => datasets[s.id] = []);
+    shopList.forEach((s: any) => datasets[s.name.toLowerCase().replace(/\s+/g, '')] = []);
 
     for (let day = 1; day <= daysInMonth; day++) {
         const dateStr = new Date(now.getFullYear(), now.getMonth(), day).toISOString().split('T')[0];
@@ -209,6 +209,7 @@ export async function getSalesVsOverheadsData() {
 
         // Per-shop datasets
         shopList.forEach((shop: any) => {
+            const shopKey = shop.name.toLowerCase().replace(/\s+/g, '');
             const shopStructExpenses = Object.values(shop.expenses || {})
                 .reduce((a: number, b: any) => a + Number(b || 0), 0);
             const shopLedgerExpenses = ledgerExpenses
@@ -223,14 +224,14 @@ export async function getSalesVsOverheadsData() {
             const shopDaySales = (sales || [])
                 .filter((s: any) => s.shop_id === shop.id && (s.date || '').startsWith(dateStr))
                 .reduce((sum: number, s: any) => sum + Number(s.total_with_tax || 0), 0);
-            const prevShopSales = datasets[shop.id]?.[day - 2]?.sales || 0;
+            const prevShopSales = datasets[shopKey]?.[day - 2]?.sales || 0;
             const cumulativeShopSales = day > currentDay ? null : Math.round((prevShopSales + shopDaySales) * 100) / 100;
 
             const shopProfitVal = cumulativeShopSales !== null
                 ? Math.round((cumulativeShopSales - cumulativeShopOverhead) * 100) / 100
                 : null;
 
-            datasets[shop.id].push({
+            datasets[shopKey].push({
                 day,
                 overhead: cumulativeShopOverhead,
                 sales: cumulativeShopSales,
