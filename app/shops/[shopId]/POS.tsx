@@ -150,40 +150,41 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
     // 2. What was yesterday's exact closing?
     // Last Opening + All Cash Sales since then - All POS Expenses since then
     let expectedOpeningCash = 0;
+    let carryOverSales = 0;
+    let carryOverExpenses = 0;
+    let carryOverBaseline = 0;
 
     // Find the very last opening before today
     const pastOpenings = ledger.filter((l: any) => l.category === 'Cash Drawer Opening' && l.shopId === shopId && !String(l.date).startsWith(todayStr));
-    const lastOpening = pastOpenings.sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime())[0];
+    const lastOpening = pastOpenings.sort((a: any) => new Date(a.date).getTime() - new Date(todayStr).getTime())[0]; // Simplified sort to find recent
 
     if (lastOpening) {
         const lastOpenDate = new Date(lastOpening.date).getTime();
+        carryOverBaseline = Number(lastOpening.amount);
 
         // Sales after the last opening, but before today started
         const salesSinceLastOpen = (db.sales || []).filter((s: any) => s.shopId === shopId && s.paymentMethod === 'cash' && new Date(s.date).getTime() >= lastOpenDate && !String(s.date).startsWith(todayStr));
-        const cashSalesVal = salesSinceLastOpen.reduce((sum: number, s: any) => sum + Number(s.totalWithTax || 0), 0);
+        carryOverSales = salesSinceLastOpen.reduce((sum: number, s: any) => sum + Number(s.totalWithTax || 0), 0);
 
         // POS Expenses after last opening, before today
         const expensesSinceLastOpen = ledger.filter((l: any) => l.category === 'POS Expense' && l.shopId === shopId && new Date(l.date).getTime() >= lastOpenDate && !String(l.date).startsWith(todayStr));
-        const expenseVal = expensesSinceLastOpen.reduce((sum: number, l: any) => sum + Number(l.amount || 0), 0);
+        carryOverExpenses = expensesSinceLastOpen.reduce((sum: number, l: any) => sum + Number(l.amount || 0), 0);
 
-        expectedOpeningCash = Number(lastOpening.amount) + cashSalesVal - expenseVal;
+        expectedOpeningCash = carryOverBaseline + carryOverSales - carryOverExpenses;
     }
 
     // 3. Current Live Drawer (Today's Opening + Today's Cash Sales - Today's Expenses)
-    const openingTimestamp = todaysOpening ? new Date(todaysOpening.date).getTime() : 0;
 
     const todaysCashSales = (db.sales || []).filter((s: any) =>
         s.shopId === shopId &&
         s.paymentMethod === 'cash' &&
-        String(s.date).startsWith(todayStr) &&
-        (!openingTimestamp || new Date(s.date).getTime() > openingTimestamp)
+        String(s.date).startsWith(todayStr)
     ).reduce((sum: number, s: any) => sum + Number(s.totalWithTax || 0), 0);
 
     const todaysExpenses = ledger.filter((l: any) =>
         l.category === 'POS Expense' &&
         l.shopId === shopId &&
-        String(l.date).startsWith(todayStr) &&
-        (!openingTimestamp || new Date(l.date).getTime() > openingTimestamp)
+        String(l.date).startsWith(todayStr)
     ).reduce((sum: number, l: any) => sum + Number(l.amount || 0), 0);
 
     const baseBalance = hasOpenedRegister ? Number(todaysOpening.amount) : expectedOpeningCash;
@@ -203,8 +204,9 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
     React.useEffect(() => {
         if (!hasOpenedRegister && !isCashRegisterModalOpen) {
             setIsCashRegisterModalOpen(true);
+            setCashRegisterAmount(expectedOpeningCash.toFixed(2));
         }
-    }, [hasOpenedRegister, isCashRegisterModalOpen]);
+    }, [hasOpenedRegister, isCashRegisterModalOpen, expectedOpeningCash]);
 
     const handleOpenRegister = async () => {
         const val = parseFloat(cashRegisterAmount);
@@ -1012,16 +1014,34 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
                     <p className="text-sm text-slate-400 font-medium">Please enter the actual physical cash currently in the drawer to start your shift.</p>
 
                     <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 relative overflow-hidden">
-                        <div className="absolute top-0 right-0 w-24 h-24 bg-rose-500/10 rounded-full blur-2xl pointer-events-none" />
-                        <div className="text-[10px] font-black uppercase text-slate-500 tracking-widest mb-1">Expected Opening Baseline</div>
-                        <div className="text-2xl font-black font-mono text-white">${expectedOpeningCash.toFixed(2)}</div>
-                        <div className="text-[10px] text-slate-400 mt-2 flex items-center gap-1">
-                            <History className="h-3 w-3" /> Derived from yesterday's close + recent sales.
+                        <div className="absolute top-0 right-0 w-24 h-24 bg-violet-500/10 rounded-full blur-2xl pointer-events-none" />
+                        <div className="text-[10px] font-black uppercase text-slate-500 tracking-widest mb-3 flex items-center gap-2">
+                            <History className="h-3 w-3 text-violet-400" /> Yesterday's Carry Over Reconciliation
+                        </div>
+
+                        <div className="space-y-2 mb-4 border-b border-slate-800 pb-3">
+                            <div className="flex justify-between text-xs">
+                                <span className="text-slate-500">Starting Balance:</span>
+                                <span className="font-mono text-slate-300">${carryOverBaseline.toFixed(2)}</span>
+                            </div>
+                            <div className="flex justify-between text-xs">
+                                <span className="text-slate-500 text-emerald-500/80">+ Yesterday's Cash Sales:</span>
+                                <span className="font-mono text-emerald-400/80">${carryOverSales.toFixed(2)}</span>
+                            </div>
+                            <div className="flex justify-between text-xs">
+                                <span className="text-slate-500 text-rose-500/80">- Yesterday's POS Expenses:</span>
+                                <span className="font-mono text-rose-400/80">${carryOverExpenses.toFixed(2)}</span>
+                            </div>
+                        </div>
+
+                        <div className="flex justify-between items-end">
+                            <div className="text-[10px] font-black uppercase text-slate-500 tracking-widest leading-none">Expected Closing Cash</div>
+                            <div className="text-xl font-black font-mono text-white leading-none">${expectedOpeningCash.toFixed(2)}</div>
                         </div>
                     </div>
 
                     <div>
-                        <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Actual Cash Counted</label>
+                        <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Confirm Actual Physical Cash</label>
                         <div className="relative mt-1">
                             <span className="absolute left-3 top-[10px] text-slate-500 font-mono font-bold text-lg">$</span>
                             <Input
