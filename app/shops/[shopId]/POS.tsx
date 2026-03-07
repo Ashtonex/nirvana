@@ -39,6 +39,7 @@ import {
     Printer
 } from "lucide-react";
 import { recordSale, recordQuotation, addNewProductFromPos, recordUntrackedSale, openCashRegister, recordPosExpense } from "../../actions";
+import { thermalPrinter } from "@/lib/thermalPrinter";
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
@@ -1030,6 +1031,46 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
                     >
                         Add to Cart
                     </Button>
+                </div>
+            </Modal>
+
+            {/* Checkout Success Modal */}
+            <Modal
+                isOpen={isSuccessModalOpen}
+                onClose={() => setIsSuccessModalOpen(false)}
+                title="Sale Complete!"
+            >
+                <div className="space-y-4 pt-2">
+                    <p className="text-sm text-slate-400 font-medium">Sale recorded successfully. You can print a receipt or close this window.</p>
+                    {activeReceipt && (
+                        <div className="pt-4 border-t border-slate-800 flex flex-col gap-2">
+                            <Button
+                                className="w-full bg-blue-600 hover:bg-blue-700 text-white font-black uppercase italic tracking-wider h-12 flex items-center justify-center gap-2"
+                                onClick={async () => {
+                                    try {
+                                        await thermalPrinter.printReceipt(activeReceipt);
+                                    } catch (e: any) {
+                                        alert("Direct printing failed. Please check connection or use system print.\n\nError: " + e.message);
+                                    }
+                                }}
+                            >
+                                <Printer className="h-5 w-5" /> Print Directly (USB)
+                            </Button>
+                            <Button
+                                variant="outline"
+                                className="w-full border-slate-800 text-slate-400 font-black uppercase italic tracking-wider h-12"
+                                onClick={() => window.print()}
+                            >
+                                Use System Print
+                            </Button>
+                            <Button
+                                className="w-full bg-violet-600 hover:bg-violet-700 text-white font-black uppercase italic tracking-wider h-12 mt-2"
+                                onClick={() => setIsSuccessModalOpen(false)}
+                            >
+                                Done
+                            </Button>
+                        </div>
+                    )}
                 </div>
             </Modal>
 
