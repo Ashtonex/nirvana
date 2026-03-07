@@ -114,6 +114,11 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
     const [isCashRegisterModalOpen, setIsCashRegisterModalOpen] = useState(false);
     const [cashRegisterAmount, setCashRegisterAmount] = useState("");
 
+    // Printer Connection State
+    const [printerTransport, setPrinterTransport] = useState<'usb' | 'bluetooth'>('usb');
+    const [isPrinterConnected, setIsPrinterConnected] = useState(false);
+    const [isConnectingPrinter, setIsConnectingPrinter] = useState(false);
+
     // Expense Tracking
     const [isExpenseModalOpen, setIsExpenseModalOpen] = useState(false);
     const [expenseAmount, setExpenseAmount] = useState("");
@@ -283,6 +288,26 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
 
     const updatePrice = (id: string, newPrice: number) => {
         setCart(cart.map(c => c.item.id === id ? { ...c, price: newPrice } : c));
+    };
+
+    const handleConnectPrinter = async (transport: 'usb' | 'bluetooth') => {
+        setIsConnectingPrinter(true);
+        try {
+            const success = transport === 'usb'
+                ? await thermalPrinter.connectUsb()
+                : await thermalPrinter.connectBluetooth();
+
+            if (success) {
+                setPrinterTransport(transport);
+                setIsPrinterConnected(true);
+            } else {
+                alert(`Failed to connect to ${transport.toUpperCase()} printer.`);
+            }
+        } catch (error: any) {
+            alert(`Connection error: ${error.message}`);
+        } finally {
+            setIsConnectingPrinter(false);
+        }
     };
 
     const handleAddAdHocProduct = async () => {
@@ -597,6 +622,31 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
                     >
                         <ShoppingCart className="h-4 w-4" /> Quick Sale
                     </Button>
+
+                    <div className="flex items-center gap-1 bg-slate-900 border border-slate-800 rounded-lg p-1 h-10">
+                        <Button
+                            onClick={() => handleConnectPrinter('usb')}
+                            disabled={isConnectingPrinter}
+                            variant="ghost"
+                            className={cn(
+                                "h-8 px-2 text-[8px] font-black uppercase italic flex items-center gap-1",
+                                (isPrinterConnected && printerTransport === 'usb') ? "bg-emerald-500/20 text-emerald-400" : "text-slate-500"
+                            )}
+                        >
+                            USB
+                        </Button>
+                        <Button
+                            onClick={() => handleConnectPrinter('bluetooth')}
+                            disabled={isConnectingPrinter}
+                            variant="ghost"
+                            className={cn(
+                                "h-8 px-2 text-[8px] font-black uppercase italic flex items-center gap-1",
+                                (isPrinterConnected && printerTransport === 'bluetooth') ? "bg-blue-500/20 text-blue-400" : "text-slate-500"
+                            )}
+                        >
+                            {isConnectingPrinter && printerTransport === 'bluetooth' ? "..." : "BT"}
+                        </Button>
+                    </div>
 
                     <Button
                         onClick={async () => {
@@ -1058,16 +1108,19 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
                     {activeReceipt && (
                         <div className="pt-4 border-t border-slate-800 flex flex-col gap-2">
                             <Button
-                                className="w-full bg-blue-600 hover:bg-blue-700 text-white font-black uppercase italic tracking-wider h-12 flex items-center justify-center gap-2"
+                                className={cn(
+                                    "w-full text-white font-black uppercase italic tracking-wider h-12 flex items-center justify-center gap-2",
+                                    printerTransport === 'usb' ? "bg-blue-600 hover:bg-blue-700" : "bg-indigo-600 hover:bg-indigo-700"
+                                )}
                                 onClick={async () => {
                                     try {
                                         await thermalPrinter.printReceipt(activeReceipt);
                                     } catch (e: any) {
-                                        alert("Direct printing failed. Please check connection or use system print.\n\nError: " + e.message);
+                                        alert(`Direct printing (${printerTransport.toUpperCase()}) failed. Please check connection.\n\nError: ` + e.message);
                                     }
                                 }}
                             >
-                                <Printer className="h-5 w-5" /> Print Directly (USB)
+                                <Printer className="h-5 w-5" /> Print Directly ({printerTransport.toUpperCase()})
                             </Button>
                             <Button
                                 variant="outline"

@@ -28,19 +28,35 @@ interface Navigator {
 }
 
 export class ThermalPrinterService {
-    private device: any | null = null;
+    private usbDevice: any | null = null;
+    private bluetoothDevice: any | null = null;
+    private bluetoothCharacteristic: any | null = null;
+    private currentTransport: 'usb' | 'bluetooth' | null = null;
 
-    async connect() {
+    // Common Thermal Printer BLE UUIDs
+    private readonly BLE_SERVICE_UUIDS = [
+        '0000ae30-0000-1000-8000-00805f9b34fb',
+        '49535343-fe7d-4ae5-8fa9-9fafd205e455',
+        '0000ff00-0000-1000-8000-00805f9b34fb'
+    ];
+    private readonly BLE_CHARACTERISTIC_UUIDS = [
+        '0000ae01-0000-1000-8000-00805f9b34fb',
+        '49535343-8841-43f4-8a54-e7e0167ca04b',
+        '0000ff02-0000-1000-8000-00805f9b34fb'
+    ];
+
+    async connectUsb() {
         try {
-            this.device = await (navigator as any).usb.requestDevice({
+            this.usbDevice = await (navigator as any).usb.requestDevice({
                 filters: []
             });
 
-            await this.device.open();
-            if (this.device.configuration === null) {
-                await this.device.selectConfiguration(1);
+            await this.usbDevice.open();
+            if (this.usbDevice.configuration === null) {
+                await this.usbDevice.selectConfiguration(1);
             }
-            await this.device.claimInterface(0);
+            await this.usbDevice.claimInterface(0);
+            this.currentTransport = 'usb';
             return true;
         } catch (error) {
             console.error("USB Connection failed:", error);
@@ -48,21 +64,83 @@ export class ThermalPrinterService {
         }
     }
 
+    async connectBluetooth() {
+        try {
+            const device = await (navigator as any).bluetooth.requestDevice({
+                filters: [{ services: this.BLE_SERVICE_UUIDS.concat(['000018f0-0000-1000-8000-00805f9b34fb']) }],
+                optionalServices: this.BLE_SERVICE_UUIDS
+            });
+
+            const server = await device.gatt.connect();
+
+            // Try known services
+            let characteristic = null;
+            for (const serviceUuid of this.BLE_SERVICE_UUIDS) {
+                try {
+                    const service = await server.getPrimaryService(serviceUuid);
+                    for (const charUuid of this.BLE_CHARACTERISTIC_UUIDS) {
+                        try {
+                            characteristic = await service.getCharacteristic(charUuid);
+                            if (characteristic) break;
+                        } catch (e) { }
+                    }
+                    if (characteristic) break;
+                } catch (e) { }
+            }
+
+            if (!characteristic) {
+                // If specific service search fails, try to find any writeable characteristic
+                const services = await server.getPrimaryServices();
+                for (const service of services) {
+                    const chars = await service.getCharacteristics();
+                    characteristic = chars.find((c: any) => c.properties.write || c.properties.writeWithoutResponse);
+                    if (characteristic) break;
+                }
+            }
+
+            if (!characteristic) throw new Error("Could not find a writeable characteristic on the device");
+
+            this.bluetoothDevice = device;
+            this.bluetoothCharacteristic = characteristic;
+            this.currentTransport = 'bluetooth';
+            return true;
+        } catch (error) {
+            console.error("Bluetooth Connection failed:", error);
+            return false;
+        }
+    }
+
+    async connect() {
+        // Default to USB for backward compatibility if called without preference
+        return this.connectUsb();
+    }
+
     async printRaw(data: Uint8Array) {
-        if (!this.device) {
-            const connected = await this.connect();
-            if (!connected) throw new Error("Printer not connected");
+        if (!this.currentTransport) {
+            throw new Error("Printer not connected. Please connect via USB or Bluetooth first.");
         }
 
-        const interfaceNumber = 0;
-        const alternateInterface = this.device?.configuration?.interfaces[interfaceNumber].alternates[0];
-        const endpointOut = alternateInterface.endpoints.find(
-            (e: any) => e.direction === 'out'
-        );
+        if (this.currentTransport === 'usb') {
+            if (!this.usbDevice) throw new Error("USB Device not initialized");
+            const interfaceNumber = 0;
+            const alternateInterface = this.usbDevice.configuration?.interfaces[interfaceNumber].alternates[0];
+            const endpointOut = alternateInterface.endpoints.find(
+                (e: any) => e.direction === 'out'
+            );
 
-        if (!endpointOut) throw new Error("No bulk out endpoint found");
+            if (!endpointOut) throw new Error("No bulk out endpoint found");
+            await this.usbDevice.transferOut(endpointOut.endpointNumber, data);
+        } else if (this.currentTransport === 'bluetooth') {
+            if (!this.bluetoothCharacteristic) throw new Error("Bluetooth characteristic not initialized");
 
-        await this.device?.transferOut(endpointOut.endpointNumber, data);
+            // BLE normally has a 20-byte MTU limit for writeWithoutResponse, 
+            // but some devices support more. To be safe, we chunk in 20-Byte segments.
+            const chunkSize = 20;
+            for (let i = 0; i < data.length; i += chunkSize) {
+                const chunk = data.slice(i, i + chunkSize);
+                await this.bluetoothCharacteristic.writeValue(chunk);
+            }
+        }
     }
 
     async printReceipt(receipt: any) {
