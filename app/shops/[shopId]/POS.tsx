@@ -1330,13 +1330,27 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
                             {todaysSales.map((sale: any) => (
                                 <div key={sale.id} className="bg-slate-950 border border-slate-800 rounded-lg p-3">
                                     <div className="flex justify-between items-start">
-                                        <div>
-                                            <p className="text-xs font-bold text-slate-200">{sale.id}</p>
-                                            <p className="text-[10px] text-slate-500">{sale.clientName || 'Walk-in'}</p>
-                                        </div>
-                                        <div className="text-right">
-                                            <p className="text-xs font-bold text-emerald-400">${(sale.totalWithTax || 0).toFixed(2)}</p>
-                                            <p className="text-[10px] text-slate-500">{sale.items?.length || 0} items</p>
+                                        <div className="flex-1">
+                                            <div className="flex justify-between items-start mb-1">
+                                                <p className="text-xs font-black text-slate-100 uppercase italic tracking-tight">{sale.itemName}</p>
+                                                <p className="text-xs font-mono font-bold text-emerald-400">${(sale.totalWithTax || 0).toFixed(2)}</p>
+                                            </div>
+                                            <div className="grid grid-cols-2 gap-2 text-[10px]">
+                                                <div className="space-y-0.5">
+                                                    <p className="text-slate-500 font-bold uppercase tracking-widest">Product ID</p>
+                                                    <p className="text-slate-300 font-mono truncate">{sale.itemId || sale.id}</p>
+                                                </div>
+                                                <div className="space-y-0.5 text-right">
+                                                    <p className="text-slate-500 font-bold uppercase tracking-widest">Detail</p>
+                                                    <p className="text-slate-300 font-bold">
+                                                        {sale.quantity} x ${(sale.unitPrice * (1 + (db.settings?.taxRate || 0.155))).toFixed(2)}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                            <div className="mt-2 pt-2 border-t border-slate-800/50 flex justify-between items-center">
+                                                <p className="text-[9px] text-slate-500 font-bold uppercase tracking-widest">Client: <span className="text-slate-400">{sale.clientName || 'Walk-in'}</span></p>
+                                                <p className="text-[9px] text-slate-600 font-mono italic">{sale.id}</p>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
