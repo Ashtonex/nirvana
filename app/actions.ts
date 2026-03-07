@@ -267,23 +267,27 @@ export async function recordSale(sale: any) {
         payment_method: sale.paymentMethod || 'cash'
     });
 
-    const { data: alloc } = await supabaseAdmin.from('inventory_allocations').select('quantity').eq('item_id', sale.itemId).eq('shop_id', sale.shopId).single();
-    if (alloc) await supabaseAdmin.from('inventory_allocations').update({ quantity: alloc.quantity - sale.quantity }).eq('item_id', sale.itemId).eq('shop_id', sale.shopId);
+    const isService = sale.itemId?.startsWith('service_');
 
-    const { data: item } = await supabaseAdmin.from('inventory_items').select('quantity, name').eq('id', sale.itemId).single();
-    if (item) {
-        const newQty = item.quantity - sale.quantity;
-        await supabaseAdmin.from('inventory_items').update({ quantity: newQty }).eq('id', sale.itemId);
-        if (newQty <= 0) {
-            try {
-                await sendEmail({
-                    to: ORACLE_RECIPIENT,
-                    subject: `[ALERT] Stock Depleted: ${item.name}`,
-                    html: `<p>Product 0 units.</p>`
-                });
-            } catch (e) {
-                // Do not fail the sale flow if email fails
-                console.error('[Email] Stock depleted alert failed:', (e as any)?.message || e);
+    if (!isService) {
+        const { data: alloc } = await supabaseAdmin.from('inventory_allocations').select('quantity').eq('item_id', sale.itemId).eq('shop_id', sale.shopId).single();
+        if (alloc) await supabaseAdmin.from('inventory_allocations').update({ quantity: alloc.quantity - sale.quantity }).eq('item_id', sale.itemId).eq('shop_id', sale.shopId);
+
+        const { data: item } = await supabaseAdmin.from('inventory_items').select('quantity, name').eq('id', sale.itemId).single();
+        if (item) {
+            const newQty = item.quantity - sale.quantity;
+            await supabaseAdmin.from('inventory_items').update({ quantity: newQty }).eq('id', sale.itemId);
+            if (newQty <= 0) {
+                try {
+                    await sendEmail({
+                        to: ORACLE_RECIPIENT,
+                        subject: `[ALERT] Stock Depleted: ${item.name}`,
+                        html: `<p>Product 0 units.</p>`
+                    });
+                } catch (e) {
+                    // Do not fail the sale flow if email fails
+                    console.error('[Email] Stock depleted alert failed:', (e as any)?.message || e);
+                }
             }
         }
     }

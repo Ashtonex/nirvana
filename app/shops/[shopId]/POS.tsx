@@ -210,6 +210,12 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
     const baseBalance = hasOpenedRegister ? Number(todaysOpening.amount) : expectedOpeningCash;
     const liveCashInDrawer = baseBalance + todaysCashSales - todaysExpenses;
 
+    const SHOP_SERVICES = [
+        { id: 'service_engraving', name: 'Engraving', category: 'Service', basePrice: 1 },
+        { id: 'service_watch_repair', name: 'Watch Repairs', category: 'Service', basePrice: 1 },
+        { id: 'service_wrapping', name: 'Wrapping', category: 'Service', basePrice: 1 },
+    ];
+
     // Trigger auto-print when success modal opens
     React.useEffect(() => {
         if (isSuccessModalOpen && activeReceipt) {
@@ -800,6 +806,26 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
                     </div>
                 </div>
 
+                <div className="mb-8 p-4 bg-slate-900/60 border border-amber-500/20 rounded-2xl backdrop-blur-sm">
+                    <div className="flex items-center gap-2 mb-4">
+                        <Sparkles className="h-4 w-4 text-amber-500" />
+                        <h2 className="text-[10px] font-black uppercase tracking-widest text-amber-500/80">Premium Services</h2>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        {SHOP_SERVICES.map(service => (
+                            <Button
+                                key={service.id}
+                                onClick={() => addToCart({ id: service.id, name: service.name, category: service.category, landedCost: 0 }, service.basePrice)}
+                                variant="outline"
+                                className="h-12 border-amber-500/10 bg-amber-500/5 hover:bg-amber-500/10 hover:border-amber-500/40 text-amber-200 text-xs font-black uppercase italic flex items-center justify-between px-4 group transition-all"
+                            >
+                                <span className="group-hover:translate-x-1 transition-transform">{service.name}</span>
+                                <Plus className="h-3 w-3 opacity-50 group-hover:opacity-100 group-hover:scale-125 transition-all" />
+                            </Button>
+                        ))}
+                    </div>
+                </div>
+
                 {filteredInventory.length === 0 && searchTerm ? (
                     <div className="flex flex-col items-center justify-center py-20 bg-slate-900/40 border border-dashed border-slate-800 rounded-2xl">
                         <PackagePlus className="h-12 w-12 text-slate-700 mb-4" />
@@ -972,25 +998,34 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
                         ) : cart.map((entry) => {
                             const dynamicOverhead = totalShopStock > 0 ? shopExpenses / totalShopStock : 0;
                             const landedCostWithOverhead = (entry.item.landedCost || 0) + dynamicOverhead;
-                            const isLossLeading = entry.price < (landedCostWithOverhead * 1.155);
+                            const isService = entry.item.id?.startsWith('service_');
+                            const isLossLeading = !isService && entry.price < (landedCostWithOverhead * 1.155);
                             return (
-                                <div key={entry.item.id} className={cn("bg-slate-900 p-3 rounded-lg border", isLossLeading ? "border-rose-500/30" : "border-slate-800")}>
+                                <div key={entry.item.id} className={cn("bg-slate-900 p-3 rounded-lg border", isLossLeading ? "border-rose-500/30" : "border-slate-800", isService && "border-amber-500/30 bg-amber-500/5")}>
                                     <div className="flex justify-between items-start">
-                                        <h4 className="text-[11px] font-black uppercase truncate italic">{entry.item.name}</h4>
-                                        <button onClick={() => removeFromCart(entry.item.id)} className="text-slate-600 hover:text-rose-500"><Trash2 className="h-3 w-3" /></button>
-                                    </div>
-                                    <div className="flex items-center justify-between mt-2">
-                                        <div className="flex items-center gap-2 bg-slate-950 px-1 rounded border border-slate-800">
-                                            <button onClick={() => updateQty(entry.item.id, -1)}><Minus className="h-3 w-3" /></button>
-                                            <span className="text-xs font-black">{entry.quantity}</span>
-                                            <button onClick={() => updateQty(entry.item.id, 1)}><Plus className="h-3 w-3" /></button>
+                                        <div className="flex flex-col">
+                                            <h4 className="text-[11px] font-black uppercase truncate italic text-white">{entry.item.name}</h4>
+                                            {isService && <span className="text-[8px] font-black text-amber-500 uppercase tracking-widest mt-0.5">Intangible Service</span>}
                                         </div>
-                                        <div className="flex items-center gap-1 bg-slate-950 p-1 rounded border border-slate-800">
-                                            <span className="text-[8px] font-black text-slate-600">$</span>
-                                            <input type="number" className="bg-transparent w-16 text-right text-xs font-black focus:outline-none" value={entry.price} onChange={(e) => updatePrice(entry.item.id, parseFloat(e.target.value) || 0)} />
+                                        <button onClick={() => removeFromCart(entry.item.id)} className="text-slate-600 hover:text-rose-500 transition-colors"><Trash2 className="h-3 w-3" /></button>
+                                    </div>
+                                    <div className="flex items-center justify-between mt-3">
+                                        <div className="flex items-center gap-2 bg-slate-950 px-2 py-1 rounded border border-slate-800">
+                                            <button onClick={() => updateQty(entry.item.id, -1)} className="text-slate-500 hover:text-white transition-colors"><Minus className="h-3 w-3" /></button>
+                                            <span className="text-xs font-black min-w-[12px] text-center">{entry.quantity}</span>
+                                            <button onClick={() => updateQty(entry.item.id, 1)} className="text-slate-500 hover:text-white transition-colors"><Plus className="h-3 w-3" /></button>
+                                        </div>
+                                        <div className="flex items-center gap-1.5 bg-slate-950 px-2 py-1 rounded border border-slate-800 group/price">
+                                            <span className="text-[10px] font-black text-slate-600 group-hover/price:text-amber-500 transition-colors">$</span>
+                                            <input
+                                                type="number"
+                                                className="bg-transparent w-20 text-right text-xs font-black focus:outline-none text-slate-200"
+                                                value={entry.price}
+                                                onChange={(e) => updatePrice(entry.item.id, parseFloat(e.target.value) || 0)}
+                                            />
                                         </div>
                                     </div>
-                                    {isLossLeading && <p className="text-[8px] font-black text-rose-500 mt-1 uppercase flex items-center gap-1"><ShieldAlert className="h-2 w-2" /> Margin Risk Detected</p>}
+                                    {isLossLeading && <p className="text-[8px] font-black text-rose-500 mt-2 uppercase flex items-center gap-1"><ShieldAlert className="h-2 w-2" /> Margin Risk Detected</p>}
                                 </div>
                             );
                         })}
