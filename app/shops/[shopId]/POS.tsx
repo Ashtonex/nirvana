@@ -139,6 +139,20 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
 
     const clientLTV = getClientLTV(clientName);
 
+    // Identify Top 3 Best Sellers for this shop
+    const itemSalesCount: Record<string, number> = {};
+    (db.sales || []).filter((s: any) => s.shopId === shopId).forEach((s: any) => {
+        itemSalesCount[s.itemId] = (itemSalesCount[s.itemId] || 0) + Number(s.quantity || 0);
+    });
+    const topSellerIds = Object.entries(itemSalesCount)
+        .sort(([, a], [, b]) => b - a)
+        .slice(0, 3)
+        .map(([id]) => id);
+
+    const topSellers = inventory.filter(item => topSellerIds.includes(item.id));
+    // Fallback if no sales yet: just show first 3
+    const defaultDisplayItems = topSellers.length >= 1 ? topSellers : inventory.slice(0, 3);
+
     // Calculate Cash Drawer Math
     const ledger = db.ledger || [];
     const todayStr = new Date().toISOString().split('T')[0];
@@ -294,7 +308,7 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
         });
     };
 
-    const handleQuickSale = () => {
+    const handleQuickSale = async () => {
         const qty = parseInt(quickSale.quantity) || 1;
         const salePrice = parseFloat(quickSale.price) || 0;
 
@@ -303,28 +317,49 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
             return;
         }
 
-        // Try to find the product in inventory
-        const existingItem = inventory.find((item: any) =>
-            item.name.toLowerCase() === quickSale.name.toLowerCase()
-        );
+        startTransition(async () => {
+            try {
+                // Try to find the product in inventory
+                const existingItem = inventory.find((item: any) =>
+                    item.name.toLowerCase() === quickSale.name.toLowerCase()
+                );
 
-        if (existingItem) {
-            // Add tracked product to cart
-            addToCart(existingItem, salePrice, qty);
-        } else {
-            // Add untracked product to cart with fake ID
-            addToCart({
-                id: `QUICK_${Date.now()}`,
-                name: quickSale.name,
-                category: "Quick Sale",
-                quantity: 0,
-                landedCost: 0,
-                allocations: []
-            }, salePrice, qty);
-        }
+                if (existingItem) {
+                    // Add tracked product to cart
+                    addToCart(existingItem, salePrice, qty);
+                } else {
+                    // It genuinely doesn't exist. Create it on the fly in MASTER inventory.
+                    const addedItem: any = await addNewProductFromPos({
+                        name: quickSale.name,
+                        category: "Quick Sale",
+                        landedCost: salePrice * 0.7, // Estimate cost at 70% of sale price
+                        shopId,
+                        initialStock: 0 // Will be handled by the sale itself
+                    });
 
-        setIsQuickSaleModalOpen(false);
-        setQuickSale({ name: "", quantity: "1", price: "0" });
+                    if (addedItem?.id) {
+                        // Create a mock inventory item object to add to cart immediately
+                        const newItem = {
+                            id: addedItem.id,
+                            name: quickSale.name,
+                            category: "Quick Sale",
+                            quantity: 0,
+                            landedCost: salePrice * 0.7,
+                            allocations: [{ shopId, quantity: 0 }]
+                        };
+                        addToCart(newItem, salePrice, qty);
+                    } else {
+                        throw new Error("Failed to register new product");
+                    }
+                }
+
+                setIsQuickSaleModalOpen(false);
+                setQuickSale({ name: "", quantity: "1", price: "0" });
+            } catch (error) {
+                console.error("Quick sale failed:", error);
+                alert("Failed to process quick sale registration.");
+            }
+        });
     };
 
     const taxRate = db.settings?.taxRate || 0.155;
@@ -669,7 +704,7 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
                     </div>
                 ) : (
                     <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
-                        {(searchTerm ? filteredInventory : filteredInventory.slice(0, 6)).map((item) => {
+                        {(searchTerm ? filteredInventory : defaultDisplayItems).map((item) => {
                             const allocation = item.allocations.find((a: any) => a.shopId === shopId);
                             const qtyAtShop = (allocation ? allocation.quantity : 0);
                             const totalNetworkStock = item.quantity || 0;
