@@ -1500,6 +1500,47 @@ export async function exportTaxLedgerCSV() {
     }
 }
 
+// Export general reports as CSV
+export async function exportReportsCSV(sales: any[]) {
+    try {
+        if (!sales || sales.length === 0) {
+            return { success: false, error: 'No sales data to export' };
+        }
+
+        const csvRows: string[] = [];
+        
+        // CSV header
+        csvRows.push('Date,Time,Shop,Product,Quantity,Unit Price,Total (inc. Tax)');
+        
+        // CSV rows
+        sales.forEach((sale: any) => {
+            const date = new Date(sale.date);
+            const row = [
+                date.toLocaleDateString(),
+                date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                `"${sale.shopId}"`,
+                `"${sale.itemName}"`,
+                sale.quantity,
+                sale.unitPrice.toFixed(2),
+                sale.totalWithTax.toFixed(2)
+            ].join(',');
+            
+            csvRows.push(row);
+        });
+        
+        const csvContent = csvRows.join('\n');
+        
+        return { 
+            success: true, 
+            data: csvContent,
+            filename: `financial-report-${new Date().toISOString().split('T')[0]}.csv`
+        };
+    } catch (error) {
+        console.error('Error exporting report:', error);
+        return { success: false, error: 'Failed to export report' };
+    }
+}
+
 // Print ZIMRA compliance log
 export async function printZIMRALog() {
     try {
