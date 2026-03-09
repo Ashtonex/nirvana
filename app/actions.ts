@@ -457,30 +457,67 @@ export async function registerBulkInventoryItems(
 }
 
 export async function updateInventoryItem(itemId: string, updates: any) {
-    await supabaseAdmin.from('inventory_items').update(updates).eq('id', itemId);
-    revalidatePath("/inventory");
-    revalidatePath("/");
-
-    // Also revalidate all shop pages in case allocations are affected
-    const { data: shops } = await supabaseAdmin.from('shops').select('id');
-    if (shops) {
-        for (const shop of shops) {
-            revalidatePath(`/shops/${shop.id}`);
+    try {
+        const { error } = await supabaseAdmin.from('inventory_items').update(updates).eq('id', itemId);
+        
+        if (error) {
+            console.error('[updateInventoryItem] Database error:', error);
+            return { success: false, error: error.message };
         }
+
+        // Revalidate all relevant paths
+        revalidatePath("/inventory");
+        revalidatePath("/");
+        revalidatePath("/inventory/InventoryMaster");
+        
+        // Also revalidate all shop pages in case allocations are affected
+        const { data: shops } = await supabaseAdmin.from('shops').select('id');
+        if (shops) {
+            for (const shop of shops) {
+                revalidatePath(`/shops/${shop.id}`);
+            }
+        }
+        
+        return { success: true, message: `Item updated successfully` };
+    } catch (err: any) {
+        console.error('[updateInventoryItem] Error:', err);
+        return { success: false, error: err.message };
     }
 }
 
 export async function deleteInventoryItem(itemId: string) {
-    await supabaseAdmin.from('inventory_items').delete().eq('id', itemId);
-    revalidatePath("/inventory");
-    revalidatePath("/");
-
-    // Also revalidate all shop pages
-    const { data: shops } = await supabaseAdmin.from('shops').select('id');
-    if (shops) {
-        for (const shop of shops) {
-            revalidatePath(`/shops/${shop.id}`);
+    try {
+        // First, get the item details before deleting
+        const { data: item } = await supabaseAdmin.from('inventory_items').select('name').eq('id', itemId).single();
+        
+        // Delete the inventory item
+        const { error } = await supabaseAdmin.from('inventory_items').delete().eq('id', itemId);
+        
+        if (error) {
+            console.error('[deleteInventoryItem] Database error:', error);
+            return { success: false, error: error.message };
         }
+
+        // Delete associated allocations
+        await supabaseAdmin.from('inventory_allocations').delete().eq('item_id', itemId);
+
+        // Revalidate all relevant paths
+        revalidatePath("/inventory");
+        revalidatePath("/");
+        revalidatePath("/inventory/InventoryMaster");
+        
+        // Also revalidate all shop pages
+        const { data: shops } = await supabaseAdmin.from('shops').select('id');
+        if (shops) {
+            for (const shop of shops) {
+                revalidatePath(`/shops/${shop.id}`);
+            }
+        }
+        
+        return { success: true, message: `${item?.name || 'Item'} has been permanently deleted from inventory` };
+    } catch (err: any) {
+        console.error('[deleteInventoryItem] Error:', err);
+        return { success: false, error: err.message };
     }
 }
 

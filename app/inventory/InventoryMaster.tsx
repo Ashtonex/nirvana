@@ -776,7 +776,14 @@ export default function InventoryMaster({ db }: { db: any }) {
                                                                 const newName = prompt("Update Product Name:", item.name);
                                                                 const newQty = prompt("Override Total Quantity:", item.quantity);
                                                                 if (newName && newQty) {
-                                                                    startTransition(() => updateInventoryItem(item.id, { name: newName, quantity: Number(newQty) }));
+                                                                    startTransition(async () => {
+                                                                        const result = await updateInventoryItem(item.id, { name: newName, quantity: Number(newQty) });
+                                                                        if (result.success) {
+                                                                            alert(`✓ ${newName} quantity updated to ${newQty}. All pages will refresh.`);
+                                                                        } else {
+                                                                            alert(`❌ Error updating item: ${result.error}`);
+                                                                        }
+                                                                    });
                                                                 }
                                                             }}
                                                             title="Quick Edit Ledger Entry"
@@ -787,7 +794,14 @@ export default function InventoryMaster({ db }: { db: any }) {
                                                         <button
                                                             onClick={() => {
                                                                 if (confirm(`CRITICAL: Purge ${item.name} from Master Ledger? This action is IRREVERSIBLE.`)) {
-                                                                    startTransition(() => deleteInventoryItem(item.id));
+                                                                    startTransition(async () => {
+                                                                        const result = await deleteInventoryItem(item.id);
+                                                                        if (result.success) {
+                                                                            alert(`✓ ${result.message}`);
+                                                                        } else {
+                                                                            alert(`❌ Error deleting item: ${result.error}`);
+                                                                        }
+                                                                    });
                                                                 }
                                                             }}
                                                             title="Purge Entry"
