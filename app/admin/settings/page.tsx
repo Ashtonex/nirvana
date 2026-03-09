@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { Badge, Button, Input, Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui";
 import NukeConsole from "@/components/NukeConsole";
+import { TaxSettingsForm } from "./TaxSettingsForm";
 
 export default async function SettingsPage() {
     const settings = await getGlobalSettings();
@@ -46,56 +47,7 @@ export default async function SettingsPage() {
                         <CardDescription className="text-[10px] font-bold uppercase italic">Thresholds & Dynamic Computation</CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-6">
-                        <form action={async (formData: FormData) => {
-                            "use server";
-                            await updateGlobalSettings({
-                                taxRate: Number(formData.get('taxRate')) / 100,
-                                taxThreshold: Number(formData.get('taxThreshold')),
-                                taxMode: formData.get('taxMode') as any
-                            });
-                        }} className="space-y-6">
-                            <div className="grid gap-4 md:grid-cols-2">
-                                <div className="space-y-2">
-                                    <label className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Global Tax Rate (%)</label>
-                                    <Input
-                                        name="taxRate"
-                                        type="number"
-                                        step="0.1"
-                                        defaultValue={settings.taxRate * 100}
-                                        className="bg-slate-900 border-slate-800 font-bold"
-                                    />
-                                </div>
-                                <div className="space-y-2">
-                                    <label className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Tax Threshold ($)</label>
-                                    <Input
-                                        name="taxThreshold"
-                                        type="number"
-                                        defaultValue={settings.taxThreshold}
-                                        className="bg-slate-900 border-slate-800 font-bold"
-                                    />
-                                </div>
-                            </div>
-
-                            <div className="space-y-2">
-                                <label className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Tax Applicability Mode</label>
-                                <select
-                                    name="taxMode"
-                                    defaultValue={settings.taxMode}
-                                    className="w-full bg-slate-900 border border-slate-800 rounded-md p-2 text-sm font-bold text-white focus:outline-none focus:ring-1 focus:ring-sky-500"
-                                >
-                                    <option value="all">Apply to All Products</option>
-                                    <option value="above_threshold">Only Above Threshold (ZIMRA Logic)</option>
-                                    <option value="none">Disable All Taxes</option>
-                                </select>
-                                <p className="text-[10px] text-slate-500 italic mt-1 uppercase leading-tight font-bold">
-                                    Determines how the Oracle calculates fiscal liability during POS checkout.
-                                </p>
-                            </div>
-
-                            <Button type="submit" className="w-full h-12 bg-sky-600 hover:bg-sky-500 text-[10px] font-black uppercase italic tracking-widest shadow-[0_0_20px_rgba(14,165,233,0.3)]">
-                                <Save className="mr-2 h-4 w-4" /> Finalize Fiscal Constants
-                            </Button>
-                        </form>
+                        <TaxSettingsForm settings={settings} />
                     </CardContent>
                 </Card>
 
