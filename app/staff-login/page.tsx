@@ -1,9 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, Button, Input } from "@/components/ui";
-import { Mail, Loader2, UserCheck, KeyRound } from "lucide-react";
+import { Mail, Loader2, UserCheck, KeyRound, WifiOff } from "lucide-react";
+import { useOfflineAuth } from "@/hooks/useOfflineAuth";
+import { isOnline } from "@/lib/local-db";
 
 export default function StaffLoginPage() {
   const router = useRouter();
@@ -11,10 +13,52 @@ export default function StaffLoginPage() {
   const [pin, setPin] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isOfflineMode, setIsOfflineMode] = useState(false);
+  const { login: offlineLogin } = useOfflineAuth();
+
+  // Check online status
+  useEffect(() => {
+    isOnline().then(online => setIsOfflineMode(!online));
+    
+    const handleOnline = () => setIsOfflineMode(false);
+    const handleOffline = () => setIsOfflineMode(true);
+    
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
 
   const login = async () => {
     setLoading(true);
     setError(null);
+    
+    const online = await isOnline();
+    
+    // If offline, try local auth first
+    if (!online) {
+      try {
+        const result = await offlineLogin(pin);
+        if (result.success && result.session) {
+          // Navigate to shop or mobile menu
+          const shopId = result.session.shopId;
+          window.location.href = shopId ? `/shops/${shopId}` : "/mobile-menu";
+          return;
+        }
+        setError(result.error || "Invalid PIN for offline login");
+        return;
+      } catch (e: any) {
+        setError(e?.message || "Offline login failed");
+        return;
+      } finally {
+        setLoading(false);
+      }
+    }
+    
+    // Online login - use API
     try {
       const res = await fetch("/api/staff/login", {
         method: "POST",
@@ -37,27 +81,39 @@ export default function StaffLoginPage() {
   return (
     <div className="min-h-[100svh] flex items-center justify-center p-4 bg-slate-950">
       <div className="w-full max-w-md">
+        {/* Offline indicator */}
+        {isOfflineMode && (
+          <div className="mb-4 flex items-center justify-center gap-2 bg-amber-500/20 text-amber-400 px-4 py-2 rounded-lg border border-amber-500/30">
+            <WifiOff className="w-4 h-4" />
+            <span className="text-sm font-medium">Offline Mode - Enter saved PIN</span>
+          </div>
+        )}
+        
         <Card className="bg-slate-900 border-slate-800">
           <CardHeader>
             <CardTitle className="text-white font-black uppercase italic">Staff Login</CardTitle>
             <CardDescription className="text-slate-500">
-              Enter your work email and your shop device PIN.
+              {isOfflineMode 
+                ? "Enter your device PIN to log in offline." 
+                : "Enter your work email and your shop device PIN."}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Work Email</label>
-              <div className="relative">
-                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
-                <Input
-                  value={workEmail}
-                  onChange={(e) => setWorkEmail(e.target.value)}
-                  className="pl-10 bg-slate-950 border-slate-800"
-                  placeholder="name.surname@kipasa.com"
-                  type="email"
-                />
+            {!isOfflineMode && (
+              <div className="space-y-2">
+                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Work Email</label>
+                <div className="relative">
+                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
+                  <Input
+                    value={workEmail}
+                    onChange={(e) => setWorkEmail(e.target.value)}
+                    className="pl-10 bg-slate-950 border-slate-800"
+                    placeholder="name.surname@kipasa.com"
+                    type="email"
+                  />
+                </div>
               </div>
-            </div>
+            )}
 
             <div className="space-y-2">
               <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Device PIN</label>
@@ -82,7 +138,7 @@ export default function StaffLoginPage() {
 
             <Button
               className="w-full h-12 font-black uppercase"
-              disabled={loading || !workEmail || !pin}
+              disabled={loading || (!isOfflineMode && (!workEmail || !pin)) || (isOfflineMode && !pin)}
               onClick={login}
             >
               {loading ? (

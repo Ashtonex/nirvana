@@ -1,33 +1,163 @@
-const CACHE_NAME = 'nirvana-cache-v1';
+const CACHE_NAME = 'nirvana-v3';
 const OFFLINE_URL = '/';
+
+// Pre-cache all app routes for offline use
+const APP_ROUTES = [
+    '/',
+    '/login',
+    '/staff-login',
+    '/inventory',
+    '/shops',
+    '/finance',
+    '/reports',
+    '/employees',
+    '/transfers',
+    '/intelligence',
+    '/chat',
+    '/quotations',
+];
+
+// Assets to cache for offline use
+const STATIC_ASSETS = [
+    '/',
+    '/manifest.json',
+    '/icon-192.png',
+    '/icon-512.png',
+];
 
 self.addEventListener('install', (event) => {
     event.waitUntil(
         caches.open(CACHE_NAME).then((cache) => {
-            return cache.addAll([OFFLINE_URL]);
+            // Cache app routes
+            return cache.addAll([...STATIC_ASSETS, ...APP_ROUTES]).catch((err) => {
+                console.log('Cache addAll failed:', err);
+                // Still try to cache what we can
+                return cache.addAll(STATIC_ASSETS);
+            });
         })
     );
     self.skipWaiting();
 });
 
 self.addEventListener('activate', (event) => {
-    event.waitUntil(clients.claim());
+    event.waitUntil(
+        caches.keys().then((cacheNames) => {
+            return Promise.all(
+                cacheNames
+                    .filter((name) => name !== CACHE_NAME)
+                    .map((name) => caches.delete(name))
+            );
+        })
+    );
+    self.clients.claim();
 });
 
+// Handle offline sales - queue them and sync when online
+self.addEventListener('sync', (event) => {
+    if (event.tag === 'sync-sales') {
+        event.waitUntil(syncPendingSales());
+    }
+});
+
+async function syncPendingSales() {
+    const db = await openDB();
+    const sales = await db.getAll('pending-sales');
+    
+    for (const sale of sales) {
+        try {
+            const response = await fetch('/api/sales/offline', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(sale)
+            });
+            
+            if (response.ok) {
+                await db.delete('pending-sales', sale.id);
+            }
+        } catch (e) {
+            console.error('Failed to sync sale:', e);
+        }
+    }
+}
+
+function openDB() {
+    return new Promise((resolve, reject) => {
+        const request = indexedDB.open('nirvana-offline', 1);
+        request.onerror = () => reject(request.error);
+        request.onsuccess = () => resolve({
+            getAll: (store) => new Promise((res, rej) => {
+                const tx = request.result.transaction(store, 'readonly');
+                const req = tx.objectStore(store).getAll();
+                req.onsuccess = () => res(req.result);
+                req.onerror = () => rej(req.error);
+            }),
+            delete: (store, id) => new Promise((res, rej) => {
+                const tx = request.result.transaction(store, 'readwrite');
+                tx.objectStore(store).delete(id);
+                tx.oncomplete = () => res();
+                tx.onerror = () => rej(tx.error);
+            })
+        });
+        request.onupgradeneeded = (event) => {
+            const db = event.target.result;
+            if (!db.objectStoreNames.contains('pending-sales')) {
+                db.createObjectStore('pending-sales', { keyPath: 'id' });
+            }
+        };
+    });
+}
+
 self.addEventListener('fetch', (event) => {
+    const url = new URL(event.request.url);
+    
+    // Skip non-GET requests (POST for sales)
+    if (event.request.method !== 'GET') {
+        return;
+    }
+    
+    // For navigation requests, try network first, fallback to cache
     if (event.request.mode === 'navigate') {
         event.respondWith(
-            fetch(event.request).catch(() => {
-                return caches.open(CACHE_NAME).then((cache) => {
-                    return cache.match(OFFLINE_URL);
-                });
-            })
+            fetch(event.request)
+                .then((response) => {
+                    // Cache the successful response
+                    const responseClone = response.clone();
+                    caches.open(CACHE_NAME).then((cache) => {
+                        cache.put(event.request, responseClone);
+                    });
+                    return response;
+                })
+                .catch(() => {
+                    return caches.match(event.request).then((cachedResponse) => {
+                        return cachedResponse || caches.match('/');
+                    });
+                })
         );
-    } else {
-        event.respondWith(
-            caches.match(event.request).then((response) => {
-                return response || fetch(event.request);
-            })
-        );
+        return;
     }
+    
+    // For static assets, try cache first, then network
+    event.respondWith(
+        caches.match(event.request).then((response) => {
+            if (response) {
+                return response;
+            }
+            return fetch(event.request).then((networkResponse) => {
+                // Cache static assets
+                if (networkResponse.ok && (
+                    url.pathname.endsWith('.js') ||
+                    url.pathname.endsWith('.css') ||
+                    url.pathname.endsWith('.png') ||
+                    url.pathname.endsWith('.ico') ||
+                    url.pathname.startsWith('/_next/static/')
+                )) {
+                    const responseClone = networkResponse.clone();
+                    caches.open(CACHE_NAME).then((cache) => {
+                        cache.put(event.request, responseClone);
+                    });
+                }
+                return networkResponse;
+            });
+        })
+    );
 });

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useTransition } from "react";
+import React, { useState, useTransition, useEffect } from "react";
 import {
     Card,
     CardContent,
@@ -48,6 +48,7 @@ import {
     recordLayby,
     updateLaybyPayment
 } from "../../actions";
+import { useOfflineSales } from "@/components/useOfflineSales";
 import { thermalPrinter } from "@/lib/thermalPrinter";
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -91,6 +92,14 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
     const [clientPhone, setClientPhone] = useState("");
     const [selectedEmployeeId, setSelectedEmployeeId] = useState("");
     const [paymentMethod, setPaymentMethod] = useState<'cash' | 'ecocash'>('cash');
+
+    // Offline handling
+    const { saveSaleOffline, syncPendingSales, getPendingCount, isOnline } = useOfflineSales();
+    const [pendingSyncCount, setPendingSyncCount] = useState(0);
+
+    useEffect(() => {
+        getPendingCount().then(setPendingSyncCount);
+    }, [getPendingCount]);
 
     // Discount (0.50 to 5.00 USD)
     const [discount, setDiscount] = useState(0);
@@ -714,6 +723,23 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
                         onChange={(e) => setSearchTerm(e.target.value)}
                     />
                 </div>
+
+                {/* Online/Offline Status & Pending Sync */}
+                {(!isOnline || pendingSyncCount > 0) && (
+                    <div className={`flex items-center justify-between px-4 py-2 rounded-lg text-xs font-black uppercase ${!isOnline ? 'bg-amber-500/20 border border-amber-500/30' : 'bg-emerald-500/20 border border-emerald-500/30'}`}>
+                        <div className="flex items-center gap-2">
+                            <div className={`h-2 w-2 rounded-full ${isOnline ? 'bg-emerald-500' : 'bg-amber-500 animate-pulse'}`} />
+                            <span className={isOnline ? 'text-emerald-400' : 'text-amber-400'}>
+                                {isOnline ? 'Online' : 'OFFLINE MODE'}
+                            </span>
+                        </div>
+                        {pendingSyncCount > 0 && (
+                            <span className="text-amber-400">
+                                {pendingSyncCount} sale{pendingSyncCount !== 1 ? 's' : ''} pending sync
+                            </span>
+                        )}
+                    </div>
+                )}
 
                 <div className="flex flex-wrap items-center gap-2">
                     <Button

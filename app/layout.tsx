@@ -4,6 +4,8 @@ import "./globals.css";
 import { AuthProvider } from "@/components/AuthProvider";
 import { AppShell } from "@/components/AppShell";
 import { StaffProvider } from "@/components/StaffProvider";
+import { ServiceWorkerRegistration } from "@/components/ServiceWorkerRegistration";
+import { OfflineIndicator } from "@/components/OfflineIndicator";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -48,7 +50,11 @@ export default function RootLayout({
       <body className={`${inter.className} antialiased bg-background text-foreground`}>
         <AuthProvider>
           <StaffProvider>
-            <AppShell>{children}</AppShell>
+            <AppShell>
+              <ServiceWorkerRegistration />
+              <OfflineIndicator />
+              {children}
+            </AppShell>
           </StaffProvider>
         </AuthProvider>
       </body>
