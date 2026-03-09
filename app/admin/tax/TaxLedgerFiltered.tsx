@@ -32,12 +32,35 @@ export function TaxLedgerFiltered({ shops, sales, settings }: TaxLedgerFilteredP
 
     const flatTaxRate = 0.155;
 
-    // Filter sales based on selected period
+    // Filter sales based on selected period and tax threshold
+    // Sales ABOVE threshold should NOT appear in tax ledger (only in financials)
     const filteredSales = sales.filter((sale: any) => {
         const saleDate = new Date(sale.date);
-        if (!startDate || !endDate) return true;
-        return saleDate >= startDate && saleDate <= endDate;
+        
+        // Filter by period
+        if (startDate && endDate) {
+            if (saleDate < startDate || saleDate > endDate) return false;
+        }
+        
+        // Filter out above-threshold sales from tax ledger
+        // These sales are NOT filed with ZIMRA, only shown in financials
+        if (settings.taxMode === 'above_threshold' && sale.totalBeforeTax > settings.taxThreshold) {
+            return false;
+        }
+        
+        return true;
     });
+
+    // Count excluded sales (above threshold) for display
+    const excludedSales = settings.taxMode === 'above_threshold' 
+        ? sales.filter((sale: any) => {
+            const saleDate = new Date(sale.date);
+            if (startDate && endDate) {
+                if (saleDate < startDate || saleDate > endDate) return false;
+            }
+            return sale.totalBeforeTax > settings.taxThreshold;
+        })
+        : [];
 
     // Calculate metrics
     const totalSales = filteredSales.reduce((sum: number, s: any) => sum + s.totalWithTax, 0);
@@ -102,7 +125,14 @@ export function TaxLedgerFiltered({ shops, sales, settings }: TaxLedgerFilteredP
                         <h3 className="text-sm font-black uppercase italic flex items-center gap-2">
                             <FileText className="h-4 w-4 text-sky-500" /> Itemized Tax Ledger
                         </h3>
-                        <p className="text-[10px] text-slate-500 font-bold uppercase mt-1">Showing {filteredSales.length} transaction{filteredSales.length !== 1 ? 's' : ''}</p>
+                        <p className="text-[10px] text-slate-500 font-bold uppercase mt-1">
+                            Showing {filteredSales.length} transaction{filteredSales.length !== 1 ? 's' : ''}
+                            {settings.taxMode === 'above_threshold' && excludedSales.length > 0 && (
+                                <span className="text-amber-500 ml-2">
+                                    ({excludedSales.length} above ${settings.taxThreshold} threshold - NOT filed)
+                                </span>
+                            )}
+                        </p>
                     </div>
                     <Badge className="bg-sky-500/10 text-sky-500 border-sky-500/20 text-[10px] uppercase font-black">
                         Strategy: {settings.taxMode.replace('_', ' ')}

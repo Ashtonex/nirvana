@@ -1443,6 +1443,15 @@ export async function exportTaxLedgerCSV() {
             return { success: false, error: 'No sales data to export' };
         }
 
+        // Filter out above-threshold sales from tax ledger export
+        // Sales above threshold are NOT filed with ZIMRA
+        const filteredSales = db.sales.filter((sale: any) => {
+            if (settings.taxMode === 'above_threshold' && sale.totalBeforeTax > settings.taxThreshold) {
+                return false;
+            }
+            return true;
+        });
+
         const flatTaxRate = 0.155;
         const csvRows: string[] = [];
         
@@ -1450,7 +1459,7 @@ export async function exportTaxLedgerCSV() {
         csvRows.push('Date,Product,Shop,Quantity,Unit Price,Total Before Tax,Standard Tax (15.5%),Reported Tax,Status');
         
         // CSV rows
-        db.sales.forEach((sale: any) => {
+        filteredSales.forEach((sale: any) => {
             const standardTax = sale.totalBeforeTax * flatTaxRate;
             const shopName = db.shops.find((s: any) => s.id === sale.shopId)?.name || sale.shopId;
             const isUnderThreshold = settings.taxMode === 'above_threshold' && sale.totalBeforeTax <= settings.taxThreshold;
@@ -1476,9 +1485,9 @@ export async function exportTaxLedgerCSV() {
         });
         
         // Add summary
-        const totalSales = db.sales.reduce((sum: number, s: any) => sum + s.totalWithTax, 0);
-        const theoreticalTax = db.sales.reduce((sum: number, s: any) => sum + (s.totalBeforeTax * flatTaxRate), 0);
-        const reportedTax = db.sales.reduce((sum: number, s: any) => sum + s.tax, 0);
+        const totalSales = filteredSales.reduce((sum: number, s: any) => sum + s.totalWithTax, 0);
+        const theoreticalTax = filteredSales.reduce((sum: number, s: any) => sum + (s.totalBeforeTax * flatTaxRate), 0);
+        const reportedTax = filteredSales.reduce((sum: number, s: any) => sum + s.tax, 0);
         
         csvRows.push('');
         csvRows.push('SUMMARY');
@@ -1486,6 +1495,11 @@ export async function exportTaxLedgerCSV() {
         csvRows.push(`Total Theoretical Tax (15.5%),${theoreticalTax.toFixed(2)}`);
         csvRows.push(`Total Reported Tax,${reportedTax.toFixed(2)}`);
         csvRows.push(`Fiscal Efficiency Gain,${(theoreticalTax - reportedTax).toFixed(2)}`);
+        
+        if (settings.taxMode === 'above_threshold') {
+            const excludedCount = db.sales.length - filteredSales.length;
+            csvRows.push(`Note: ${excludedCount} transaction(s) above $${settings.taxThreshold} threshold - NOT filed with ZIMRA`);
+        }
         
         const csvContent = csvRows.join('\n');
         
@@ -1555,6 +1569,15 @@ export async function printZIMRALog() {
             return { success: false, error: 'No sales data to log' };
         }
 
+        // Filter out above-threshold sales from ZIMRA log
+        // Sales above threshold are NOT filed with ZIMRA
+        const filteredSales = db.sales.filter((sale: any) => {
+            if (settings.taxMode === 'above_threshold' && sale.totalBeforeTax > settings.taxThreshold) {
+                return false;
+            }
+            return true;
+        });
+
         const flatTaxRate = 0.155;
         const timestamp = new Date().toISOString();
         const logRows: string[] = [];
@@ -1570,10 +1593,19 @@ export async function printZIMRALog() {
         logRows.push('=====================================');
         logRows.push('');
         
+        // Note about excluded sales
+        if (settings.taxMode === 'above_threshold') {
+            const excludedCount = db.sales.length - filteredSales.length;
+            if (excludedCount > 0) {
+                logRows.push(`NOTE: ${excludedCount} transaction(s) above $${settings.taxThreshold} threshold - NOT FILED WITH ZIMRA`);
+                logRows.push('');
+            }
+        }
+        
         logRows.push('TRANSACTION LOG:');
         logRows.push('-'.repeat(100));
         
-        db.sales.forEach((sale: any, index: number) => {
+        filteredSales.forEach((sale: any, index: number) => {
             const standardTax = sale.totalBeforeTax * flatTaxRate;
             const shopName = db.shops.find((s: any) => s.id === sale.shopId)?.name || sale.shopId;
             const isUnderThreshold = settings.taxMode === 'above_threshold' && sale.totalBeforeTax <= settings.taxThreshold;
@@ -1599,12 +1631,12 @@ export async function printZIMRALog() {
         logRows.push('COMPLIANCE SUMMARY');
         logRows.push('=====================================');
         
-        const totalSales = db.sales.reduce((sum: number, s: any) => sum + s.totalWithTax, 0);
-        const theoreticalTax = db.sales.reduce((sum: number, s: any) => sum + (s.totalBeforeTax * flatTaxRate), 0);
-        const reportedTax = db.sales.reduce((sum: number, s: any) => sum + s.tax, 0);
+        const totalSales = filteredSales.reduce((sum: number, s: any) => sum + s.totalWithTax, 0);
+        const theoreticalTax = filteredSales.reduce((sum: number, s: any) => sum + (s.totalBeforeTax * flatTaxRate), 0);
+        const reportedTax = filteredSales.reduce((sum: number, s: any) => sum + s.tax, 0);
         const taxSaving = theoreticalTax - reportedTax;
         
-        logRows.push(`Total Transactions: ${db.sales.length}`);
+        logRows.push(`Total Transactions (Filed): ${filteredSales.length}`);
         logRows.push(`Total Sales Volume: $${totalSales.toFixed(2)}`);
         logRows.push(`Total Theoretical Tax (15.5%): $${theoreticalTax.toFixed(2)}`);
         logRows.push(`Total Reported Tax: $${reportedTax.toFixed(2)}`);
