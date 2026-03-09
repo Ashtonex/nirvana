@@ -617,16 +617,25 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
             }
 
             const totals = data?.totals;
+            const isWeeklyDay = data?.isWeeklyDay;
+            
             const msgLines = [
                 `NIRVANA EOD — ${shopId.toUpperCase()}`,
                 `Date: ${new Date().toLocaleDateString()}`,
+                isWeeklyDay ? '📊 Weekly Report Also Generated!' : null,
                 totals ? `Transactions: ${totals.count}` : null,
                 totals ? `Total (inc tax): $${Number(totals.totalWithTax || 0).toFixed(2)}` : null,
                 totals ? `Total (pre tax): $${Number(totals.totalBeforeTax || 0).toFixed(2)}` : null,
                 totals ? `Tax: $${Number(totals.totalTax || 0).toFixed(2)}` : null,
+                totals && totals.totalDiscount ? `Discounts: $${Number(totals.totalDiscount || 0).toFixed(2)}` : null,
+                totals && totals.totalExpenses ? `Expenses: $${Number(totals.totalExpenses || 0).toFixed(2)}` : null,
                 `Report PDF is attached.`
             ].filter(Boolean);
             setEodShareText(msgLines.join('\n'));
+
+            if (isWeeklyDay) {
+                alert('📊 Weekly Report has been generated and emailed! Week summary sent to management.');
+            }
 
             // Generate report PDF for sharing
             try {
