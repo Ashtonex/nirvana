@@ -92,6 +92,9 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
     const [selectedEmployeeId, setSelectedEmployeeId] = useState("");
     const [paymentMethod, setPaymentMethod] = useState<'cash' | 'ecocash'>('cash');
 
+    // Discount (0.50 to 5.00 USD)
+    const [discount, setDiscount] = useState(0);
+
     // UI States
     const [isClosingDay, setIsClosingDay] = useState(false);
     const [isEodShareModalOpen, setIsEodShareModalOpen] = useState(false);
@@ -413,6 +416,8 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
     const totalBeforeTax = cart.reduce((sum, c) => sum + (c.price / (1 + taxRate)) * c.quantity, 0);
     const totalWithTax = cart.reduce((sum, c) => sum + c.price * c.quantity, 0);
     const totalTax = totalWithTax - totalBeforeTax;
+    const totalDue = Math.max(0, totalWithTax - discount);
+    const discountAmount = Math.min(discount, totalWithTax);
 
     const handleCheckout = () => {
         startTransition(async () => {
@@ -460,10 +465,11 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
                             totalGross: c.price * c.quantity
                         })),
                         subtotal: totalBeforeTax,
+                        discount: discountAmount,
                         tax: totalTax,
-                        total: totalWithTax,
+                        total: totalDue,
                         paidAmount: deposit,
-                        balanceRemaining: totalWithTax - deposit,
+                        balanceRemaining: totalDue - deposit,
                         dateStamp: new Date().toLocaleDateString(),
                         timeStamp: new Date().toLocaleTimeString(),
                         paymentMethod: 'cash',
@@ -493,7 +499,8 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
                                 totalBeforeTax: lineNet,
                                 employeeId: selectedEmployeeId || "system",
                                 clientName: clientName || "General Walk-in",
-                                paymentMethod
+                                paymentMethod,
+                                discount: discountAmount
                             });
                         } else {
                             await recordSale({
@@ -505,7 +512,8 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
                                 totalBeforeTax: lineNet,
                                 employeeId: selectedEmployeeId || "system",
                                 clientName: clientName || "General Walk-in",
-                                paymentMethod
+                                paymentMethod,
+                                discount: discountAmount
                             });
                         }
 
@@ -530,8 +538,9 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
                         clientPhone: clientPhone || "N/A",
                         items: receiptItems,
                         subtotal: totalBeforeTax,
+                        discount: discountAmount,
                         tax: totalTax,
-                        total: totalWithTax,
+                        total: totalDue,
                         dateStamp: new Date().toLocaleDateString(),
                         timeStamp: new Date().toLocaleTimeString(),
                         paymentMethod
@@ -568,6 +577,7 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
                 setClientPhone("");
                 setLaybyDeposit("");
                 setPaymentMethod('cash');
+                setDiscount(0);
 
                 // Auto-print if a receipt was generated and printer is connected
                 if (currentReceiptData && isPrinterConnected) {
@@ -769,8 +779,9 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
                                         timeStamp: new Date().toLocaleTimeString(),
                                         items: previewItems,
                                         subtotal: totalBeforeTax,
+                                        discount: discountAmount,
                                         tax: totalTax,
-                                        total: totalWithTax,
+                                        total: totalDue,
                                         paymentMethod: paymentMethod.toUpperCase()
                                     };
                                     await thermalPrinter.printReceipt(previewReceipt);
@@ -1116,10 +1127,48 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
                         })}
                     </div>
 
-                    <div className="pt-4 border-t border-slate-800 space-y-2">
-                        <div className="flex justify-between text-[10px] font-bold text-slate-500 uppercase"><span>Subtotal</span><span>${totalBeforeTax.toFixed(2)}</span></div>
-                        <div className="flex justify-between text-xl font-black text-white italic tracking-tighter uppercase"><span>Total Due</span><span className="text-emerald-400">${totalWithTax.toFixed(2)}</span></div>
-                    </div>
+                    {cart.length > 0 && (
+                        <div className="pt-4 border-t border-slate-800 space-y-2">
+                            <div className="flex justify-between text-[10px] font-bold text-slate-500 uppercase"><span>Subtotal</span><span>${totalBeforeTax.toFixed(2)}</span></div>
+                            
+                            {/* Discount Input */}
+                            <div className="flex items-center justify-between gap-2 p-2 bg-amber-500/5 border border-amber-500/20 rounded-lg">
+                                <div className="flex items-center gap-2">
+                                    <Coins className="h-3 w-3 text-amber-500" />
+                                    <span className="text-[10px] font-black text-amber-500 uppercase">Discount</span>
+                                </div>
+                                <div className="flex items-center gap-1">
+                                    <span className="text-[10px] font-black text-amber-500">$</span>
+                                    <input
+                                        type="number"
+                                        min="0"
+                                        max="5"
+                                        step="0.50"
+                                        value={discount || ''}
+                                        onChange={(e) => {
+                                            const val = parseFloat(e.target.value) || 0;
+                                            if (val >= 0 && val <= 5) {
+                                                setDiscount(val);
+                                            }
+                                        }}
+                                        placeholder="0.00"
+                                        className="w-16 bg-transparent text-right text-xs font-black focus:outline-none text-amber-500 border-b border-amber-500/30 focus:border-amber-500"
+                                    />
+                                </div>
+                            </div>
+                            {discount > 0 && (
+                                <div className="flex justify-between text-[10px] font-bold text-amber-500 uppercase">
+                                    <span>Discount Applied</span>
+                                    <span>-${discountAmount.toFixed(2)}</span>
+                                </div>
+                            )}
+                            
+                            <div className="flex justify-between text-xl font-black text-white italic tracking-tighter uppercase">
+                                <span>Total Due</span>
+                                <span className="text-emerald-400">${totalDue.toFixed(2)}</span>
+                            </div>
+                        </div>
+                    )}
 
                     {posMode === 'sale' && (
                         <div className="space-y-2 bg-slate-900/50 p-3 rounded-lg border border-slate-800">
@@ -1176,7 +1225,7 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
                                 />
                                 {laybyDeposit && !isNaN(parseFloat(laybyDeposit)) && (
                                     <p className="text-[10px] text-slate-500 font-bold">
-                                        Balance remaining: <span className="text-rose-400">${Math.max(0, totalWithTax - parseFloat(laybyDeposit)).toFixed(2)}</span>
+                                        Balance remaining: <span className="text-rose-400">${Math.max(0, totalDue - parseFloat(laybyDeposit)).toFixed(2)}</span>
                                     </p>
                                 )}
                             </div>

@@ -246,25 +246,30 @@ export async function recordSale(sale: any) {
     const { data: settings } = await supabase.from('oracle_settings').select('*').single();
     if (!settings) throw new Error("Settings not found");
 
+    const discount = sale.discount || 0;
+    const subtotalBeforeDiscount = sale.totalBeforeTax;
+    const subtotalAfterDiscount = Math.max(0, subtotalBeforeDiscount - discount);
+    
     let tax = 0;
     const taxRate = Number(settings.tax_rate) || 0.155;
     if (settings.tax_mode === 'all') {
-        tax = sale.totalBeforeTax * taxRate;
+        tax = subtotalAfterDiscount * taxRate;
     } else if (settings.tax_mode === 'above_threshold') {
-        if ((sale.totalBeforeTax / sale.quantity) >= Number(settings.tax_threshold)) {
-            tax = sale.totalBeforeTax * taxRate;
+        if ((subtotalAfterDiscount / sale.quantity) >= Number(settings.tax_threshold)) {
+            tax = subtotalAfterDiscount * taxRate;
         }
     }
 
-    const totalWithTax = sale.totalBeforeTax + tax;
+    const totalWithTax = subtotalAfterDiscount + tax;
     const saleId = Math.random().toString(36).substring(2, 9);
     const timestamp = new Date().toISOString();
 
     await supabaseAdmin.from('sales').insert({
         id: saleId, shop_id: sale.shopId, item_id: sale.itemId, item_name: sale.itemName,
-        quantity: sale.quantity, unit_price: sale.unitPrice, total_before_tax: sale.totalBeforeTax,
+        quantity: sale.quantity, unit_price: sale.unitPrice, total_before_tax: subtotalAfterDiscount,
         tax, total_with_tax: totalWithTax, date: timestamp, employee_id: sale.employeeId, client_name: sale.clientName,
-        payment_method: sale.paymentMethod || 'cash'
+        payment_method: sale.paymentMethod || 'cash',
+        discount_applied: discount
     });
 
     const isService = sale.itemId?.startsWith('service_');
