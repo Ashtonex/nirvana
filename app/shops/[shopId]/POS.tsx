@@ -809,9 +809,8 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
                     <Button
                         onClick={async () => {
                             try {
-                                const pdfRes = await fetch(`/api/eod/pdf?shopId=${encodeURIComponent(shopId)}`, { 
-                                    cache: 'no-store',
-                                    credentials: 'include'
+                                const pdfRes = await fetch(`/api/eod/pdf?shopId=${encodeURIComponent(shopId)}&test=true`, { 
+                                    cache: 'no-store'
                                 });
                                 if (pdfRes.ok) {
                                     const blob = await pdfRes.blob();

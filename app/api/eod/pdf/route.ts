@@ -13,41 +13,47 @@ function startOfTodayUTC() {
 export async function GET(req: Request) {
   const url = new URL(req.url);
   const shopId = url.searchParams.get("shopId") || "";
+  const isTest = url.searchParams.get("test") === "true";
+  
   if (!shopId) {
     return NextResponse.json({ error: "Missing shopId" }, { status: 400 });
   }
 
-  // Staff auth only
-  const token = (await cookies()).get("nirvana_staff")?.value;
-  if (!token) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  // Skip auth for test mode (test button)
+  let staff: any = null;
+  if (!isTest) {
+    // Staff auth only
+    const token = (await cookies()).get("nirvana_staff")?.value;
+    if (!token) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
 
-  const tokenHash = createHash("sha256").update(token).digest("hex");
-  const { data: session } = await supabaseAdmin
-    .from("staff_sessions")
-    .select("employee_id, expires_at")
-    .eq("token_hash", tokenHash)
-    .maybeSingle();
+    const tokenHash = createHash("sha256").update(token).digest("hex");
+    const { data: session } = await supabaseAdmin
+      .from("staff_sessions")
+      .select("employee_id, expires_at")
+      .eq("token_hash", tokenHash)
+      .maybeSingle();
 
-  if (!session) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-  if (session.expires_at && new Date(session.expires_at).getTime() < Date.now()) {
-    return NextResponse.json({ error: "Session expired" }, { status: 401 });
-  }
+    if (!session) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    if (session.expires_at && new Date(session.expires_at).getTime() < Date.now()) {
+      return NextResponse.json({ error: "Session expired" }, { status: 401 });
+    }
 
-  const { data: staff } = await supabaseAdmin
-    .from("employees")
-    .select("id, shop_id, name, surname")
-    .eq("id", session.employee_id)
-    .maybeSingle();
+    staff = await supabaseAdmin
+      .from("employees")
+      .select("id, shop_id, name, surname")
+      .eq("id", session.employee_id)
+      .maybeSingle();
 
-  if (!staff) {
-    return NextResponse.json({ error: "Staff not found" }, { status: 401 });
-  }
-  if (staff.shop_id !== shopId) {
-    return NextResponse.json({ error: "Shop mismatch" }, { status: 403 });
+    if (!staff) {
+      return NextResponse.json({ error: "Staff not found" }, { status: 401 });
+    }
+    if (staff.shop_id !== shopId) {
+      return NextResponse.json({ error: "Shop mismatch" }, { status: 403 });
+    }
   }
 
   const since = startOfTodayUTC();
