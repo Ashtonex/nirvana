@@ -487,19 +487,33 @@ export async function updateInventoryItem(itemId: string, updates: any) {
 
 export async function deleteInventoryItem(itemId: string) {
     try {
-        // First, get the item details before deleting
+        // First, get the item details before attempting to delete
         const { data: item } = await supabaseAdmin.from('inventory_items').select('name').eq('id', itemId).single();
         
-        // Delete the inventory item
+        if (!item) {
+            return { success: false, error: 'Item not found' };
+        }
+
+        // Check if there are any sales records for this item
+        const { data: sales } = await supabaseAdmin.from('sales').select('id').eq('item_id', itemId).limit(1);
+        
+        if (sales && sales.length > 0) {
+            return { 
+                success: false, 
+                error: `Cannot delete "${item.name}" because it has sales records. Items with transaction history cannot be deleted to maintain audit trails. Consider archiving or setting quantity to 0 instead.`
+            };
+        }
+
+        // Delete associated allocations first
+        await supabaseAdmin.from('inventory_allocations').delete().eq('item_id', itemId);
+
+        // Now delete the inventory item
         const { error } = await supabaseAdmin.from('inventory_items').delete().eq('id', itemId);
         
         if (error) {
             console.error('[deleteInventoryItem] Database error:', error);
             return { success: false, error: error.message };
         }
-
-        // Delete associated allocations
-        await supabaseAdmin.from('inventory_allocations').delete().eq('item_id', itemId);
 
         // Revalidate all relevant paths
         revalidatePath("/inventory");
@@ -514,7 +528,7 @@ export async function deleteInventoryItem(itemId: string) {
             }
         }
         
-        return { success: true, message: `${item?.name || 'Item'} has been permanently deleted from inventory` };
+        return { success: true, message: `${item.name} has been permanently deleted from inventory` };
     } catch (err: any) {
         console.error('[deleteInventoryItem] Error:', err);
         return { success: false, error: err.message };
