@@ -809,7 +809,10 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
                     <Button
                         onClick={async () => {
                             try {
-                                const pdfRes = await fetch(`/api/eod/pdf?shopId=${encodeURIComponent(shopId)}`, { cache: 'no-store' });
+                                const pdfRes = await fetch(`/api/eod/pdf?shopId=${encodeURIComponent(shopId)}`, { 
+                                    cache: 'no-store',
+                                    credentials: 'include'
+                                });
                                 if (pdfRes.ok) {
                                     const blob = await pdfRes.blob();
                                     const url = URL.createObjectURL(blob);
@@ -821,10 +824,11 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
                                     document.body.removeChild(link);
                                     URL.revokeObjectURL(url);
                                 } else {
-                                    alert('Failed to generate PDF');
+                                    const errData = await pdfRes.json().catch(() => ({}));
+                                    alert('Failed to generate PDF: ' + (errData.error || pdfRes.statusText));
                                 }
-                            } catch (e) {
-                                alert('Error generating PDF');
+                            } catch (e: any) {
+                                alert('Error generating PDF: ' + e.message);
                             }
                         }}
                         variant="outline"

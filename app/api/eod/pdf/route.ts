@@ -72,7 +72,8 @@ export async function GET(req: Request) {
     .select("id, name, category, inventory_allocations(shop_id, quantity)");
 
   if (salesErr || ledgerErr || invErr) {
-    return NextResponse.json({ error: (salesErr || ledgerErr || invErr)?.message }, { status: 500 });
+    console.error("PDF generation error:", salesErr, ledgerErr, invErr);
+    return NextResponse.json({ error: `Database error: ${salesErr?.message || ledgerErr?.message || invErr?.message}` }, { status: 500 });
   }
 
   const rows = sales || [];
