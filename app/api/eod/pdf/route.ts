@@ -193,33 +193,86 @@ export async function GET(req: Request) {
   page.drawText(`EcoCash: $${totalEcocash.toFixed(2)}`, { x: margin, y, size: 10, font, color: rgb(0.38, 0.45, 0.55) });
   y -= 24;
 
-  drawText("Top Performers Today", 12, true);
+  // Get top item names for highlighting
+  const topItemNames = new Set(topItems.slice(0, 5).map(i => i.name));
 
-  // Table
-  const colItem = margin;
-  const colQty = width - margin - 120;
+  // ALL SALES TODAY
+  drawText("All Sales Today", 12, true);
+
+  // Table header
+  const colTime = margin;
+  const colItem = margin + 60;
+  const colQty = width - margin - 100;
+  const colDiscount = width - margin - 40;
   const colGross = width - margin - 12;
   page.drawLine({ start: { x: margin, y }, end: { x: width - margin, y }, thickness: 1, color: rgb(0.88, 0.9, 0.93) });
   y -= 16;
-  page.drawText("Item", { x: colItem, y, size: 10, font: fontBold, color: rgb(0.38, 0.45, 0.55) });
-  page.drawText("Qty", { x: colQty, y, size: 10, font: fontBold, color: rgb(0.38, 0.45, 0.55) });
-  page.drawText("Gross", { x: colGross - 40, y, size: 10, font: fontBold, color: rgb(0.38, 0.45, 0.55) });
+  page.drawText("Time", { x: colTime, y, size: 9, font: fontBold, color: rgb(0.38, 0.45, 0.55) });
+  page.drawText("Item", { x: colItem, y, size: 9, font: fontBold, color: rgb(0.38, 0.45, 0.55) });
+  page.drawText("Qty", { x: colQty, y, size: 9, font: fontBold, color: rgb(0.38, 0.45, 0.55) });
+  page.drawText("Disc.", { x: colDiscount, y, size: 9, font: fontBold, color: rgb(0.38, 0.45, 0.55) });
+  page.drawText("Total", { x: colGross - 40, y, size: 9, font: fontBold, color: rgb(0.38, 0.45, 0.55) });
   y -= 10;
   page.drawLine({ start: { x: margin, y }, end: { x: width - margin, y }, thickness: 1, color: rgb(0.88, 0.9, 0.93) });
   y -= 14;
 
-  for (const it of topItems) {
-    if (y < margin + 40) break;
-    page.drawText(it.name.length > 50 ? `${it.name.slice(0, 48)}...` : it.name, { x: colItem, y, size: 9, font, color: rgb(0.1, 0.14, 0.22) });
-    page.drawText(String(it.qty), { x: colQty, y, size: 9, font, color: rgb(0.1, 0.14, 0.22) });
-    page.drawText(`$${it.gross.toFixed(2)}`, { x: colGross - 60, y, size: 9, font, color: rgb(0.1, 0.14, 0.22) });
-    y -= 16;
+  // Sort sales by time (newest first)
+  const sortedSales = [...rows].sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+  for (const s of sortedSales) {
+    if (y < margin + 40) {
+      // Add new page if needed
+      const newPage = pdf.addPage([595.28, 841.89]);
+      y = height - margin;
+    }
+    
+    const time = new Date(s.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const isTopPerformer = topItemNames.has(s.item_name);
+    const itemColor = isTopPerformer ? rgb(0.1, 0.6, 0.3) : rgb(0.1, 0.14, 0.22);
+    const itemFont = isTopPerformer ? fontBold : font;
+    const discount = Number(s.discount_applied || 0);
+    
+    page.drawText(time, { x: colTime, y, size: 8, font, color: rgb(0.38, 0.45, 0.55) });
+    page.drawText((s.item_name || 'Unknown').length > 35 ? `${(s.item_name || 'Unknown').slice(0, 33)}...` : (s.item_name || 'Unknown'), { x: colItem, y, size: 8, font: itemFont, color: itemColor });
+    page.drawText(String(s.quantity || 0), { x: colQty, y, size: 8, font, color: rgb(0.1, 0.14, 0.22) });
+    page.drawText(discount > 0 ? `-$${discount.toFixed(2)}` : '-', { x: colDiscount, y, size: 8, font, color: discount > 0 ? rgb(0.8, 0.1, 0.1) : rgb(0.5, 0.5, 0.5) });
+    page.drawText(`$${Number(s.total_with_tax || 0).toFixed(2)}`, { x: colGross - 50, y, size: 8, font: itemFont, color: itemColor });
+    y -= 14;
   }
 
-  // SECOND PAGE: Restock Required
+  // SECOND PAGE: Top Performers Summary
+  const page2 = pdf.addPage([595.28, 841.89]);
+  let y2 = height - margin;
+  
+  page2.drawText("🏆 TOP PERFORMERS", { x: margin, y: y2, size: 14, font: fontBold, color: rgb(0.1, 0.6, 0.3) });
+  y2 -= 30;
+
+  // Table header
+  page2.drawLine({ start: { x: margin, y: y2 }, end: { x: width - margin, y: y2 }, thickness: 1, color: rgb(0.88, 0.9, 0.93) });
+  y2 -= 16;
+  page2.drawText("Item", { x: margin, y: y2, size: 10, font: fontBold, color: rgb(0.38, 0.45, 0.55) });
+  page2.drawText("Qty Sold", { x: width - margin - 180, y: y2, size: 10, font: fontBold, color: rgb(0.38, 0.45, 0.55) });
+  page2.drawText("Revenue", { x: width - margin - 60, y: y2, size: 10, font: fontBold, color: rgb(0.38, 0.45, 0.55) });
+  y2 -= 10;
+  page2.drawLine({ start: { x: margin, y: y2 }, end: { x: width - margin, y: y2 }, thickness: 1, color: rgb(0.88, 0.9, 0.93) });
+  y2 -= 14;
+
+  for (const it of topItems) {
+    page2.drawText(it.name.length > 60 ? `${it.name.slice(0, 58)}...` : it.name, { x: margin, y: y2, size: 9, font: fontBold, color: rgb(0.1, 0.6, 0.3) });
+    page2.drawText(String(it.qty), { x: width - margin - 180, y: y2, size: 9, font: fontBold, color: rgb(0.1, 0.14, 0.22) });
+    page2.drawText(`$${it.gross.toFixed(2)}`, { x: width - margin - 60, y: y2, size: 9, font: fontBold, color: rgb(0.1, 0.14, 0.22) });
+    y2 -= 16;
+  }
+
+  y2 -= 30;
+
+  // Restock Required Section (on same page 2)
   if (outOfStockItems.length > 0) {
-    const page2 = pdf.addPage([595.28, 841.89]);
-    let y2 = height - margin;
+    if (y2 < margin + 100) {
+      // Add new page if needed
+      const newPage = pdf.addPage([595.28, 841.89]);
+      y2 = height - margin;
+    }
 
     page2.drawText("NIRVANA restock alert", { x: margin, y: y2, size: 14, font: fontBold, color: rgb(0.8, 0.1, 0.1) });
     y2 -= 24;

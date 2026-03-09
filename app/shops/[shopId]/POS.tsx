@@ -807,37 +807,6 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
                     </Button>
 
                     <Button
-                        onClick={async () => {
-                            try {
-                                const pdfRes = await fetch(`/api/eod/pdf?shopId=${encodeURIComponent(shopId)}&test=true`, { 
-                                    cache: 'no-store'
-                                });
-                                if (pdfRes.ok) {
-                                    const blob = await pdfRes.blob();
-                                    const url = URL.createObjectURL(blob);
-                                    const link = document.createElement('a');
-                                    link.href = url;
-                                    link.download = `EOD_${shopId}_${new Date().toISOString().split('T')[0]}.pdf`;
-                                    document.body.appendChild(link);
-                                    link.click();
-                                    document.body.removeChild(link);
-                                    URL.revokeObjectURL(url);
-                                } else {
-                                    const errData = await pdfRes.json().catch(() => ({}));
-                                    alert('Failed to generate PDF: ' + (errData.error || pdfRes.statusText));
-                                }
-                            } catch (e: any) {
-                                alert('Error generating PDF: ' + e.message);
-                            }
-                        }}
-                        variant="outline"
-                        className="h-10 px-3 border-sky-500/30 text-sky-300 hover:bg-sky-500/10 text-[10px] font-black uppercase italic flex items-center gap-2"
-                        title="Download EOD PDF Report"
-                    >
-                        <FileText className="h-4 w-4" /> Test PDF
-                    </Button>
-
-                    <Button
                         onClick={handleEndOfDayAndLogout}
                         disabled={isClosingDay}
                         variant="outline"
