@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 import { getDashboardData, deleteQuotation, finalizeQuotation } from "../../actions";
 import Link from "next/link";
 import POS from "./POS";
