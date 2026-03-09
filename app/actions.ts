@@ -458,11 +458,52 @@ export async function registerBulkInventoryItems(
 
 export async function updateInventoryItem(itemId: string, updates: any) {
     try {
+        // Update the main inventory item
         const { error } = await supabaseAdmin.from('inventory_items').update(updates).eq('id', itemId);
         
         if (error) {
             console.error('[updateInventoryItem] Database error:', error);
             return { success: false, error: error.message };
+        }
+
+        // If quantity is being updated, also update all allocations for this item
+        if (updates.quantity !== undefined) {
+            const newQuantity = updates.quantity;
+            
+            // Get all allocations for this item
+            const { data: allocations } = await supabaseAdmin
+                .from('inventory_allocations')
+                .select('*')
+                .eq('item_id', itemId);
+            
+            if (allocations && allocations.length > 0) {
+                // If setting quantity to 0, set all allocations to 0
+                if (newQuantity === 0) {
+                    for (const allocation of allocations) {
+                        await supabaseAdmin
+                            .from('inventory_allocations')
+                            .update({ quantity: 0 })
+                            .eq('item_id', itemId)
+                            .eq('shop_id', allocation.shop_id);
+                    }
+                } else {
+                    // Otherwise, distribute the new quantity proportionally
+                    const totalAllocated = allocations.reduce((sum: number, a: any) => sum + (a.quantity || 0), 0);
+                    
+                    if (totalAllocated > 0) {
+                        for (const allocation of allocations) {
+                            const proportion = allocation.quantity / totalAllocated;
+                            const newAllocationQty = Math.round(newQuantity * proportion);
+                            
+                            await supabaseAdmin
+                                .from('inventory_allocations')
+                                .update({ quantity: newAllocationQty })
+                                .eq('item_id', itemId)
+                                .eq('shop_id', allocation.shop_id);
+                        }
+                    }
+                }
+            }
         }
 
         // Revalidate all relevant paths
