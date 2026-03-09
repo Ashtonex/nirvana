@@ -334,9 +334,9 @@ export async function POST(req: Request) {
     }
   }
 
-  // Check if we should generate weekly report (Friday = 5, Saturday = 6)
+  // Check if we should generate weekly report (Saturday = 6 only)
   const today = new Date().getDay();
-  const shouldSendWeekly = today === 5 || today === 6;
+  const shouldSendWeekly = today === 6;
   
   let weeklyEmailed = false;
   if (shouldSendWeekly) {

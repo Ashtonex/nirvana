@@ -633,7 +633,7 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
             ].filter(Boolean);
             setEodShareText(msgLines.join('\n'));
 
-            if (isWeeklyDay) {
+            if (isWeeklyDay && data.weeklyEmailed) {
                 alert('📊 Weekly Report has been generated and emailed! Week summary sent to management.');
             }
 
