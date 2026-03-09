@@ -1428,3 +1428,164 @@ export async function updateLaybyPayment(laybyId: string, amount: number, shopId
     revalidatePath(`/shops/${shopId}`);
     return { success: true, fullyPaid: isFullyPaid };
 }
+
+// Export tax ledger as CSV
+export async function exportTaxLedgerCSV() {
+    try {
+        const db = await getDashboardData();
+        const settings = await getGlobalSettings();
+        
+        if (!settings) {
+            return { success: false, error: 'Settings not found' };
+        }
+        
+        if (!db.sales || db.sales.length === 0) {
+            return { success: false, error: 'No sales data to export' };
+        }
+
+        const flatTaxRate = 0.155;
+        const csvRows: string[] = [];
+        
+        // CSV header
+        csvRows.push('Date,Product,Shop,Quantity,Unit Price,Total Before Tax,Standard Tax (15.5%),Reported Tax,Status');
+        
+        // CSV rows
+        db.sales.forEach((sale: any) => {
+            const standardTax = sale.totalBeforeTax * flatTaxRate;
+            const shopName = db.shops.find((s: any) => s.id === sale.shopId)?.name || sale.shopId;
+            const isUnderThreshold = settings.taxMode === 'above_threshold' && sale.totalBeforeTax <= settings.taxThreshold;
+            const isCredit = Number(sale.totalWithTax || 0) < 0 || Number(sale.tax || 0) < 0;
+            
+            let status = 'FILED';
+            if (isCredit) status = 'CREDIT';
+            if (isUnderThreshold) status = 'EXEMPT';
+            
+            const row = [
+                new Date(sale.date).toLocaleDateString(),
+                `"${sale.itemName}"`,
+                shopName,
+                sale.quantity,
+                sale.unitPrice.toFixed(2),
+                sale.totalBeforeTax.toFixed(2),
+                standardTax.toFixed(2),
+                sale.tax.toFixed(2),
+                status
+            ].join(',');
+            
+            csvRows.push(row);
+        });
+        
+        // Add summary
+        const totalSales = db.sales.reduce((sum: number, s: any) => sum + s.totalWithTax, 0);
+        const theoreticalTax = db.sales.reduce((sum: number, s: any) => sum + (s.totalBeforeTax * flatTaxRate), 0);
+        const reportedTax = db.sales.reduce((sum: number, s: any) => sum + s.tax, 0);
+        
+        csvRows.push('');
+        csvRows.push('SUMMARY');
+        csvRows.push(`Total Sales,${totalSales.toFixed(2)}`);
+        csvRows.push(`Total Theoretical Tax (15.5%),${theoreticalTax.toFixed(2)}`);
+        csvRows.push(`Total Reported Tax,${reportedTax.toFixed(2)}`);
+        csvRows.push(`Fiscal Efficiency Gain,${(theoreticalTax - reportedTax).toFixed(2)}`);
+        
+        const csvContent = csvRows.join('\n');
+        
+        return { 
+            success: true, 
+            data: csvContent,
+            filename: `tax-ledger-${new Date().toISOString().split('T')[0]}.csv`
+        };
+    } catch (error) {
+        console.error('Error exporting tax ledger:', error);
+        return { success: false, error: 'Failed to export tax ledger' };
+    }
+}
+
+// Print ZIMRA compliance log
+export async function printZIMRALog() {
+    try {
+        const db = await getDashboardData();
+        const settings = await getGlobalSettings();
+        
+        if (!settings) {
+            return { success: false, error: 'Settings not found' };
+        }
+        
+        if (!db.sales || db.sales.length === 0) {
+            return { success: false, error: 'No sales data to log' };
+        }
+
+        const flatTaxRate = 0.155;
+        const timestamp = new Date().toISOString();
+        const logRows: string[] = [];
+        
+        // ZIMRA Log header
+        logRows.push('=====================================');
+        logRows.push('ZIMRA COMPLIANCE LOG');
+        logRows.push('=====================================');
+        logRows.push(`Generated: ${timestamp}`);
+        logRows.push(`Tax Strategy: ${settings.taxMode.replace('_', ' ')}`);
+        if (settings.taxMode === 'above_threshold') {
+            logRows.push(`Tax Threshold: $${settings.taxThreshold}`);
+        }
+        logRows.push('=====================================');
+        logRows.push('');
+        
+        // Transaction details
+        logRows.push('TRANSACTION LOG:');
+        logRows.push('-'.repeat(100));
+        
+        db.sales.forEach((sale: any, index: number) => {
+            const standardTax = sale.totalBeforeTax * flatTaxRate;
+            const shopName = db.shops.find((s: any) => s.id === sale.shopId)?.name || sale.shopId;
+            const isUnderThreshold = settings.taxMode === 'above_threshold' && sale.totalBeforeTax <= settings.taxThreshold;
+            const isCredit = Number(sale.totalWithTax || 0) < 0 || Number(sale.tax || 0) < 0;
+            
+            let status = 'FILED';
+            if (isCredit) status = 'CREDIT';
+            if (isUnderThreshold) status = 'EXEMPT';
+            
+            logRows.push(`[${index + 1}] ${new Date(sale.date).toLocaleDateString()} - ID: ${sale.id}`);
+            logRows.push(`    Product: ${sale.itemName} (Qty: ${sale.quantity})`);
+            logRows.push(`    Shop: ${shopName}`);
+            logRows.push(`    Unit Price: $${sale.unitPrice.toFixed(2)}`);
+            logRows.push(`    Total Before Tax: $${sale.totalBeforeTax.toFixed(2)}`);
+            logRows.push(`    Standard Tax (15.5%): $${standardTax.toFixed(2)}`);
+            logRows.push(`    Reported Tax: $${sale.tax.toFixed(2)}`);
+            logRows.push(`    Total with Tax: $${sale.totalWithTax.toFixed(2)}`);
+            logRows.push(`    Status: ${status}`);
+            logRows.push('');
+        });
+        
+        // Summary section
+        logRows.push('=====================================');
+        logRows.push('COMPLIANCE SUMMARY');
+        logRows.push('=====================================');
+        
+        const totalSales = db.sales.reduce((sum: number, s: any) => sum + s.totalWithTax, 0);
+        const theoreticalTax = db.sales.reduce((sum: number, s: any) => sum + (s.totalBeforeTax * flatTaxRate), 0);
+        const reportedTax = db.sales.reduce((sum: number, s: any) => sum + s.tax, 0);
+        const taxSaving = theoreticalTax - reportedTax;
+        
+        logRows.push(`Total Transactions: ${db.sales.length}`);
+        logRows.push(`Total Sales Volume: $${totalSales.toFixed(2)}`);
+        logRows.push(`Total Theoretical Tax (15.5%): $${theoreticalTax.toFixed(2)}`);
+        logRows.push(`Total Reported Tax: $${reportedTax.toFixed(2)}`);
+        logRows.push(`Fiscal Efficiency Gain: $${taxSaving.toFixed(2)}`);
+        logRows.push('');
+        
+        logRows.push('=====================================');
+        logRows.push('END OF ZIMRA COMPLIANCE LOG');
+        logRows.push('=====================================');
+        
+        const logContent = logRows.join('\n');
+        
+        return { 
+            success: true, 
+            data: logContent,
+            filename: `zimra-log-${new Date().toISOString().split('T')[0]}.txt`
+        };
+    } catch (error) {
+        console.error('Error generating ZIMRA log:', error);
+        return { success: false, error: 'Failed to generate ZIMRA log' };
+    }
+}

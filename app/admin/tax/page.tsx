@@ -27,6 +27,7 @@ import {
     TableFooter,
     Button
 } from "@/components/ui";
+import { TaxReportingControls } from "./TaxReportingControls";
 
 export default async function TaxPage() {
     const db = await getDashboardData();
@@ -207,13 +208,8 @@ export default async function TaxPage() {
                             <Receipt className="h-4 w-4" /> Reporting Controls
                         </CardTitle>
                     </CardHeader>
-                    <CardContent className="flex gap-4">
-                        <Button variant="outline" className="flex-1 h-10 border-slate-800 hover:bg-slate-900 text-[10px] font-black uppercase italic tracking-widest">
-                            Export CSV
-                        </Button>
-                        <Button variant="outline" className="flex-1 h-10 border-slate-800 hover:bg-slate-900 text-[10px] font-black uppercase italic tracking-widest">
-                            Print ZIMRA Log
-                        </Button>
+                    <CardContent>
+                        <TaxReportingControls />
                     </CardContent>
                 </Card>
             </div>
