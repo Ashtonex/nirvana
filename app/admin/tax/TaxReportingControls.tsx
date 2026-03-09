@@ -3,8 +3,15 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui';
 import { exportTaxLedgerCSV, printZIMRALog } from '../../actions';
+import { Period } from './PeriodSelector';
 
-export function TaxReportingControls() {
+export interface TaxReportingControlsProps {
+    period?: Period;
+    startDate?: Date;
+    endDate?: Date;
+}
+
+export function TaxReportingControls({ period = 'month', startDate, endDate }: TaxReportingControlsProps) {
     const [isLoadingCSV, setIsLoadingCSV] = useState(false);
     const [isLoadingZIMRA, setIsLoadingZIMRA] = useState(false);
     const [error, setError] = useState<string | null>(null);
