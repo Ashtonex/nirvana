@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { PeriodSelector, Period } from '../admin/tax/PeriodSelector';
 import { Button } from '@/components/ui';
 import { Download, Calendar, Filter } from 'lucide-react';
-import { exportReportsCSV } from '../actions';
+import { exportReportsCSV } from '../../actions';
 
 interface ReportsFilteredProps {
     sales: any[];
