@@ -55,7 +55,7 @@ export async function GET(req: Request) {
   // Fetch Sales
   const { data: sales, error: salesErr } = await supabaseAdmin
     .from("sales")
-    .select("id,item_name,quantity,total_with_tax,total_before_tax,tax,date,payment_method")
+    .select("id,item_name,quantity,total_with_tax,total_before_tax,tax,date,payment_method,discount_applied")
     .eq("shop_id", shopId)
     .gte("date", since);
 
@@ -79,6 +79,7 @@ export async function GET(req: Request) {
   const totalWithTax = rows.reduce((sum: number, s: any) => sum + Number(s.total_with_tax || 0), 0);
   const totalBeforeTax = rows.reduce((sum: number, s: any) => sum + Number(s.total_before_tax || 0), 0);
   const totalTax = rows.reduce((sum: number, s: any) => sum + Number(s.tax || 0), 0);
+  const totalDiscount = rows.reduce((sum: number, s: any) => sum + Number(s.discount_applied || 0), 0);
 
   // Cash Reconciliation Logic
   const openingEntry = (ledger || []).find((l: any) => l.category === 'Cash Drawer Opening');
@@ -151,6 +152,10 @@ export async function GET(req: Request) {
   page.drawText(`Total (pre tax): $${totalBeforeTax.toFixed(2)}`, { x: margin + 12, y, size: 11, font, color: rgb(0.1, 0.14, 0.22) });
   y -= 18;
   page.drawText(`Tax: $${totalTax.toFixed(2)}`, { x: margin + 12, y, size: 11, font, color: rgb(0.1, 0.14, 0.22) });
+  y -= 18;
+  page.drawText(`Discounts Issued: -$${totalDiscount.toFixed(2)}`, { x: margin + 12, y, size: 11, font, color: rgb(0.8, 0.1, 0.1) });
+  y -= 18;
+  page.drawText(`Expenses: -$${totalPosExpenses.toFixed(2)}`, { x: margin + 12, y, size: 11, font, color: rgb(0.8, 0.1, 0.1) });
 
   y = boxTop - boxHeight - 20;
 
