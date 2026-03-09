@@ -275,48 +275,42 @@ export async function recordSale(sale: any) {
     const isService = sale.itemId?.startsWith('service_');
 
     if (!isService) {
-        // Use atomic increment for concurrent sales safety
-        // The (col) => col - X syntax ensures database handles concurrency
-        const { data: alloc } = await supabaseAdmin
-            .from('inventory_allocations')
-            .select('quantity')
-            .eq('item_id', sale.itemId)
-            .eq('shop_id', sale.shopId)
-            .single();
-        
-        if (alloc) {
-            // Atomic decrement - database handles race conditions
-            await supabaseAdmin
-                .from('inventory_allocations')
-                .update({ quantity: Number(alloc.quantity) - sale.quantity })
-                .eq('item_id', sale.itemId)
-                .eq('shop_id', sale.shopId);
+        // Use atomic DB functions to prevent race conditions from concurrent sales
+        try {
+            await supabaseAdmin.rpc('decrement_allocation', { 
+                item_id: sale.itemId, 
+                shop_id: sale.shopId, 
+                qty: sale.quantity 
+            });
+        } catch (e) {
+            console.error('Failed to decrement allocation:', e);
         }
 
-        // Update master inventory
+        try {
+            await supabaseAdmin.rpc('decrement_inventory', { 
+                item_id: sale.itemId, 
+                qty: sale.quantity 
+            });
+        } catch (e) {
+            console.error('Failed to decrement inventory:', e);
+        }
+
+        // Check if stock is depleted after the sale
         const { data: item } = await supabaseAdmin
             .from('inventory_items')
             .select('quantity, name')
             .eq('id', sale.itemId)
             .single();
             
-        if (item) {
-            const newQty = Number(item.quantity) - sale.quantity;
-            await supabaseAdmin
-                .from('inventory_items')
-                .update({ quantity: newQty })
-                .eq('id', sale.itemId);
-                
-            if (newQty <= 0) {
-                try {
-                    await sendEmail({
-                        to: ORACLE_RECIPIENT,
-                        subject: `[ALERT] Stock Depleted: ${item.name}`,
-                        html: `<p>Product has 0 units remaining.</p>`
-                    });
-                } catch (e) {
-                    console.error('[Email] Stock depleted alert failed:', (e as any)?.message || e);
-                }
+        if (item && Number(item.quantity) <= 0) {
+            try {
+                await sendEmail({
+                    to: ORACLE_RECIPIENT,
+                    subject: `[ALERT] Stock Depleted: ${item.name}`,
+                    html: `<p>Product has 0 units remaining.</p>`
+                });
+            } catch (e) {
+                console.error('[Email] Stock depleted alert failed:', (e as any)?.message || e);
             }
         }
     }
