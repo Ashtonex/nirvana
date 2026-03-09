@@ -19,11 +19,19 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   // Protected app shell
   return (
     <AccessGate>
-      <div className="flex h-screen overflow-hidden">
-        <Sidebar />
-        <main className="flex-1 overflow-y-auto px-4 py-4 md:px-8 md:py-8 pb-20 md:pb-8">
-          {children}
+      <div className="flex h-screen h-[100dvh] overflow-hidden w-full max-w-[100vw]">
+        {/* Desktop sidebar - hidden on mobile */}
+        <div className="hidden lg:block">
+          <Sidebar />
+        </div>
+        
+        {/* Main content area */}
+        <main className="flex-1 overflow-y-auto overflow-x-hidden w-full max-w-[100vw] px-2 sm:px-4 py-3 sm:py-6 pb-24 sm:pb-8">
+          <div className="w-full max-w-full overflow-x-hidden">
+            {children}
+          </div>
         </main>
+        
         <AiChat />
         <MobileNav />
         <ServiceWorkerRegistration />

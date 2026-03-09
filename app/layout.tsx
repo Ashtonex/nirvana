@@ -29,9 +29,10 @@ export const metadata: Metadata = {
 export const viewport = {
   width: "device-width",
   initialScale: 1,
-  maximumScale: 5, // Allow some scaling for accessibility
-  userScalable: true,
-  themeColor: "#8b5cf6", // Match manifest
+  maximumScale: 1,
+  userScalable: false,
+  themeColor: "#8b5cf6",
+  viewportFit: "cover",
 };
 
 export default function RootLayout({
