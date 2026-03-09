@@ -179,7 +179,7 @@ export async function getSalesVsOverheadsData() {
         global: []
     };
 
-    shopList.forEach((s: any) => datasets[s.name.toLowerCase().replace(/\s+/g, '')] = []);
+    shopList.forEach((s: any) => datasets[s.id] = []);
 
     for (let day = 1; day <= daysInMonth; day++) {
         const dateStr = new Date(now.getFullYear(), now.getMonth(), day).toISOString().split('T')[0];
@@ -209,7 +209,7 @@ export async function getSalesVsOverheadsData() {
 
         // Per-shop datasets
         shopList.forEach((shop: any) => {
-            const shopKey = shop.name.toLowerCase().replace(/\s+/g, '');
+            const shopKey = shop.id; // Use ID directly: kipasa, dubdub, tradecenter
             const shopStructExpenses = Object.values(shop.expenses || {})
                 .reduce((a: number, b: any) => a + Number(b || 0), 0);
             const shopLedgerExpenses = ledgerExpenses

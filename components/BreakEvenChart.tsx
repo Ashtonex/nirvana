@@ -22,13 +22,26 @@ export function BreakEvenChart({ datasets }: BreakEvenChartProps) {
     const [activeTab, setActiveTab] = useState(availableShops[0] || "global");
     const data = datasets[activeTab] || [];
     
+    // Debug logging
+    React.useEffect(() => {
+        console.log('BreakEvenChart Debug:', {
+            availableShops,
+            activeTab,
+            dataLength: data.length,
+            datasetsKeys: Object.keys(datasets || {}),
+            datasetsStructure: Object.fromEntries(
+                Object.entries(datasets || {}).map(([key, val]) => [key, { length: Array.isArray(val) ? val.length : 'not array' }])
+            )
+        });
+    }, [activeTab, data.length, datasets, availableShops]);
+    
     // Get shop display name
     const getShopDisplayName = (key: string) => {
         const nameMap: Record<string, string> = {
             'global': 'Global',
-            'kipasa': 'Kipasa',
-            'dubdub': 'DubDub',
-            'tradecenter': 'Trade Center'
+            'kipasa': 'Kipasa Branch',
+            'dubdub': 'Dub Dub Outlet',
+            'tradecenter': 'Trade Center HQ'
         };
         return nameMap[key] || key;
     };
