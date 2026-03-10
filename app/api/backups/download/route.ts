@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import fs from 'fs/promises';
 import path from 'path';
 
+// Required for static export compatibility
+export const dynamic = 'force-dynamic';
+
 export async function GET(req: NextRequest) {
     const searchParams = req.nextUrl.searchParams;
     const items = searchParams.get('file');
@@ -34,3 +37,4 @@ export async function GET(req: NextRequest) {
         return NextResponse.json({ error: 'File not found' }, { status: 404 });
     }
 }
+

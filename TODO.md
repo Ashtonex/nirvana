@@ -1,87 +1,49 @@
+# Lay-by Sale Error Fix - Completed
 
-# ✅ Nirvana Offline Mode - COMPLETED
+## Issues Fixed
 
-## Build Status: ✅ SUCCESS
+### Fix 1: Backup Download API Route ✅
+- Added `export const dynamic = 'force-dynamic';` to `app/api/backups/download/route.ts`
+- This resolves the build error: "export const dynamic = "force-static"/export const revalidate not configured on route"
 
-## Architecture
+### Fix 2: Database Schema (Requires Manual Action) ⚠️
+- The `quotations` table needs a `paid_amount` column for lay-by functionality
 
-The app uses a **local-first + PWA** approach for offline functionality:
+---
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                     Nirvana App                            │
-│  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────┐ │
-│  │ Service     │  │ IndexedDB   │  │ Supabase (Cloud)    │ │
-│  │ Worker      │◄─┤ (Local DB)  │◄─┤ (when online)       │ │
-│  │ (Caching)   │  │             │  │                     │ │
-│  └─────────────┘  └─────────────┘  └─────────────────────┘ │
-└─────────────────────────────────────────────────────────────┘
-```
+## Supabase SQL Migration (Run this in your Supabase Dashboard)
 
-### How Offline Works:
+Go to your Supabase Dashboard → SQL Editor and run:
 
-1. **First Visit (Online):**
-   - Service worker caches all pages/assets
-   - Data synced from Supabase to IndexedDB
-   - Works offline after initial load
+```sql
+-- Add paid_amount column to quotations table for lay-by functionality
+ALTER TABLE quotations ADD COLUMN IF NOT EXISTS paid_amount NUMERIC DEFAULT 0;
 
-2. **When Offline:**
-   - Service worker serves cached pages
-   - App reads/writes data to IndexedDB (local)
-   - Sales queued in `pendingSync` table
-   - UI shows "Offline Mode" indicator
+-- Also add client_phone column if it doesn't exist (required for lay-by)
+ALTER TABLE quotations ADD COLUMN IF NOT EXISTS client_phone TEXT DEFAULT '';
 
-3. **When Back Online:**
-   - Queued sales sync to Supabase automatically
-   - Data refreshes from cloud
-
-## Files Implemented
-
-| File | Purpose |
-|------|---------|
-| `lib/local-db.ts` | IndexedDB with Dexie - local data storage |
-| `hooks/useLocalData.ts` | Local-first data fetching hook |
-| `hooks/useOfflineAuth.ts` | Offline PIN authentication |
-| `components/useOfflineSales.ts` | Queue sales when offline |
-| `components/OfflineIndicator.tsx` | Show online/offline status |
-| `public/sw.js` | Service worker for page caching |
-| `public/manifest.json` | PWA manifest for installability |
-
-## Running the App
-
-```bash
-# Development
-npm run dev
-
-# Production (for offline testing)
-npm run build
-npm start
+-- Verify the columns were added
+SELECT column_name, data_type, column_default 
+FROM information_schema.columns 
+WHERE table_name = 'quotations' 
+AND column_name IN ('paid_amount', 'client_phone', 'client_email')
+ORDER BY column_name;
 ```
 
-## To Install as PWA (Desktop/Mobile Browser)
+---
 
-1. Open app in Chrome/Edge
-2. Click install icon in address bar
-3. App installs as standalone app
-4. Works offline after first load
+## After Running the SQL
 
-## For Native Mobile App (Optional)
+1. Redeploy your app to Vercel
+2. Test the lay-by sale functionality
 
-To run as native Android/iOS app with Capacitor, you would need:
+---
 
-1. Deploy the Next.js API to a server (Vercel/Railway)
-2. Update `NEXT_PUBLIC_SUPABASE_URL` to point to deployed API
-3. Build static export and use Capacitor
+## Summary
 
-This is because static export doesn't support API routes, and the local-first architecture works best when:
-- Online: API routes connect to Supabase
-- Offline: All data from IndexedDB
-
-## Current Limitation
-
-The API routes require a server to run. For full offline mobile:
-- Option A: Keep as PWA (works in mobile browser)
-- Option B: Deploy API separately + Capacitor shell
-
-The local-first architecture is already in place - it just needs the API deployed to work fully offline in a native app.
+| Issue | Status | Action Required |
+|-------|--------|-----------------|
+| Build error (backup route) | ✅ Fixed | Redeploy to Vercel |
+| Missing `paid_amount` column | ⚠️ Pending | Run SQL in Supabase |
+| Missing `client_phone` column | ⚠️ Pending | Run SQL in Supabase |
 
