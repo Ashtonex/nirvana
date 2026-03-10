@@ -108,7 +108,10 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
     const [isClosingDay, setIsClosingDay] = useState(false);
     const [isEodShareModalOpen, setIsEodShareModalOpen] = useState(false);
     const [eodShareUrl, setEodShareUrl] = useState<string>("");
+    const [eodShareBlob, setEodShareBlob] = useState<Blob | null>(null);
     const [eodShareText, setEodShareText] = useState<string>("");
+    const [eodHistory, setEodHistory] = useState<{id: string; date: string; text: string; blob: Blob | null; url: string}[]>([]);
+    const [isEodHistoryModalOpen, setIsEodHistoryModalOpen] = useState(false);
 
     const [isReturnModalOpen, setIsReturnModalOpen] = useState(false);
     const [returnSaleId, setReturnSaleId] = useState("");
@@ -121,6 +124,9 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
 
     // Today's receipts modal
     const [isReceiptsModalOpen, setIsReceiptsModalOpen] = useState(false);
+
+    // Expenses receipts modal
+    const [isExpensesModalOpen, setIsExpensesModalOpen] = useState(false);
 
     // Get today's sales for calculations
     const today = new Date().toISOString().split('T')[0];
@@ -491,28 +497,21 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
                     const transactionId = Math.random().toString(36).substring(2, 9).toUpperCase();
                     const receiptItems = [];
 
-                    for (const entry of cart) {
-                        const isUntracked = entry.item.id.startsWith('QUICK_');
-                        const netPrice = entry.price / (1 + taxRate);
-                        const grossPrice = entry.price;
-                        const lineNet = netPrice * entry.quantity;
-                        const lineGross = grossPrice * entry.quantity;
-                        const itemTax = lineGross - lineNet;
+                    // Check if we're offline
+                    const isOffline = !isOnline;
 
-                        if (isUntracked) {
-                            await recordUntrackedSale({
-                                shopId,
-                                itemName: entry.item.name,
-                                quantity: entry.quantity,
-                                unitPrice: netPrice,
-                                totalBeforeTax: lineNet,
-                                employeeId: selectedEmployeeId || "system",
-                                clientName: clientName || "General Walk-in",
-                                paymentMethod,
-                                discount: discountAmount
-                            });
-                        } else {
-                            await recordSale({
+                    if (isOffline) {
+                        // Save each cart item to offline queue
+                        for (const entry of cart) {
+                            const isUntracked = entry.item.id.startsWith('QUICK_');
+                            const netPrice = entry.price / (1 + taxRate);
+                            const grossPrice = entry.price;
+                            const lineNet = netPrice * entry.quantity;
+                            const lineGross = grossPrice * entry.quantity;
+                            const itemTax = lineGross - lineNet;
+
+                            // For offline, we save to IndexedDB - untracked items also use same structure
+                            await saveSaleOffline({
                                 shopId,
                                 itemId: entry.item.id,
                                 itemName: entry.item.name,
@@ -524,41 +523,144 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
                                 paymentMethod,
                                 discount: discountAmount
                             });
+
+                            receiptItems.push({
+                                name: entry.item.name,
+                                quantity: entry.quantity,
+                                priceNet: netPrice,
+                                priceGross: grossPrice,
+                                totalNet: lineNet,
+                                totalGross: lineGross,
+                                tax: itemTax
+                            });
                         }
 
-                        receiptItems.push({
-                            name: entry.item.name,
-                            quantity: entry.quantity,
-                            priceNet: netPrice,
-                            priceGross: grossPrice,
-                            totalNet: lineNet,
-                            totalGross: lineGross,
-                            tax: itemTax
-                        });
+                        // Update pending count
+                        const count = await getPendingCount();
+                        setPendingSyncCount(count);
+
+                        currentReceiptData = {
+                            orderId: `ORD-${transactionId}`,
+                            receiptNo: `#RCT-${transactionId}`,
+                            transactionId,
+                            shopName: shop?.name || "NIRVANA STORE",
+                            cashier,
+                            clientName: clientName || "Walk-in Customer",
+                            clientPhone: clientPhone || "N/A",
+                            items: receiptItems,
+                            subtotal: totalBeforeTax,
+                            discount: discountAmount,
+                            tax: totalTax,
+                            total: totalDue,
+                            dateStamp: new Date().toLocaleDateString(),
+                            timeStamp: new Date().toLocaleTimeString(),
+                            paymentMethod,
+                            isOfflineQueued: true
+                        };
+
+                        setActiveReceipt(currentReceiptData);
+                        setIsSuccessModalOpen(true);
+                    } else {
+                        // Online mode - use server actions as before
+                        for (const entry of cart) {
+                            const isUntracked = entry.item.id.startsWith('QUICK_');
+                            const netPrice = entry.price / (1 + taxRate);
+                            const grossPrice = entry.price;
+                            const lineNet = netPrice * entry.quantity;
+                            const lineGross = grossPrice * entry.quantity;
+                            const itemTax = lineGross - lineNet;
+
+                            if (isUntracked) {
+                                await recordUntrackedSale({
+                                    shopId,
+                                    itemName: entry.item.name,
+                                    quantity: entry.quantity,
+                                    unitPrice: netPrice,
+                                    totalBeforeTax: lineNet,
+                                    employeeId: selectedEmployeeId || "system",
+                                    clientName: clientName || "General Walk-in",
+                                    paymentMethod,
+                                    discount: discountAmount
+                                });
+                            } else {
+                                await recordSale({
+                                    shopId,
+                                    itemId: entry.item.id,
+                                    itemName: entry.item.name,
+                                    quantity: entry.quantity,
+                                    unitPrice: netPrice,
+                                    totalBeforeTax: lineNet,
+                                    employeeId: selectedEmployeeId || "system",
+                                    clientName: clientName || "General Walk-in",
+                                    paymentMethod,
+                                    discount: discountAmount
+                                });
+                            }
+
+                            receiptItems.push({
+                                name: entry.item.name,
+                                quantity: entry.quantity,
+                                priceNet: netPrice,
+                                priceGross: grossPrice,
+                                totalNet: lineNet,
+                                totalGross: lineGross,
+                                tax: itemTax
+                            });
+                        }
+
+                        currentReceiptData = {
+                            orderId: `ORD-${transactionId}`,
+                            receiptNo: `#RCT-${transactionId}`,
+                            transactionId,
+                            shopName: shop?.name || "NIRVANA STORE",
+                            cashier,
+                            clientName: clientName || "Walk-in Customer",
+                            clientPhone: clientPhone || "N/A",
+                            items: receiptItems,
+                            subtotal: totalBeforeTax,
+                            discount: discountAmount,
+                            tax: totalTax,
+                            total: totalDue,
+                            dateStamp: new Date().toLocaleDateString(),
+                            timeStamp: new Date().toLocaleTimeString(),
+                            paymentMethod
+                        };
+
+                        setActiveReceipt(currentReceiptData);
+                        setIsSuccessModalOpen(true);
                     }
-
-                    currentReceiptData = {
-                        orderId: `ORD-${transactionId}`,
-                        receiptNo: `#RCT-${transactionId}`,
-                        transactionId,
-                        shopName: shop?.name || "NIRVANA STORE",
-                        cashier,
-                        clientName: clientName || "Walk-in Customer",
-                        clientPhone: clientPhone || "N/A",
-                        items: receiptItems,
-                        subtotal: totalBeforeTax,
-                        discount: discountAmount,
-                        tax: totalTax,
-                        total: totalDue,
-                        dateStamp: new Date().toLocaleDateString(),
-                        timeStamp: new Date().toLocaleTimeString(),
-                        paymentMethod
-                    };
-
-                    setActiveReceipt(currentReceiptData);
-                    setIsSuccessModalOpen(true);
                 } else {
-                    // QUOTE MODE
+                    // QUOTE MODE - Generate quote and share to WhatsApp
+                    const quoteId = Math.random().toString(36).substring(2, 6).toUpperCase();
+                    const quoteItems = cart.map(c => ({
+                        name: c.item.name,
+                        quantity: c.quantity,
+                        unitPrice: (c.price / (1 + taxRate)).toFixed(2),
+                        total: (c.price * c.quantity).toFixed(2)
+                    }));
+
+                    const quoteText = `*QUOTATION #QT-${quoteId}*
+_${shop?.name || 'NIRVANA STORE'}_
+
+*Client:* ${clientName || 'Walk-in Customer'}
+${clientPhone ? `*Phone:* ${clientPhone}` : ''}
+${clientEmail ? `*Email:* ${clientEmail}` : ''}
+
+*Items:*
+${quoteItems.map(i => `• ${i.quantity}x ${i.name}
+  @ $${i.unitPrice} = $${i.total}`).join('\n')}
+
+------------------------
+*Subtotal:* $${totalBeforeTax.toFixed(2)}
+*Tax (15.5%):* $${totalTax.toFixed(2)}
+*_TOTAL: $${totalWithTax.toFixed(2)}_*
+
+*Valid for 7 days*
+*Quote prepared by:* ${selectedEmployeeId ? employees.find((e: any) => e.id === selectedEmployeeId)?.name || 'Staff' : 'Nirvana Staff'}
+
+Generated via NIRVANA POS`;
+
+                    // Save quote to database
                     await recordQuotation({
                         shopId,
                         clientName: clientName || "Walk-in Customer",
@@ -576,7 +678,18 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
                         totalWithTax,
                         employeeId: selectedEmployeeId || "system"
                     });
-                    alert("Quotation generated successfully!");
+
+                    // Share to WhatsApp
+                    const waUrl = `https://wa.me/${clientPhone ? clientPhone.replace(/\D/g, '') : ''}?text=${encodeURIComponent(quoteText)}`;
+                    
+                    // If there's a phone number, try to open WhatsApp directly, otherwise show the quote
+                    if (clientPhone) {
+                        window.open(waUrl, '_blank', 'noopener,noreferrer');
+                    } else {
+                        // Copy to clipboard if no phone
+                        await navigator.clipboard.writeText(quoteText);
+                        alert(`Quotation #QT-${quoteId} copied to clipboard! Send to customer manually.`);
+                    }
                 }
 
                 // Shared cleanup for all modes
@@ -652,7 +765,20 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
                 if (pdfRes.ok) {
                     const blob = await pdfRes.blob();
                     const url = URL.createObjectURL(blob);
+                    setEodShareBlob(blob);
                     setEodShareUrl(url);
+                    
+                    // Save to history
+                    const reportId = `${shopId}-${new Date().toISOString().slice(0, 10)}`;
+                    const newReport = {
+                        id: reportId,
+                        date: new Date().toISOString(),
+                        text: msgLines.join('\n'),
+                        blob: blob,
+                        url: url
+                    };
+                    setEodHistory(prev => [newReport, ...prev].slice(0, 30)); // Keep last 30 reports
+                    
                     setIsEodShareModalOpen(true);
                 } else {
                     const err = await pdfRes.json().catch(() => ({}));
@@ -668,12 +794,11 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
 
     const shareEodToWhatsApp = async () => {
         // Prefer native share sheet with file (WhatsApp selectable) on mobile.
-        if (eodShareUrl) {
+        // Use the stored blob directly instead of fetching the blob URL
+        if (eodShareBlob) {
             try {
-                const r = await fetch(eodShareUrl);
-                const b = await r.blob();
-                const file = new File([b], `EOD_${shopId}_${new Date().toISOString().slice(0, 10)}.pdf`, { type: 'application/pdf' });
-                const nav: any = navigator as any;
+                const file = new File([eodShareBlob], `EOD_${shopId}_${new Date().toISOString().slice(0, 10)}.pdf`, { type: 'application/pdf' });
+                const nav: any = navigator;
                 if (nav?.canShare?.({ files: [file] }) && nav?.share) {
                     await nav.share({
                         title: `EOD ${shopId.toUpperCase()}`,
@@ -843,6 +968,15 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
                     </Button>
 
                     <Button
+                        onClick={() => setIsEodHistoryModalOpen(true)}
+                        variant="outline"
+                        className="h-10 px-3 border-sky-500/30 text-sky-300 hover:bg-sky-500/10 text-[10px] font-black uppercase italic flex items-center gap-2"
+                        title="View daily reports history"
+                    >
+                        <FileText className="h-4 w-4" /> Reports
+                    </Button>
+
+                    <Button
                         onClick={() => setIsExpenseModalOpen(true)}
                         variant="outline"
                         className="h-10 px-3 border-rose-500/30 text-rose-300 hover:bg-rose-500/10 text-[10px] font-black uppercase italic flex items-center gap-2"
@@ -870,6 +1004,15 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
                         title="View today's receipts"
                     >
                         <FileText className="h-4 w-4" /> Receipts
+                    </Button>
+
+                    <Button
+                        onClick={() => setIsExpensesModalOpen(true)}
+                        variant="outline"
+                        className="h-10 px-3 border-rose-500/30 text-rose-200 hover:bg-rose-500/10 text-[10px] font-black uppercase italic flex items-center gap-2"
+                        title="View expenses"
+                    >
+                        <Minus className="h-4 w-4" /> Expenses
                     </Button>
 
                     <Button
@@ -1644,7 +1787,14 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
 
             <Modal
                 isOpen={isEodShareModalOpen}
-                onClose={() => setIsEodShareModalOpen(false)}
+                onClose={() => {
+                    setIsEodShareModalOpen(false);
+                    if (eodShareUrl) {
+                        try { URL.revokeObjectURL(eodShareUrl); } catch { }
+                        setEodShareUrl("");
+                        setEodShareBlob(null);
+                    }
+                }}
                 title="End of Day Report"
             >
                 <div className="space-y-4">
@@ -1839,6 +1989,119 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
                                                 <p className="text-[9px] text-slate-600 font-mono italic">{sale.id}</p>
                                             </div>
                                         </div>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            </Modal>
+
+            <Modal
+                isOpen={isExpensesModalOpen}
+                onClose={() => setIsExpensesModalOpen(false)}
+                title="Expenses History"
+            >
+                <div className="space-y-4 max-h-[60vh] overflow-y-auto">
+                    {ledger.filter((l: any) => l.category === 'POS Expense' && l.shopId === shopId).length === 0 ? (
+                        <p className="text-slate-500 text-center py-8">No expenses recorded</p>
+                    ) : (
+                        <div className="space-y-2">
+                            <p className="text-[10px] text-slate-500 font-bold uppercase">
+                                {ledger.filter((l: any) => l.category === 'POS Expense' && l.shopId === shopId).length} expense{ledger.filter((l: any) => l.category === 'POS Expense' && l.shopId === shopId).length !== 1 ? 's' : ''} recorded
+                            </p>
+                            {ledger.filter((l: any) => l.category === 'POS Expense' && l.shopId === shopId).map((expense: any) => (
+                                <div key={expense.id} className="bg-slate-950 border border-slate-800 rounded-lg p-3">
+                                    <div className="flex justify-between items-start">
+                                        <div className="flex-1">
+                                            <div className="flex justify-between items-start mb-1">
+                                                <p className="text-xs font-black text-slate-100 uppercase italic tracking-tight">{expense.description || 'Expense'}</p>
+                                                <p className="text-xs font-mono font-bold text-rose-400">-${(expense.amount || 0).toFixed(2)}</p>
+                                            </div>
+                                            <div className="mt-2 pt-2 border-t border-slate-800/50 flex justify-between items-center">
+                                                <p className="text-[9px] text-slate-500 font-bold uppercase tracking-widest">
+                                                    {expense.date ? new Date(expense.date).toLocaleDateString() : 'Today'}
+                                                </p>
+                                                <p className="text-[9px] text-slate-600 font-mono italic">{expense.id}</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            </Modal>
+
+            <Modal
+                isOpen={isEodHistoryModalOpen}
+                onClose={() => setIsEodHistoryModalOpen(false)}
+                title="Daily Reports History"
+            >
+                <div className="space-y-4 max-h-[60vh] overflow-y-auto">
+                    {eodHistory.length === 0 ? (
+                        <div className="text-center py-8">
+                            <p className="text-slate-500 mb-4">No daily reports generated yet</p>
+                            <p className="text-[10px] text-slate-600">Use "Power Off" button to generate end-of-day reports</p>
+                        </div>
+                    ) : (
+                        <div className="space-y-2">
+                            <p className="text-[10px] text-slate-500 font-bold uppercase">
+                                {eodHistory.length} report{eodHistory.length !== 1 ? 's' : ''} saved
+                            </p>
+                            {eodHistory.map((report) => (
+                                <div key={report.id} className="bg-slate-950 border border-slate-800 rounded-lg p-3">
+                                    <div className="flex justify-between items-start mb-2">
+                                        <div>
+                                            <p className="text-xs font-black text-slate-100 uppercase italic">
+                                                {new Date(report.date).toLocaleDateString()}
+                                            </p>
+                                            <p className="text-[9px] text-slate-500 font-mono">
+                                                {new Date(report.date).toLocaleTimeString()}
+                                            </p>
+                                        </div>
+                                        <div className="flex gap-2">
+                                            <Button
+                                                size="sm"
+                                                variant="outline"
+                                                className="h-7 text-[9px] font-black uppercase"
+                                                onClick={() => {
+                                                    // Open PDF in new tab
+                                                    if (report.url) {
+                                                        window.open(report.url, '_blank', 'noopener,noreferrer');
+                                                    }
+                                                }}
+                                            >
+                                                View PDF
+                                            </Button>
+                                            <Button
+                                                size="sm"
+                                                className="h-7 bg-emerald-600 hover:bg-emerald-500 text-[9px] font-black uppercase"
+                                                onClick={async () => {
+                                                    // Try to share via WhatsApp
+                                                    if (report.blob) {
+                                                        const file = new File([report.blob], `EOD_${report.id}.pdf`, { type: 'application/pdf' });
+                                                        const nav: any = navigator;
+                                                        if (nav?.canShare?.({ files: [file] }) && nav?.share) {
+                                                            await nav.share({
+                                                                title: `EOD ${report.id}`,
+                                                                text: report.text,
+                                                                files: [file],
+                                                            });
+                                                            return;
+                                                        }
+                                                    }
+                                                    // Fallback: copy text to clipboard
+                                                    await navigator.clipboard.writeText(report.text);
+                                                    alert('Report text copied to clipboard!');
+                                                }}
+                                            >
+                                                Share
+                                            </Button>
+                                        </div>
+                                    </div>
+                                    <div className="text-[9px] text-slate-500 font-mono whitespace-pre-wrap line-clamp-4 bg-slate-900 p-2 rounded">
+                                        {report.text}
                                     </div>
                                 </div>
                             ))}

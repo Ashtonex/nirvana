@@ -100,20 +100,23 @@ export function OraclePulse({ data }: OraclePulseProps) {
                                 <div className="flex justify-between items-end">
                                     <div>
                                         <p className="text-sm font-black text-white uppercase italic">{shop.name}</p>
-                                        <p className="text-[10px] font-bold text-slate-500 uppercase">${shop.revenue.toLocaleString()} / ${shop.expenses.toLocaleString()} Goal</p>
+                                        <p className="text-[10px] font-bold text-slate-500 uppercase">
+                                            ${shop.revenue.toLocaleString()} revenue / 
+                                            <span className="text-rose-400"> ${shop.expenses.toLocaleString()} expenses</span>
+                                        </p>
                                     </div>
                                     <Badge className={cn(
                                         "text-[10px] font-black uppercase px-2",
                                         shop.progress >= 100 ? "bg-emerald-500/10 text-emerald-500" : "bg-amber-500/10 text-amber-500"
                                     )}>
-                                        {shop.progress >= 100 ? "Goal Met" : `${(100 - shop.progress).toFixed(0)}% to Target`}
+                                        {shop.progress >= 100 ? "Covered" : `${shop.progress.toFixed(0)}% Covered`}
                                     </Badge>
                                 </div>
                                 <div className="h-3 w-full bg-slate-900 rounded-full overflow-hidden border border-slate-800">
                                     <div
                                         className={cn(
                                             "h-full transition-all duration-1000",
-                                            shop.progress >= 100 ? "bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.3)]" : "bg-violet-500"
+                                            shop.progress >= 100 ? "bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.3)]" : "bg-rose-500"
                                         )}
                                         style={{ width: `${Math.min(100, shop.progress)}%` }}
                                     />
