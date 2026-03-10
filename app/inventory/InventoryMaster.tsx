@@ -369,7 +369,7 @@ export default function InventoryMaster({ db }: { db: any }) {
                                         <Plus className="h-5 w-5 animate-pulse" /> Instant Ledger Registration
                                     </h3>
                                     <div className="grid grid-cols-1 md:grid-cols-5 gap-6 mb-6">
-                                        <div className="space-y-2 col-span-2">
+                                        <div className="space-y-2 md:col-span-2">
                                             <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Product Name</label>
                                             <Input
                                                 className="bg-slate-950 border-slate-800 text-white font-bold h-12"
@@ -534,8 +534,8 @@ export default function InventoryMaster({ db }: { db: any }) {
                                                     Clear
                                                 </button>
                                             </div>
-                                            <div className="max-h-48 overflow-y-auto border border-slate-800 rounded-lg">
-                                                <table className="w-full text-xs">
+                                            <div className="max-h-48 overflow-y-auto overflow-x-auto border border-slate-800 rounded-lg">
+                                                <table className="w-full text-xs min-w-[500px]">
                                                     <thead className="bg-slate-950 sticky top-0">
                                                         <tr>
                                                             <th className="text-left p-2 font-black text-slate-500 uppercase">Name</th>
@@ -595,7 +595,7 @@ export default function InventoryMaster({ db }: { db: any }) {
                                         <Input type="number" value={shipment.purchasePrice} onChange={e => setShipment({ ...shipment, purchasePrice: parseFloat(e.target.value) || 0 })} className="h-10 bg-slate-950 border-emerald-900/40 font-black text-lg" />
                                     </div>
                                 </div>
-                                <div className="grid grid-cols-2 gap-6">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                                     <div className="space-y-2">
                                         <label className="text-[10px] font-black text-slate-500 uppercase">Shipping Fees</label>
                                         <Input type="number" value={shipment.shippingCost} onChange={e => setShipment({ ...shipment, shippingCost: parseFloat(e.target.value) || 0 })} className="h-10 bg-slate-950 border-slate-850" />
@@ -747,7 +747,7 @@ export default function InventoryMaster({ db }: { db: any }) {
                                     filteredInventory.map((item: any) => {
                                         const insights = getInsights(item.id, item.quantity, item.landedCost, item.dateAdded);
                                         return (
-                                            <div key={item.id} className="p-6 flex items-center justify-between group hover:bg-white/5 transition-all">
+                                            <div key={item.id} className="p-4 sm:p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 group hover:bg-white/5 transition-all">
                                                 <div className="flex items-center gap-6">
                                                     <div className="h-12 w-12 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-center group-hover:border-violet-500/40 transition-colors">
                                                         <Target className="h-6 w-6 text-slate-500 group-hover:text-violet-400" />
@@ -757,7 +757,7 @@ export default function InventoryMaster({ db }: { db: any }) {
                                                         <p className="text-[10px] font-black text-slate-600 uppercase tracking-widest">{item.sku} | {item.category} | Stock Age: {insights.daysInStock}d</p>
                                                     </div>
                                                 </div>
-                                                <div className="flex gap-8 items-center">
+                                                <div className="flex flex-wrap gap-4 sm:gap-8 items-center w-full sm:w-auto">
                                                     <div className="text-right">
                                                         <p className="text-[10px] font-black text-slate-600 uppercase mb-1">Bleed / Pc</p>
                                                         <p className="text-xs font-black text-rose-500/80 italic">${insights.cumulativeBleed.toFixed(2)}</p>
@@ -1002,7 +1002,7 @@ export default function InventoryMaster({ db }: { db: any }) {
                             </button>
                         </div>
 
-                        <div className="p-12 grid grid-cols-2 gap-16">
+                        <div className="p-4 sm:p-12 grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-16 overflow-y-auto max-h-[70vh]">
                             {/* Forecasted Yield */}
                             <div className="space-y-8">
                                 <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.5em] border-b border-slate-800 pb-3 flex items-center gap-2">

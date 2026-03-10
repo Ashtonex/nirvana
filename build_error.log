@@ -1,0 +1,24 @@
+
+> nirvana@0.1.0 build
+> next build
+
+Γû▓ Next.js 16.1.6 (Turbopack)
+- Environments: .env.local
+
+  Creating an optimized production build ...
+Γ£ô Compiled successfully in 51s
+  Running TypeScript ...
+  Collecting page data using 7 workers ...
+Error: export const dynamic = "force-static"/export const revalidate not configured on route "/api/backups/download" with "output: export". See more info here: https://nextjs.org/docs/advanced-features/static-html-export
+    at module evaluation (G:\work\ATMCAPPROJECTS\nirvana\.next\server\chunks\[root-of-the-server]__f087aa65._.js:1:1979)
+    at instantiateModule (G:\work\ATMCAPPROJECTS\nirvana\.next\server\chunks\[turbopack]_runtime.js:740:9)
+    at instantiateRuntimeModule (G:\work\ATMCAPPROJECTS\nirvana\.next\server\chunks\[turbopack]_runtime.js:768:12)
+    at getOrInstantiateRuntimeModule (G:\work\ATMCAPPROJECTS\nirvana\.next\server\chunks\[turbopack]_runtime.js:781:12)
+    at Object.m (G:\work\ATMCAPPROJECTS\nirvana\.next\server\chunks\[turbopack]_runtime.js:790:18)
+    at Object.<anonymous> (G:\work\ATMCAPPROJECTS\nirvana\.next\server\app\api\backups\download\route.js:8:3)
+
+> Build error occurred
+Error: Failed to collect page data for /api/backups/download
+    at ignore-listed frames {
+  type: 'Error'
+}

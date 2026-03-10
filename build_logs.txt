@@ -1,0 +1,15 @@
+
+> nirvana@0.1.0 build:mobile
+> cross-env MOBILE_BUILD=true next build && npx cap sync
+
+Γû▓ Next.js 16.1.6 (Turbopack)
+- Environments: .env.local
+
+  Creating an optimized production build ...
+Γ£ô Compiled successfully in 30.7s
+  Running TypeScript ...
+  Collecting page data using 7 workers ...
+
+> Build error occurred
+Error: Page "/quotations/[quoteId]" is missing "generateStaticParams()" so it cannot be used with "output: export" config.
+    at ignore-listed frames
