@@ -773,6 +773,7 @@ export async function getOracleMasterPulse() {
     const { data: inventory } = await supabaseAdmin.from('inventory_items').select('*, inventory_allocations(*)');
     const { data: sales } = await supabaseAdmin.from('sales').select('*');
     const { data: shops } = await supabaseAdmin.from('shops').select('*');
+    const { data: ledger } = await supabaseAdmin.from('ledger_entries').select('*');
     if (!inventory || !sales || !shops || !settings) return null;
 
     const totalRevenue = sales.reduce((sum: number, s: any) => sum + Number(s.total_with_tax), 0);
@@ -790,22 +791,38 @@ export async function getOracleMasterPulse() {
         return acc;
     }, {});
 
+    // Calculate total expenses per shop: structured expenses + ledger expenses
+    const calculateShopExpenses = (shopId: string) => {
+        const structuredExpenses = Object.values(
+            shops?.find((s: any) => s.id === shopId)?.expenses || {}
+        ).reduce((acc: number, val: any) => acc + Number(val || 0), 0);
+        
+        const ledgerExpenses = (ledger || [])
+            .filter((l: any) => l.shop_id === shopId && l.type === 'expense')
+            .reduce((acc: number, l: any) => acc + Number(l.amount || 0), 0);
+        
+        return structuredExpenses + ledgerExpenses;
+    };
+
     return {
         totalUnits: inventory.reduce((sum: number, i: any) => sum + i.quantity, 0),
         categoryBreakdown,
         finances: { revenue: totalRevenue, tax: totalTax, grossProfit, netIncome: grossProfit, monthlyBurn: 0 },
-        shopPerformance: (shops || []).map((s: any) => ({
-            id: s.id,
-            name: s.name,
-            revenue: (sales || [])
+        shopPerformance: (shops || []).map((s: any) => {
+            const shopRevenue = (sales || [])
                 .filter((sa: any) => sa.shop_id === s.id)
-                .reduce((acc: number, sa: any) => acc + Number(sa.total_with_tax), 0),
-            expenses: Object.values(s.expenses || {}).reduce(
-                (acc: number, val: any) => acc + Number(val || 0),
-                0
-            ),
-            progress: 100
-        })),
+                .reduce((acc: number, sa: any) => acc + Number(sa.total_with_tax), 0);
+            const shopExpenses = calculateShopExpenses(s.id);
+            const progress = shopExpenses > 0 ? (shopRevenue / shopExpenses) * 100 : 100;
+            
+            return {
+                id: s.id,
+                name: s.name,
+                revenue: shopRevenue,
+                expenses: shopExpenses,
+                progress
+            };
+        }),
         deadCapital: 0,
         zombieCount: 0,
         recentEmails: []

@@ -11,6 +11,10 @@
   "dependencies": {
     "@ai-sdk/openai": "^3.0.27",
     "@ai-sdk/react": "^3.0.84",
+    "@capacitor/android": "^8.2.0",
+    "@capacitor/cli": "^8.2.0",
+    "@capacitor/core": "^8.2.0",
+    "@capacitor/ios": "^8.2.0",
     "@sendgrid/mail": "^8.1.6",
     "@supabase/supabase-js": "^2.98.0",
     "ai": "^6.0.82",
