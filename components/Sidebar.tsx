@@ -18,7 +18,8 @@ import {
     ClipboardList,
     ShieldCheck,
     Scale,
-    LogOut
+    LogOut,
+    FileText
 } from 'lucide-react';
 import { useAuth } from '@/components/AuthProvider';
 import { useStaff } from '@/components/StaffProvider';
@@ -45,6 +46,7 @@ const navItems = [
     { name: 'Tax Ledger', href: '/admin/tax', icon: Scale },
     { name: 'Financials', href: '/finance', icon: BarChart3 },
     { name: 'Reports', href: '/reports', icon: BarChart3 },
+    { name: 'EOD Reports', href: '/admin/eod', icon: FileText },
     { name: 'Data Vault', href: '/admin/backups', icon: ShieldCheck },
 ];
 
