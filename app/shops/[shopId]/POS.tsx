@@ -74,6 +74,30 @@ const Modal = ({ isOpen, onClose, title, children }: { isOpen: boolean, onClose:
     );
 };
 
+type LaybyItem = {
+    itemId: string;
+    itemName: string;
+    quantity: number;
+    unitPrice: number;
+    total: number;
+};
+
+type LaybyQuote = {
+    id: string;
+    shopId: string;
+    clientName: string;
+    clientPhone: string;
+    items: LaybyItem[];
+    totalBeforeTax: number;
+    tax: number;
+    totalWithTax: number;
+    paidAmount: number;
+    status: 'layby' | 'converted' | string;
+    date: string;
+    expiryDate?: string;
+    employeeId?: string;
+};
+
 export default function POS({ shopId, inventory, db }: { shopId: string, inventory: any[], db: any }) {
     const [cart, setCart] = useState<{ item: any, quantity: number, price: number }[]>([]);
     const [searchTerm, setSearchTerm] = useState("");
@@ -162,7 +186,7 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
     const [isSuccessModalOpen, setIsSuccessModalOpen] = useState(false);
 
     // Live Lay-by list for this shop (so newly created / updated lay-bys appear immediately)
-    const [laybyList, setLaybyList] = useState(
+    const [laybyList, setLaybyList] = useState<LaybyQuote[]>(
         () => (db.quotations || []).filter((q: any) => q.status === 'layby' && q.shopId === shopId)
     );
 
@@ -471,7 +495,7 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
                     });
 
                     // Push new lay-by into local list so it appears in the Lay-by modal immediately
-                    setLaybyList(prev => [
+                    setLaybyList((prev: LaybyQuote[]) => [
                         {
                             id: res.id,
                             shopId,
@@ -1536,15 +1560,15 @@ Generated via NIRVANA POS`;
                                                 try {
                                                     const result = await updateLaybyPayment(selectedLaybyId, amt, shopId, selectedEmployeeId || "system");
                                                     // Update local lay-by state for a smoother UX
-                                                    setLaybyList(prev => {
-                                                        const next = prev.map((q: any) => {
+                                                    setLaybyList((prev: LaybyQuote[]) => {
+                                                        const next = prev.map((q: LaybyQuote) => {
                                                             if (q.id !== selectedLaybyId) return q;
                                                             const newPaid = Number(q.paidAmount || 0) + amt;
                                                             return { ...q, paidAmount: newPaid };
                                                         });
                                                         // If fully paid, drop from list
                                                         if (result?.fullyPaid) {
-                                                            return next.filter((q: any) => q.id !== selectedLaybyId);
+                                                            return next.filter((q: LaybyQuote) => q.id !== selectedLaybyId);
                                                         }
                                                         return next;
                                                     });

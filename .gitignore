@@ -45,3 +45,6 @@ lib/db.json.bak.*
 
 # test results
 test-results/
+
+# android build artifacts
+android/.kotlin/
