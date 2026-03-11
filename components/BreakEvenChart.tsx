@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend } from 'recharts';
 import { Target, TrendingUp, DollarSign, AlertCircle } from "lucide-react";
@@ -11,37 +11,48 @@ interface BreakEvenChartProps {
 }
 
 export function BreakEvenChart({ datasets }: BreakEvenChartProps) {
-    // Get available shops from datasets
-    const availableShops = Object.keys(datasets || {}).sort((a, b) => {
-        // Always put 'global' first
-        if (a === 'global') return -1;
-        if (b === 'global') return 1;
-        return a.localeCompare(b);
-    });
-
-    const [activeTab, setActiveTab] = useState(availableShops[0] || "global");
-    const data = datasets[activeTab] || [];
-    
-    // Debug logging
-    React.useEffect(() => {
-        console.log('BreakEvenChart Debug:', {
-            availableShops,
-            activeTab,
-            dataLength: data.length,
-            datasetsKeys: Object.keys(datasets || {}),
-            datasetsStructure: Object.fromEntries(
-                Object.entries(datasets || {}).map(([key, val]) => [key, { length: Array.isArray(val) ? val.length : 'not array' }])
-            )
+    const availableShops = useMemo(() => {
+        const keys = Object.keys(datasets || {});
+        const preferredOrder = ["kipasa", "dubdub", "tradecenter", "global"];
+        return keys.sort((a, b) => {
+            const ai = preferredOrder.indexOf(a);
+            const bi = preferredOrder.indexOf(b);
+            if (ai !== -1 || bi !== -1) return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi);
+            return a.localeCompare(b);
         });
-    }, [activeTab, data.length, datasets, availableShops]);
+    }, [datasets]);
+
+    const defaultTab = useMemo(() => {
+        if (!availableShops.length) return "global";
+        try {
+            const stored = typeof window !== "undefined" ? window.localStorage.getItem("nirvana.breakEven.activeShop") : null;
+            if (stored && availableShops.includes(stored)) return stored;
+        } catch { /* ignore */ }
+        const firstNonGlobal = availableShops.find((k) => k !== "global");
+        return firstNonGlobal || availableShops[0] || "global";
+    }, [availableShops]);
+
+    const [activeTab, setActiveTab] = useState(defaultTab);
+    const data = datasets?.[activeTab] || [];
+
+    useEffect(() => {
+        if (!availableShops.includes(activeTab)) setActiveTab(defaultTab);
+    }, [activeTab, availableShops, defaultTab]);
+
+    const onTabChange = (next: string) => {
+        setActiveTab(next);
+        try {
+            window.localStorage.setItem("nirvana.breakEven.activeShop", next);
+        } catch { /* ignore */ }
+    };
     
     // Get shop display name
     const getShopDisplayName = (key: string) => {
         const nameMap: Record<string, string> = {
             'global': 'Global',
-            'kipasa': 'Kipasa Branch',
-            'dubdub': 'Dub Dub Outlet',
-            'tradecenter': 'Trade Center HQ'
+            'kipasa': 'Kipasa',
+            'dubdub': 'Dub Dub',
+            'tradecenter': 'TC'
         };
         return nameMap[key] || key;
     };
@@ -57,7 +68,7 @@ export function BreakEvenChart({ datasets }: BreakEvenChartProps) {
                         Cumulative Sales vs. Daily Distributed Overheads
                     </CardDescription>
                 </div>
-                <Tabs value={activeTab} onValueChange={setActiveTab} className="bg-slate-950/50 p-1 rounded-xl border border-slate-800">
+                <Tabs value={activeTab} onValueChange={onTabChange} className="bg-slate-950/50 p-1 rounded-xl border border-slate-800">
                     <TabsList className="bg-transparent border-0 h-9">
                         {availableShops.map((shop) => {
                             const colors: Record<string, string> = {

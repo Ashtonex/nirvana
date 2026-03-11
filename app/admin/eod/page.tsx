@@ -7,7 +7,6 @@ import {
   ArrowLeft, 
   FileText, 
   Calendar,
-  Mail
 } from 'lucide-react';
 import { Button } from '@/components/ui';
 import { getDashboardData } from '../../actions';
@@ -45,7 +44,7 @@ export default async function HistoricalEODPage() {
             Generate end-of-day reports for any past date. Select a shop and date below.
           </p>
 
-          <form action="/api/eod/historical" method="POST" className="space-y-6">
+          <form action="/api/eod/pdf" method="GET" className="space-y-6">
             <div>
               <label className="block text-xs font-black uppercase text-slate-500 mb-2">
                 Select Shop
@@ -76,37 +75,13 @@ export default async function HistoricalEODPage() {
               />
             </div>
 
-            <div>
-              <label className="block text-xs font-black uppercase text-slate-500 mb-2">
-                Send Report To
-              </label>
-              <input 
-                type="email" 
-                name="email"
-                placeholder="admin@yourbusiness.com (optional)"
-                className="w-full bg-slate-950 border border-slate-700 rounded-lg px-4 py-3 text-white font-bold"
-              />
-            </div>
-
             <div className="flex gap-4">
               <Button 
                 type="submit"
-                name="action"
-                value="view"
                 className="flex-1 bg-emerald-600 hover:bg-emerald-500"
               >
                 <FileText className="h-4 w-4 mr-2" />
-                View Report
-              </Button>
-              
-              <Button 
-                type="submit"
-                name="action"
-                value="email"
-                className="flex-1 bg-sky-600 hover:bg-sky-500"
-              >
-                <Mail className="h-4 w-4 mr-2" />
-                Email Report
+                Download PDF
               </Button>
             </div>
           </form>

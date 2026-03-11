@@ -110,7 +110,7 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
     const [eodShareUrl, setEodShareUrl] = useState<string>("");
     const [eodShareBlob, setEodShareBlob] = useState<Blob | null>(null);
     const [eodShareText, setEodShareText] = useState<string>("");
-    const [eodHistory, setEodHistory] = useState<{id: string; date: string; text: string; blob: Blob | null; url: string}[]>([]);
+    const [eodHistory, setEodHistory] = useState<{id: string; date: string; text: string; blob: Blob | null; url: string; shopId: string}[]>([]);
     const [isEodHistoryModalOpen, setIsEodHistoryModalOpen] = useState(false);
 
     const [isReturnModalOpen, setIsReturnModalOpen] = useState(false);
@@ -473,12 +473,22 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
                         cashier,
                         clientName,
                         clientPhone,
-                        items: cart.map(c => ({
-                            name: c.item.name,
-                            quantity: c.quantity,
-                            priceGross: c.price,
-                            totalGross: c.price * c.quantity
-                        })),
+                        items: cart.map(c => {
+                            const priceGross = Number(c.price || 0);
+                            const priceNet = priceGross / (1 + taxRate);
+                            const totalGross = priceGross * Number(c.quantity || 0);
+                            const totalNet = priceNet * Number(c.quantity || 0);
+                            const tax = totalGross - totalNet;
+                            return {
+                                name: c.item.name,
+                                quantity: c.quantity,
+                                priceNet,
+                                priceGross,
+                                totalNet,
+                                totalGross,
+                                tax,
+                            };
+                        }),
                         subtotal: totalBeforeTax,
                         discount: discountAmount,
                         tax: totalTax,
@@ -761,7 +771,8 @@ Generated via NIRVANA POS`;
 
             // Generate report PDF for sharing
             try {
-                const pdfRes = await fetch(`/api/eod/pdf?shopId=${encodeURIComponent(shopId)}`, { cache: 'no-store' });
+                const dayStamp = new Date().toISOString().slice(0, 10);
+                const pdfRes = await fetch(`/api/eod/pdf?shopId=${encodeURIComponent(shopId)}&date=${encodeURIComponent(dayStamp)}`, { cache: 'no-store' });
                 if (pdfRes.ok) {
                     const blob = await pdfRes.blob();
                     const url = URL.createObjectURL(blob);
@@ -769,13 +780,14 @@ Generated via NIRVANA POS`;
                     setEodShareUrl(url);
                     
                     // Save to history
-                    const reportId = `${shopId}-${new Date().toISOString().slice(0, 10)}`;
+                    const reportId = `${shopId}-${dayStamp}`;
                     const newReport = {
                         id: reportId,
                         date: new Date().toISOString(),
                         text: msgLines.join('\n'),
                         blob: blob,
-                        url: url
+                        url: url,
+                        shopId,
                     };
                     setEodHistory(prev => [newReport, ...prev].slice(0, 30)); // Keep last 30 reports
                     
@@ -2066,10 +2078,9 @@ Generated via NIRVANA POS`;
                                                 variant="outline"
                                                 className="h-7 text-[9px] font-black uppercase"
                                                 onClick={() => {
-                                                    // Open PDF in new tab
-                                                    if (report.url) {
-                                                        window.open(report.url, '_blank', 'noopener,noreferrer');
-                                                    }
+                                                    const stamp = (report.id || '').split('-').slice(1).join('-') || (report.date || '').slice(0, 10) || new Date().toISOString().slice(0, 10);
+                                                    const pdfUrl = `/api/eod/pdf?shopId=${encodeURIComponent(report.shopId)}&date=${encodeURIComponent(stamp)}`;
+                                                    window.open(pdfUrl, '_blank', 'noopener,noreferrer');
                                                 }}
                                             >
                                                 View PDF

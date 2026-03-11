@@ -4,9 +4,15 @@ import { createHash } from "crypto";
 import { supabaseAdmin } from "@/lib/supabase";
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 
-function startOfTodayUTC() {
-  const d = new Date();
+function startOfDayUTC(date?: string | null) {
+  const d = date ? new Date(`${date}T00:00:00.000Z`) : new Date();
   d.setUTCHours(0, 0, 0, 0);
+  return d.toISOString();
+}
+
+function endOfDayUTC(date?: string | null) {
+  const d = date ? new Date(`${date}T23:59:59.999Z`) : new Date();
+  d.setUTCHours(23, 59, 59, 999);
   return d.toISOString();
 }
 
@@ -14,6 +20,7 @@ export async function GET(req: Request) {
   const url = new URL(req.url);
   const shopId = url.searchParams.get("shopId") || "";
   const isTest = url.searchParams.get("test") === "true";
+  const date = url.searchParams.get("date"); // YYYY-MM-DD (optional)
   
   if (!shopId) {
     return NextResponse.json({ error: "Missing shopId" }, { status: 400 });
@@ -56,21 +63,24 @@ export async function GET(req: Request) {
     }
   }
 
-  const since = startOfTodayUTC();
+  const since = startOfDayUTC(date);
+  const until = endOfDayUTC(date);
 
   // Fetch Sales
   const { data: sales, error: salesErr } = await supabaseAdmin
     .from("sales")
     .select("id,item_name,quantity,total_with_tax,total_before_tax,tax,date,payment_method,discount_applied")
     .eq("shop_id", shopId)
-    .gte("date", since);
+    .gte("date", since)
+    .lte("date", until);
 
   // Fetch Ledger (Opening Balance & POS Expenses)
   const { data: ledger, error: ledgerErr } = await supabaseAdmin
     .from("ledger_entries")
     .select("category,amount,date")
     .eq("shop_id", shopId)
-    .gte("date", since);
+    .gte("date", since)
+    .lte("date", until);
 
   // Fetch Inventory for Restock Alerts
   const { data: inventory, error: invErr } = await supabaseAdmin
@@ -301,7 +311,8 @@ export async function GET(req: Request) {
   }
 
   const bytes = await pdf.save();
-  const filename = `EOD_${shopId}_${new Date().toISOString().slice(0, 10)}.pdf`;
+  const stamp = (date || new Date().toISOString().slice(0, 10));
+  const filename = `EOD_${shopId}_${stamp}.pdf`;
 
   return new NextResponse(Buffer.from(bytes), {
     status: 200,

@@ -1,3 +1,89 @@
+/* eslint-disable no-restricted-globals */
+const VERSION = 'v1';
+const SHELL_CACHE = `nirvana-shell-${VERSION}`;
+const RUNTIME_CACHE = `nirvana-runtime-${VERSION}`;
+
+// Minimal app-shell assets. Keep this list small and stable.
+const SHELL_ASSETS = [
+  '/',
+  '/manifest.json',
+  '/icon-192.png',
+  '/icon-512.png',
+];
+
+self.addEventListener('install', (event) => {
+  event.waitUntil(
+    caches.open(SHELL_CACHE)
+      .then((cache) => cache.addAll(SHELL_ASSETS))
+      .then(() => self.skipWaiting())
+  );
+});
+
+self.addEventListener('activate', (event) => {
+  event.waitUntil((async () => {
+    const keys = await caches.keys();
+    await Promise.all(
+      keys
+        .filter((k) => k.startsWith('nirvana-') && ![SHELL_CACHE, RUNTIME_CACHE].includes(k))
+        .map((k) => caches.delete(k))
+    );
+    await self.clients.claim();
+  })());
+});
+
+function isNextStatic(url) {
+  return url.pathname.startsWith('/_next/static/');
+}
+
+function isIconOrManifest(url) {
+  return url.pathname === '/manifest.json' || url.pathname.startsWith('/icon-');
+}
+
+// Network-first for HTML navigations (dashboard pages), fallback to cached shell.
+async function handleNavigate(request) {
+  try {
+    const fresh = await fetch(request);
+    const cache = await caches.open(RUNTIME_CACHE);
+    cache.put(request, fresh.clone());
+    return fresh;
+  } catch {
+    const cached = await caches.match(request);
+    if (cached) return cached;
+    return (await caches.match('/')) || Response.error();
+  }
+}
+
+// Cache-first for static assets (fast + offline-safe).
+async function handleStatic(request) {
+  const cached = await caches.match(request);
+  if (cached) return cached;
+  const fresh = await fetch(request);
+  const cache = await caches.open(RUNTIME_CACHE);
+  cache.put(request, fresh.clone());
+  return fresh;
+}
+
+self.addEventListener('fetch', (event) => {
+  const request = event.request;
+  const url = new URL(request.url);
+
+  // Only handle same-origin requests.
+  if (url.origin !== self.location.origin) return;
+
+  // Ignore non-GET.
+  if (request.method !== 'GET') return;
+
+  if (request.mode === 'navigate') {
+    event.respondWith(handleNavigate(request));
+    return;
+  }
+
+  if (isNextStatic(url) || isIconOrManifest(url)) {
+    event.respondWith(handleStatic(request));
+    return;
+  }
+});
+
 const CACHE_NAME = 'nirvana-v3';
 const OFFLINE_URL = '/';
 

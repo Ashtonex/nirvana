@@ -48,7 +48,7 @@ let nativeConnection: NativeBtConnection | null = null;
 export async function nativeBluetoothConnect(): Promise<boolean> {
     try {
         const ble = await getBleClient();
-        await ble.initialize();
+        await ble.initialize({ androidNeverForLocation: true });
 
         return new Promise((resolve) => {
             // Show the native device picker
@@ -58,21 +58,6 @@ export async function nativeBluetoothConnect(): Promise<boolean> {
                 const deviceId = device.deviceId;
                 await ble.connect(deviceId);
 
-                // Find a writable characteristic
-                for (const serviceUuid of PRINTER_SERVICE_UUIDS) {
-                    for (const charUuid of PRINTER_CHAR_UUIDS) {
-                        try {
-                            await ble.read(deviceId, serviceUuid, charUuid);
-                            nativeConnection = { deviceId, serviceUuid, charUuid };
-                            resolve(true);
-                            return;
-                        } catch {
-                            // Try next combination
-                        }
-                    }
-                }
-
-                // Fallback: read all services and find first writable char
                 try {
                     const services = await ble.getServices(deviceId);
                     for (const service of services) {
@@ -88,7 +73,7 @@ export async function nativeBluetoothConnect(): Promise<boolean> {
                             }
                         }
                     }
-                } catch { }
+                } catch { /* ignore */ }
 
                 resolve(false);
             }).catch(() => resolve(false));
@@ -118,4 +103,82 @@ export function nativeBluetoothDisconnect(): void {
         ble.disconnect(nativeConnection!.deviceId).catch(() => { });
     });
     nativeConnection = null;
+}
+
+// ---- Native Bluetooth Classic (Serial/SPP) via @ascentio-it/capacitor-bluetooth-serial ----
+
+let BtSerial: any = null;
+
+async function getBtSerial() {
+    if (!BtSerial) {
+        const mod = await import('@ascentio-it/capacitor-bluetooth-serial');
+        BtSerial = mod.BluetoothSerial;
+    }
+    return BtSerial;
+}
+
+let serialAddress: string | null = null;
+
+export async function nativeClassicBluetoothConnect(): Promise<boolean> {
+    try {
+        const serial = await getBtSerial();
+        try {
+            const enabled = await serial.isEnabled();
+            if (!enabled?.enabled) await serial.enable();
+        } catch { /* ignore */ }
+
+        // Prefer paired devices (most POS printers are paired in Android Bluetooth settings).
+        const paired = await serial.getPairedDevices().catch(() => ({ devices: [] as any[] }));
+        const devices: any[] = paired?.devices || [];
+
+        // If no paired devices, fall back to scan.
+        const list = devices.length ? devices : (await serial.scan().then((r: any) => r?.devices || []).catch(() => []));
+        if (!list.length) return false;
+
+        // Pick device: if only one, auto. Otherwise prompt user.
+        let selected = list[0];
+        if (list.length > 1 && typeof window !== 'undefined') {
+            const options = list.map((d, i) => `${i + 1}) ${d.name || 'Unknown'} — ${d.address || d.id}`).join('\n');
+            const pick = window.prompt(`Select printer:\n${options}\n\nEnter number:`, "1");
+            const idx = Math.max(1, Math.min(list.length, Number(pick || 1))) - 1;
+            selected = list[idx];
+        }
+
+        const address = selected.address || selected.id;
+        if (!address) return false;
+
+        await serial.connectInsecure({ address }).catch(() => serial.connect({ address }));
+        serialAddress = address;
+        return true;
+    } catch (err) {
+        console.error('Native Classic connect error:', err);
+        return false;
+    }
+}
+
+function bytesToBinaryString(data: Uint8Array): string {
+    // Convert bytes to a 1-byte-per-char string for plugins that accept string payloads.
+    // Chunked to avoid call stack limits.
+    let out = '';
+    const chunk = 4096;
+    for (let i = 0; i < data.length; i += chunk) {
+        const slice = data.slice(i, i + chunk);
+        out += String.fromCharCode(...slice);
+    }
+    return out;
+}
+
+export async function nativeClassicBluetoothSend(data: Uint8Array): Promise<void> {
+    if (!serialAddress) throw new Error('No classic Bluetooth connection');
+    const serial = await getBtSerial();
+    const payload = bytesToBinaryString(data);
+    await serial.write({ address: serialAddress, value: payload });
+}
+
+export async function nativeClassicBluetoothDisconnect(): Promise<void> {
+    if (!serialAddress) return;
+    const serial = await getBtSerial();
+    const addr = serialAddress;
+    serialAddress = null;
+    await serial.disconnect({ address: addr }).catch(() => { });
 }

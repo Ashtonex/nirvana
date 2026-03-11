@@ -26,6 +26,9 @@ import {
     nativeBluetoothConnect,
     nativeBluetoothSend,
     nativeBluetoothDisconnect,
+    nativeClassicBluetoothConnect,
+    nativeClassicBluetoothSend,
+    nativeClassicBluetoothDisconnect,
 } from './capacitorBridge';
 
 export class ThermalPrinterService {
@@ -70,9 +73,19 @@ export class ThermalPrinterService {
     async connectBluetooth() {
         // On Android/iOS: use native Capacitor plugin
         if (isCapacitor()) {
-            const success = await nativeBluetoothConnect();
-            if (success) this.currentTransport = 'bluetooth';
-            return success;
+            const bleOk = await nativeBluetoothConnect();
+            if (bleOk) {
+                this.currentTransport = 'bluetooth';
+                return true;
+            }
+
+            // Fallback to Classic Bluetooth Serial (common receipt printers)
+            const classicOk = await nativeClassicBluetoothConnect();
+            if (classicOk) {
+                this.currentTransport = 'bluetooth';
+                return true;
+            }
+            return false;
         }
 
         // Desktop browser: use Web Bluetooth API
@@ -143,6 +156,7 @@ export class ThermalPrinterService {
     disconnect() {
         if (isCapacitor() && this.currentTransport === 'bluetooth') {
             nativeBluetoothDisconnect();
+            nativeClassicBluetoothDisconnect().catch(() => { });
         }
         this.currentTransport = null;
         this.usbDevice = null;
@@ -168,7 +182,11 @@ export class ThermalPrinterService {
         } else if (this.currentTransport === 'bluetooth') {
             // Native Capacitor path (Android/iOS)
             if (isCapacitor()) {
-                await nativeBluetoothSend(data);
+                try {
+                    await nativeBluetoothSend(data);
+                } catch {
+                    await nativeClassicBluetoothSend(data);
+                }
                 return;
             }
 
@@ -210,10 +228,14 @@ export class ThermalPrinterService {
             const itemName = item.name.substring(0, width).toUpperCase();
             chunks.push(encoder.encode(itemName + "\n"));
 
-            const qtyStr = `${item.quantity} x ${item.priceNet.toFixed(2)}`;
-            const priceStr = item.priceNet.toFixed(2);
-            const taxStr = item.tax.toFixed(2);
-            const totalStr = item.totalGross.toFixed(2);
+            const priceNet = Number(item.priceNet ?? (item.priceGross ? (Number(item.priceGross) / 1.155) : 0));
+            const totalGross = Number(item.totalGross ?? item.total ?? (item.priceGross ? (Number(item.priceGross) * Number(item.quantity || 0)) : 0));
+            const tax = Number(item.tax ?? (totalGross - (priceNet * Number(item.quantity || 0))));
+
+            const qtyStr = `${item.quantity} x ${priceNet.toFixed(2)}`;
+            const priceStr = priceNet.toFixed(2);
+            const taxStr = tax.toFixed(2);
+            const totalStr = totalGross.toFixed(2);
 
             const row = `${qtyStr.padEnd(14)} ${priceStr.padStart(8)} ${taxStr.padStart(8)} ${totalStr.padStart(9)}\n`;
             chunks.push(encoder.encode(row));
