@@ -9,18 +9,31 @@ export function AccessGate({ children }: { children: React.ReactNode }) {
 
   // Check if staff is logged in
   const [staffShopId, setStaffShopId] = useState<string | null>(null);
+  const [ownerOk, setOwnerOk] = useState(false);
   const [checked, setChecked] = useState(false);
 
   useEffect(() => {
     async function checkStaff() {
       try {
-        const res = await fetch("/api/staff/me", { cache: "no-store" });
-        const data = await res.json();
-        if (data?.staff?.shop_id) {
-          setStaffShopId(data.staff.shop_id);
+        const res = await fetch("/api/staff/me", { cache: "no-store", credentials: "include" });
+        if (res.ok) {
+          const data = await res.json();
+          if (data?.staff?.shop_id) {
+            setStaffShopId(data.staff.shop_id);
+            setChecked(true);
+            return;
+          }
         }
       } catch (e) {
         // Not staff
+      }
+
+      // If not staff, check owner session (Next route)
+      try {
+        const r2 = await fetch("/api/auth/me", { cache: "no-store", credentials: "include" });
+        setOwnerOk(r2.ok);
+      } catch {
+        setOwnerOk(false);
       }
       setChecked(true);
     }
@@ -53,5 +66,10 @@ export function AccessGate({ children }: { children: React.ReactNode }) {
   }
 
   // Not staff - let through (owner AuthProvider will handle owner check)
-  return <>{children}</>;
+  if (ownerOk) return <>{children}</>;
+
+  // Neither staff nor owner: force login instead of falling through to Command Center
+  const staffPreferred = pathname.startsWith("/shops") || pathname.startsWith("/staff-chat");
+  router.replace(staffPreferred ? "/staff-login" : "/login");
+  return null;
 }
