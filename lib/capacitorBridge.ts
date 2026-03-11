@@ -109,6 +109,13 @@ export function nativeBluetoothDisconnect(): void {
 
 let BtSerial: any = null;
 
+type ClassicBtDevice = {
+    name?: string;
+    address?: string;
+    id?: string;
+    class?: number;
+};
+
 async function getBtSerial() {
     if (!BtSerial) {
         const mod = await import('@ascentio-it/capacitor-bluetooth-serial');
@@ -129,16 +136,18 @@ export async function nativeClassicBluetoothConnect(): Promise<boolean> {
 
         // Prefer paired devices (most POS printers are paired in Android Bluetooth settings).
         const paired = await serial.getPairedDevices().catch(() => ({ devices: [] as any[] }));
-        const devices: any[] = paired?.devices || [];
+        const devices: ClassicBtDevice[] = paired?.devices || [];
 
         // If no paired devices, fall back to scan.
-        const list = devices.length ? devices : (await serial.scan().then((r: any) => r?.devices || []).catch(() => []));
+        const list: ClassicBtDevice[] = devices.length
+            ? devices
+            : (await serial.scan().then((r: any) => (r?.devices || []) as ClassicBtDevice[]).catch(() => []));
         if (!list.length) return false;
 
         // Pick device: if only one, auto. Otherwise prompt user.
         let selected = list[0];
         if (list.length > 1 && typeof window !== 'undefined') {
-            const options = list.map((d, i) => `${i + 1}) ${d.name || 'Unknown'} — ${d.address || d.id}`).join('\n');
+            const options = list.map((d: ClassicBtDevice, i: number) => `${i + 1}) ${d.name || 'Unknown'} — ${d.address || d.id}`).join('\n');
             const pick = window.prompt(`Select printer:\n${options}\n\nEnter number:`, "1");
             const idx = Math.max(1, Math.min(list.length, Number(pick || 1))) - 1;
             selected = list[idx];
