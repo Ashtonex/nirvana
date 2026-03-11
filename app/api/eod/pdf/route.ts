@@ -4,6 +4,9 @@ import { createHash } from "crypto";
 import { supabaseAdmin } from "@/lib/supabase";
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
+
 function startOfDayUTC(date?: string | null) {
   const d = date ? new Date(`${date}T00:00:00.000Z`) : new Date();
   d.setUTCHours(0, 0, 0, 0);
@@ -17,14 +20,15 @@ function endOfDayUTC(date?: string | null) {
 }
 
 export async function GET(req: Request) {
-  const url = new URL(req.url);
-  const shopId = url.searchParams.get("shopId") || "";
-  const isTest = url.searchParams.get("test") === "true";
-  const date = url.searchParams.get("date"); // YYYY-MM-DD (optional)
-  
-  if (!shopId) {
-    return NextResponse.json({ error: "Missing shopId" }, { status: 400 });
-  }
+  try {
+    const url = new URL(req.url);
+    const shopId = url.searchParams.get("shopId") || "";
+    const isTest = url.searchParams.get("test") === "true";
+    const date = url.searchParams.get("date"); // YYYY-MM-DD (optional)
+    
+    if (!shopId) {
+      return NextResponse.json({ error: "Missing shopId" }, { status: 400 });
+    }
 
   // Skip auth for test mode (test button)
   if (!isTest) {
@@ -95,10 +99,15 @@ export async function GET(req: Request) {
     .from("inventory_items")
     .select("id, name, category, inventory_allocations(shop_id, quantity)");
 
-  if (salesErr || ledgerErr || invErr) {
-    console.error("PDF generation error:", salesErr, ledgerErr, invErr);
-    return NextResponse.json({ error: `Database error: ${salesErr?.message || ledgerErr?.message || invErr?.message}` }, { status: 500 });
-  }
+    if (salesErr || ledgerErr) {
+      console.error("PDF generation error:", salesErr, ledgerErr);
+      return NextResponse.json({ error: `Database error: ${salesErr?.message || ledgerErr?.message}` }, { status: 500 });
+    }
+
+    if (invErr) {
+      // Restock alerts are optional; do not fail PDF generation if this query breaks
+      console.warn("PDF restock query failed (continuing without restock alerts):", invErr);
+    }
 
   const rows = sales || [];
   const totalWithTax = rows.reduce((sum: number, s: any) => sum + Number(s.total_with_tax || 0), 0);
@@ -153,7 +162,7 @@ export async function GET(req: Request) {
   );
 
   // Restock logic
-  const outOfStockItems = (inventory || []).filter((item: any) => {
+  const outOfStockItems = (inventory && !invErr ? inventory : []).filter((item: any) => {
     const alloc = (item.inventory_allocations || []).find((a: any) => a.shop_id === shopId);
     return alloc && Number(alloc.quantity) <= 0;
   }).map((item: any) => ({
@@ -372,16 +381,20 @@ export async function GET(req: Request) {
     }
   }
 
-  const bytes = await pdf.save();
-  const stamp = (date || new Date().toISOString().slice(0, 10));
-  const filename = `EOD_${shopId}_${stamp}.pdf`;
+    const bytes = await pdf.save();
+    const stamp = (date || new Date().toISOString().slice(0, 10));
+    const filename = `EOD_${shopId}_${stamp}.pdf`;
 
-  return new NextResponse(Buffer.from(bytes), {
-    status: 200,
-    headers: {
-      "Content-Type": "application/pdf",
-      "Content-Disposition": `attachment; filename=${filename}`,
-      "Cache-Control": "no-store",
-    },
-  });
+    return new NextResponse(Buffer.from(bytes), {
+      status: 200,
+      headers: {
+        "Content-Type": "application/pdf",
+        "Content-Disposition": `attachment; filename=${filename}`,
+        "Cache-Control": "no-store",
+      },
+    });
+  } catch (err) {
+    console.error('EOD PDF route failed:', err);
+    return NextResponse.json({ error: 'Failed to generate PDF' }, { status: 500 });
+  }
 }
