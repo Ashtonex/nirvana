@@ -161,6 +161,11 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
     const [activeReceipt, setActiveReceipt] = useState<any | null>(null);
     const [isSuccessModalOpen, setIsSuccessModalOpen] = useState(false);
 
+    // Live Lay-by list for this shop (so newly created / updated lay-bys appear immediately)
+    const [laybyList, setLaybyList] = useState(
+        () => (db.quotations || []).filter((q: any) => q.status === 'layby' && q.shopId === shopId)
+    );
+
     const employees = (db.employees || []).filter((e: any) => e.shopId === shopId && e.active);
     const shop = db.shops.find((s: any) => s.id === shopId);
     const shopExpenses = shop ? Object.values(shop.expenses).reduce((a: number, b: any) => a + Number(b), 0) : 0;
@@ -464,6 +469,32 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
                         clientPhone,
                         employeeId: selectedEmployeeId || "system"
                     });
+
+                    // Push new lay-by into local list so it appears in the Lay-by modal immediately
+                    setLaybyList(prev => [
+                        {
+                            id: res.id,
+                            shopId,
+                            clientName,
+                            clientPhone,
+                            items: cart.map(c => ({
+                                itemId: c.item.id,
+                                itemName: c.item.name,
+                                quantity: c.quantity,
+                                unitPrice: c.price / (1 + taxRate),
+                                total: c.price * c.quantity,
+                            })),
+                            totalBeforeTax,
+                            tax: totalTax,
+                            totalWithTax,
+                            paidAmount: deposit,
+                            status: 'layby',
+                            date: res.date,
+                            expiryDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+                            employeeId: selectedEmployeeId || "system",
+                        },
+                        ...prev,
+                    ]);
 
                     currentReceiptData = {
                         orderId: `LAY-${res.id}`,
@@ -1444,7 +1475,7 @@ Generated via NIRVANA POS`;
             {/* Lay-by Management Modal */}
             <Modal isOpen={isLaybyModalOpen} onClose={() => setIsLaybyModalOpen(false)} title="Pending Lay-bys">
                 <div className="space-y-4">
-                    {(db.quotations || []).filter((q: any) => q.status === 'layby' && q.shopId === shopId).length === 0 ? (
+                    {laybyList.length === 0 ? (
                         <p className="text-center text-slate-500 text-xs py-6">No pending lay-bys for this shop.</p>
                     ) : (
                         <div className="space-y-2">
@@ -1455,11 +1486,11 @@ Generated via NIRVANA POS`;
                                 className="w-full h-12 bg-slate-950 border border-slate-800 rounded-xl text-xs font-bold text-slate-200 px-4 outline-none focus:border-sky-500/50 transition-all"
                             >
                                 <option value="">Choose a lay-by...</option>
-                                {(db.quotations || []).filter((q: any) => q.status === 'layby' && q.shopId === shopId).map((q: any) => {
-                                    const balance = Number(q.total_with_tax || 0) - Number(q.paid_amount || 0);
+                                {laybyList.map((q: any) => {
+                                    const balance = Number(q.totalWithTax || 0) - Number(q.paidAmount || 0);
                                     return (
                                         <option key={q.id} value={q.id}>
-                                            #{q.id} — {q.client_name || q.clientName} (Bal: ${balance.toFixed(2)})
+                                            #{q.id} — {q.clientName} (Bal: ${balance.toFixed(2)})
                                         </option>
                                     );
                                 })}
@@ -1468,10 +1499,10 @@ Generated via NIRVANA POS`;
                     )}
 
                     {selectedLaybyId && (() => {
-                        const lb = (db.quotations || []).find((q: any) => q.id === selectedLaybyId);
+                        const lb = laybyList.find((q: any) => q.id === selectedLaybyId);
                         if (!lb) return null;
-                        const total = Number(lb.total_with_tax || lb.totalWithTax || 0);
-                        const paid = Number(lb.paid_amount || 0);
+                        const total = Number(lb.totalWithTax || 0);
+                        const paid = Number(lb.paidAmount || 0);
                         const balance = total - paid;
                         return (
                             <div className="space-y-3 p-4 bg-slate-950 rounded-xl border border-slate-800">
@@ -1503,7 +1534,20 @@ Generated via NIRVANA POS`;
                                             if (isNaN(amt) || amt <= 0) return alert("Enter a valid payment amount.");
                                             startTransition(async () => {
                                                 try {
-                                                    await updateLaybyPayment(selectedLaybyId, amt, shopId, selectedEmployeeId || "system");
+                                                    const result = await updateLaybyPayment(selectedLaybyId, amt, shopId, selectedEmployeeId || "system");
+                                                    // Update local lay-by state for a smoother UX
+                                                    setLaybyList(prev => {
+                                                        const next = prev.map((q: any) => {
+                                                            if (q.id !== selectedLaybyId) return q;
+                                                            const newPaid = Number(q.paidAmount || 0) + amt;
+                                                            return { ...q, paidAmount: newPaid };
+                                                        });
+                                                        // If fully paid, drop from list
+                                                        if (result?.fullyPaid) {
+                                                            return next.filter((q: any) => q.id !== selectedLaybyId);
+                                                        }
+                                                        return next;
+                                                    });
                                                     setLaybyPaymentAmount("");
                                                     setSelectedLaybyId("");
                                                     setIsLaybyModalOpen(false);

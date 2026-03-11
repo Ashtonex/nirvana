@@ -97,6 +97,7 @@ export async function getDashboardData() {
                     totalBeforeTax: Number(q.total_before_tax || 0),
                     tax: Number(q.tax || 0),
                     totalWithTax: Number(q.total_with_tax || 0),
+                    paidAmount: Number(q.paid_amount || 0),
                     status: q.status || 'pending',
                     date: q.date || new Date().toISOString(),
                     expiryDate: q.expiry_date || q.expiryDate || in7Days,

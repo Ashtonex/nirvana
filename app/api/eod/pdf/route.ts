@@ -74,10 +74,10 @@ export async function GET(req: Request) {
     .gte("date", since)
     .lte("date", until);
 
-  // Fetch Ledger (Opening Balance & POS Expenses)
+  // Fetch Ledger (Opening Balance, POS Expenses, Lay-by cash)
   const { data: ledger, error: ledgerErr } = await supabaseAdmin
     .from("ledger_entries")
-    .select("category,amount,date")
+    .select("category,amount,date,description")
     .eq("shop_id", shopId)
     .gte("date", since)
     .lte("date", until);
@@ -108,10 +108,41 @@ export async function GET(req: Request) {
   const posExpenses = (ledger || []).filter((l: any) => l.category === 'POS Expense');
   const totalPosExpenses = posExpenses.reduce((sum: number, l: any) => sum + Number(l.amount || 0), 0);
 
+  // Lay-by ledger activity (cash movements)
+  const laybyDeposits = (ledger || []).filter((l: any) => l.category === 'Lay-by Deposit');
+  const laybyInstallments = (ledger || []).filter((l: any) => l.category === 'Lay-by installment');
+  const laybyFinals = (ledger || []).filter((l: any) => l.category === 'Lay-by Final Payment');
+
+  const totalLaybyDeposit = laybyDeposits.reduce((sum: number, l: any) => sum + Number(l.amount || 0), 0);
+  const totalLaybyInstall = laybyInstallments.reduce((sum: number, l: any) => sum + Number(l.amount || 0), 0);
+  const totalLaybyFinal = laybyFinals.reduce((sum: number, l: any) => sum + Number(l.amount || 0), 0);
+  const totalLaybyCash = totalLaybyDeposit + totalLaybyInstall + totalLaybyFinal;
+
   const closingCashBalance = openingBalance + totalCashSales - totalPosExpenses;
 
   const ecocashSales = rows.filter((s: any) => s.payment_method === 'ecocash');
   const totalEcocash = ecocashSales.reduce((sum: number, s: any) => sum + Number(s.total_with_tax || 0), 0);
+
+  // Lay-by position (outstanding vs collected) from quotations
+  const { data: laybyQuotes } = await supabaseAdmin
+    .from("quotations")
+    .select("shop_id,total_with_tax,paid_amount,status")
+    .eq("shop_id", shopId)
+    .in("status", ["layby", "converted"]);
+
+  const laybyRows = laybyQuotes || [];
+  const laybyOutstanding = laybyRows
+    .filter((q: any) => q.status === "layby")
+    .reduce((sum: number, q: any) => {
+      const total = Number(q.total_with_tax || 0);
+      const paid = Number(q.paid_amount || 0);
+      return sum + Math.max(0, total - paid);
+    }, 0);
+
+  const laybyCollectedToDate = laybyRows.reduce(
+    (sum: number, q: any) => sum + Number(q.paid_amount || 0),
+    0
+  );
 
   // Restock logic
   const outOfStockItems = (inventory || []).filter((item: any) => {
@@ -201,7 +232,30 @@ export async function GET(req: Request) {
   page.drawText(`Cash: $${totalCashSales.toFixed(2)}`, { x: margin, y, size: 10, font, color: rgb(0.38, 0.45, 0.55) });
   y -= 14;
   page.drawText(`EcoCash: $${totalEcocash.toFixed(2)}`, { x: margin, y, size: 10, font, color: rgb(0.38, 0.45, 0.55) });
-  y -= 24;
+  y -= 14;
+
+  // Lay-by cash activity (today)
+  if (totalLaybyCash > 0 || laybyOutstanding > 0) {
+    y -= 6;
+    drawText("Lay-by Activity (Cash Today)", 11, true);
+    page.drawText(
+      `Deposits: $${totalLaybyDeposit.toFixed(2)} • Installments: $${totalLaybyInstall.toFixed(2)} • Final: $${totalLaybyFinal.toFixed(2)}`,
+      { x: margin, y, size: 9, font, color: rgb(0.38, 0.45, 0.55) }
+    );
+    y -= 14;
+    page.drawText(
+      `Total Lay-by Cash Today: $${totalLaybyCash.toFixed(2)}`,
+      { x: margin, y, size: 10, font: fontBold, color: rgb(0.1, 0.4, 0.2) }
+    );
+    y -= 14;
+    page.drawText(
+      `Lay-by Position: Outstanding $${laybyOutstanding.toFixed(2)} • Collected to Date $${laybyCollectedToDate.toFixed(2)}`,
+      { x: margin, y, size: 9, font, color: rgb(0.38, 0.45, 0.55) }
+    );
+    y -= 18;
+  } else {
+    y -= 24;
+  }
 
   // Get top item names for highlighting
   const topItemNames = new Set(topItems.slice(0, 5).map(i => i.name));

@@ -35,6 +35,13 @@ export default async function ShopPage({ params }: { params: { shopId: string } 
 
     const shopSales = db.sales.filter((s: any) => s.shopId === shopId);
     const shopQuotes = (db.quotations || []).filter((q: any) => q.shopId === shopId && q.status === 'pending');
+    const shopLaybys = (db.quotations || []).filter((q: any) => q.shopId === shopId && q.status === 'layby');
+    const laybyOutstanding = shopLaybys.reduce((sum: number, q: any) => {
+        const total = Number(q.totalWithTax || 0);
+        const paid = Number(q.paidAmount || 0);
+        return sum + Math.max(0, total - paid);
+    }, 0);
+    const laybyCollected = shopLaybys.reduce((sum: number, q: any) => sum + Number(q.paidAmount || 0), 0);
     const shopEmployees = (db.employees || []).filter((e: any) => e.shopId === shopId && e.active);
 
     const totalRev = shopSales.reduce((sum: number, s: any) => sum + s.totalWithTax, 0);
@@ -61,7 +68,7 @@ export default async function ShopPage({ params }: { params: { shopId: string } 
                 </div>
             </div>
 
-            <div className="grid gap-4 md:grid-cols-4">
+            <div className="grid gap-4 md:grid-cols-5">
                 <Card className="bg-slate-900/40 border-slate-800/50 backdrop-blur-md">
                     <CardHeader className="pb-2">
                         <CardTitle className="text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-2">
@@ -115,6 +122,27 @@ export default async function ShopPage({ params }: { params: { shopId: string } 
                         <p className="text-[10px] text-slate-400 font-bold uppercase mt-2 truncate">
                             {shopEmployees.map((e: any) => e.name).join(', ')}
                         </p>
+                    </CardContent>
+                </Card>
+
+                <Card className="bg-slate-900/40 border-slate-800/50 backdrop-blur-md">
+                    <CardHeader className="pb-2">
+                        <CardTitle className="text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-2">
+                            <FileText className="h-3 w-3 text-sky-400" /> Lay-bys
+                        </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="text-2xl font-black text-white font-mono">
+                            ${laybyOutstanding.toFixed(2)}
+                        </div>
+                        <p className="text-[10px] text-slate-500 font-bold uppercase mt-1">
+                            Outstanding • {shopLaybys.length} active
+                        </p>
+                        {laybyCollected > 0 && (
+                            <p className="text-[9px] text-emerald-400 font-mono mt-1">
+                                Collected: ${laybyCollected.toFixed(2)}
+                            </p>
+                        )}
                     </CardContent>
                 </Card>
             </div>
