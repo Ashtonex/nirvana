@@ -1350,6 +1350,11 @@ export async function recordLayby(layby: {
     const id = Math.random().toString(36).substring(2, 9);
     const date = new Date().toISOString();
 
+    // Validate items
+    if (!layby.items || layby.items.length === 0) {
+        throw new Error("Lay-by requires at least one item");
+    }
+
     // 1. Create the Lay-by record in quotations table
     await supabaseAdmin.from('quotations').insert({
         id,
@@ -1379,37 +1384,40 @@ export async function recordLayby(layby: {
 
     // 3. Reserve Inventory (Reduce stock immediately)
     for (const item of layby.items) {
-        if (item.itemId?.startsWith('service_')) continue;
+        if (!item.itemId || item.itemId.startsWith('service_')) continue;
 
-        // Reduce Shop Allocation
-        const { data: alloc } = await supabaseAdmin.from('inventory_allocations')
-            .select('quantity')
-            .eq('item_id', item.itemId)
-            .eq('shop_id', layby.shopId)
-            .single();
-
-        if (alloc) {
-            await supabaseAdmin.from('inventory_allocations')
-                .update({ quantity: alloc.quantity - item.quantity })
+        try {
+            // Reduce Shop Allocation
+            const { data: alloc } = await supabaseAdmin.from('inventory_allocations')
+                .select('quantity')
                 .eq('item_id', item.itemId)
-                .eq('shop_id', layby.shopId);
-        }
+                .eq('shop_id', layby.shopId)
+                .single();
 
-        // Reduce Global Stock
-        const { data: invItem } = await supabaseAdmin.from('inventory_items')
-            .select('quantity')
-            .eq('id', item.itemId)
-            .single();
+            if (alloc && alloc.quantity > 0) {
+                await supabaseAdmin.from('inventory_allocations')
+                    .update({ quantity: Math.max(0, alloc.quantity - item.quantity) })
+                    .eq('item_id', item.itemId)
+                    .eq('shop_id', layby.shopId);
+            }
 
-        if (invItem) {
-            await supabaseAdmin.from('inventory_items')
-                .update({ quantity: invItem.quantity - item.quantity })
-                .eq('id', item.itemId);
+            // Reduce Global Stock
+            const { data: invItem } = await supabaseAdmin.from('inventory_items')
+                .select('quantity')
+                .eq('id', item.itemId)
+                .single();
+
+            if (invItem && invItem.quantity > 0) {
+                await supabaseAdmin.from('inventory_items')
+                    .update({ quantity: Math.max(0, invItem.quantity - item.quantity) })
+                    .eq('id', item.itemId);
+            }
+        } catch (err) {
+            console.error('Failed to decrement inventory for layby item:', item.itemId, err);
+            // Continue with other items even if one fails
         }
     }
 
-    revalidatePath(`/shops/${layby.shopId}`);
-    revalidatePath('/inventory');
     return { id, date };
 }
 
