@@ -41,7 +41,7 @@ export default async function HistoricalEODPage() {
 
         <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
           <p className="text-slate-400 mb-6">
-            Generate end-of-day reports for any past date. Select a shop and date below.
+            Download end-of-day reports as PDFs for any past date. Select a shop and date below.
           </p>
 
           <form action="/api/eod/pdf" method="GET" className="space-y-6">
@@ -84,52 +84,6 @@ export default async function HistoricalEODPage() {
                 Download PDF
               </Button>
             </div>
-          </form>
-        </div>
-
-        <div className="mt-6 bg-slate-900 border border-slate-800 rounded-xl p-6">
-          <h2 className="text-lg font-black uppercase italic mb-4">Quick Generate</h2>
-          <p className="text-slate-400 text-sm mb-4">
-            Generate reports for multiple days at once.
-          </p>
-          
-          <form action="/api/eod/historical" method="POST" className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs font-black uppercase text-slate-500 mb-2">
-                  From Date
-                </label>
-                <input 
-                  type="date" 
-                  name="startDate"
-                  required
-                  max={new Date().toISOString().split('T')[0]}
-                  className="w-full bg-slate-950 border border-slate-700 rounded-lg px-4 py-3 text-white font-bold"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-black uppercase text-slate-500 mb-2">
-                  To Date
-                </label>
-                <input 
-                  type="date" 
-                  name="endDate"
-                  required
-                  max={new Date().toISOString().split('T')[0]}
-                  className="w-full bg-slate-950 border border-slate-700 rounded-lg px-4 py-3 text-white font-bold"
-                />
-              </div>
-            </div>
-            
-            <Button 
-              type="submit"
-              name="action"
-              value="range"
-              className="w-full bg-violet-600 hover:bg-violet-500"
-            >
-              <Calendar className="h-4 w-4 mr-2" />
-              Generate Date Range
-            </Button>
           </form>
         </div>
       </div>
