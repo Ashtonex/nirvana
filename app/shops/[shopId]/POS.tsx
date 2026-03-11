@@ -484,7 +484,7 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
                         tax: totalTax,
                         total: totalDue,
                         paidAmount: deposit,
-                        balanceRemaining: totalDue - deposit,
+                        balanceRemaining: Math.max(0, Number(totalDue) - deposit),
                         dateStamp: new Date().toLocaleDateString(),
                         timeStamp: new Date().toLocaleTimeString(),
                         paymentMethod: 'cash',

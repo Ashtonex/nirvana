@@ -40,7 +40,7 @@ async function sendWeeklyReport(shopId: string, staffName: string) {
 
   // Get expenses
   const { data: expenses } = await supabaseAdmin
-    .from("ledger")
+    .from("ledger_entries")
     .select("amount, category")
     .eq("shop_id", shopId)
     .eq("category", "POS Expense")
@@ -222,7 +222,7 @@ export async function POST(req: Request) {
 
   // Get today's expenses
   const { data: expenses } = await supabaseAdmin
-    .from("ledger")
+    .from("ledger_entries")
     .select("amount, category")
     .eq("shop_id", shopId)
     .eq("category", "POS Expense")

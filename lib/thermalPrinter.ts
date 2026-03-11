@@ -1,4 +1,4 @@
-// WebUSB Type Definitions for environments without @types/w3c-web-usb
+// WebUSB Type Definitions for desktop browser environments
 interface USBDevice {
     open(): Promise<void>;
     selectConfiguration(configurationValue: number): Promise<void>;
@@ -21,11 +21,12 @@ interface USBOutTransferResult {
     status: string;
 }
 
-interface Navigator {
-    usb: {
-        requestDevice(options: { filters: any[] }): Promise<USBDevice>;
-    };
-}
+import {
+    isCapacitor,
+    nativeBluetoothConnect,
+    nativeBluetoothSend,
+    nativeBluetoothDisconnect,
+} from './capacitorBridge';
 
 export class ThermalPrinterService {
     private usbDevice: any | null = null;
@@ -33,7 +34,7 @@ export class ThermalPrinterService {
     private bluetoothCharacteristic: any | null = null;
     private currentTransport: 'usb' | 'bluetooth' | null = null;
 
-    // Common Thermal Printer BLE UUIDs
+    // Common Thermal Printer BLE UUIDs (for Web Bluetooth desktop fallback)
     private readonly BLE_SERVICE_UUIDS = [
         '0000ae30-0000-1000-8000-00805f9b34fb',
         '49535343-fe7d-4ae5-8fa9-9fafd205e455',
@@ -42,15 +43,17 @@ export class ThermalPrinterService {
     private readonly BLE_CHARACTERISTIC_UUIDS = [
         '0000ae01-0000-1000-8000-00805f9b34fb',
         '49535343-8841-43f4-8a54-e7e0167ca04b',
-        '0000ff02-0000-1000-8000-00805f9b34fb'
+        '0000ff02-0000-1000-8000-00805f9b34fb',
     ];
 
     async connectUsb() {
+        // USB is desktop-only (Web USB API not available in Android WebView)
+        if (isCapacitor()) {
+            console.warn('USB printing is not supported in the mobile app. Please use Bluetooth.');
+            return false;
+        }
         try {
-            this.usbDevice = await (navigator as any).usb.requestDevice({
-                filters: []
-            });
-
+            this.usbDevice = await (navigator as any).usb.requestDevice({ filters: [] });
             await this.usbDevice.open();
             if (this.usbDevice.configuration === null) {
                 await this.usbDevice.selectConfiguration(1);
@@ -65,17 +68,23 @@ export class ThermalPrinterService {
     }
 
     async connectBluetooth() {
+        // On Android/iOS: use native Capacitor plugin
+        if (isCapacitor()) {
+            const success = await nativeBluetoothConnect();
+            if (success) this.currentTransport = 'bluetooth';
+            return success;
+        }
+
+        // Desktop browser: use Web Bluetooth API
         try {
-            console.log("Requesting Bluetooth device...");
-            // Many thermal printers don't advertise their primary service UUID.
-            // Using acceptAllDevices makes it much easier to find them.
+            console.log("Requesting Bluetooth device (Web Bluetooth)...");
             const device = await (navigator as any).bluetooth.requestDevice({
                 acceptAllDevices: true,
                 optionalServices: [
                     ...this.BLE_SERVICE_UUIDS,
-                    '000018f0-0000-1000-8000-00805f9b34fb', // Generic printer
+                    '000018f0-0000-1000-8000-00805f9b34fb',
                     '000018f1-0000-1000-8000-00805f9b34fb',
-                    '00001101-0000-1000-8000-00805f9b34fb', // Serial Port Profile
+                    '00001101-0000-1000-8000-00805f9b34fb',
                     '0000ff00-0000-1000-8000-00805f9b34fb',
                 ]
             });
@@ -84,10 +93,8 @@ export class ThermalPrinterService {
             const server = await device.gatt.connect();
 
             console.log("Searching for services...");
-            // Try known services first
             let characteristic = null;
 
-            // Re-merge UUIDs for more thorough search
             const allServiceUuids = [
                 ...this.BLE_SERVICE_UUIDS,
                 '000018f0-0000-1000-8000-00805f9b34fb',
@@ -98,14 +105,10 @@ export class ThermalPrinterService {
             for (const serviceUuid of allServiceUuids) {
                 try {
                     const service = await server.getPrimaryService(serviceUuid);
-                    console.log(`Found service: ${serviceUuid}`);
                     for (const charUuid of this.BLE_CHARACTERISTIC_UUIDS) {
                         try {
                             characteristic = await service.getCharacteristic(charUuid);
-                            if (characteristic) {
-                                console.log(`Found characteristic: ${charUuid}`);
-                                break;
-                            }
+                            if (characteristic) break;
                         } catch (e) { }
                     }
                     if (characteristic) break;
@@ -113,7 +116,6 @@ export class ThermalPrinterService {
             }
 
             if (!characteristic) {
-                // If specific service search fails, try to find any writeable characteristic
                 const services = await server.getPrimaryServices();
                 for (const service of services) {
                     const chars = await service.getCharacteristics();
@@ -135,8 +137,17 @@ export class ThermalPrinterService {
     }
 
     async connect() {
-        // Default to USB for backward compatibility if called without preference
         return this.connectUsb();
+    }
+
+    disconnect() {
+        if (isCapacitor() && this.currentTransport === 'bluetooth') {
+            nativeBluetoothDisconnect();
+        }
+        this.currentTransport = null;
+        this.usbDevice = null;
+        this.bluetoothDevice = null;
+        this.bluetoothCharacteristic = null;
     }
 
     async printRaw(data: Uint8Array) {
@@ -151,14 +162,18 @@ export class ThermalPrinterService {
             const endpointOut = alternateInterface.endpoints.find(
                 (e: any) => e.direction === 'out'
             );
-
             if (!endpointOut) throw new Error("No bulk out endpoint found");
             await this.usbDevice.transferOut(endpointOut.endpointNumber, data);
-        } else if (this.currentTransport === 'bluetooth') {
-            if (!this.bluetoothCharacteristic) throw new Error("Bluetooth characteristic not initialized");
 
-            // BLE normally has a 20-byte MTU limit for writeWithoutResponse, 
-            // but some devices support more. To be safe, we chunk in 20-Byte segments.
+        } else if (this.currentTransport === 'bluetooth') {
+            // Native Capacitor path (Android/iOS)
+            if (isCapacitor()) {
+                await nativeBluetoothSend(data);
+                return;
+            }
+
+            // Web Bluetooth path (desktop)
+            if (!this.bluetoothCharacteristic) throw new Error("Bluetooth characteristic not initialized");
             const chunkSize = 20;
             for (let i = 0; i < data.length; i += chunkSize) {
                 const chunk = data.slice(i, i + chunkSize);
@@ -169,20 +184,18 @@ export class ThermalPrinterService {
 
     async printReceipt(receipt: any) {
         const encoder = new TextEncoder();
-        const init = new Uint8Array([0x1b, 0x40]); // ESC @ (Initialize)
-        const center = new Uint8Array([0x1b, 0x61, 0x01]); // ESC a 1 (Center)
-        const left = new Uint8Array([0x1b, 0x61, 0x00]); // ESC a 0 (Left)
-        const fontB = new Uint8Array([0x1b, 0x4d, 0x01]); // ESC M 1 (Select Font B)
-        const cut = new Uint8Array([0x1d, 0x56, 0x41, 0x03]); // GS V A 3 (Paper Cut)
+        const init = new Uint8Array([0x1b, 0x40]);
+        const center = new Uint8Array([0x1b, 0x61, 0x01]);
+        const left = new Uint8Array([0x1b, 0x61, 0x00]);
+        const fontB = new Uint8Array([0x1b, 0x4d, 0x01]);
+        const cut = new Uint8Array([0x1d, 0x56, 0x41, 0x03]);
 
-        // Font B typically allows ~42 characters on 58mm paper
         const width = 42;
         const line = "-".repeat(width) + "\n";
         const dotLine = ". ".repeat(width / 2) + "\n";
 
         const chunks: Uint8Array[] = [init, fontB, center];
 
-        // Header
         chunks.push(encoder.encode(receipt.shopName.toUpperCase() + "\n"));
         chunks.push(encoder.encode("NIRVANA PREMIUM NETWORK\n"));
         chunks.push(encoder.encode(`${receipt.dateStamp} | ${receipt.timeStamp}\n`));
@@ -190,7 +203,6 @@ export class ThermalPrinterService {
         chunks.push(encoder.encode(line));
 
         chunks.push(left);
-        // Column Headers
         chunks.push(encoder.encode("ITEM x QTY              PRICE      TAX     TOTAL\n"));
         chunks.push(encoder.encode(line));
 
@@ -224,16 +236,15 @@ export class ThermalPrinterService {
         chunks.push(encoder.encode(`PAYMENT: ${receipt.paymentMethod.toUpperCase()}\n`));
         chunks.push(encoder.encode(`ORDER ID: ${receipt.orderId}\n`));
 
-        // QR Code
         const qrData = `VERIFY_NIRVANA_${receipt.transactionId || receipt.orderId}`;
-        chunks.push(new Uint8Array([0x1d, 0x28, 0x6b, 0x03, 0x00, 0x31, 0x43, 0x05])); // Set QR size (5)
-        chunks.push(new Uint8Array([0x1d, 0x28, 0x6b, 0x03, 0x00, 0x31, 0x45, 0x30])); // Set error correction
+        chunks.push(new Uint8Array([0x1d, 0x28, 0x6b, 0x03, 0x00, 0x31, 0x43, 0x05]));
+        chunks.push(new Uint8Array([0x1d, 0x28, 0x6b, 0x03, 0x00, 0x31, 0x45, 0x30]));
         const dataBytes = encoder.encode(qrData);
         const pL = (dataBytes.length + 3) % 256;
         const pH = Math.floor((dataBytes.length + 3) / 256);
-        chunks.push(new Uint8Array([0x1d, 0x28, 0x6b, pL, pH, 0x31, 0x50, 0x30])); // Store data
+        chunks.push(new Uint8Array([0x1d, 0x28, 0x6b, pL, pH, 0x31, 0x50, 0x30]));
         chunks.push(dataBytes);
-        chunks.push(new Uint8Array([0x1d, 0x28, 0x6b, 0x03, 0x00, 0x31, 0x51, 0x30])); // Print QR
+        chunks.push(new Uint8Array([0x1d, 0x28, 0x6b, 0x03, 0x00, 0x31, 0x51, 0x30]));
 
         chunks.push(encoder.encode("\nTHANK YOU FOR SHOPPING!\n"));
         chunks.push(encoder.encode(line));
@@ -253,7 +264,6 @@ export class ThermalPrinterService {
     }
 
     async printTest() {
-        // Just a dummy receipt to test the layout
         const mockReceipt = {
             shopName: "Nirvana Test Shop",
             cashier: "Admin",
