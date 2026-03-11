@@ -148,6 +148,7 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
 
     // Today's receipts modal
     const [isReceiptsModalOpen, setIsReceiptsModalOpen] = useState(false);
+    const [receiptsPaymentFilter, setReceiptsPaymentFilter] = useState<'cash' | 'ecocash'>('cash');
 
     // Expenses receipts modal
     const [isExpensesModalOpen, setIsExpensesModalOpen] = useState(false);
@@ -2036,15 +2037,51 @@ Generated via NIRVANA POS`;
                 onClose={() => setIsReceiptsModalOpen(false)}
                 title="Today's Receipts"
             >
-                <div className="space-y-4 max-h-[60vh] overflow-y-auto">
-                    {todaysSales.length === 0 ? (
+                {(() => {
+                    const filtered = (todaysSales || []).filter((s: any) => {
+                        const pm = String(s?.paymentMethod || '').toLowerCase();
+                        return pm === receiptsPaymentFilter;
+                    });
+                    const totalFiltered = filtered.reduce((sum: number, s: any) => sum + Number(s?.totalWithTax || 0), 0);
+                    return (
+                        <div className="space-y-4 max-h-[60vh] overflow-y-auto">
+                            <div className="grid grid-cols-2 gap-2">
+                                <Button
+                                    type="button"
+                                    variant={receiptsPaymentFilter === 'cash' ? 'default' : 'outline'}
+                                    className={cn(
+                                        "h-9 text-[10px] font-black uppercase italic tracking-widest",
+                                        receiptsPaymentFilter === 'cash'
+                                            ? "bg-emerald-600 hover:bg-emerald-500"
+                                            : "border-slate-800 text-slate-400 hover:text-slate-200"
+                                    )}
+                                    onClick={() => setReceiptsPaymentFilter('cash')}
+                                >
+                                    Cash Only
+                                </Button>
+                                <Button
+                                    type="button"
+                                    variant={receiptsPaymentFilter === 'ecocash' ? 'default' : 'outline'}
+                                    className={cn(
+                                        "h-9 text-[10px] font-black uppercase italic tracking-widest",
+                                        receiptsPaymentFilter === 'ecocash'
+                                            ? "bg-sky-600 hover:bg-sky-500"
+                                            : "border-slate-800 text-slate-400 hover:text-slate-200"
+                                    )}
+                                    onClick={() => setReceiptsPaymentFilter('ecocash')}
+                                >
+                                    EcoCash Only
+                                </Button>
+                            </div>
+
+                            {(todaysSales || []).length === 0 ? (
                         <p className="text-slate-500 text-center py-8">No sales recorded today</p>
                     ) : (
                         <div className="space-y-2">
                             <p className="text-[10px] text-slate-500 font-bold uppercase">
-                                {todaysSales.length} sale{todaysSales.length !== 1 ? 's' : ''} today
+                                {filtered.length} {receiptsPaymentFilter} sale{filtered.length !== 1 ? 's' : ''} today • Total ${totalFiltered.toFixed(2)}
                             </p>
-                            {todaysSales.map((sale: any) => (
+                            {filtered.map((sale: any) => (
                                 <div key={sale.id} className="bg-slate-950 border border-slate-800 rounded-lg p-3">
                                     <div className="flex justify-between items-start">
                                         <div className="flex-1">
@@ -2074,7 +2111,9 @@ Generated via NIRVANA POS`;
                             ))}
                         </div>
                     )}
-                </div>
+                        </div>
+                    );
+                })()}
             </Modal>
 
             <Modal
