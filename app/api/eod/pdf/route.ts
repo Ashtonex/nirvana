@@ -94,10 +94,12 @@ export async function GET(req: Request) {
     .gte("date", since)
     .lte("date", until);
 
-  // Fetch Inventory for Restock Alerts
-  const { data: inventory, error: invErr } = await supabaseAdmin
-    .from("inventory_items")
-    .select("id, name, category, inventory_allocations(shop_id, quantity)");
+  // Fetch Restock Alerts (avoid pulling entire inventory; query only the shop allocations)
+  const { data: oosAllocs, error: invErr } = await supabaseAdmin
+    .from("inventory_allocations")
+    .select("item_id, quantity")
+    .eq("shop_id", shopId)
+    .lte("quantity", 0);
 
     if (salesErr || ledgerErr) {
       console.error("PDF generation error:", salesErr, ledgerErr);
@@ -162,13 +164,30 @@ export async function GET(req: Request) {
   );
 
   // Restock logic
-  const outOfStockItems = (inventory && !invErr ? inventory : []).filter((item: any) => {
-    const alloc = (item.inventory_allocations || []).find((a: any) => a.shop_id === shopId);
-    return alloc && Number(alloc.quantity) <= 0;
-  }).map((item: any) => ({
-    name: item.name,
-    category: item.category
-  }));
+  const oosIds = (!invErr && Array.isArray(oosAllocs) ? oosAllocs : [])
+    .filter((a: any) => Number(a.quantity) <= 0)
+    .map((a: any) => a.item_id)
+    .filter(Boolean);
+
+  let outOfStockItems: { name: string; category: string }[] = [];
+  if (oosIds.length > 0) {
+    try {
+      const { data: items, error: itemsErr } = await supabaseAdmin
+        .from("inventory_items")
+        .select("id,name,category")
+        .in("id", oosIds);
+      if (!itemsErr && items) {
+        outOfStockItems = items.map((it: any) => ({
+          name: it.name,
+          category: it.category || "Uncategorized",
+        }));
+      } else if (itemsErr) {
+        console.warn('PDF restock items lookup failed (continuing without restock alerts):', itemsErr);
+      }
+    } catch (e) {
+      console.warn('PDF restock items lookup exception (continuing without restock alerts):', e);
+    }
+  }
 
   const itemMap = new Map<string, { name: string; qty: number; gross: number }>();
   for (const s of rows as any[]) {
