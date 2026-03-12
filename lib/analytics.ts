@@ -72,8 +72,9 @@ export async function getBestSellers(daysBack = 30): Promise<SalesMetric[]> {
 // 2. PERFORMANCE TRENDS
 export async function getPerformanceTrends() {
     const now = new Date();
-    const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-    const sixtyDaysAgo = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000);
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const thirtyDaysAgo = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000);
+    const sixtyDaysAgo = new Date(today.getTime() - 60 * 24 * 60 * 60 * 1000);
 
     const { data: sales } = await supabaseAdmin.from('sales').select('total_with_tax, date');
 
@@ -82,7 +83,7 @@ export async function getPerformanceTrends() {
 
     (sales || []).forEach((sale: any) => {
         const saleDate = new Date(sale.date);
-        if (saleDate >= thirtyDaysAgo) {
+        if (saleDate >= thirtyDaysAgo && saleDate < today) {
             currentPeriodRevenue += sale.total_with_tax;
         } else if (saleDate >= sixtyDaysAgo && saleDate < thirtyDaysAgo) {
             previousPeriodRevenue += sale.total_with_tax;
