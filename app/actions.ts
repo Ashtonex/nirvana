@@ -8,6 +8,7 @@ import { createHash, randomUUID } from "crypto";
 import { sendEmail } from "@/lib/email";
 import { sendWhatsAppMessage } from "@/lib/twilio";
 import { cookies } from "next/headers";
+import { computePosAuditReport } from "@/lib/posAudit";
 
 function getPublicBaseUrl() {
     const url =
@@ -1095,6 +1096,21 @@ export async function updateCashDrawerOpening(input: {
     revalidatePath(`/shops/${shopId}`);
     revalidatePath("/admin/audit");
     return { success: true, created: false, oldAmount, newAmount };
+}
+
+export async function getPosAuditReport(input: { shopId: string; dateYYYYMMDD: string }) {
+    const actor = await requireManagerOrOwner();
+    const shopId = String(input?.shopId || "").trim();
+    const day = String(input?.dateYYYYMMDD || "").trim();
+
+    if (!shopId) throw new Error("Missing shopId");
+    if (!day) throw new Error("Missing date");
+
+    if (actor.kind === "staff" && actor.shopId && actor.shopId !== shopId) {
+        throw new Error("Forbidden");
+    }
+
+    return computePosAuditReport({ shopId, dateYYYYMMDD: day });
 }
 
 export async function recordPosExpense(shopId: string, amount: number, description: string, employeeId: string) {
