@@ -1,20 +1,18 @@
 import { supabaseAdmin } from "@/lib/supabase";
 
-function startOfDayUTC(dateYYYYMMDD: string) {
-  const d = new Date(`${dateYYYYMMDD}T00:00:00.000Z`);
-  d.setUTCHours(0, 0, 0, 0);
+function startOfDayLocal(dateYYYYMMDD: string) {
+  const d = new Date(`${dateYYYYMMDD}T00:00:00`);
   return d.toISOString();
 }
 
-function endOfDayUTC(dateYYYYMMDD: string) {
-  const d = new Date(`${dateYYYYMMDD}T23:59:59.999Z`);
-  d.setUTCHours(23, 59, 59, 999);
+function endOfDayLocal(dateYYYYMMDD: string) {
+  const d = new Date(`${dateYYYYMMDD}T23:59:59.999`);
   return d.toISOString();
 }
 
 function dayBack(dateYYYYMMDD: string, days: number) {
-  const d = new Date(`${dateYYYYMMDD}T00:00:00.000Z`);
-  d.setUTCDate(d.getUTCDate() - days);
+  const d = new Date(`${dateYYYYMMDD}T00:00:00`);
+  d.setDate(d.getDate() - days);
   return d.toISOString().split("T")[0];
 }
 
@@ -106,11 +104,11 @@ export async function computePosAuditReport(input: { shopId: string; dateYYYYMMD
   if (!shopId) throw new Error("Missing shopId");
   if (!day) throw new Error("Missing date");
 
-  const since = startOfDayUTC(day);
-  const until = endOfDayUTC(day);
+  const since = startOfDayLocal(day);
+  const until = endOfDayLocal(day);
   const prevDay = dayBack(day, 1);
-  const sincePrev = startOfDayUTC(prevDay);
-  const untilPrev = endOfDayUTC(prevDay);
+  const sincePrev = startOfDayLocal(prevDay);
+  const untilPrev = endOfDayLocal(prevDay);
 
   const [salesRes, ledgerRes, employeesRes, auditRes, prevSalesRes, prevLedgerRes] = await Promise.all([
     supabaseAdmin
