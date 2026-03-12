@@ -128,7 +128,7 @@ export async function computePosAuditReport(input: { shopId: string; dateYYYYMMD
     supabaseAdmin.from("employees").select("id,name,surname,role,shop_id"),
     supabaseAdmin
       .from("audit_log")
-      .select("id,timestamp,employee_id,action,details,shop_id")
+      .select("id,timestamp,employee_id,action,details")
       .gte("timestamp", sincePrev)
       .lte("timestamp", until),
     supabaseAdmin
@@ -189,6 +189,13 @@ export async function computePosAuditReport(input: { shopId: string; dateYYYYMMD
   const prevOpeningEntries = prevLedgerRows
     .filter((l) => String(l?.category || "") === "Cash Drawer Opening" && isSameDayISO(l?.date, prevDay))
     .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+  if (prevOpeningEntries.length === 0) {
+    flags.push({
+      code: "PREV_OPENING_MISSING",
+      severity: "warn",
+      message: `No Cash Drawer Opening found for previous day (${prevDay}). Expected opening may be unreliable.`,
+    });
+  }
   const prevOpeningAmount = prevOpeningEntries[0] ? toMoney(prevOpeningEntries[0].amount) : 0;
 
   const prevCashSales = prevSalesRows
@@ -383,4 +390,3 @@ export async function computePosAuditReport(input: { shopId: string; dateYYYYMMD
     auditEvents,
   };
 }
-
