@@ -149,7 +149,7 @@ export async function GET(req: Request) {
     const bytes = await pdf.save();
     const filename = `POS_AUDIT_${shopId}_${report.date}_${ymd(new Date())}.pdf`;
 
-    return new NextResponse(bytes, {
+    return new NextResponse(Buffer.from(bytes), {
       status: 200,
       headers: {
         "Content-Type": "application/pdf",
@@ -163,4 +163,3 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: msg }, { status });
   }
 }
-
