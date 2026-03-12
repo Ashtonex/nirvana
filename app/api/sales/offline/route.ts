@@ -12,6 +12,7 @@ async function resolveSaleItem(
     client: ReturnType<typeof createClient>,
     sale: any
 ): Promise<{ itemId: string; itemName: string }> {
+    type InventoryItemLite = { id: string; name: string | null };
     const rawId = String(sale?.itemId || '').trim();
     const rawName = String(sale?.itemName || '').trim();
     const qty = Math.max(1, Number(sale?.quantity || 1));
@@ -21,7 +22,8 @@ async function resolveSaleItem(
     if (!looksUntracked) {
         // Verify the item exists; if not, fall back to name resolution.
         const { data: byId } = await client.from('inventory_items').select('id,name').eq('id', rawId).maybeSingle();
-        if (byId?.id) return { itemId: byId.id, itemName: byId.name || rawName || byId.id };
+        const byIdRow = byId as InventoryItemLite | null;
+        if (byIdRow?.id) return { itemId: byIdRow.id, itemName: byIdRow.name || rawName || byIdRow.id };
     }
 
     if (rawName) {
@@ -31,7 +33,7 @@ async function resolveSaleItem(
             .ilike('name', rawName)
             .limit(5);
 
-        const list = candidates || [];
+        const list = (candidates || []) as InventoryItemLite[];
         const exact = list.find((c: any) => String(c.name || '').toLowerCase() === rawName.toLowerCase()) || list[0];
         if (exact?.id) return { itemId: exact.id, itemName: exact.name || rawName };
     }
