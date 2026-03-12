@@ -325,7 +325,8 @@ export async function POST(req: Request) {
     : [];
 
   const lowItemMap = new Map<string, LowItem>(lowItems.map((i) => [i.id, i]));
-  const restock = (lowAllocs || []).map((a: any) => {
+  type RestockItem = { itemId: string; name: string; category: string; qty: number };
+  const restock: RestockItem[] = (lowAllocs || []).map((a: any) => {
     const it = lowItemMap.get(a.item_id);
     return { itemId: a.item_id, name: it?.name || a.item_id, category: it?.category || "", qty: Number(a.quantity || 0) };
   });
