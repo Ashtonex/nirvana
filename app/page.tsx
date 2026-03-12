@@ -1,10 +1,11 @@
 export const dynamic = 'force-dynamic';
 
 import { getDashboardData } from "./actions";
-import { getBestSellers, getPerformanceTrends, getReorderSuggestions, getDeadStock, getSalesHistory, getStaffLeaderboard, getRevenueForecast, getPremiumStockValue, getSalesVsOverheadsData } from "@/lib/analytics";
+import { getBestSellers, getPerformanceTrends, getReorderSuggestions, getDeadStock, getSalesHistory, getStaffLeaderboard, getRevenueForecast, getPremiumStockValue, getSalesVsOverheadsData, getRevenueExpenseProfitTrajectoryData } from "@/lib/analytics";
 import { IntelligenceDashboard } from "@/components/IntelligenceDashboard";
 import { SalesChart } from "@/components/SalesChart";
 import { BreakEvenChart } from "@/components/BreakEvenChart";
+import { RevenueExpenseProfitTrajectoryChart } from "@/components/RevenueExpenseProfitTrajectoryChart";
 import { Leaderboard } from "@/components/Leaderboard";
 import { RealtimeDashboard } from "@/components/RealtimeDashboard";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui";
@@ -33,7 +34,8 @@ export default async function Home() {
     leaderboard,
     forecast,
     premiumStockValue,
-    breakEvenData
+    breakEvenData,
+    revExpData
   ] = await Promise.all([
     getBestSellers(),
     getPerformanceTrends(),
@@ -43,7 +45,8 @@ export default async function Home() {
     getStaffLeaderboard(),
     getRevenueForecast(),
     getPremiumStockValue(),
-    getSalesVsOverheadsData()
+    getSalesVsOverheadsData(),
+    getRevenueExpenseProfitTrajectoryData()
   ]);
 
   const totalExpenses = Object.values(db?.globalExpenses || {}).reduce((a: number, b: any) => a + Number(b), 0);
@@ -141,6 +144,10 @@ export default async function Home() {
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
+        <RevenueExpenseProfitTrajectoryChart datasets={revExpData} />
+      </div>
+
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
         <Card className="col-span-4">
           <CardHeader>
             <CardTitle>Rationalized Distribution Index</CardTitle>
@@ -183,4 +190,3 @@ export default async function Home() {
     </div>
   );
 }
-

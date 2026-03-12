@@ -243,6 +243,110 @@ export async function getSalesVsOverheadsData() {
     return datasets;
 }
 
+export async function getRevenueExpenseProfitTrajectoryData() {
+    const now = new Date();
+    const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+    const currentDay = now.getDate();
+
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+    const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999).toISOString();
+
+    const { data: shops } = await supabaseAdmin.from('shops').select('id, name, expenses');
+    const { data: ledger } = await supabaseAdmin
+        .from('ledger_entries')
+        .select('shop_id, type, amount, date')
+        .eq('type', 'expense')
+        .gte('date', monthStart)
+        .lte('date', monthEnd);
+    const { data: sales } = await supabaseAdmin
+        .from('sales')
+        .select('shop_id, total_with_tax, date')
+        .gte('date', monthStart)
+        .lte('date', monthEnd);
+
+    const shopList = shops || [];
+    const ledgerExpenses = ledger || [];
+    const salesRows = sales || [];
+
+    const datasets: Record<string, any[]> = { global: [] };
+    shopList.forEach((s: any) => (datasets[s.id] = []));
+
+    const globalFixedMonthly = shopList.reduce((sum: number, shop: any) => {
+        const exp = shop.expenses || {};
+        return sum + Object.values(exp).reduce((a: number, b: any) => a + Number(b || 0), 0);
+    }, 0);
+    const dailyGlobalFixed = daysInMonth > 0 ? globalFixedMonthly / daysInMonth : 0;
+
+    for (let day = 1; day <= daysInMonth; day++) {
+        const dateStr = new Date(now.getFullYear(), now.getMonth(), day).toISOString().split('T')[0];
+
+        const globalDayRevenue = salesRows
+            .filter((s: any) => (s.date || '').startsWith(dateStr))
+            .reduce((sum: number, s: any) => sum + Number(s.total_with_tax || 0), 0);
+        const prevGlobalRevenue = datasets.global[day - 2]?.revenue || 0;
+        const cumulativeGlobalRevenue = day > currentDay ? null : Math.round((prevGlobalRevenue + globalDayRevenue) * 100) / 100;
+
+        const globalDayVariableExp = ledgerExpenses
+            .filter((l: any) => (l.date || '').startsWith(dateStr))
+            .reduce((sum: number, l: any) => sum + Number(l.amount || 0), 0);
+        const prevGlobalVar = datasets.global[day - 2]?.variableExpenses || 0;
+        const cumulativeGlobalVar = Math.round((prevGlobalVar + globalDayVariableExp) * 100) / 100;
+
+        const cumulativeGlobalFixed = Math.round((dailyGlobalFixed * day) * 100) / 100;
+        const cumulativeGlobalExpenses = Math.round((cumulativeGlobalFixed + cumulativeGlobalVar) * 100) / 100;
+
+        const globalProfit = cumulativeGlobalRevenue !== null
+            ? Math.round((cumulativeGlobalRevenue - cumulativeGlobalExpenses) * 100) / 100
+            : null;
+
+        datasets.global.push({
+            day,
+            date: dateStr,
+            revenue: cumulativeGlobalRevenue,
+            expenses: cumulativeGlobalExpenses,
+            profit: globalProfit,
+            fixedOverhead: cumulativeGlobalFixed,
+            variableExpenses: cumulativeGlobalVar,
+        });
+
+        shopList.forEach((shop: any) => {
+            const shopKey = shop.id;
+            const shopFixedMonthly = Object.values(shop.expenses || {}).reduce((a: number, b: any) => a + Number(b || 0), 0);
+            const dailyShopFixed = daysInMonth > 0 ? shopFixedMonthly / daysInMonth : 0;
+            const cumulativeShopFixed = Math.round((dailyShopFixed * day) * 100) / 100;
+
+            const shopDayRevenue = salesRows
+                .filter((s: any) => s.shop_id === shop.id && (s.date || '').startsWith(dateStr))
+                .reduce((sum: number, s: any) => sum + Number(s.total_with_tax || 0), 0);
+            const prevShopRevenue = datasets[shopKey]?.[day - 2]?.revenue || 0;
+            const cumulativeShopRevenue = day > currentDay ? null : Math.round((prevShopRevenue + shopDayRevenue) * 100) / 100;
+
+            const shopDayVarExp = ledgerExpenses
+                .filter((l: any) => l.shop_id === shop.id && (l.date || '').startsWith(dateStr))
+                .reduce((sum: number, l: any) => sum + Number(l.amount || 0), 0);
+            const prevShopVar = datasets[shopKey]?.[day - 2]?.variableExpenses || 0;
+            const cumulativeShopVar = Math.round((prevShopVar + shopDayVarExp) * 100) / 100;
+
+            const cumulativeShopExpenses = Math.round((cumulativeShopFixed + cumulativeShopVar) * 100) / 100;
+            const shopProfit = cumulativeShopRevenue !== null
+                ? Math.round((cumulativeShopRevenue - cumulativeShopExpenses) * 100) / 100
+                : null;
+
+            datasets[shopKey].push({
+                day,
+                date: dateStr,
+                revenue: cumulativeShopRevenue,
+                expenses: cumulativeShopExpenses,
+                profit: shopProfit,
+                fixedOverhead: cumulativeShopFixed,
+                variableExpenses: cumulativeShopVar,
+            });
+        });
+    }
+
+    return datasets;
+}
+
 // 4. ZOMBIE/DEAD STOCK HUNTER
 export interface DeadStockItem {
     itemId: string;
