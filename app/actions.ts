@@ -1125,7 +1125,8 @@ export async function recordPosExpense(shopId: string, amount: number, descripti
         category: 'POS Expense',
         amount: amount,
         date: timestamp,
-        description: description
+        description: description,
+        employee_id: employeeId
     }]);
 
     // Optional: Log to audit trail

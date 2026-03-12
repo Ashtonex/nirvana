@@ -121,7 +121,7 @@ export async function computePosAuditReport(input: { shopId: string; dateYYYYMMD
       .lte("date", until),
     supabaseAdmin
       .from("ledger_entries")
-      .select("id,shop_id,type,category,amount,date,description")
+      .select("id,shop_id,type,category,amount,date,description,employee_id")
       .eq("shop_id", shopId)
       .gte("date", since)
       .lte("date", until),
@@ -139,7 +139,7 @@ export async function computePosAuditReport(input: { shopId: string; dateYYYYMMD
       .lte("date", untilPrev),
     supabaseAdmin
       .from("ledger_entries")
-      .select("id,shop_id,type,category,amount,date,description")
+      .select("id,shop_id,type,category,amount,date,description,employee_id")
       .eq("shop_id", shopId)
       .gte("date", sincePrev)
       .lte("date", untilPrev),
@@ -276,11 +276,12 @@ export async function computePosAuditReport(input: { shopId: string; dateYYYYMMD
       };
     });
 
-  // Expenses list with best-effort attribution via audit log
+  // Build expenseAudit lookup for legacy matching
   const expenseAudit = auditRows
     .filter((a) => isSameDayISO(a?.timestamp, day))
     .filter((a) => String(a?.action || "").toLowerCase().includes("record_pos_expense"));
 
+  // Expenses list - use direct employee_id from ledger, fallback to audit log matching
   const expenses = ledgerRows
     .filter((l) => String(l?.type || "").toLowerCase() === "expense" && isSameDayISO(l?.date, day))
     .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
@@ -289,17 +290,21 @@ export async function computePosAuditReport(input: { shopId: string; dateYYYYMMD
       const desc = String(l?.description || "");
       const ts = String(l?.date || "");
 
-      // Match audit entry by amount + description, within the same day.
-      const match = expenseAudit.find((a) => {
-        const details = a?.details;
-        const detAmt = toMoney((details && (details.amount ?? details?.[0]?.amount)) ?? 0);
-        const detDesc = String((details && (details.description ?? details?.[0]?.description)) ?? "");
-        if (detAmt !== amt) return false;
-        if (detDesc && desc && detDesc !== desc) return false;
-        // Soft time match (same day is enough).
-        return true;
-      });
-      const employeeId = match?.employee_id ? String(match.employee_id) : null;
+      // Use employee_id directly from ledger if available
+      let employeeId = l?.employee_id ? String(l.employee_id) : null;
+      
+      // Fallback: try to match via audit log if no direct employee_id
+      if (!employeeId) {
+        const match = expenseAudit.find((a) => {
+          const details = a?.details;
+          const detAmt = toMoney((details && (details.amount ?? details?.[0]?.amount)) ?? 0);
+          const detDesc = String((details && (details.description ?? details?.[0]?.description)) ?? "");
+          if (detAmt !== amt) return false;
+          if (detDesc && desc && detDesc !== desc) return false;
+          return true;
+        });
+        employeeId = match?.employee_id ? String(match.employee_id) : null;
+      }
 
       return {
         id: String(l.id),
