@@ -1,8 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import fs from 'fs/promises';
 import path from 'path';
+import { requireOwnerAccess } from "@/lib/api-auth";
 
 export async function POST(req: NextRequest) {
+    const auth = await requireOwnerAccess(req);
+    if (!auth.ok) {
+        return NextResponse.json({ error: auth.error }, { status: auth.status });
+    }
+
     try {
         const { file } = await req.json();
 

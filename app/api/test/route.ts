@@ -1,6 +1,7 @@
 export const dynamic = 'force-dynamic';
 
 import { NextResponse } from 'next/server';
+import { requireOwnerAccess } from '@/lib/api-auth';
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const ENABLE = process.env.NIRVANA_ENABLE_INTERNAL_TESTS === 'true';
@@ -97,7 +98,12 @@ async function runTest() {
     }
 }
 
-export async function GET() {
+export async function GET(req: Request) {
+    const auth = await requireOwnerAccess(req);
+    if (!auth.ok) {
+        return NextResponse.json({ error: auth.error }, { status: auth.status });
+    }
+
     const result = await runTest();
     const status = result.success ? 200 : (result.configured ? 503 : 404);
     return NextResponse.json(result, { status });

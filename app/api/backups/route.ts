@@ -1,8 +1,14 @@
 import { NextResponse } from 'next/server';
 import fs from 'fs/promises';
 import path from 'path';
+import { requireOwnerAccess } from "@/lib/api-auth";
 
-export async function GET() {
+export async function GET(req: Request) {
+    const auth = await requireOwnerAccess(req);
+    if (!auth.ok) {
+        return NextResponse.json({ error: auth.error }, { status: auth.status });
+    }
+
     try {
         const libDir = path.join(process.cwd(), 'lib');
         const files = await fs.readdir(libDir);
@@ -24,7 +30,7 @@ export async function GET() {
         backups.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
         return NextResponse.json(backups);
-    } catch (error) {
+    } catch {
         return NextResponse.json({ error: 'Failed to list backups' }, { status: 500 });
     }
 }

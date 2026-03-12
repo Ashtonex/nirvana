@@ -1,18 +1,24 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase";
+import { getStaffSessionEmployeeId, isApiAuthEnforced } from "@/lib/api-auth";
 
 export async function PATCH(
-  req: Request,
+  _req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
 
-  if (id.startsWith('msg_')) {
-    const messageId = id.replace('msg_', '');
+  const staffEmployeeId = await getStaffSessionEmployeeId();
+  if (isApiAuthEnforced() && !staffEmployeeId) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  if (id.startsWith("msg_")) {
+    const messageId = id.replace("msg_", "");
     await supabaseAdmin
-      .from('chat_messages')
+      .from("chat_messages")
       .update({ read: true })
-      .eq('id', messageId);
+      .eq("id", messageId);
   }
 
   return NextResponse.json({ success: true });
