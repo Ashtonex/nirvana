@@ -65,7 +65,8 @@ async function syncPendingSalesFromDB(onSync?: () => void) {
                     const response = await fetch('/api/sales/offline', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(sale)
+                        body: JSON.stringify(sale),
+                        credentials: 'include'
                     });
                     
                     if (response.ok) {

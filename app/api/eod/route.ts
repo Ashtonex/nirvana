@@ -165,42 +165,46 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Missing shopId" }, { status: 400 });
   }
 
-  // Staff auth only (device usage)
-  const token = (await cookies()).get("nirvana_staff")?.value;
-  if (!token) {
+  // Auth: check staff first, then owner
+  const cookieStore = await cookies();
+  const staffToken = cookieStore.get("nirvana_staff")?.value;
+  const ownerToken = cookieStore.get("nirvana_owner")?.value;
+
+  if (!staffToken && !ownerToken) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const tokenHash = createHash("sha256").update(token).digest("hex");
-  const { data: session } = await supabaseAdmin
-    .from("staff_sessions")
-    .select("employee_id, expires_at")
-    .eq("token_hash", tokenHash)
-    .maybeSingle();
+  let staffName = "Owner";
 
-  if (!session) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (staffToken) {
+    const tokenHash = createHash("sha256").update(staffToken).digest("hex");
+    const { data: session } = await supabaseAdmin
+      .from("staff_sessions")
+      .select("employee_id, expires_at")
+      .eq("token_hash", tokenHash)
+      .maybeSingle();
+
+    if (!session || (session.expires_at && new Date(session.expires_at).getTime() < Date.now())) {
+      return NextResponse.json({ error: "Session expired" }, { status: 401 });
+    }
+
+    const { data: staff } = await supabaseAdmin
+      .from("employees")
+      .select("id, shop_id, name, surname")
+      .eq("id", session.employee_id)
+      .maybeSingle();
+
+    if (!staff) {
+      return NextResponse.json({ error: "Staff not found" }, { status: 401 });
+    }
+
+    if (staff.shop_id !== shopId) {
+      return NextResponse.json({ error: "Shop mismatch" }, { status: 403 });
+    }
+    staffName = `${staff.name} ${staff.surname}`;
   }
+  // If no staff token but owner token exists, we let it through to the logic below.
 
-  if (session.expires_at && new Date(session.expires_at).getTime() < Date.now()) {
-    return NextResponse.json({ error: "Session expired" }, { status: 401 });
-  }
-
-  const { data: staff } = await supabaseAdmin
-    .from("employees")
-    .select("id, shop_id, name, surname")
-    .eq("id", session.employee_id)
-    .maybeSingle();
-
-  if (!staff) {
-    return NextResponse.json({ error: "Staff not found" }, { status: 401 });
-  }
-
-  if (staff.shop_id !== shopId) {
-    return NextResponse.json({ error: "Shop mismatch" }, { status: 403 });
-  }
-
-  const staffName = `${staff.name} ${staff.surname}`;
   const since = startOfTodayUTC();
   
   // Get today's sales with discount info

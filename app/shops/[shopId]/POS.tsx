@@ -799,7 +799,8 @@ Generated via NIRVANA POS`;
             const res = await fetch('/api/eod', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ shopId, sendEmail: false })
+                body: JSON.stringify({ shopId, sendEmail: false }),
+                credentials: 'include'
             });
             
             if (res.status === 401) {
@@ -832,7 +833,10 @@ Generated via NIRVANA POS`;
             console.log('Generating EOD PDF...');
             try {
                 const dayStamp = new Date().toISOString().slice(0, 10);
-                const pdfRes = await fetch(`/api/eod/pdf?shopId=${encodeURIComponent(shopId)}&date=${encodeURIComponent(dayStamp)}`, { cache: 'no-store' });
+                const pdfRes = await fetch(`/api/eod/pdf?shopId=${encodeURIComponent(shopId)}&date=${encodeURIComponent(dayStamp)}`, { 
+                    cache: 'no-store',
+                    credentials: 'include'
+                });
                 
                 if (pdfRes.ok) {
                     const blob = await pdfRes.blob();
@@ -905,7 +909,7 @@ Generated via NIRVANA POS`;
 
     const finalizeEodLogout = async () => {
         try {
-            await fetch('/api/staff/logout', { method: 'POST' });
+            await fetch('/api/staff/logout', { method: 'POST', credentials: 'include' });
         } finally {
             window.location.href = '/login';
         }
@@ -2022,7 +2026,8 @@ Generated via NIRVANA POS`;
                                         reason: returnReason,
                                         notes: returnNotes,
                                         restock: returnRestock,
-                                    })
+                                    }),
+                                    credentials: 'include'
                                 });
                                 const data = await res.json().catch(() => ({}));
                                 if (!res.ok) {
