@@ -78,6 +78,43 @@ async function getActor(req: Request): Promise<Actor | null> {
   return null;
 }
 
+async function resolveItemForUntrackedSale(shopId: string, itemName: string, quantity: number) {
+  const name = String(itemName || '').trim() || 'Ad-hoc Item';
+  const qty = Math.max(1, Number(quantity || 1));
+
+  const { data: candidates } = await supabaseAdmin
+    .from("inventory_items")
+    .select("id,name")
+    .ilike("name", name)
+    .limit(5);
+
+  const list = candidates || [];
+  const exact = list.find((c: any) => String(c.name || '').toLowerCase() === name.toLowerCase()) || list[0];
+  if (exact?.id) return { itemId: exact.id, itemName: exact.name || name };
+
+  const itemId = `adhoc_${Math.random().toString(36).substring(2, 9)}`;
+  const timestamp = new Date().toISOString();
+
+  await supabaseAdmin.from("inventory_items").insert({
+    id: itemId,
+    shipment_id: "POS-UNTRACKED",
+    name,
+    category: "Quick Sale",
+    quantity: qty,
+    acquisition_price: 0,
+    landed_cost: 0,
+    date_added: timestamp,
+  });
+
+  await supabaseAdmin.from("inventory_allocations").insert({
+    item_id: itemId,
+    shop_id: shopId,
+    quantity: qty,
+  });
+
+  return { itemId, itemName: name };
+}
+
 export async function POST(req: Request) {
   const actor = await getActor(req);
   if (!actor) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -107,11 +144,13 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Shop mismatch" }, { status: 403 });
   }
 
+  const resolved = await resolveItemForUntrackedSale(shop_id, item_name, quantity);
+
   const working: any = {
     id,
     shop_id,
-    item_id: "UNTRACKED",
-    item_name,
+    item_id: resolved.itemId,
+    item_name: resolved.itemName,
     quantity,
     unit_price,
     total_before_tax,
@@ -127,6 +166,14 @@ export async function POST(req: Request) {
   for (let attempt = 0; attempt < 8; attempt++) {
     const res = await supabaseAdmin.from("sales").insert(working);
     if (!res.error) {
+      // Best-effort inventory decrement (ad-hoc items are created with qty then decremented to 0)
+      try {
+        if (!String(working.item_id || '').startsWith("service_")) {
+          await supabaseAdmin.rpc("decrement_allocation", { item_id: working.item_id, shop_id, qty: quantity });
+          await supabaseAdmin.rpc("decrement_inventory", { item_id: working.item_id, qty: quantity });
+        }
+      } catch {}
+
       // Success - log audit entry
       try {
         await supabaseAdmin.from("audit_log").insert({

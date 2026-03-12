@@ -17,6 +17,19 @@ function getPublicBaseUrl() {
     return url ? String(url).replace(/\/$/, '') : '';
 }
 
+function getLaybyPaidAmountFromLedger(ledgerEntries: any[], laybyId: string): number {
+    if (!laybyId) return 0;
+    const needle = `lay-by #${String(laybyId).toLowerCase()}`;
+    return (ledgerEntries || [])
+        .filter((l: any) => {
+            const category = String(l?.category || '').toLowerCase();
+            if (!category.startsWith('lay-by')) return false;
+            const description = String(l?.description || '').toLowerCase();
+            return description.includes(needle);
+        })
+        .reduce((sum: number, l: any) => sum + Number(l?.amount || 0), 0);
+}
+
 export async function getDashboardData() {
     // Guard: if Supabase env is missing/misconfigured, never crash the whole app.
     // Return safe empty structures so pages can render and show UI.
@@ -57,6 +70,8 @@ export async function getDashboardData() {
         const { data: transfers } = await supabaseAdmin.from('transfers').select('*');
         const { data: emails } = await supabaseAdmin.from('oracle_emails').select('*');
 
+        const ledgerRows = ledger || [];
+
         return {
             inventory: (inventory || []).map((i: any) => ({
                 id: i.id,
@@ -87,6 +102,11 @@ export async function getDashboardData() {
             quotations: (quotations || []).map((q: any) => {
                 const in7Days = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
                 const items = Array.isArray(q.items) ? q.items : [];
+                const paidFromColumn = q.paid_amount;
+                const paidAmount =
+                    paidFromColumn === undefined || paidFromColumn === null
+                        ? getLaybyPaidAmountFromLedger(ledgerRows, q.id)
+                        : Number(paidFromColumn || 0);
                 return {
                     id: q.id,
                     shopId: q.shop_id,
@@ -97,7 +117,7 @@ export async function getDashboardData() {
                     totalBeforeTax: Number(q.total_before_tax || 0),
                     tax: Number(q.tax || 0),
                     totalWithTax: Number(q.total_with_tax || 0),
-                    paidAmount: Number(q.paid_amount || 0),
+                    paidAmount,
                     status: q.status || 'pending',
                     date: q.date || new Date().toISOString(),
                     expiryDate: q.expiry_date || q.expiryDate || in7Days,
@@ -119,7 +139,7 @@ export async function getDashboardData() {
             shipments: (shipments || []).map((sh: any) => ({
                 id: sh.id, supplier: sh.supplier || "Internal Transfer", shipmentNumber: sh.shipment_number || "---", date: sh.date || new Date().toISOString()
             })),
-            ledger: (ledger || []).map((l: any) => ({
+            ledger: (ledgerRows || []).map((l: any) => ({
                 id: l.id, type: l.type || 'expense', category: l.category || 'General', amount: Number(l.amount || 0),
                 date: l.date || new Date().toISOString(), description: l.description || "", shopId: l.shop_id
             })),
@@ -324,11 +344,12 @@ export async function recordSale(sale: any) {
 
 export async function recordUntrackedSale(sale: any) {
     const timestamp = new Date().toISOString();
+    const desiredQty = Math.max(1, Number(sale.quantity || 1));
 
     // Check if product exists by name in database
     const { data: existingItems } = await supabaseAdmin.from('inventory_items')
         .select('id, name')
-        .ilike('name', sale.itemName);
+        .ilike('name', String(sale.itemName || '').trim());
 
     let itemId = "UNTRACKED";
     let actualItemName = sale.itemName;
@@ -347,7 +368,8 @@ export async function recordUntrackedSale(sale: any) {
             shipment_id: 'QUICK-SALE-AUTO',
             name: sale.itemName,
             category: 'Quick Sale',
-            quantity: 0,
+            // Create with enough stock to cover this sale, then the sale decrements back to 0.
+            quantity: desiredQty,
             acquisition_price: 0,
             landed_cost: 0,
             date_added: timestamp
@@ -356,7 +378,7 @@ export async function recordUntrackedSale(sale: any) {
         await supabaseAdmin.from('inventory_allocations').insert({
             item_id: itemId,
             shop_id: sale.shopId,
-            quantity: 0
+            quantity: desiredQty
         });
     }
 
@@ -683,15 +705,71 @@ export async function finalizeQuotation(quoteId: string) {
 }
 
 export async function addNewProductFromPos(productData: any) {
-    const id = Math.random().toString(36).substring(2, 9);
-    const timestamp = new Date().toISOString();
-    await supabaseAdmin.from('inventory_items').insert({
-        id, shipment_id: 'POS-AD-HOC', name: productData.name, category: productData.category,
-        quantity: productData.initialStock || 0, acquisition_price: productData.landedCost, landed_cost: productData.landedCost, date_added: timestamp
-    });
-    await supabaseAdmin.from('inventory_allocations').insert({ item_id: id, shop_id: productData.shopId, quantity: productData.initialStock || 0 });
+    const name = String(productData?.name || '').trim();
+    const category = String(productData?.category || 'General').trim() || 'General';
+    const landedCost = Number(productData?.landedCost || 0);
+    const shopId = String(productData?.shopId || '').trim();
+    const initialStock = Math.max(0, Number(productData?.initialStock || 0));
 
-    const totalCost = (productData.initialStock || 0) * productData.landedCost;
+    if (!name) throw new Error("Missing product name");
+    if (!shopId) throw new Error("Missing shopId");
+
+    const timestamp = new Date().toISOString();
+
+    // If the product already exists (case-insensitive exact match), do not create duplicates.
+    const { data: existingMatches } = await supabaseAdmin
+        .from('inventory_items')
+        .select('id, quantity, name, category, landed_cost')
+        .ilike('name', name)
+        .limit(5);
+
+    const existingList = existingMatches || [];
+    const existing = existingList.find((i: any) => String(i.name || '').toLowerCase() === name.toLowerCase()) || existingList[0];
+
+    const id = existing?.id || Math.random().toString(36).substring(2, 9);
+    const createdNew = !existing?.id;
+
+    if (createdNew) {
+        await supabaseAdmin.from('inventory_items').insert({
+            id,
+            shipment_id: 'POS-AD-HOC',
+            name,
+            category,
+            quantity: initialStock,
+            acquisition_price: landedCost,
+            landed_cost: landedCost,
+            date_added: timestamp
+        });
+    } else if (initialStock > 0) {
+        await supabaseAdmin
+            .from('inventory_items')
+            .update({ quantity: Number(existing.quantity || 0) + initialStock })
+            .eq('id', id);
+    }
+
+    // Ensure shop allocation exists and is incremented when adding stock from POS.
+    const { data: alloc } = await supabaseAdmin
+        .from('inventory_allocations')
+        .select('quantity')
+        .eq('item_id', id)
+        .eq('shop_id', shopId)
+        .maybeSingle();
+
+    if (!alloc) {
+        await supabaseAdmin.from('inventory_allocations').insert({
+            item_id: id,
+            shop_id: shopId,
+            quantity: initialStock
+        });
+    } else if (initialStock > 0) {
+        await supabaseAdmin
+            .from('inventory_allocations')
+            .update({ quantity: Number(alloc.quantity || 0) + initialStock })
+            .eq('item_id', id)
+            .eq('shop_id', shopId);
+    }
+
+    const totalCost = initialStock * landedCost;
     if (totalCost > 0) {
         await supabaseAdmin.from('ledger_entries').insert([{
             id: Math.random().toString(36).substring(2, 9),
@@ -699,13 +777,21 @@ export async function addNewProductFromPos(productData: any) {
             category: 'Inventory Acquisition',
             amount: totalCost,
             date: timestamp,
-            description: `Ad-Hoc POS Addition: ${productData.name}`
+            description: `Ad-Hoc POS Addition: ${name}`
         }]);
     }
     revalidatePath("/inventory");
     revalidatePath("/");
-    revalidatePath(`/shops/${productData.shopId}`);
-    return { id };
+    revalidatePath(`/shops/${shopId}`);
+
+    return {
+        id,
+        name: existing?.name || name,
+        category: existing?.category || category,
+        landedCost: Number(existing?.landed_cost || landedCost),
+        createdNew,
+        addedStock: initialStock,
+    };
 }
 
 export async function openCashRegister(shopId: string, expectedAmount: number, actualAmount: number) {
@@ -1356,8 +1442,24 @@ export async function recordLayby(layby: {
         throw new Error("Lay-by requires at least one item");
     }
 
+    // Pre-check stock before writing anything so we don't create partial lay-bys.
+    for (const item of layby.items) {
+        if (!item.itemId || String(item.itemId).startsWith('service_')) continue;
+        const qty = Math.max(1, Number(item.quantity || 0));
+        const { data: alloc } = await supabaseAdmin
+            .from('inventory_allocations')
+            .select('quantity')
+            .eq('item_id', item.itemId)
+            .eq('shop_id', layby.shopId)
+            .maybeSingle();
+
+        if (!alloc || Number(alloc.quantity || 0) < qty) {
+            throw new Error(`Insufficient stock for lay-by: ${item.itemName || item.itemId}`);
+        }
+    }
+
     // 1. Create the Lay-by record in quotations table
-    await supabaseAdmin.from('quotations').insert({
+    const base: any = {
         id,
         shop_id: layby.shopId,
         items: layby.items,
@@ -1370,9 +1472,52 @@ export async function recordLayby(layby: {
         employee_id: layby.employeeId,
         date,
         status: 'layby'
-    });
+    };
 
-    // 2. Record the deposit in the ledger (Cash inflow)
+    // Insert with column fallback (in case paid_amount/client_phone not in schema yet)
+    const working: any = { ...base };
+    let inserted = false;
+    for (let attempt = 0; attempt < 6; attempt++) {
+        const res = await supabaseAdmin.from('quotations').insert(working);
+        if (!res.error) {
+            inserted = true;
+            break;
+        }
+
+        const msg = res.error.message || '';
+        const m1 = msg.match(/Could not find the '([^']+)' column/i);
+        const m2 = msg.match(/column "([^"]+)" of relation "quotations" does not exist/i);
+        const missing = (m1 && m1[1]) || (m2 && m2[1]);
+        if (missing && Object.prototype.hasOwnProperty.call(working, missing)) {
+            delete working[missing];
+            continue;
+        }
+        throw new Error(res.error.message);
+    }
+    if (!inserted) throw new Error('Failed to create lay-by record');
+
+    // 2. Reserve Inventory (Reduce stock immediately)
+    for (const item of layby.items) {
+        if (!item.itemId || item.itemId.startsWith('service_')) continue;
+
+        const qty = Math.max(1, Number(item.quantity || 0));
+
+        // Use atomic DB functions to match sale behavior and avoid race conditions.
+        const decAlloc = await supabaseAdmin.rpc('decrement_allocation', {
+            item_id: item.itemId,
+            shop_id: layby.shopId,
+            qty
+        });
+        if (decAlloc.error) throw new Error(decAlloc.error.message);
+
+        const decInv = await supabaseAdmin.rpc('decrement_inventory', {
+            item_id: item.itemId,
+            qty
+        });
+        if (decInv.error) throw new Error(decInv.error.message);
+    }
+
+    // 3. Record the deposit in the ledger (Cash inflow)
     await supabaseAdmin.from('ledger_entries').insert({
         id: Math.random().toString(36).substring(2, 9),
         shop_id: layby.shopId,
@@ -1382,42 +1527,6 @@ export async function recordLayby(layby: {
         date,
         description: `Deposit for Lay-by #${id} - ${layby.clientName}`
     });
-
-    // 3. Reserve Inventory (Reduce stock immediately)
-    for (const item of layby.items) {
-        if (!item.itemId || item.itemId.startsWith('service_')) continue;
-
-        try {
-            // Reduce Shop Allocation
-            const { data: alloc } = await supabaseAdmin.from('inventory_allocations')
-                .select('quantity')
-                .eq('item_id', item.itemId)
-                .eq('shop_id', layby.shopId)
-                .single();
-
-            if (alloc && alloc.quantity > 0) {
-                await supabaseAdmin.from('inventory_allocations')
-                    .update({ quantity: Math.max(0, alloc.quantity - item.quantity) })
-                    .eq('item_id', item.itemId)
-                    .eq('shop_id', layby.shopId);
-            }
-
-            // Reduce Global Stock
-            const { data: invItem } = await supabaseAdmin.from('inventory_items')
-                .select('quantity')
-                .eq('id', item.itemId)
-                .single();
-
-            if (invItem && invItem.quantity > 0) {
-                await supabaseAdmin.from('inventory_items')
-                    .update({ quantity: Math.max(0, invItem.quantity - item.quantity) })
-                    .eq('id', item.itemId);
-            }
-        } catch (err) {
-            console.error('Failed to decrement inventory for layby item:', item.itemId, err);
-            // Continue with other items even if one fails
-        }
-    }
 
     return { id, date };
 }
@@ -1431,27 +1540,62 @@ export async function updateLaybyPayment(laybyId: string, amount: number, shopId
     if (!layby || layby.status !== 'layby') throw new Error('Lay-by not found');
 
     const date = new Date().toISOString();
-    const newPaidAmount = Number(layby.paid_amount || 0) + amount;
-    const isFullyPaid = newPaidAmount >= Number(layby.total_with_tax);
+    const tentativePaid = Number(layby.paid_amount || 0) + amount;
+    const tentativeFullyPaid = tentativePaid >= Number(layby.total_with_tax);
 
-    // 1. Update the Lay-by record
-    await supabaseAdmin.from('quotations').update({
-        paid_amount: newPaidAmount,
-        status: isFullyPaid ? 'converted' : 'layby'
-    }).eq('id', laybyId);
-
-    // 2. Record payment in ledger
+    // 1. Record payment in ledger first (this is the source of truth if paid_amount column is missing).
     await supabaseAdmin.from('ledger_entries').insert({
         id: Math.random().toString(36).substring(2, 9),
         shop_id: shopId,
         type: 'income',
-        category: isFullyPaid ? 'Lay-by Final Payment' : 'Lay-by installment',
+        // If paid_amount column is missing, we can't reliably know "final" vs "installment" here.
+        category: layby.paid_amount === undefined || layby.paid_amount === null
+            ? 'Lay-by installment'
+            : (tentativeFullyPaid ? 'Lay-by Final Payment' : 'Lay-by installment'),
         amount: amount,
         date,
         description: `Payment for Lay-by #${laybyId} - ${layby.client_name}`
     });
 
-    // 3. If fully paid, record as a Sale for reporting
+    // 2. Compute paid amount (prefer DB column if present, fall back to ledger aggregation).
+    let newPaidAmount = Number(layby.paid_amount || 0) + amount;
+    let isFullyPaid = newPaidAmount >= Number(layby.total_with_tax);
+
+    if (layby.paid_amount === undefined || layby.paid_amount === null) {
+        const { data: lbLedger } = await supabaseAdmin
+            .from('ledger_entries')
+            .select('amount, category, description')
+            .eq('shop_id', shopId)
+            .ilike('category', 'Lay-by%')
+            .ilike('description', `%Lay-by #${laybyId}%`);
+
+        const paidFromLedger = getLaybyPaidAmountFromLedger(lbLedger || [], laybyId);
+        newPaidAmount = paidFromLedger; // already includes this payment
+        isFullyPaid = newPaidAmount >= Number(layby.total_with_tax);
+    }
+
+    // 3. Update the lay-by record (tolerant to missing paid_amount column).
+    const updateWorking: any = {
+        paid_amount: newPaidAmount,
+        status: isFullyPaid ? 'converted' : 'layby'
+    };
+
+    for (let attempt = 0; attempt < 4; attempt++) {
+        const res = await supabaseAdmin.from('quotations').update(updateWorking).eq('id', laybyId);
+        if (!res.error) break;
+
+        const msg = res.error.message || '';
+        const m1 = msg.match(/Could not find the '([^']+)' column/i);
+        const m2 = msg.match(/column "([^"]+)" of relation "quotations" does not exist/i);
+        const missing = (m1 && m1[1]) || (m2 && m2[1]);
+        if (missing && Object.prototype.hasOwnProperty.call(updateWorking, missing)) {
+            delete updateWorking[missing];
+            continue;
+        }
+        throw new Error(res.error.message);
+    }
+
+    // 4. If fully paid, record as a Sale for reporting
     if (isFullyPaid) {
         // Record each item as a sale, but SKIP inventory reduction because it was reserved at start
         for (const item of (layby.items as any[])) {
@@ -1469,7 +1613,8 @@ export async function updateLaybyPayment(laybyId: string, amount: number, shopId
                 date,
                 employee_id: employeeId,
                 client_name: layby.client_name,
-                payment_method: 'cash' // Assuming cash for lay-by payments
+                payment_method: 'cash', // Assuming cash for lay-by payments
+                discount_applied: 0
             });
         }
     }

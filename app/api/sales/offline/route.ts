@@ -8,6 +8,59 @@ const supabaseAdmin = supabaseUrl && serviceRoleKey
     ? createClient(supabaseUrl, serviceRoleKey, { auth: { autoRefreshToken: false, persistSession: false } })
     : null;
 
+async function resolveSaleItem(
+    client: ReturnType<typeof createClient>,
+    sale: any
+): Promise<{ itemId: string; itemName: string }> {
+    const rawId = String(sale?.itemId || '').trim();
+    const rawName = String(sale?.itemName || '').trim();
+    const qty = Math.max(1, Number(sale?.quantity || 1));
+
+    const looksUntracked = !rawId || rawId === 'UNTRACKED' || rawId.startsWith('QUICK_');
+
+    if (!looksUntracked) {
+        // Verify the item exists; if not, fall back to name resolution.
+        const { data: byId } = await client.from('inventory_items').select('id,name').eq('id', rawId).maybeSingle();
+        if (byId?.id) return { itemId: byId.id, itemName: byId.name || rawName || byId.id };
+    }
+
+    if (rawName) {
+        const { data: candidates } = await client
+            .from('inventory_items')
+            .select('id,name')
+            .ilike('name', rawName)
+            .limit(5);
+
+        const list = candidates || [];
+        const exact = list.find((c: any) => String(c.name || '').toLowerCase() === rawName.toLowerCase()) || list[0];
+        if (exact?.id) return { itemId: exact.id, itemName: exact.name || rawName };
+    }
+
+    // Create an ad-hoc item so inventory decrement and analytics remain consistent.
+    const itemId = `adhoc_${Math.random().toString(36).substring(2, 9)}`;
+    const timestamp = new Date().toISOString();
+
+    await client.from('inventory_items').insert({
+        id: itemId,
+        shipment_id: 'OFFLINE-SYNC-ADHOC',
+        name: rawName || 'Ad-hoc Item',
+        category: 'Quick Sale',
+        // Create with enough stock to cover this synced sale, then decrement back to 0.
+        quantity: qty,
+        acquisition_price: 0,
+        landed_cost: 0,
+        date_added: timestamp
+    });
+
+    await client.from('inventory_allocations').insert({
+        item_id: itemId,
+        shop_id: String(sale?.shopId || '').trim(),
+        quantity: qty
+    });
+
+    return { itemId, itemName: rawName || 'Ad-hoc Item' };
+}
+
 export async function POST(request: Request) {
     if (!supabaseAdmin) {
         console.error('Offline sync failed: Supabase admin not configured');
@@ -16,6 +69,7 @@ export async function POST(request: Request) {
 
     try {
         const sale = await request.json();
+        const resolved = await resolveSaleItem(supabaseAdmin, sale);
 
         const { data: settings } = await supabaseAdmin.from('oracle_settings').select('*').single();
         if (!settings) throw new Error("Settings not found");
@@ -41,8 +95,8 @@ export async function POST(request: Request) {
         await supabaseAdmin.from('sales').insert({
             id: saleId,
             shop_id: sale.shopId,
-            item_id: sale.itemId,
-            item_name: sale.itemName,
+            item_id: resolved.itemId,
+            item_name: resolved.itemName,
             quantity: sale.quantity,
             unit_price: sale.unitPrice,
             total_before_tax: subtotalAfterDiscount,
@@ -55,12 +109,12 @@ export async function POST(request: Request) {
             discount_applied: discount
         });
 
-        const isService = sale.itemId?.startsWith('service_');
+        const isService = resolved.itemId?.startsWith('service_');
 
         if (!isService) {
             try {
                 await supabaseAdmin.rpc('decrement_allocation', { 
-                    item_id: sale.itemId, 
+                    item_id: resolved.itemId, 
                     shop_id: sale.shopId, 
                     qty: sale.quantity 
                 });
@@ -70,7 +124,7 @@ export async function POST(request: Request) {
 
             try {
                 await supabaseAdmin.rpc('decrement_inventory', { 
-                    item_id: sale.itemId, 
+                    item_id: resolved.itemId, 
                     qty: sale.quantity 
                 });
             } catch (e) {

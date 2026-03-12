@@ -20,6 +20,13 @@ function startOfWeekUTC() {
   return d.toISOString();
 }
 
+function startOfDaysBackUTC(daysBack: number) {
+  const d = new Date();
+  d.setUTCDate(d.getUTCDate() - Math.max(0, Number(daysBack || 0)));
+  d.setUTCHours(0, 0, 0, 0);
+  return d.toISOString();
+}
+
 async function sendWeeklyReport(shopId: string, staffName: string) {
   const since = startOfWeekUTC();
   
@@ -53,6 +60,8 @@ async function sendWeeklyReport(shopId: string, staffName: string) {
   const ecocashSales = rows.filter((s: any) => s.payment_method === 'ecocash');
   const totalCash = cashSales.reduce((sum: number, s: any) => sum + Number(s.total_with_tax || 0), 0);
   const totalEcocash = ecocashSales.reduce((sum: number, s: any) => sum + Number(s.total_with_tax || 0), 0);
+
+  const closingCashEstimate = openingCash + totalCash + laybyCash - totalExpenses + adjustmentNet;
 
   // Top items (best sellers)
   const itemMap = new Map<string, { name: string; qty: number; gross: number }>();
@@ -206,6 +215,7 @@ export async function POST(req: Request) {
   // If no staff token but owner token exists, we let it through to the logic below.
 
   const since = startOfTodayUTC();
+  const since7d = startOfDaysBackUTC(6);
   
   // Get today's sales with discount info
   const { data: sales, error } = await supabaseAdmin
@@ -224,15 +234,33 @@ export async function POST(req: Request) {
   const totalTax = rows.reduce((sum: number, s: any) => sum + Number(s.tax || 0), 0);
   const totalDiscount = rows.reduce((sum: number, s: any) => sum + Number(s.discount_applied || 0), 0);
 
-  // Get today's expenses
-  const { data: expenses } = await supabaseAdmin
+  // Get today's ledger activity (expenses, drawer open, lay-by cash, adjustments)
+  const { data: ledgerEntries } = await supabaseAdmin
     .from("ledger_entries")
-    .select("amount, category")
+    .select("amount, category, description, date, type")
     .eq("shop_id", shopId)
-    .eq("category", "POS Expense")
     .gte("date", since);
-  
-  const totalExpenses = (expenses || []).reduce((sum: number, e: any) => sum + Number(e.amount || 0), 0);
+
+  const ledgerRows = ledgerEntries || [];
+
+  const posExpenseRows = ledgerRows.filter((l: any) => l.category === "POS Expense");
+  const totalExpenses = posExpenseRows.reduce((sum: number, e: any) => sum + Number(e.amount || 0), 0);
+
+  const openingRows = ledgerRows
+    .filter((l: any) => l.category === "Cash Drawer Opening")
+    .sort((a: any, b: any) => new Date(a.date).getTime() - new Date(b.date).getTime());
+  const opening = openingRows[0] || null;
+  const openingCash = opening ? Number(opening.amount || 0) : 0;
+
+  const adjustmentRows = ledgerRows.filter((l: any) => l.category === "Cash Drawer Adjustment");
+  const adjustmentNet = adjustmentRows.reduce((sum: number, l: any) => {
+    const amt = Number(l.amount || 0);
+    const t = String(l.type || "").toLowerCase();
+    return sum + (t === "income" ? amt : t === "expense" ? -amt : 0);
+  }, 0);
+
+  const laybyRows = ledgerRows.filter((l: any) => String(l.category || "").startsWith("Lay-by"));
+  const laybyCash = laybyRows.reduce((sum: number, l: any) => sum + Number(l.amount || 0), 0);
 
   // Calculate payment method breakdown
   const cashSales = rows.filter((s: any) => s.payment_method === 'cash');
@@ -253,6 +281,64 @@ export async function POST(req: Request) {
   const topItems = [...itemMap.values()]
     .sort((a, b) => b.gross - a.gross)
     .slice(0, 8);
+
+  // 7-day pulse (daily totals + best seller per day)
+  const { data: recentSales } = await supabaseAdmin
+    .from("sales")
+    .select("item_name,total_with_tax,quantity,date")
+    .eq("shop_id", shopId)
+    .gte("date", since7d);
+
+  const dailyMap = new Map<string, { date: string; gross: number; tx: number; items: Map<string, { name: string; gross: number }> }>();
+  for (const s of (recentSales || []) as any[]) {
+    const day = new Date(s.date).toISOString().split("T")[0];
+    const cur = dailyMap.get(day) || { date: day, gross: 0, tx: 0, items: new Map() };
+    cur.gross += Number(s.total_with_tax || 0);
+    cur.tx += 1;
+    const key = String(s.item_name || "Unknown");
+    const icur = cur.items.get(key) || { name: key, gross: 0 };
+    icur.gross += Number(s.total_with_tax || 0);
+    cur.items.set(key, icur);
+    dailyMap.set(day, cur);
+  }
+
+  const dailyPulse = [...dailyMap.values()]
+    .sort((a, b) => a.date.localeCompare(b.date))
+    .map((d) => {
+      const top = [...d.items.values()].sort((a, b) => b.gross - a.gross)[0];
+      return { date: d.date, gross: d.gross, transactions: d.tx, topItem: top ? { name: top.name, gross: top.gross } : null };
+    });
+
+  const avg7 = dailyPulse.length ? dailyPulse.reduce((s, d) => s + Number(d.gross || 0), 0) / dailyPulse.length : 0;
+
+  // Low stock (<= 5) for this shop
+  const { data: lowAllocs } = await supabaseAdmin
+    .from("inventory_allocations")
+    .select("item_id, quantity")
+    .eq("shop_id", shopId)
+    .lte("quantity", 5)
+    .order("quantity", { ascending: true })
+    .limit(5);
+
+  const lowIds = (lowAllocs || []).map((a: any) => a.item_id).filter(Boolean);
+  const { data: lowItems } = lowIds.length
+    ? await supabaseAdmin.from("inventory_items").select("id,name,category").in("id", lowIds)
+    : { data: [] as any[] };
+
+  const lowItemMap = new Map((lowItems || []).map((i: any) => [i.id, i]));
+  const restock = (lowAllocs || []).map((a: any) => {
+    const it = lowItemMap.get(a.item_id);
+    return { itemId: a.item_id, name: it?.name || a.item_id, category: it?.category || "", qty: Number(a.quantity || 0) };
+  });
+
+  // Oracle suggestions (deterministic, no external AI required)
+  const oracle: string[] = [];
+  if (avg7 > 0 && totalWithTax < avg7 * 0.8) oracle.push(`Revenue dipped vs 7-day average ($${avg7.toFixed(2)}). Review staffing, stock-outs, and promotions.`);
+  if (avg7 > 0 && totalWithTax > avg7 * 1.2) oracle.push(`Strong day vs 7-day average ($${avg7.toFixed(2)}). Double down on today’s best sellers tomorrow.`);
+  if (totalExpenses > 0 && totalWithTax > 0 && totalExpenses > totalWithTax * 0.1) oracle.push(`POS expenses are high relative to sales (${((totalExpenses / totalWithTax) * 100).toFixed(1)}%). Audit today's spend for preventable leakage.`);
+  if (restock.length) oracle.push(`Low stock alert: ${restock.map(r => `${r.name} (${r.qty})`).join(", ")}. Prioritize replenishment.`);
+  if (topItems.length) oracle.push(`Top seller today: ${topItems[0].name} (gross $${topItems[0].gross.toFixed(2)}). Ensure it stays visible and stocked.`);
+  if (!oracle.length) oracle.push("Stable day. Focus on increasing basket size with accessories and controlled discounting.");
 
   const recipient = process.env.EOD_REPORT_RECIPIENT || ORACLE_RECIPIENT;
 
@@ -278,7 +364,82 @@ export async function POST(req: Request) {
               <h4 style="margin:16px 0 8px;font-size:12px;">Payment Breakdown</h4>
               <p style="margin:4px 0;"><b>Cash Sales:</b> $${totalCash.toFixed(2)} (${cashSales.length} transactions)</p>
               <p style="margin:4px 0 0;"><b>EcoCash Sales:</b> $${totalEcocash.toFixed(2)} (${ecocashSales.length} transactions)</p>
+
+              <h4 style="margin:16px 0 8px;font-size:12px;">Cash Operations</h4>
+              <p style="margin:4px 0;"><b>Opening Drawer:</b> $${openingCash.toFixed(2)} ${opening?.date ? `(${new Date(opening.date).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})})` : ''}</p>
+              <p style="margin:4px 0;"><b>Lay-by Cash Received:</b> $${laybyCash.toFixed(2)}</p>
+              <p style="margin:4px 0;"><b>Drawer Adjustments (net):</b> $${adjustmentNet.toFixed(2)}</p>
+              <p style="margin:4px 0;"><b>Estimated Closing Cash:</b> $${closingCashEstimate.toFixed(2)}</p>
             </div>
+
+            <h3 style="margin:18px 0 8px;">💸 Expenses Entered Today</h3>
+            <table style="width:100%;border-collapse:collapse;font-size:11px;">
+              <thead>
+                <tr>
+                  <th style="text-align:left;border-bottom:1px solid #cbd5e1;padding:6px;">Time</th>
+                  <th style="text-align:left;border-bottom:1px solid #cbd5e1;padding:6px;">Description</th>
+                  <th style="text-align:right;border-bottom:1px solid #cbd5e1;padding:6px;">Amount</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${posExpenseRows.length > 0 ? posExpenseRows
+                  .sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime())
+                  .map((e: any) => `
+                    <tr>
+                      <td style="padding:6px;border-bottom:1px solid #e2e8f0;">${new Date(e.date).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})}</td>
+                      <td style="padding:6px;border-bottom:1px solid #e2e8f0;">${String(e.description || e.category || 'Expense')}</td>
+                      <td style="padding:6px;border-bottom:1px solid #e2e8f0;text-align:right;color:#dc2626;">-$${Number(e.amount || 0).toFixed(2)}</td>
+                    </tr>
+                  `).join("") : '<tr><td colspan="3" style="padding:12px;text-align:center;color:#64748b;">No POS expenses recorded</td></tr>'}
+              </tbody>
+            </table>
+
+            <h3 style="margin:18px 0 8px;">📉 Low Stock (Restock Watchlist)</h3>
+            <table style="width:100%;border-collapse:collapse;font-size:11px;">
+              <thead>
+                <tr>
+                  <th style="text-align:left;border-bottom:1px solid #cbd5e1;padding:6px;">Item</th>
+                  <th style="text-align:left;border-bottom:1px solid #cbd5e1;padding:6px;">Category</th>
+                  <th style="text-align:right;border-bottom:1px solid #cbd5e1;padding:6px;">Qty</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${restock.length ? restock.map((r: any) => `
+                  <tr>
+                    <td style="padding:6px;border-bottom:1px solid #e2e8f0;">${r.name}</td>
+                    <td style="padding:6px;border-bottom:1px solid #e2e8f0;color:#64748b;">${r.category || '-'}</td>
+                    <td style="padding:6px;border-bottom:1px solid #e2e8f0;text-align:right;">${r.qty}</td>
+                  </tr>
+                `).join("") : '<tr><td colspan="3" style="padding:12px;text-align:center;color:#64748b;">No low-stock items (<= 5) found</td></tr>'}
+              </tbody>
+            </table>
+
+            <h3 style="margin:18px 0 8px;">📈 7-Day Sales Pulse</h3>
+            <table style="width:100%;border-collapse:collapse;font-size:11px;">
+              <thead>
+                <tr>
+                  <th style="text-align:left;border-bottom:1px solid #cbd5e1;padding:6px;">Day (UTC)</th>
+                  <th style="text-align:right;border-bottom:1px solid #cbd5e1;padding:6px;">Gross</th>
+                  <th style="text-align:right;border-bottom:1px solid #cbd5e1;padding:6px;">Tx</th>
+                  <th style="text-align:left;border-bottom:1px solid #cbd5e1;padding:6px;">Best Seller</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${dailyPulse.length ? dailyPulse.map((d: any) => `
+                  <tr>
+                    <td style="padding:6px;border-bottom:1px solid #e2e8f0;">${d.date}</td>
+                    <td style="padding:6px;border-bottom:1px solid #e2e8f0;text-align:right;">$${Number(d.gross || 0).toFixed(2)}</td>
+                    <td style="padding:6px;border-bottom:1px solid #e2e8f0;text-align:right;">${d.transactions}</td>
+                    <td style="padding:6px;border-bottom:1px solid #e2e8f0;">${d.topItem ? `${d.topItem.name} ($${Number(d.topItem.gross || 0).toFixed(2)})` : '-'}</td>
+                  </tr>
+                `).join("") : '<tr><td colspan="4" style="padding:12px;text-align:center;color:#64748b;">Not enough sales data for pulse</td></tr>'}
+              </tbody>
+            </table>
+
+            <h3 style="margin:18px 0 8px;">🔮 Oracle Suggestions</h3>
+            <ul style="margin:0;padding-left:18px;">
+              ${oracle.map((t) => `<li style="margin:6px 0;">${t}</li>`).join("")}
+            </ul>
 
             <h3 style="margin:18px 0 8px;">📦 All Sales Today</h3>
             <table style="width:100%;border-collapse:collapse;font-size:11px;">
@@ -365,9 +526,21 @@ export async function POST(req: Request) {
       count: rows.length,
       totalCash,
       totalEcocash,
+      openingCash,
+      laybyCash,
+      adjustmentNet,
+      closingCashEstimate,
       cashTransactionCount: cashSales.length,
       ecocashTransactionCount: ecocashSales.length
     },
+    expenses: posExpenseRows.map((e: any) => ({
+      time: new Date(e.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      amount: Number(e.amount || 0),
+      description: String(e.description || ""),
+    })),
+    restock,
+    dailyPulse,
+    oracle,
     topItems,
     allSales: rows.map((s: any) => ({
       time: new Date(s.date).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}),

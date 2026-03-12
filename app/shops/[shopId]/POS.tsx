@@ -103,6 +103,12 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
     const [searchTerm, setSearchTerm] = useState("");
     const [isPending, startTransition] = useTransition();
 
+    // Local inventory state so POS can immediately sell ad-hoc items without a page reload.
+    const [inventoryState, setInventoryState] = useState<any[]>(() => inventory || []);
+    useEffect(() => {
+        setInventoryState(inventory || []);
+    }, [inventory]);
+
     // POS Modes
     const [posMode, setPosMode] = useState<'sale' | 'quote' | 'layby'>('sale');
     const [laybyDeposit, setLaybyDeposit] = useState("");
@@ -195,7 +201,7 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
     const shop = db.shops.find((s: any) => s.id === shopId);
     const shopExpenses = shop ? Object.values(shop.expenses).reduce((a: number, b: any) => a + Number(b), 0) : 0;
 
-    const totalShopStock = inventory.reduce((sum, item) => {
+    const totalShopStock = inventoryState.reduce((sum, item) => {
         const alloc = item.allocations.find((a: any) => a.shopId === shopId);
         return sum + (alloc ? alloc.quantity : 0);
     }, 0);
@@ -218,9 +224,9 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
         .slice(0, 3)
         .map(([id]) => id);
 
-    const topSellers = inventory.filter(item => topSellerIds.includes(item.id));
+    const topSellers = inventoryState.filter(item => topSellerIds.includes(item.id));
     // Fallback if no sales yet: just show first 3
-    const defaultDisplayItems = topSellers.length >= 1 ? topSellers : inventory.slice(0, 3);
+    const defaultDisplayItems = topSellers.length >= 1 ? topSellers : inventoryState.slice(0, 3);
 
     // Calculate Cash Drawer Math
     const ledger = db.ledger || [];
@@ -345,6 +351,66 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
         setCart(cart.filter(c => c.item.id !== id));
     };
 
+    const applyLocalStockDecrement = (itemId: string, qty: number) => {
+        if (!itemId || String(itemId).startsWith('service_')) return;
+        const q = Math.max(0, Number(qty || 0));
+        if (!q) return;
+
+        setInventoryState((prev) =>
+            (prev || []).map((it: any) => {
+                if (it.id !== itemId) return it;
+                const allocations = Array.isArray(it.allocations) ? it.allocations.map((a: any) => {
+                    if (a.shopId !== shopId) return a;
+                    return { ...a, quantity: Math.max(0, Number(a.quantity || 0) - q) };
+                }) : it.allocations;
+                return {
+                    ...it,
+                    quantity: Math.max(0, Number(it.quantity || 0) - q),
+                    allocations
+                };
+            })
+        );
+    };
+
+    const upsertLocalInventoryItem = (item: any, addedStock: number) => {
+        if (!item?.id) return;
+        const add = Math.max(0, Number(addedStock || 0));
+        setInventoryState((prev) => {
+            const current = prev || [];
+            const idx = current.findIndex((p: any) => p.id === item.id);
+            if (idx === -1) {
+                return [
+                    ...current,
+                    {
+                        id: item.id,
+                        name: item.name || "New Item",
+                        category: item.category || "General",
+                        quantity: add,
+                        landedCost: Number(item.landedCost || item.landed_cost || 0),
+                        allocations: [{ shopId, quantity: add }]
+                    }
+                ];
+            }
+
+            const next = [...current];
+            const cur = next[idx];
+            const allocations = Array.isArray(cur.allocations) ? [...cur.allocations] : [];
+            const aIdx = allocations.findIndex((a: any) => a.shopId === shopId);
+            if (aIdx === -1) allocations.push({ shopId, quantity: add });
+            else allocations[aIdx] = { ...allocations[aIdx], quantity: Number(allocations[aIdx].quantity || 0) + add };
+
+            next[idx] = {
+                ...cur,
+                name: item.name || cur.name,
+                category: item.category || cur.category,
+                landedCost: Number(item.landedCost || item.landed_cost || cur.landedCost || 0),
+                quantity: Number(cur.quantity || 0) + add,
+                allocations
+            };
+            return next;
+        });
+    };
+
     const updateQty = (id: string, delta: number) => {
         setCart(cart.map(c => {
             if (c.item.id === id) {
@@ -387,13 +453,19 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
 
         startTransition(async () => {
             try {
-                const addedItem = await addNewProductFromPos({
+                const stockToAdd = parseInt(newProduct.initialStock) || 0;
+                const addedItem: any = await addNewProductFromPos({
                     name: newProduct.name,
                     category: newProduct.category,
                     landedCost: parseFloat(newProduct.landedCost),
                     shopId,
-                    initialStock: parseInt(newProduct.initialStock) || 0
+                    initialStock: stockToAdd
                 });
+
+                upsertLocalInventoryItem(
+                    { ...addedItem, name: newProduct.name, category: newProduct.category, landedCost: parseFloat(newProduct.landedCost) },
+                    Number(addedItem?.addedStock ?? stockToAdd)
+                );
                 setIsAddProductModalOpen(false);
                 setNewProduct({ name: "", category: "", landedCost: "", initialStock: "0" });
                 alert(`${newProduct.name} added to inventory system.`);
@@ -415,7 +487,7 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
         startTransition(async () => {
             try {
                 // Try to find the product in inventory
-                const existingItem = inventory.find((item: any) =>
+                const existingItem = inventoryState.find((item: any) =>
                     item.name.toLowerCase() === quickSale.name.toLowerCase()
                 );
 
@@ -423,24 +495,28 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
                     // Add tracked product to cart
                     addToCart(existingItem, salePrice, qty);
                 } else {
-                    // It genuinely doesn't exist. Create it on the fly in MASTER inventory.
+                    // It genuinely doesn't exist. Create it on the fly in MASTER inventory with enough stock to cover this sale.
                     const addedItem: any = await addNewProductFromPos({
                         name: quickSale.name,
                         category: "Quick Sale",
                         landedCost: salePrice * 0.7, // Estimate cost at 70% of sale price
                         shopId,
-                        initialStock: 0 // Will be handled by the sale itself
+                        initialStock: qty // Added then sold, leaving 0 after checkout
                     });
 
                     if (addedItem?.id) {
+                        upsertLocalInventoryItem(
+                            { ...addedItem, name: quickSale.name, category: "Quick Sale", landedCost: salePrice * 0.7 },
+                            qty
+                        );
                         // Create a mock inventory item object to add to cart immediately
                         const newItem = {
                             id: addedItem.id,
                             name: quickSale.name,
                             category: "Quick Sale",
-                            quantity: 0,
+                            quantity: qty,
                             landedCost: salePrice * 0.7,
-                            allocations: [{ shopId, quantity: 0 }]
+                            allocations: [{ shopId, quantity: qty }]
                         };
                         addToCart(newItem, salePrice, qty);
                     } else {
@@ -494,6 +570,11 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
                         clientPhone,
                         employeeId: selectedEmployeeId || "system"
                     });
+
+                    // Lay-by reserves stock immediately; reflect it locally so staff can keep selling without refresh.
+                    for (const entry of cart) {
+                        applyLocalStockDecrement(entry.item.id, entry.quantity);
+                    }
 
                     // Push new lay-by into local list so it appears in the Lay-by modal immediately
                     setLaybyList((prev: LaybyQuote[]) => [
@@ -590,6 +671,8 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
                                 discount: discountAmount
                             });
 
+                            applyLocalStockDecrement(entry.item.id, entry.quantity);
+
                             receiptItems.push({
                                 name: entry.item.name,
                                 quantity: entry.quantity,
@@ -662,6 +745,8 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
                                     discount: discountAmount
                                 });
                             }
+
+                            applyLocalStockDecrement(entry.item.id, entry.quantity);
 
                             receiptItems.push({
                                 name: entry.item.name,
@@ -915,7 +1000,7 @@ Generated via NIRVANA POS`;
         }
     };
 
-    const filteredInventory = inventory.filter((item: any) =>
+    const filteredInventory = inventoryState.filter((item: any) =>
         item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         item.category.toLowerCase().includes(searchTerm.toLowerCase())
     );
@@ -1213,7 +1298,7 @@ Generated via NIRVANA POS`;
                             const supplier = shipment?.supplier || "Global Provider";
 
                             const daysInStock = Math.floor((new Date().getTime() - new Date(item.dateAdded).getTime()) / (1000 * 3600 * 24));
-                            const totalInventoryCount = inventory.reduce((sum, i) => sum + i.quantity, 0);
+                            const totalInventoryCount = inventoryState.reduce((sum, i) => sum + i.quantity, 0);
                             const totalGlobalOverhead = db.globalExpenses ? Object.values(db.globalExpenses).reduce((acc: number, val: any) => acc + Number(val), 0) : 0;
                             const dailyBleed = totalInventoryCount > 0 ? (totalGlobalOverhead / 30) / totalInventoryCount : 0;
                             const cumulativeBleed = dailyBleed * daysInStock;
