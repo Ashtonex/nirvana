@@ -319,11 +319,12 @@ export async function POST(req: Request) {
     .limit(5);
 
   const lowIds = (lowAllocs || []).map((a: any) => a.item_id).filter(Boolean);
-  const { data: lowItems } = lowIds.length
-    ? await supabaseAdmin.from("inventory_items").select("id,name,category").in("id", lowIds)
-    : { data: [] as any[] };
+  type LowItem = { id: string; name?: string | null; category?: string | null };
+  const lowItems: LowItem[] = lowIds.length
+    ? (((await supabaseAdmin.from("inventory_items").select("id,name,category").in("id", lowIds)).data as LowItem[]) || [])
+    : [];
 
-  const lowItemMap = new Map((lowItems || []).map((i: any) => [i.id, i]));
+  const lowItemMap = new Map<string, LowItem>(lowItems.map((i) => [i.id, i]));
   const restock = (lowAllocs || []).map((a: any) => {
     const it = lowItemMap.get(a.item_id);
     return { itemId: a.item_id, name: it?.name || a.item_id, category: it?.category || "", qty: Number(a.quantity || 0) };
