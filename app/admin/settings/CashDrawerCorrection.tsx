@@ -42,16 +42,17 @@ export function CashDrawerCorrection({ shops }: { shops: { id: string; name: str
   }, [current]);
 
   return (
-    <Card className="bg-slate-950/40 border-slate-800">
-      <CardHeader>
-        <CardTitle className="text-lg font-black uppercase italic flex items-center gap-2">
-          <Coins className="h-5 w-5 text-amber-500" /> Cash Drawer Corrections
-        </CardTitle>
-        <CardDescription className="text-[10px] font-bold uppercase italic">
-          Manager/Owner only. Every change is logged in Security Audit.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-4">
+    <div id="opening-balance">
+      <Card className="bg-slate-950/40 border-slate-800">
+        <CardHeader>
+          <CardTitle className="text-lg font-black uppercase italic flex items-center gap-2">
+            <Coins className="h-5 w-5 text-amber-500" /> Opening Balance Adjustment
+          </CardTitle>
+          <CardDescription className="text-[10px] font-bold uppercase italic">
+            Manager/Owner only. Fix the opening cash drawer amount for a day. Every change is logged in Security Audit.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
         <div className="grid gap-3 md:grid-cols-2">
           <div className="space-y-2">
             <label className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Shop</label>
@@ -136,8 +137,8 @@ export function CashDrawerCorrection({ shops }: { shops: { id: string; name: str
         >
           <Save className="mr-2 h-4 w-4" /> Apply Correction
         </Button>
-      </CardContent>
-    </Card>
+        </CardContent>
+      </Card>
+    </div>
   );
 }
-

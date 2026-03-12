@@ -39,6 +39,14 @@ export default async function SettingsPage() {
                 <p className="text-slate-400 font-bold tracking-widest uppercase text-xs italic">
                     Fiscal Strategy & System Integrity Configuration
                 </p>
+                <div className="pt-3 flex flex-wrap items-center justify-center gap-2">
+                    <a
+                        href="#opening-balance"
+                        className="inline-flex items-center justify-center rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-[10px] font-black uppercase italic tracking-widest text-amber-300 hover:bg-amber-500/20"
+                    >
+                        Jump: Opening Balance
+                    </a>
+                </div>
             </div>
 
             <div className="grid gap-8 md:grid-cols-2">

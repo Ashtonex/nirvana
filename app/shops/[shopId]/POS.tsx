@@ -25,6 +25,7 @@ import {
     Users,
     AlertCircle,
     ShieldAlert,
+    Settings,
     BadgeCheck,
     TrendingUp,
     RefreshCcw,
@@ -33,6 +34,7 @@ import {
     Sparkles,
     Coins,
     PackagePlus,
+    ClipboardList,
     Power,
     MessageSquare,
     LogOut,
@@ -121,6 +123,8 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
     const [clientEmail, setClientEmail] = useState("");
     const [clientPhone, setClientPhone] = useState("");
     const [selectedEmployeeId, setSelectedEmployeeId] = useState("");
+    const [staffRole, setStaffRole] = useState<string>("");
+    const [staffDisplayName, setStaffDisplayName] = useState<string>("");
     const [paymentMethod, setPaymentMethod] = useState<'cash' | 'ecocash'>('cash');
 
     // Offline handling
@@ -143,6 +147,11 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
                 const staffId = data?.staff?.id;
                 if (!cancelled && staffId) {
                     setSelectedEmployeeId(String(staffId));
+                    setStaffRole(String(data?.staff?.role || ""));
+                    const name = String(data?.staff?.name || "").trim();
+                    const surname = String(data?.staff?.surname || "").trim();
+                    const combined = `${name} ${surname}`.trim();
+                    setStaffDisplayName(combined || String(data?.staff?.email || "") || "Manager");
                 }
             } catch { }
         }
@@ -151,6 +160,12 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
             cancelled = true;
         };
     }, [selectedEmployeeId]);
+
+    const canUseManagerTools = (() => {
+        const r = String(staffRole || "").toLowerCase();
+        return r === "owner" || r === "admin" || r === "manager" || r === "lead_manager" || r === "lead manager";
+    })();
+    const [isManagerToolsOpen, setIsManagerToolsOpen] = useState(false);
 
     // Discount (0.50 to 5.00 USD)
     const [discount, setDiscount] = useState(0);
@@ -1058,6 +1073,16 @@ Generated via NIRVANA POS`;
                 )}
 
                 <div className="flex flex-wrap items-center gap-2">
+                    {canUseManagerTools && (
+                        <Button
+                            onClick={() => setIsManagerToolsOpen(true)}
+                            className="bg-amber-600 hover:bg-amber-500 text-[10px] font-black uppercase italic h-10 px-3 flex items-center gap-2"
+                            title="Admin/Manager tools"
+                        >
+                            <ShieldAlert className="h-4 w-4" /> Manager Tools
+                        </Button>
+                    )}
+
                     <Button
                         onClick={() => setIsAddProductModalOpen(true)}
                         className="bg-violet-600 hover:bg-violet-500 text-[10px] font-black uppercase italic h-10 px-3 flex items-center gap-2"
@@ -1071,6 +1096,12 @@ Generated via NIRVANA POS`;
                     >
                         <ShoppingCart className="h-4 w-4" /> Quick Sale
                     </Button>
+
+                    {db?.settings?.taxMode ? (
+                        <Badge className="bg-emerald-500/10 text-emerald-300 border-emerald-500/20 text-[9px] font-black uppercase">
+                            Tax: {String(db.settings.taxMode).replace(/_/g, " ")} @ {Number(db.settings.taxRate || 0) * 100}%
+                        </Badge>
+                    ) : null}
 
                     <div className="flex items-center gap-1 bg-slate-900 border border-slate-800 rounded-lg p-1 h-10">
                         <Button
@@ -1246,6 +1277,54 @@ Generated via NIRVANA POS`;
                         <LogOut className="h-4 w-4" /> Logout
                     </Button>
                 </div>
+
+                <Modal
+                    isOpen={isManagerToolsOpen}
+                    onClose={() => setIsManagerToolsOpen(false)}
+                    title={`Manager Tools${staffDisplayName ? ` — ${staffDisplayName}` : ""}`}
+                >
+                    <div className="space-y-3">
+                        <Button
+                            className="w-full bg-amber-600 hover:bg-amber-500 text-[10px] font-black uppercase italic tracking-widest"
+                            onClick={() => {
+                                setIsManagerToolsOpen(false);
+                                window.location.href = "/admin/settings#opening-balance";
+                            }}
+                        >
+                            <Coins className="mr-2 h-4 w-4" /> Adjust Opening Balance
+                        </Button>
+                        <Button
+                            className="w-full bg-slate-800 hover:bg-slate-700 text-[10px] font-black uppercase italic tracking-widest"
+                            onClick={() => {
+                                setIsManagerToolsOpen(false);
+                                window.location.href = "/admin/settings";
+                            }}
+                        >
+                            <Settings className="mr-2 h-4 w-4" /> Admin Settings
+                        </Button>
+                        <Button
+                            className="w-full bg-slate-800 hover:bg-slate-700 text-[10px] font-black uppercase italic tracking-widest"
+                            onClick={() => {
+                                setIsManagerToolsOpen(false);
+                                window.location.href = "/admin/audit";
+                            }}
+                        >
+                            <ShieldCheck className="mr-2 h-4 w-4" /> Security Audit
+                        </Button>
+                        <Button
+                            className="w-full bg-slate-800 hover:bg-slate-700 text-[10px] font-black uppercase italic tracking-widest"
+                            onClick={() => {
+                                setIsManagerToolsOpen(false);
+                                window.location.href = "/inventory/stocktake";
+                            }}
+                        >
+                            <ClipboardList className="mr-2 h-4 w-4" /> Stocktake Audit
+                        </Button>
+                        <div className="text-[10px] font-bold uppercase text-slate-400">
+                            If you cannot see these pages, your staff role must be Manager/Admin/Owner.
+                        </div>
+                    </div>
+                </Modal>
 
                 <div className="flex gap-2 w-full mt-4 sm:mt-0 sm:w-auto overflow-x-auto pb-2 scrollbar-hide">
                     <div className="bg-slate-900 border border-slate-800 px-4 py-2 rounded-lg flex items-center gap-3 h-10 shadow-lg min-w-max">
