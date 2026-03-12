@@ -25,6 +25,7 @@ import {
     Users,
     AlertCircle,
     ShieldAlert,
+    ShieldCheck,
     Settings,
     BadgeCheck,
     TrendingUp,
