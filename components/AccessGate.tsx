@@ -9,6 +9,7 @@ export function AccessGate({ children }: { children: React.ReactNode }) {
 
   // Check if staff is logged in
   const [staffShopId, setStaffShopId] = useState<string | null>(null);
+  const [staffRole, setStaffRole] = useState<string | null>(null);
   const [ownerOk, setOwnerOk] = useState(false);
   const [checked, setChecked] = useState(false);
 
@@ -20,6 +21,7 @@ export function AccessGate({ children }: { children: React.ReactNode }) {
           const data = await res.json();
           if (data?.staff?.shop_id) {
             setStaffShopId(data.staff.shop_id);
+            setStaffRole(String(data?.staff?.role || ""));
             setChecked(true);
             return;
           }
@@ -55,8 +57,21 @@ export function AccessGate({ children }: { children: React.ReactNode }) {
     const onTheirShop = pathname === `/shops/${staffShopId}` || pathname.startsWith(`/shops/${staffShopId}/`);
     const onStaffChat = pathname === "/staff-chat";
     const onCommandCenter = pathname === "/";
+
+    const r = String(staffRole || "").toLowerCase();
+    const isManager =
+      r === "manager" ||
+      r === "lead_manager" ||
+      r === "lead manager" ||
+      r === "admin" ||
+      r === "owner";
+
+    const managerAllowed =
+      pathname === "/inventory/stocktake" ||
+      pathname === "/admin/audit" ||
+      pathname === "/admin/settings";
     
-    if (onTheirShop || onStaffChat) {
+    if (onTheirShop || onStaffChat || (isManager && managerAllowed)) {
       return <>{children}</>;
     }
 

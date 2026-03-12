@@ -15,10 +15,14 @@ import {
 import { Badge, Button, Input, Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui";
 import NukeConsole from "@/components/NukeConsole";
 import { TaxSettingsForm } from "./TaxSettingsForm";
+import { getDashboardData } from "../../actions";
+import { CashDrawerCorrection } from "./CashDrawerCorrection";
 
 export default async function SettingsPage() {
     const settings = await getGlobalSettings();
     if (!settings) return <div>Inconsistent Oracle State. Error 404.</div>;
+    const db = await getDashboardData();
+    const shops = (db.shops || []).map((s: any) => ({ id: s.id, name: s.name }));
 
     return (
         <div className="space-y-8 pb-32 pt-8">
@@ -106,6 +110,10 @@ export default async function SettingsPage() {
                         </div>
                     </CardContent>
                 </Card>
+            </div>
+
+            <div className="max-w-3xl mx-auto">
+                <CashDrawerCorrection shops={shops} />
             </div>
 
             <div className="max-w-3xl mx-auto">

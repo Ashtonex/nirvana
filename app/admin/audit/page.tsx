@@ -58,10 +58,12 @@ export default function AuditPage() {
     if (!db) return <div className="p-8 text-slate-500 animate-pulse uppercase font-black">Decrypting Ledger...</div>;
 
     const auditLog = [...(db.auditLog || [])].reverse();
+    const employeeMap = new Map((db.employees || []).map((e: any) => [e.id, `${e.name || ""} ${e.surname || ""}`.trim()]));
     const filteredLog = auditLog.filter(entry =>
-        entry.action.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        entry.details.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        entry.employeeId.toLowerCase().includes(searchTerm.toLowerCase())
+        String(entry.action || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+        String(entry.details || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+        String(entry.employeeId || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+        String(employeeMap.get(entry.employeeId) || "").toLowerCase().includes(searchTerm.toLowerCase())
     );
 
     const getIcon = (action: string) => {
@@ -134,7 +136,7 @@ export default function AuditPage() {
                                         <div className="flex items-center justify-end gap-2 mb-1">
                                             <span className="text-[10px] font-black text-slate-500 uppercase tracking-tighter">Executor</span>
                                             <Badge variant="outline" className="text-[9px] font-black uppercase text-emerald-400 border-emerald-500/20 px-2">
-                                                <User className="h-2 w-2 mr-1" /> {entry.employeeId}
+                                                <User className="h-2 w-2 mr-1" /> {employeeMap.get(entry.employeeId) || entry.employeeId}
                                             </Badge>
                                         </div>
                                         <p className="text-[8px] font-black text-slate-700 uppercase">Verification Hash: {entry.id.toUpperCase()}</p>

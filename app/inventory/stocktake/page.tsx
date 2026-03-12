@@ -30,10 +30,32 @@ export default function StocktakePage() {
     const [counts, setCounts] = useState<Record<string, number>>({});
     const [loading, setLoading] = useState(false);
     const [searchTerm, setSearchTerm] = useState("");
+    const [executor, setExecutor] = useState<string>("");
     const router = useRouter();
 
     useEffect(() => {
         getDashboardData().then(setDb);
+    }, []);
+
+    useEffect(() => {
+        let cancelled = false;
+        async function loadExecutor() {
+            try {
+                const r = await fetch("/api/staff/me", { cache: "no-store", credentials: "include" });
+                if (r.ok) {
+                    const data = await r.json().catch(() => ({}));
+                    const staff = data?.staff;
+                    const name = staff ? `${staff.name || ""} ${staff.surname || ""}`.trim() : "";
+                    if (!cancelled) setExecutor(name || String(staff?.id || ""));
+                } else {
+                    if (!cancelled) setExecutor("Owner");
+                }
+            } catch {
+                if (!cancelled) setExecutor("Owner");
+            }
+        }
+        loadExecutor();
+        return () => { cancelled = true; };
     }, []);
 
     if (!db) return <div className="p-8 text-slate-500 animate-pulse uppercase font-black">Loading Manifest...</div>;
@@ -63,7 +85,6 @@ export default function StocktakePage() {
 
             await recordStocktake({
                 shopId: selectedShop,
-                employeeId: "MANAGER", // Simplified
                 items: itemsToSync
             });
 

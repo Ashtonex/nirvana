@@ -7,6 +7,7 @@ import { supabase, supabaseAdmin } from "@/lib/supabase";
 import { createHash, randomUUID } from "crypto";
 import { sendEmail } from "@/lib/email";
 import { sendWhatsAppMessage } from "@/lib/twilio";
+import { cookies } from "next/headers";
 
 function getPublicBaseUrl() {
     const url =
@@ -15,6 +16,86 @@ function getPublicBaseUrl() {
         process.env.NEXT_PUBLIC_SITE_URL ||
         '';
     return url ? String(url).replace(/\/$/, '') : '';
+}
+
+type ActorCtx =
+    | { kind: "owner"; id: string; name: string; role: "owner" }
+    | { kind: "staff"; id: string; name: string; role: string; shopId: string };
+
+function isManagerRole(role: string | null | undefined) {
+    const r = String(role || "").toLowerCase();
+    return r === "owner" || r === "admin" || r === "manager" || r === "lead_manager" || r === "lead manager";
+}
+
+async function getActorFromCookies(): Promise<ActorCtx | null> {
+    const cookieStore = await cookies();
+
+    // Owner cookie is a simple privileged session in this app.
+    const ownerToken = cookieStore.get("nirvana_owner")?.value;
+    if (ownerToken) {
+        return { kind: "owner", id: "owner-1", name: "Owner", role: "owner" };
+    }
+
+    const staffToken = cookieStore.get("nirvana_staff")?.value;
+
+    // Supabase Auth (owner/admin accounts) - allow privileged actions even without the custom owner cookie.
+    if (!staffToken) {
+        const accessToken = cookieStore.get("sb-access-token")?.value;
+        if (accessToken) {
+            try {
+                const { data, error } = await supabaseAdmin.auth.getUser(accessToken);
+                if (!error && data?.user?.id) {
+                    const { data: emp } = await supabaseAdmin
+                        .from("employees")
+                        .select("id,name,surname,shop_id,role")
+                        .eq("id", data.user.id)
+                        .maybeSingle();
+
+                    const role = String((emp as any)?.role || "");
+                    if (isManagerRole(role)) {
+                        const name = emp?.name ? `${emp.name || ""} ${emp.surname || ""}`.trim() : (data.user.email || "Admin");
+                        const isOwnerLike = String(role).toLowerCase() === "owner" || String(role).toLowerCase() === "admin";
+                        return isOwnerLike
+                            ? { kind: "owner", id: data.user.id, name, role: "owner" }
+                            : { kind: "staff", id: data.user.id, name, role, shopId: String((emp as any)?.shop_id || "") };
+                    }
+                }
+            } catch { }
+        }
+
+        return null;
+    }
+
+    const tokenHash = createHash("sha256").update(staffToken).digest("hex");
+    const { data: session } = await supabaseAdmin
+        .from("staff_sessions")
+        .select("employee_id, expires_at")
+        .eq("token_hash", tokenHash)
+        .maybeSingle();
+
+    if (!session) return null;
+    if (session.expires_at && new Date(session.expires_at).getTime() < Date.now()) return null;
+
+    const { data: staff } = await supabaseAdmin
+        .from("employees")
+        .select("id,name,surname,shop_id,role,is_active,active")
+        .eq("id", session.employee_id)
+        .maybeSingle();
+
+    if (!staff?.id) return null;
+    const active = Boolean((staff as any).is_active ?? (staff as any).active ?? true);
+    if (!active) return null;
+
+    const name = `${staff.name || "Staff"} ${staff.surname || ""}`.trim();
+    return { kind: "staff", id: staff.id, name, role: String(staff.role || "sales"), shopId: String(staff.shop_id || "") };
+}
+
+async function requireManagerOrOwner() {
+    const actor = await getActorFromCookies();
+    if (!actor) throw new Error("Unauthorized");
+    if (actor.kind === "owner") return actor;
+    if (!isManagerRole(actor.role)) throw new Error("Forbidden");
+    return actor;
 }
 
 function getLaybyPaidAmountFromLedger(ledgerEntries: any[], laybyId: string): number {
@@ -336,7 +417,13 @@ export async function recordSale(sale: any) {
         }
     }
 
-    await supabaseAdmin.from('audit_log').insert({ id: Math.random().toString(36).substring(2, 9), timestamp, employee_id: sale.employeeId, action: 'SALE_RECORDED', details: sale.itemName });
+    await supabaseAdmin.from('audit_log').insert({
+        id: Math.random().toString(36).substring(2, 9),
+        timestamp,
+        employee_id: sale.employeeId,
+        action: 'SALE_RECORDED',
+        details: `${sale.shopId}: ${sale.itemName} x${sale.quantity} ($${Number(totalWithTax).toFixed(2)})`
+    });
 
     revalidatePath(`/shops/${sale.shopId}`); revalidatePath("/inventory");
     revalidatePath("/");
@@ -623,18 +710,78 @@ export async function deleteInventoryItem(itemId: string) {
 }
 
 export async function recordStocktake(stocktakeData: any) {
+    const actor = await requireManagerOrOwner();
     const timestamp = new Date().toISOString();
-    for (const record of stocktakeData.items) {
-        const { data: item } = await supabase.from('inventory_items').select('*').eq('id', record.itemId).single();
-        const { data: alloc } = await supabase.from('inventory_allocations').select('*').eq('item_id', record.itemId).eq('shop_id', stocktakeData.shopId).single();
-        if (!item || !alloc) continue;
-        const diff = record.physicalQuantity - alloc.quantity;
-        if (diff !== 0) {
-            await supabase.from('inventory_allocations').update({ quantity: record.physicalQuantity }).eq('item_id', record.itemId).eq('shop_id', stocktakeData.shopId);
-            await supabase.from('inventory_items').update({ quantity: (item.quantity - alloc.quantity) + record.physicalQuantity }).eq('id', record.itemId);
-        }
+    const shopId = String(stocktakeData?.shopId || "").trim();
+    if (!shopId) throw new Error("Missing shopId");
+
+    if (actor.kind === "staff" && actor.shopId && actor.shopId !== shopId) {
+        throw new Error("Forbidden");
     }
-    revalidatePath("/inventory"); revalidatePath(`/shops/${stocktakeData.shopId}`);
+
+    const items = Array.isArray(stocktakeData?.items) ? stocktakeData.items : [];
+
+    for (const record of items) {
+        const itemId = String(record?.itemId || "").trim();
+        if (!itemId) continue;
+
+        const physicalQuantity = Math.max(0, Number(record?.physicalQuantity || 0));
+
+        const { data: item } = await supabaseAdmin
+            .from('inventory_items')
+            .select('id,name,quantity,landed_cost')
+            .eq('id', itemId)
+            .maybeSingle();
+
+        const { data: alloc } = await supabaseAdmin
+            .from('inventory_allocations')
+            .select('item_id,shop_id,quantity')
+            .eq('item_id', itemId)
+            .eq('shop_id', shopId)
+            .maybeSingle();
+
+        if (!item || !alloc) continue;
+
+        const systemQty = Number(alloc.quantity || 0);
+        const diff = physicalQuantity - systemQty;
+        if (diff === 0) continue;
+
+        await supabaseAdmin
+            .from('inventory_allocations')
+            .update({ quantity: physicalQuantity })
+            .eq('item_id', itemId)
+            .eq('shop_id', shopId);
+
+        const globalQty = Number(item.quantity || 0);
+        const nextGlobal = (globalQty - systemQty) + physicalQuantity;
+        await supabaseAdmin.from('inventory_items').update({ quantity: nextGlobal }).eq('id', itemId);
+
+        const landed = Number((item as any).landed_cost || 0);
+        const adjustmentValue = Math.abs(diff) * landed;
+        if (Number.isFinite(adjustmentValue) && adjustmentValue > 0) {
+            await supabaseAdmin.from('ledger_entries').insert({
+                id: Math.random().toString(36).substring(2, 9),
+                shop_id: shopId,
+                type: diff < 0 ? 'expense' : 'income',
+                category: 'Stock Adjustment',
+                amount: adjustmentValue,
+                date: timestamp,
+                description: `${diff < 0 ? 'Shrinkage' : 'Surplus'}: ${item.name || itemId} ${systemQty} -> ${physicalQuantity} (delta ${diff})`
+            });
+        }
+
+        await supabaseAdmin.from('audit_log').insert({
+            id: Math.random().toString(36).substring(2, 9),
+            timestamp,
+            employee_id: actor.id,
+            action: 'STOCKTAKE_ADJUSTMENT',
+            details: `${shopId}: ${item.name || itemId} ${systemQty} -> ${physicalQuantity} (delta ${diff}) by ${actor.name}`
+        });
+    }
+
+    revalidatePath("/inventory");
+    revalidatePath(`/shops/${shopId}`);
+    revalidatePath("/admin/audit");
 }
 
 export async function getShipments() {
@@ -797,6 +944,7 @@ export async function addNewProductFromPos(productData: any) {
 export async function openCashRegister(shopId: string, expectedAmount: number, actualAmount: number) {
     const timestamp = new Date().toISOString();
     const id = Math.random().toString(36).substring(2, 9);
+    const actor = await getActorFromCookies().catch(() => null);
 
     // Log the actual opening amount as an asset
     await supabaseAdmin.from('ledger_entries').insert([{
@@ -823,7 +971,130 @@ export async function openCashRegister(shopId: string, expectedAmount: number, a
         }]);
     }
 
+    // Audit trail (best-effort)
+    try {
+        await supabaseAdmin.from("audit_log").insert({
+            id: Math.random().toString(36).substring(2, 9),
+            timestamp,
+            employee_id: actor?.id || "SYSTEM",
+            action: "CASH_DRAWER_OPENED",
+            details: `${shopId}: opening $${Number(actualAmount).toFixed(2)} (expected $${Number(expectedAmount).toFixed(2)}) by ${actor?.name || "SYSTEM"}`
+        });
+    } catch { }
+
     revalidatePath(`/shops/${shopId}`);
+}
+
+export async function getCashDrawerOpening(shopId: string, dateYYYYMMDD: string) {
+    const actor = await requireManagerOrOwner();
+    const shop = String(shopId || "").trim();
+    const day = String(dateYYYYMMDD || "").trim();
+    if (!shop) throw new Error("Missing shopId");
+    if (!day) throw new Error("Missing date");
+
+    const since = `${day}T00:00:00.000Z`;
+    const until = `${day}T23:59:59.999Z`;
+
+    if (actor.kind === "staff" && actor.shopId && actor.shopId !== shop) {
+        throw new Error("Forbidden");
+    }
+
+    const { data } = await supabaseAdmin
+        .from("ledger_entries")
+        .select("id, amount, date, description, category, shop_id")
+        .eq("shop_id", shop)
+        .eq("category", "Cash Drawer Opening")
+        .gte("date", since)
+        .lte("date", until)
+        .order("date", { ascending: true })
+        .limit(1);
+
+    const entry = (data || [])[0] || null;
+    return { entry };
+}
+
+export async function updateCashDrawerOpening(input: {
+    shopId: string;
+    dateYYYYMMDD: string;
+    newAmount: number;
+    reason?: string;
+}) {
+    const actor = await requireManagerOrOwner();
+    const shopId = String(input?.shopId || "").trim();
+    const day = String(input?.dateYYYYMMDD || "").trim();
+    const newAmount = Number(input?.newAmount);
+    const reason = String(input?.reason || "").trim();
+
+    if (!shopId) throw new Error("Missing shopId");
+    if (!day) throw new Error("Missing date");
+    if (!Number.isFinite(newAmount) || newAmount < 0) throw new Error("Invalid amount");
+
+    if (actor.kind === "staff" && actor.shopId && actor.shopId !== shopId) {
+        throw new Error("Forbidden");
+    }
+
+    const since = `${day}T00:00:00.000Z`;
+    const until = `${day}T23:59:59.999Z`;
+
+    const { data: existing } = await supabaseAdmin
+        .from("ledger_entries")
+        .select("id, amount, date, description")
+        .eq("shop_id", shopId)
+        .eq("category", "Cash Drawer Opening")
+        .gte("date", since)
+        .lte("date", until)
+        .order("date", { ascending: true })
+        .limit(1);
+
+    const row = (existing || [])[0] || null;
+    const timestamp = new Date().toISOString();
+
+    if (!row) {
+        const id = Math.random().toString(36).substring(2, 9);
+        await supabaseAdmin.from("ledger_entries").insert({
+            id,
+            shop_id: shopId,
+            type: "asset",
+            category: "Cash Drawer Opening",
+            amount: newAmount,
+            date: `${day}T00:00:00.000Z`,
+            description: `Opening set by ${actor.name}${reason ? ` | Reason: ${reason}` : ""}`
+        });
+
+        await supabaseAdmin.from("audit_log").insert({
+            id: Math.random().toString(36).substring(2, 9),
+            timestamp,
+            employee_id: actor.id,
+            action: "CASH_DRAWER_OPENING_SET",
+            details: `${shopId}: opening set to $${newAmount.toFixed(2)} for ${day} by ${actor.name}${reason ? ` (reason: ${reason})` : ""}`
+        });
+
+        revalidatePath(`/shops/${shopId}`);
+        revalidatePath("/admin/audit");
+        return { success: true, created: true };
+    }
+
+    const oldAmount = Number(row.amount || 0);
+    const descBase = String(row.description || "").trim();
+    const patchNote = `| corrected $${oldAmount.toFixed(2)} -> $${newAmount.toFixed(2)} by ${actor.name} (${actor.id}) @ ${timestamp}${reason ? ` | ${reason}` : ""}`;
+    const nextDesc = descBase ? `${descBase} ${patchNote}` : patchNote;
+
+    await supabaseAdmin
+        .from("ledger_entries")
+        .update({ amount: newAmount, description: nextDesc })
+        .eq("id", row.id);
+
+    await supabaseAdmin.from("audit_log").insert({
+        id: Math.random().toString(36).substring(2, 9),
+        timestamp,
+        employee_id: actor.id,
+        action: "CASH_DRAWER_OPENING_CORRECTED",
+        details: `${shopId}: opening corrected $${oldAmount.toFixed(2)} -> $${newAmount.toFixed(2)} for ${day} by ${actor.name}${reason ? ` (reason: ${reason})` : ""}`
+    });
+
+    revalidatePath(`/shops/${shopId}`);
+    revalidatePath("/admin/audit");
+    return { success: true, created: false, oldAmount, newAmount };
 }
 
 export async function recordPosExpense(shopId: string, amount: number, description: string, employeeId: string) {

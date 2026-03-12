@@ -131,6 +131,27 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
         getPendingCount().then(setPendingSyncCount);
     }, [getPendingCount]);
 
+    // Auto-select the currently logged-in staff member so sales/audit entries are attributed correctly.
+    useEffect(() => {
+        let cancelled = false;
+        async function hydrateStaff() {
+            if (selectedEmployeeId) return;
+            try {
+                const res = await fetch("/api/staff/me", { cache: "no-store", credentials: "include" });
+                if (!res.ok) return;
+                const data = await res.json().catch(() => ({}));
+                const staffId = data?.staff?.id;
+                if (!cancelled && staffId) {
+                    setSelectedEmployeeId(String(staffId));
+                }
+            } catch { }
+        }
+        hydrateStaff();
+        return () => {
+            cancelled = true;
+        };
+    }, [selectedEmployeeId]);
+
     // Discount (0.50 to 5.00 USD)
     const [discount, setDiscount] = useState(0);
 
