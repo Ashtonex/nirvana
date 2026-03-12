@@ -147,6 +147,24 @@ export default function StaffLoginPage() {
                 <span className="inline-flex items-center gap-2"><UserCheck className="h-4 w-4" /> Log In</span>
               )}
             </Button>
+
+            <div className="pt-2 text-center">
+              <button 
+                onClick={() => {
+                  if (confirm("Reset app cache and reload? This can fix UI issues.")) {
+                    if ('serviceWorker' in navigator) {
+                      navigator.serviceWorker.getRegistrations().then(regs => {
+                        for(let reg of regs) reg.unregister();
+                      });
+                    }
+                    window.location.reload();
+                  }
+                }}
+                className="text-[9px] text-slate-600 uppercase font-black hover:text-slate-400 transition-colors"
+              >
+                App not working? Reset & Reload
+              </button>
+            </div>
           </CardContent>
         </Card>
       </div>

@@ -783,8 +783,9 @@ Generated via NIRVANA POS`;
     };
 
     const handleEndOfDayAndLogout = async () => {
-        if (!confirm('End of day: send report and log out?')) return;
+        if (!confirm('End of day: generate report and log out?')) return;
         setIsClosingDay(true);
+        console.log('Starting EOD process for', shopId);
 
         // Cleanup any previous blob url
         if (eodShareUrl) {
@@ -793,15 +794,24 @@ Generated via NIRVANA POS`;
         }
 
         try {
+            // 1. Initial EOD Summary & Weekly logic
+            console.log('Fetching /api/eod summary...');
             const res = await fetch('/api/eod', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                // Test day mode: do not email; we will share via WhatsApp
                 body: JSON.stringify({ shopId, sendEmail: false })
             });
+            
+            if (res.status === 401) {
+                alert("Session expired. Please log in again.");
+                window.location.href = "/staff-login";
+                return;
+            }
+            
             const data = await res.json().catch(() => ({}));
             if (!res.ok) {
-                console.error('EOD failed:', data);
+                console.warn('EOD summary API returned error:', data);
+                // We continue because PDF might still work
             }
 
             const totals = data?.totals;
@@ -813,22 +823,17 @@ Generated via NIRVANA POS`;
                 isWeeklyDay ? '📊 Weekly Report Also Generated!' : null,
                 totals ? `Transactions: ${totals.count}` : null,
                 totals ? `Total (inc tax): $${Number(totals.totalWithTax || 0).toFixed(2)}` : null,
-                totals ? `Total (pre tax): $${Number(totals.totalBeforeTax || 0).toFixed(2)}` : null,
-                totals ? `Tax: $${Number(totals.totalTax || 0).toFixed(2)}` : null,
-                totals && totals.totalDiscount ? `Discounts: $${Number(totals.totalDiscount || 0).toFixed(2)}` : null,
-                totals && totals.totalExpenses ? `Expenses: $${Number(totals.totalExpenses || 0).toFixed(2)}` : null,
+                totals ? `Net Revenue: $${Number((totals.totalWithTax || 0) - (totals.totalExpenses || 0)).toFixed(2)}` : null,
                 `Report PDF is attached.`
             ].filter(Boolean);
             setEodShareText(msgLines.join('\n'));
 
-            if (isWeeklyDay && data.weeklyEmailed) {
-                alert('📊 Weekly Report has been generated and emailed! Week summary sent to management.');
-            }
-
-            // Generate report PDF for sharing
+            // 2. Generate report PDF for sharing
+            console.log('Generating EOD PDF...');
             try {
                 const dayStamp = new Date().toISOString().slice(0, 10);
                 const pdfRes = await fetch(`/api/eod/pdf?shopId=${encodeURIComponent(shopId)}&date=${encodeURIComponent(dayStamp)}`, { cache: 'no-store' });
+                
                 if (pdfRes.ok) {
                     const blob = await pdfRes.blob();
                     const url = URL.createObjectURL(blob);
@@ -845,18 +850,26 @@ Generated via NIRVANA POS`;
                         url: url,
                         shopId,
                     };
-                    setEodHistory(prev => [newReport, ...prev].slice(0, 30)); // Keep last 30 reports
-                    
-                    setIsEodShareModalOpen(true);
+                    setEodHistory(prev => [newReport, ...prev].slice(0, 30));
+                    console.log('EOD PDF generated and saved to history.');
                 } else {
                     const err = await pdfRes.json().catch(() => ({}));
                     console.error('EOD PDF failed:', err);
+                    alert("PDF generation failed, but you can still log out. Check 'Reports' later.");
                 }
             } catch (e) {
-                console.error('EOD PDF error:', e);
+                console.error('EOD PDF exception:', e);
+                alert("Could not generate PDF report. Network error?");
             }
+
+            // Always open the modal if we got this far
+            setIsEodShareModalOpen(true);
+
         } catch (e) {
-            console.error('EOD error:', e);
+            console.error('Critical EOD error:', e);
+            alert("End-of-day process failed. Please try again or log out manually.");
+        } finally {
+            setIsClosingDay(false);
         }
     };
 

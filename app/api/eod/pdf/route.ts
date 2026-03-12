@@ -30,18 +30,16 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: "Missing shopId" }, { status: 400 });
     }
 
-  // Skip auth for test mode (test button)
+  // Auth check
   if (!isTest) {
     const cookieStore = await cookies();
     const staffToken = cookieStore.get("nirvana_staff")?.value;
     const ownerToken = cookieStore.get("nirvana_owner")?.value;
 
-    // Require either staff or owner session
     if (!staffToken && !ownerToken) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // If staff is logged in, enforce shop match as before
     if (staffToken) {
       const tokenHash = createHash("sha256").update(staffToken).digest("hex");
       const { data: session } = await supabaseAdmin
@@ -50,368 +48,170 @@ export async function GET(req: Request) {
         .eq("token_hash", tokenHash)
         .maybeSingle();
 
-      if (!session) {
+      if (!session || (session.expires_at && new Date(session.expires_at).getTime() < Date.now())) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-      }
-      if (session.expires_at && new Date(session.expires_at).getTime() < Date.now()) {
-        return NextResponse.json({ error: "Session expired" }, { status: 401 });
       }
 
       const { data: staff } = await supabaseAdmin
         .from("employees")
-        .select("id, shop_id, name, surname")
+        .select("id, shop_id")
         .eq("id", session.employee_id)
         .maybeSingle();
 
-      if (!staff) {
-        return NextResponse.json({ error: "Staff not found" }, { status: 401 });
-      }
-      if (staff.shop_id !== shopId) {
+      if (!staff || staff.shop_id !== shopId) {
         return NextResponse.json({ error: "Shop mismatch" }, { status: 403 });
       }
     }
-
-    // If only owner is logged in (no staff token), we trust AccessGate/owner auth
-    // and do not enforce a shop match here. The owner can generate for any shopId.
   }
 
   const since = startOfDayUTC(date);
   const until = endOfDayUTC(date);
 
-  // Fetch Sales
-  const { data: sales, error: salesErr } = await supabaseAdmin
-    .from("sales")
-    .select("id,item_name,quantity,total_with_tax,total_before_tax,tax,date,payment_method,discount_applied")
-    .eq("shop_id", shopId)
-    .gte("date", since)
-    .lte("date", until);
+  // Parallel Fetching
+  const [salesRes, ledgerRes, oosRes, allInventoryRes, thirtyDaySalesRes] = await Promise.all([
+    supabaseAdmin.from("sales").select("*").eq("shop_id", shopId).gte("date", since).lte("date", until),
+    supabaseAdmin.from("ledger_entries").select("*").eq("shop_id", shopId).gte("date", since).lte("date", until),
+    supabaseAdmin.from("inventory_allocations").select("item_id, quantity").eq("shop_id", shopId).lte("quantity", 0),
+    supabaseAdmin.from("inventory_items").select("id, name, category, landed_cost, price"),
+    supabaseAdmin.from("sales").select("item_id, quantity").eq("shop_id", shopId).gte("date", new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString())
+  ]);
 
-  // Fetch Ledger (Opening Balance, POS Expenses, Lay-by cash)
-  const { data: ledger, error: ledgerErr } = await supabaseAdmin
-    .from("ledger_entries")
-    .select("category,amount,date,description")
-    .eq("shop_id", shopId)
-    .gte("date", since)
-    .lte("date", until);
+  const sales = salesRes.data || [];
+  const ledger = ledgerRes.data || [];
+  const oosAllocs = oosRes.data || [];
+  const allInventory = allInventoryRes.data || [];
+  const recentSales = thirtyDaySalesRes.data || [];
 
-  // Fetch Restock Alerts (avoid pulling entire inventory; query only the shop allocations)
-  const { data: oosAllocs, error: invErr } = await supabaseAdmin
-    .from("inventory_allocations")
-    .select("item_id, quantity")
-    .eq("shop_id", shopId)
-    .lte("quantity", 0);
-
-    if (salesErr || ledgerErr) {
-      console.error("PDF generation error:", salesErr, ledgerErr);
-      return NextResponse.json({ error: `Database error: ${salesErr?.message || ledgerErr?.message}` }, { status: 500 });
-    }
-
-    if (invErr) {
-      // Restock alerts are optional; do not fail PDF generation if this query breaks
-      console.warn("PDF restock query failed (continuing without restock alerts):", invErr);
-    }
-
-  const rows = sales || [];
-  const totalWithTax = rows.reduce((sum: number, s: any) => sum + Number(s.total_with_tax || 0), 0);
-  const totalBeforeTax = rows.reduce((sum: number, s: any) => sum + Number(s.total_before_tax || 0), 0);
-  const totalTax = rows.reduce((sum: number, s: any) => sum + Number(s.tax || 0), 0);
-  const totalDiscount = rows.reduce((sum: number, s: any) => sum + Number(s.discount_applied || 0), 0);
-
-  // Cash Reconciliation Logic
-  const openingEntry = (ledger || []).find((l: any) => l.category === 'Cash Drawer Opening');
-  const openingBalance = Number(openingEntry?.amount || 0);
-
-  const cashSales = rows.filter((s: any) => s.payment_method === 'cash');
+  // 1. PERFORMANCE TOTALS
+  const totalWithTax = sales.reduce((sum: number, s: any) => sum + Number(s.total_with_tax || 0), 0);
+  const totalBeforeTax = sales.reduce((sum: number, s: any) => sum + Number(s.total_before_tax || 0), 0);
+  const totalTax = sales.reduce((sum: number, s: any) => sum + Number(s.tax || 0), 0);
+  const totalDiscount = sales.reduce((sum: number, s: any) => sum + Number(s.discount_applied || 0), 0);
+  const totalPosExpenses = ledger.filter((l: any) => l.category === 'POS Expense').reduce((sum: number, l: any) => sum + Number(l.amount || 0), 0);
+  
+  const cashSales = sales.filter((s: any) => s.payment_method === 'cash');
   const totalCashSales = cashSales.reduce((sum: number, s: any) => sum + Number(s.total_with_tax || 0), 0);
+  const totalEcocash = sales.filter((s: any) => s.payment_method === 'ecocash').reduce((sum: number, s: any) => sum + Number(s.total_with_tax || 0), 0);
 
-  const posExpenses = (ledger || []).filter((l: any) => l.category === 'POS Expense');
-  const totalPosExpenses = posExpenses.reduce((sum: number, l: any) => sum + Number(l.amount || 0), 0);
+  // Lay-by activity
+  const laybyCash = ledger.filter((l: any) => ['Lay-by Deposit', 'Lay-by installment', 'Lay-by Final Payment'].includes(l.category)).reduce((sum: number, l: any) => sum + Number(l.amount || 0), 0);
 
-  // Lay-by ledger activity (cash movements)
-  const laybyDeposits = (ledger || []).filter((l: any) => l.category === 'Lay-by Deposit');
-  const laybyInstallments = (ledger || []).filter((l: any) => l.category === 'Lay-by installment');
-  const laybyFinals = (ledger || []).filter((l: any) => l.category === 'Lay-by Final Payment');
+  // 2. STOCK INTELLIGENCE
+  
+  // Restock Alerts (Stock at 0)
+  const oosIds = oosAllocs.map((a: any) => a.item_id);
+  const outOfStockItems = allInventory.filter((i: any) => oosIds.includes(i.id)).map((i: any) => ({ name: i.name, category: i.category }));
 
-  const totalLaybyDeposit = laybyDeposits.reduce((sum: number, l: any) => sum + Number(l.amount || 0), 0);
-  const totalLaybyInstall = laybyInstallments.reduce((sum: number, l: any) => sum + Number(l.amount || 0), 0);
-  const totalLaybyFinal = laybyFinals.reduce((sum: number, l: any) => sum + Number(l.amount || 0), 0);
-  const totalLaybyCash = totalLaybyDeposit + totalLaybyInstall + totalLaybyFinal;
+  // Dead Stock (Zero sales in 30 days, cost > $20)
+  const itemsWithRecentSales = new Set(recentSales.map((s: any) => s.item_id));
+  const deadStock = allInventory
+    .filter((i: any) => !itemsWithRecentSales.has(i.id) && Number(i.landed_cost) > 20)
+    .slice(0, 10);
 
-  const closingCashBalance = openingBalance + totalCashSales - totalPosExpenses;
+  // Potential Stock (Best sellers in last 30 days)
+  const itemFreq = new Map<string, number>();
+  recentSales.forEach((s: any) => itemFreq.set(s.item_id, (itemFreq.get(s.item_id) || 0) + Number(s.quantity)));
 
-  const ecocashSales = rows.filter((s: any) => s.payment_method === 'ecocash');
-  const totalEcocash = ecocashSales.reduce((sum: number, s: any) => sum + Number(s.total_with_tax || 0), 0);
-
-  // Lay-by position (outstanding vs collected) from quotations
-  const { data: laybyQuotes } = await supabaseAdmin
-    .from("quotations")
-    .select("shop_id,total_with_tax,paid_amount,status")
-    .eq("shop_id", shopId)
-    .in("status", ["layby", "converted"]);
-
-  const laybyRows = laybyQuotes || [];
-  const laybyOutstanding = laybyRows
-    .filter((q: any) => q.status === "layby")
-    .reduce((sum: number, q: any) => {
-      const total = Number(q.total_with_tax || 0);
-      const paid = Number(q.paid_amount || 0);
-      return sum + Math.max(0, total - paid);
-    }, 0);
-
-  const laybyCollectedToDate = laybyRows.reduce(
-    (sum: number, q: any) => sum + Number(q.paid_amount || 0),
-    0
-  );
-
-  // Restock logic
-  const oosIds = (!invErr && Array.isArray(oosAllocs) ? oosAllocs : [])
-    .filter((a: any) => Number(a.quantity) <= 0)
-    .map((a: any) => a.item_id)
-    .filter(Boolean);
-
-  let outOfStockItems: { name: string; category: string }[] = [];
-  if (oosIds.length > 0) {
-    try {
-      const { data: items, error: itemsErr } = await supabaseAdmin
-        .from("inventory_items")
-        .select("id,name,category")
-        .in("id", oosIds);
-      if (!itemsErr && items) {
-        outOfStockItems = items.map((it: any) => ({
-          name: it.name,
-          category: it.category || "Uncategorized",
-        }));
-      } else if (itemsErr) {
-        console.warn('PDF restock items lookup failed (continuing without restock alerts):', itemsErr);
-      }
-    } catch (e) {
-      console.warn('PDF restock items lookup exception (continuing without restock alerts):', e);
-    }
-  }
-
-  const itemMap = new Map<string, { name: string; qty: number; gross: number }>();
-  for (const s of rows as any[]) {
-    const key = s.item_name || "Unknown";
-    const cur = itemMap.get(key) || { name: key, qty: 0, gross: 0 };
-    cur.qty += Number(s.quantity || 0);
-    cur.gross += Number(s.total_with_tax || 0);
-    itemMap.set(key, cur);
-  }
-  const topItems = [...itemMap.values()].sort((a, b) => b.gross - a.gross).slice(0, 10);
-
+  // 3. GENERATE PDF
   const pdf = await PDFDocument.create();
-  const page = pdf.addPage([595.28, 841.89]); // A4
+  const page = pdf.addPage([595.28, 841.89]);
   const { width, height } = page.getSize();
   const font = await pdf.embedFont(StandardFonts.Helvetica);
   const fontBold = await pdf.embedFont(StandardFonts.HelveticaBold);
 
-  const margin = 48;
+  const margin = 40;
   let y = height - margin;
 
-  const drawText = (text: string, size = 11, bold = false, color = rgb(0.1, 0.14, 0.22)) => {
+  const drawText = (text: string, size = 10, bold = false, color = rgb(0.1, 0.1, 0.1)) => {
     page.drawText(text, { x: margin, y, size, font: bold ? fontBold : font, color });
     y -= size + 6;
   };
 
   // Header
-  drawText("NIRVANA", 18, true);
-  drawText(`End of Day Report — ${shopId.toUpperCase()}`, 14, true);
-  drawText(`Generated: ${new Date().toLocaleString()}`, 10, false, rgb(0.38, 0.45, 0.55));
-  y -= 8;
-
-  // Overview Box
-  const boxTop = y;
-  const boxHeight = 110;
-  page.drawRectangle({
-    x: margin, y: boxTop - boxHeight, width: width - margin * 2, height: boxHeight,
-    borderColor: rgb(0.85, 0.88, 0.92), borderWidth: 1, color: rgb(0.96, 0.97, 0.98),
-  });
-  y = boxTop - 20;
-  page.drawText(`Daily Sales Summary`, { x: margin + 12, y, size: 10, font: fontBold, color: rgb(0.38, 0.45, 0.55) });
-  y -= 18;
-  page.drawText(`Transactions: ${rows.length}`, { x: margin + 12, y, size: 11, font: fontBold, color: rgb(0.1, 0.14, 0.22) });
-  y -= 18;
-  page.drawText(`Total (inc tax): $${totalWithTax.toFixed(2)}`, { x: margin + 12, y, size: 11, font: fontBold, color: rgb(0.1, 0.14, 0.22) });
-  y -= 18;
-  page.drawText(`Total (pre tax): $${totalBeforeTax.toFixed(2)}`, { x: margin + 12, y, size: 11, font, color: rgb(0.1, 0.14, 0.22) });
-  y -= 18;
-  page.drawText(`Tax: $${totalTax.toFixed(2)}`, { x: margin + 12, y, size: 11, font, color: rgb(0.1, 0.14, 0.22) });
-  y -= 18;
-  page.drawText(`Discounts Issued: -$${totalDiscount.toFixed(2)}`, { x: margin + 12, y, size: 11, font, color: rgb(0.8, 0.1, 0.1) });
-  y -= 18;
-  page.drawText(`Expenses: -$${totalPosExpenses.toFixed(2)}`, { x: margin + 12, y, size: 11, font, color: rgb(0.8, 0.1, 0.1) });
-
-  y = boxTop - boxHeight - 20;
-
-  // Cash Reconciliation Box
-  const reconTop = y;
-  const reconHeight = 110;
-  page.drawRectangle({
-    x: margin, y: reconTop - reconHeight, width: width - margin * 2, height: reconHeight,
-    borderColor: rgb(0.1, 0.6, 0.3), borderWidth: 1, color: rgb(0.94, 1.0, 0.96),
-  });
-  y = reconTop - 20;
-  page.drawText(`Cash Drawer Reconciliation`, { x: margin + 12, y, size: 10, font: fontBold, color: rgb(0.1, 0.4, 0.2) });
-  y -= 18;
-  page.drawText(`1. Opening Cash: $${openingBalance.toFixed(2)}`, { x: margin + 12, y, size: 11, font, color: rgb(0.1, 0.14, 0.22) });
-  y -= 18;
-  page.drawText(`2. Total Cash Sales: $${totalCashSales.toFixed(2)}`, { x: margin + 12, y, size: 11, font, color: rgb(0.1, 0.14, 0.22) });
-  y -= 18;
-  page.drawText(`3. POS Expenses: -$${totalPosExpenses.toFixed(2)}`, { x: margin + 12, y, size: 11, font, color: rgb(0.8, 0.1, 0.1) });
-  y -= 18;
-  page.drawText(`= Final Closing Cash: $${closingCashBalance.toFixed(2)}`, { x: margin + 12, y, size: 12, font: fontBold, color: rgb(0.1, 0.14, 0.22) });
-
-  y = reconTop - reconHeight - 30;
-
-  // Payments & Items Header
-  drawText("Payments Overview", 12, true);
-  page.drawText(`Cash: $${totalCashSales.toFixed(2)}`, { x: margin, y, size: 10, font, color: rgb(0.38, 0.45, 0.55) });
-  y -= 14;
-  page.drawText(`EcoCash: $${totalEcocash.toFixed(2)}`, { x: margin, y, size: 10, font, color: rgb(0.38, 0.45, 0.55) });
-  y -= 14;
-
-  // Lay-by cash activity (today)
-  if (totalLaybyCash > 0 || laybyOutstanding > 0) {
-    y -= 6;
-    drawText("Lay-by Activity (Cash Today)", 11, true);
-    page.drawText(
-      `Deposits: $${totalLaybyDeposit.toFixed(2)} • Installments: $${totalLaybyInstall.toFixed(2)} • Final: $${totalLaybyFinal.toFixed(2)}`,
-      { x: margin, y, size: 9, font, color: rgb(0.38, 0.45, 0.55) }
-    );
-    y -= 14;
-    page.drawText(
-      `Total Lay-by Cash Today: $${totalLaybyCash.toFixed(2)}`,
-      { x: margin, y, size: 10, font: fontBold, color: rgb(0.1, 0.4, 0.2) }
-    );
-    y -= 14;
-    page.drawText(
-      `Lay-by Position: Outstanding $${laybyOutstanding.toFixed(2)} • Collected to Date $${laybyCollectedToDate.toFixed(2)}`,
-      { x: margin, y, size: 9, font, color: rgb(0.38, 0.45, 0.55) }
-    );
-    y -= 18;
-  } else {
-    y -= 24;
-  }
-
-  // Get top item names for highlighting
-  const topItemNames = new Set(topItems.slice(0, 5).map(i => i.name));
-
-  // ALL SALES TODAY
-  drawText("All Sales Today", 12, true);
-
-  // Table header
-  const colTime = margin;
-  const colItem = margin + 60;
-  const colQty = width - margin - 100;
-  const colDiscount = width - margin - 40;
-  const colGross = width - margin - 12;
-  page.drawLine({ start: { x: margin, y }, end: { x: width - margin, y }, thickness: 1, color: rgb(0.88, 0.9, 0.93) });
-  y -= 16;
-  page.drawText("Time", { x: colTime, y, size: 9, font: fontBold, color: rgb(0.38, 0.45, 0.55) });
-  page.drawText("Item", { x: colItem, y, size: 9, font: fontBold, color: rgb(0.38, 0.45, 0.55) });
-  page.drawText("Qty", { x: colQty, y, size: 9, font: fontBold, color: rgb(0.38, 0.45, 0.55) });
-  page.drawText("Disc.", { x: colDiscount, y, size: 9, font: fontBold, color: rgb(0.38, 0.45, 0.55) });
-  page.drawText("Total", { x: colGross - 40, y, size: 9, font: fontBold, color: rgb(0.38, 0.45, 0.55) });
+  drawText("NIRVANA BUSINESS INTELLIGENCE", 16, true, rgb(0.5, 0.2, 0.8));
+  drawText(`End of Day Performance Report — ${shopId.toUpperCase()}`, 12, true);
+  drawText(`Period: ${new Date(since).toLocaleDateString()} — ${new Date(until).toLocaleDateString()}`, 10, false, rgb(0.4, 0.4, 0.4));
   y -= 10;
-  page.drawLine({ start: { x: margin, y }, end: { x: width - margin, y }, thickness: 1, color: rgb(0.88, 0.9, 0.93) });
-  y -= 14;
 
-  // Sort sales by time (newest first)
-  const sortedSales = [...rows].sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  // Key Metrics
+  drawText("FINANCIAL SUMMARY", 11, true, rgb(0.1, 0.5, 0.3));
+  page.drawRectangle({ x: margin, y: y - 80, width: width - margin * 2, height: 80, color: rgb(0.97, 0.98, 1) });
+  const metricsY = y - 20;
+  page.drawText(`Total Sales (Inc Tax): $${totalWithTax.toFixed(2)}`, { x: margin + 10, y: metricsY, size: 10, font: fontBold });
+  page.drawText(`Discounts: -$${totalDiscount.toFixed(2)}`, { x: margin + 10, y: metricsY - 15, size: 9, font, color: rgb(0.8, 0, 0) });
+  page.drawText(`POS Expenses: -$${totalPosExpenses.toFixed(2)}`, { x: margin + 10, y: metricsY - 30, size: 9, font, color: rgb(0.8, 0, 0) });
+  page.drawText(`Net Revenue: $${(totalWithTax - totalPosExpenses).toFixed(2)}`, { x: margin + 10, y: metricsY - 50, size: 11, font: fontBold, color: rgb(0, 0.4, 0.1) });
 
-  for (const s of sortedSales) {
-    if (y < margin + 40) {
-      // Add new page if needed
-      const newPage = pdf.addPage([595.28, 841.89]);
+  page.drawText(`Cash: $${totalCashSales.toFixed(2)}`, { x: width / 2, y: metricsY, size: 10, font });
+  page.drawText(`EcoCash: $${totalEcocash.toFixed(2)}`, { x: width / 2, y: metricsY - 15, size: 10, font });
+  page.drawText(`Lay-by Collected: $${laybyCash.toFixed(2)}`, { x: width / 2, y: metricsY - 30, size: 10, font });
+  y -= 90;
+
+  // Stock Intelligence
+  drawText("INVENTORY INTELLIGENCE", 11, true, rgb(0.8, 0.4, 0));
+  
+  drawText("Restock Required (Stock at 0):", 10, true);
+  if (outOfStockItems.length === 0) drawText("None. All items have stock.", 9, false, rgb(0.5, 0.5, 0.5));
+  else {
+    outOfStockItems.slice(0, 5).forEach((i: any) => drawText(`• ${i.name} (${i.category})`, 9));
+    if (outOfStockItems.length > 5) drawText(`...and ${outOfStockItems.length - 5} more items.`, 8, false, rgb(0.4, 0.4, 0.4));
+  }
+  y -= 10;
+
+  drawText("Dead Stock (No sales in 30 days - High investment):", 10, true);
+  if (deadStock.length === 0) drawText("None. Inventory is moving well.", 9, false, rgb(0.5, 0.5, 0.5));
+  else {
+    deadStock.forEach((i: any) => drawText(`• ${i.name} - Investment: $${Number(i.landed_cost).toFixed(2)}`, 9));
+  }
+  y -= 10;
+
+  // Business Advice
+  drawText("STRATEGIC RECOMMENDATIONS", 11, true, rgb(0.2, 0.4, 0.8));
+  page.drawRectangle({ x: margin, y: y - 100, width: width - margin * 2, height: 100, color: rgb(0.95, 0.95, 0.95), borderColor: rgb(0.8, 0.8, 0.8), borderWidth: 1 });
+  let adviceY = y - 20;
+  
+  const advice = [];
+  if (deadStock.length > 0) advice.push("DEAD STOCK: Run a 'Clearance Bundle'. Pair slow items with best sellers at a 15% discount.");
+  if (outOfStockItems.length > 3) advice.push("RESTOCK: You are losing revenue on top items. Immediate reorder suggested for highlighted products.");
+  if (totalDiscount > totalWithTax * 0.1) advice.push("MARGIN ALERT: High discounting detected. Review staff discount limits to protect profit.");
+  if (totalCashSales > 500) advice.push("SECURITY: High cash volume. Ensure a 'Mid-day Drop' to the safe was performed.");
+  if (advice.length === 0) advice.push("PERFORMANCE: Steady operations. Focus on upselling premium accessories to increase basket size.");
+
+  advice.forEach(a => {
+    page.drawText(a, { x: margin + 10, y: adviceY, size: 8, font, color: rgb(0.2, 0.2, 0.2), maxWidth: width - margin * 2 - 20 });
+    adviceY -= 20;
+  });
+  y -= 120;
+
+  // Detailed Transactions
+  drawText("TODAY'S TRANSACTIONS", 11, true);
+  y -= 5;
+  page.drawLine({ start: { x: margin, y }, end: { x: width - margin, y }, thickness: 1, color: rgb(0.8, 0.8, 0.8) });
+  y -= 15;
+  
+  sales.slice(0, 30).forEach((s: any) => {
+    if (y < 50) {
+      pdf.addPage([595.28, 841.89]);
       y = height - margin;
     }
-    
     const time = new Date(s.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    const isTopPerformer = topItemNames.has(s.item_name);
-    const itemColor = isTopPerformer ? rgb(0.1, 0.6, 0.3) : rgb(0.1, 0.14, 0.22);
-    const itemFont = isTopPerformer ? fontBold : font;
-    const discount = Number(s.discount_applied || 0);
-    
-    page.drawText(time, { x: colTime, y, size: 8, font, color: rgb(0.38, 0.45, 0.55) });
-    page.drawText((s.item_name || 'Unknown').length > 35 ? `${(s.item_name || 'Unknown').slice(0, 33)}...` : (s.item_name || 'Unknown'), { x: colItem, y, size: 8, font: itemFont, color: itemColor });
-    page.drawText(String(s.quantity || 0), { x: colQty, y, size: 8, font, color: rgb(0.1, 0.14, 0.22) });
-    page.drawText(discount > 0 ? `-$${discount.toFixed(2)}` : '-', { x: colDiscount, y, size: 8, font, color: discount > 0 ? rgb(0.8, 0.1, 0.1) : rgb(0.5, 0.5, 0.5) });
-    page.drawText(`$${Number(s.total_with_tax || 0).toFixed(2)}`, { x: colGross - 50, y, size: 8, font: itemFont, color: itemColor });
-    y -= 14;
-  }
+    page.drawText(`${time} - ${s.item_name} x${s.quantity}`, { x: margin, y, size: 8, font });
+    page.drawText(`$${Number(s.total_with_tax).toFixed(2)} (${s.payment_method})`, { x: width - margin - 80, y, size: 8, font });
+    y -= 12;
+  });
 
-  // SECOND PAGE: Top Performers Summary
-  const page2 = pdf.addPage([595.28, 841.89]);
-  let y2 = height - margin;
-  
-  page2.drawText("🏆 TOP PERFORMERS", { x: margin, y: y2, size: 14, font: fontBold, color: rgb(0.1, 0.6, 0.3) });
-  y2 -= 30;
+  const bytes = await pdf.save();
+  const filename = `EOD_${shopId}_${new Date().toISOString().slice(0, 10)}.pdf`;
 
-  // Table header
-  page2.drawLine({ start: { x: margin, y: y2 }, end: { x: width - margin, y: y2 }, thickness: 1, color: rgb(0.88, 0.9, 0.93) });
-  y2 -= 16;
-  page2.drawText("Item", { x: margin, y: y2, size: 10, font: fontBold, color: rgb(0.38, 0.45, 0.55) });
-  page2.drawText("Qty Sold", { x: width - margin - 180, y: y2, size: 10, font: fontBold, color: rgb(0.38, 0.45, 0.55) });
-  page2.drawText("Revenue", { x: width - margin - 60, y: y2, size: 10, font: fontBold, color: rgb(0.38, 0.45, 0.55) });
-  y2 -= 10;
-  page2.drawLine({ start: { x: margin, y: y2 }, end: { x: width - margin, y: y2 }, thickness: 1, color: rgb(0.88, 0.9, 0.93) });
-  y2 -= 14;
+  return new NextResponse(Buffer.from(bytes), {
+    status: 200,
+    headers: {
+      "Content-Type": "application/pdf",
+      "Content-Disposition": `attachment; filename=${filename}`,
+      "Cache-Control": "no-store",
+    },
+  });
 
-  for (const it of topItems) {
-    page2.drawText(it.name.length > 60 ? `${it.name.slice(0, 58)}...` : it.name, { x: margin, y: y2, size: 9, font: fontBold, color: rgb(0.1, 0.6, 0.3) });
-    page2.drawText(String(it.qty), { x: width - margin - 180, y: y2, size: 9, font: fontBold, color: rgb(0.1, 0.14, 0.22) });
-    page2.drawText(`$${it.gross.toFixed(2)}`, { x: width - margin - 60, y: y2, size: 9, font: fontBold, color: rgb(0.1, 0.14, 0.22) });
-    y2 -= 16;
-  }
-
-  y2 -= 30;
-
-  // Restock Required Section (on same page 2)
-  if (outOfStockItems.length > 0) {
-    if (y2 < margin + 100) {
-      // Add new page if needed
-      const newPage = pdf.addPage([595.28, 841.89]);
-      y2 = height - margin;
-    }
-
-    page2.drawText("NIRVANA restock alert", { x: margin, y: y2, size: 14, font: fontBold, color: rgb(0.8, 0.1, 0.1) });
-    y2 -= 24;
-    page2.drawText(`The following products at ${shopId.toUpperCase()} have 0 stock and need restocking:`, { x: margin, y: y2, size: 10, font, color: rgb(0.3, 0.3, 0.3) });
-    y2 -= 30;
-
-    // Table header
-    page2.drawLine({ start: { x: margin, y: y2 }, end: { x: width - margin, y: y2 }, thickness: 1, color: rgb(0.8, 0.1, 0.1) });
-    y2 -= 16;
-    page2.drawText("Product Name", { x: margin, y: y2, size: 10, font: fontBold, color: rgb(0.8, 0.1, 0.1) });
-    page2.drawText("Category", { x: width - margin - 150, y: y2, size: 10, font: fontBold, color: rgb(0.8, 0.1, 0.1) });
-    y2 -= 10;
-    page2.drawLine({ start: { x: margin, y: y2 }, end: { x: width - margin, y: y2 }, thickness: 1, color: rgb(0.8, 0.1, 0.1) });
-    y2 -= 14;
-
-    for (const item of outOfStockItems) {
-      if (y2 < margin + 40) {
-        // Handle overflow if many items are out of stock
-        const nextPage = pdf.addPage([595.28, 841.89]);
-        y2 = height - margin;
-      }
-      page2.drawText(item.name.length > 60 ? `${item.name.slice(0, 58)}...` : item.name, { x: margin, y: y2, size: 9, font, color: rgb(0.1, 0.1, 0.1) });
-      page2.drawText(item.category, { x: width - margin - 150, y: y2, size: 9, font, color: rgb(0.4, 0.4, 0.4) });
-      y2 -= 16;
-    }
-  }
-
-    const bytes = await pdf.save();
-    const stamp = (date || new Date().toISOString().slice(0, 10));
-    const filename = `EOD_${shopId}_${stamp}.pdf`;
-
-    return new NextResponse(Buffer.from(bytes), {
-      status: 200,
-      headers: {
-        "Content-Type": "application/pdf",
-        "Content-Disposition": `attachment; filename=${filename}`,
-        "Cache-Control": "no-store",
-      },
-    });
   } catch (err) {
     console.error('EOD PDF route failed:', err);
     return NextResponse.json({ error: 'Failed to generate PDF' }, { status: 500 });

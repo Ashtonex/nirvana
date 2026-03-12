@@ -25,7 +25,8 @@ export function ServiceWorkerRegistration() {
                             installingWorker.onstatechange = () => {
                                 if (installingWorker.state === 'installed') {
                                     if (navigator.serviceWorker.controller) {
-                                        console.log('New content available; please refresh.');
+                                        console.log('New content available; auto-refreshing...');
+                                        window.location.reload();
                                     }
                                 }
                             };
