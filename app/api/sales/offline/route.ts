@@ -42,7 +42,8 @@ async function resolveSaleItem(
     const itemId = `adhoc_${Math.random().toString(36).substring(2, 9)}`;
     const timestamp = new Date().toISOString();
 
-    await client.from('inventory_items').insert({
+    // Some builds type Supabase as schema-less (tables become `never`), so we cast to keep server sync unblocked.
+    await (client as any).from('inventory_items').insert({
         id: itemId,
         shipment_id: 'OFFLINE-SYNC-ADHOC',
         name: rawName || 'Ad-hoc Item',
@@ -52,13 +53,13 @@ async function resolveSaleItem(
         acquisition_price: 0,
         landed_cost: 0,
         date_added: timestamp
-    });
+    } as any);
 
-    await client.from('inventory_allocations').insert({
+    await (client as any).from('inventory_allocations').insert({
         item_id: itemId,
         shop_id: String(sale?.shopId || '').trim(),
         quantity: qty
-    });
+    } as any);
 
     return { itemId, itemName: rawName || 'Ad-hoc Item' };
 }
