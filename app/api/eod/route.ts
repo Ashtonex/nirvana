@@ -266,6 +266,7 @@ export async function POST(req: Request) {
   
   const totalCash = cashSales.reduce((sum: number, s: any) => sum + Number(s.total_with_tax || 0), 0);
   const totalEcocash = ecocashSales.reduce((sum: number, s: any) => sum + Number(s.total_with_tax || 0), 0);
+  const closingCashEstimate = openingCash + totalCash + laybyCash - totalExpenses + adjustmentNet;
 
   // Top items (best sellers)
   const itemMap = new Map<string, { name: string; qty: number; gross: number }>();
