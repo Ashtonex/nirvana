@@ -1,4 +1,4 @@
-package com.nirvana.app;
+package com.nirvana.pos;
 
 import com.getcapacitor.BridgeActivity;
 
