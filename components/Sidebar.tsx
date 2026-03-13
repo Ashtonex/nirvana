@@ -37,6 +37,7 @@ const navItems = [
     { name: 'Trade Center', href: '/shops/tradecenter', icon: Store },
     { name: 'Inventory Master', href: '/inventory', icon: Package },
     { name: 'Stocktake Audit', href: '/inventory/stocktake', icon: ClipboardList },
+    { name: 'Global Inventory', href: '/admin/inventory-manager', icon: ArrowRightLeft },
     { name: 'POS Audit', href: '/admin/pos-audit', icon: ShieldCheck },
     { name: 'Security Audit', href: '/admin/audit', icon: ShieldCheck },
     { name: 'The Oracle', href: '/finance/oracle', icon: Flame },

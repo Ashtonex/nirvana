@@ -61,7 +61,12 @@ export async function nativeBluetoothConnect(): Promise<boolean> {
             }
         }
 
-        await ble.initialize({ androidNeverForLocation: true });
+        try {
+            await ble.initialize({ androidNeverForLocation: true });
+        } catch (e: any) {
+            window.alert(`BLE Init Failed: ${e.message || JSON.stringify(e)}`);
+            return false;
+        }
 
         // Check if Bluetooth is actually on
         const enabled = await ble.isEnabled();
@@ -145,7 +150,12 @@ export async function nativeBluetoothSend(data: Uint8Array): Promise<void> {
     const chunkSize = 20;
     for (let i = 0; i < data.length; i += chunkSize) {
         const chunk = data.slice(i, i + chunkSize);
-        await ble.writeWithoutResponse(deviceId, serviceUuid, charUuid, chunk.buffer);
+        try {
+            await ble.writeWithoutResponse(deviceId, serviceUuid, charUuid, chunk.buffer);
+        } catch (e: any) {
+            console.error('BLE write error:', e);
+            throw new Error(`BLE Write Failed: ${e.message || JSON.stringify(e)}`);
+        }
     }
 }
 
@@ -211,9 +221,17 @@ export async function nativeClassicBluetoothConnect(): Promise<boolean> {
         }
 
         const address = selected.address || selected.id;
-        if (!address) return false;
+        if (!address) {
+            window.alert('Selected device has no valid address/ID');
+            return false;
+        }
 
-        await serial.connectInsecure({ address }).catch(() => serial.connect({ address }));
+        try {
+            await serial.connectInsecure({ address }).catch(() => serial.connect({ address }));
+        } catch (e: any) {
+            window.alert(`Classic Connect Failed: ${e.message || JSON.stringify(e)}`);
+            throw e;
+        }
         serialAddress = address;
         return true;
     } catch (err) {

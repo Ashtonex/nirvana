@@ -3,7 +3,8 @@
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { getDashboardData, getPosAuditReport } from "../../actions";
 import { Badge, Button, Card, CardContent, CardDescription, CardHeader, CardTitle, Input } from "@/components/ui";
-import { AlertCircle, Calendar, Download, FileSearch, ShieldCheck, TriangleAlert } from "lucide-react";
+import { AlertCircle, Calendar, Download, FileSearch, ShieldCheck, TriangleAlert, Edit2, X } from "lucide-react";
+import { updatePosExpense } from "../../actions";
 
 function money(n: any) {
   const v = Number(n || 0);
@@ -55,6 +56,38 @@ export default function PosAuditPage() {
 
   const flags = (report?.flags || []) as any[];
   const hasCritical = flags.some((f) => f?.severity === "critical");
+
+  const [editingExpense, setEditingExpense] = useState<any>(null);
+  const [newExpenseAmount, setNewExpenseAmount] = useState("");
+  const [newExpenseDesc, setNewExpenseDesc] = useState("");
+
+  const openEditExpense = (exp: any) => {
+    setEditingExpense(exp);
+    setNewExpenseAmount(String(exp.amount));
+    setNewExpenseDesc(exp.description);
+  };
+
+  const saveExpenseEdit = async () => {
+    if (!editingExpense) return;
+    const amount = parseFloat(newExpenseAmount);
+    if (isNaN(amount) || amount < 0) {
+      alert("Invalid amount");
+      return;
+    }
+
+    startTransition(async () => {
+      try {
+        await updatePosExpense(editingExpense.id, {
+          amount,
+          description: newExpenseDesc
+        });
+        setEditingExpense(null);
+        run(); // Refresh report
+      } catch (e: any) {
+        alert(e.message || "Failed to update expense");
+      }
+    });
+  };
 
   return (
     <div className="space-y-8 pb-32 pt-8">
@@ -321,13 +354,62 @@ export default function PosAuditPage() {
                           <td className="py-2 pr-3 text-slate-300">{e.employeeName || e.employeeId || "Unknown"}</td>
                           <td className="py-2 pr-3 text-slate-200 font-bold">{e.category}</td>
                           <td className="py-2 pr-3 text-slate-400">{e.description}</td>
-                          <td className="py-2 text-right text-rose-300 font-black">{money(e.amount)}</td>
+                          <td className="py-2 pr-3 text-right text-rose-300 font-black">{money(e.amount)}</td>
+                          <td className="py-2 text-right">
+                             <Button 
+                                variant="ghost" 
+                                size="icon" 
+                                className="h-6 w-6 text-slate-500 hover:text-white"
+                                onClick={() => openEditExpense(e)}
+                             >
+                                <Edit2 className="h-3 w-3" />
+                             </Button>
+                          </td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
                 </div>
               )}
+            </CardContent>
+          </Card>
+        </div>
+      ) : null}
+      {/* EDIT EXPENSE MODAL */}
+      {editingExpense ? (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
+          <Card className="w-full max-w-md bg-slate-900 border-slate-800 shadow-2xl">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-xl font-black uppercase italic tracking-tight">Edit Expense</CardTitle>
+              <Button variant="ghost" size="icon" onClick={() => setEditingExpense(null)} className="h-8 w-8 text-slate-500 hover:text-white">
+                <X className="h-4 w-4" />
+              </Button>
+            </CardHeader>
+            <CardContent className="space-y-4 pt-4">
+              <div className="space-y-2">
+                <label className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Amount</label>
+                <Input
+                  type="number"
+                  className="bg-slate-950 border-slate-800 font-black italic"
+                  value={newExpenseAmount}
+                  onChange={(e) => setNewExpenseAmount(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Description</label>
+                <Input
+                  className="bg-slate-950 border-slate-800 font-bold"
+                  value={newExpenseDesc}
+                  onChange={(e) => setNewExpenseDesc(e.target.value)}
+                />
+              </div>
+              <Button
+                className="w-full bg-emerald-600 hover:bg-emerald-500 font-black uppercase italic text-xs h-12"
+                disabled={loading}
+                onClick={saveExpenseEdit}
+              >
+                {loading ? "Updating..." : "Save Changes"}
+              </Button>
             </CardContent>
           </Card>
         </div>

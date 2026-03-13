@@ -180,7 +180,9 @@ export async function computePosAuditReport(input: { shopId: string; dateYYYYMMD
     .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
   const openingAudit = openingAuditCandidates[0] || null;
 
-  const openingEmployeeId = openingAudit?.employee_id ? String(openingAudit.employee_id) : null;
+  const openingEmployeeId = openingEntry?.employee_id 
+    ? String(openingEntry.employee_id) 
+    : (openingAudit?.employee_id ? String(openingAudit.employee_id) : null);
   const openingEmployeeName = openingEmployeeId ? employeeMap.get(openingEmployeeId) || openingEmployeeId : null;
 
   // Previous-day closing estimate (system)

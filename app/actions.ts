@@ -426,8 +426,11 @@ export async function recordSale(sale: any) {
         details: `${sale.shopId}: ${sale.itemName} x${sale.quantity} ($${Number(totalWithTax).toFixed(2)})`
     });
 
-    revalidatePath(`/shops/${sale.shopId}`); revalidatePath("/inventory");
+    revalidatePath(`/shops/${sale.shopId}`);
+    revalidatePath("/inventory");
     revalidatePath("/");
+    revalidatePath("/intelligence");
+    revalidatePath("/finance/oracle");
 }
 
 export async function recordUntrackedSale(sale: any) {
@@ -955,7 +958,8 @@ export async function openCashRegister(shopId: string, expectedAmount: number, a
         category: 'Cash Drawer Opening',
         amount: actualAmount,
         date: timestamp,
-        description: `Register Opened - Expected: $${expectedAmount.toFixed(2)} | Actual: $${actualAmount.toFixed(2)}`
+        description: `Register Opened - Expected: $${expectedAmount.toFixed(2)} | Actual: $${actualAmount.toFixed(2)}`,
+        employee_id: actor?.id || "SYSTEM"
     }]);
 
     // If there's a discrepancy, log it as an adjustment
@@ -968,7 +972,8 @@ export async function openCashRegister(shopId: string, expectedAmount: number, a
             category: 'Cash Drawer Adjustment',
             amount: Math.abs(discrepancy),
             date: timestamp,
-            description: `Register ${discrepancy < 0 ? 'Short' : 'Over'} by $${Math.abs(discrepancy).toFixed(2)}`
+            description: `Register ${discrepancy < 0 ? 'Short' : 'Over'} by $${Math.abs(discrepancy).toFixed(2)}`,
+            employee_id: actor?.id || "SYSTEM"
         }]);
     }
 
@@ -1141,6 +1146,9 @@ export async function recordPosExpense(shopId: string, amount: number, descripti
 
     revalidatePath(`/shops/${shopId}`);
     revalidatePath('/');
+    revalidatePath('/intelligence');
+    revalidatePath('/finance/oracle');
+    revalidatePath('/admin/pos-audit');
 }
 
 export async function getOracleMasterPulse() {
@@ -2140,4 +2148,99 @@ export async function printZIMRALog() {
         console.error('Error generating ZIMRA log:', error);
         return { success: false, error: 'Failed to generate ZIMRA log' };
     }
+}
+
+export async function updatePosExpense(id: string, updates: { amount?: number; description?: string }) {
+    const actor = await requireManagerOrOwner();
+    const timestamp = new Date().toISOString();
+
+    const { data: existing } = await supabaseAdmin.from('ledger_entries').select('*').eq('id', id).single();
+    if (!existing) throw new Error("Expense not found");
+
+    const patchNote = ` | Edited by ${actor.name} (${actor.id}) @ ${timestamp} | Prev: $${Number(existing.amount).toFixed(2)}: ${existing.description}`;
+    const nextDesc = (updates.description || existing.description) + patchNote;
+
+    await supabaseAdmin.from('ledger_entries').update({
+        amount: updates.amount ?? existing.amount,
+        description: nextDesc
+    }).eq('id', id);
+
+    await supabaseAdmin.from('audit_log').insert([{
+        id: Math.random().toString(36).substring(2, 9),
+        action: 'UPDATE_POS_EXPENSE',
+        employee_id: actor.id,
+        details: { id, updates, prev: existing },
+        timestamp
+    }]);
+
+    revalidatePath(`/shops/${existing.shop_id}`);
+    revalidatePath('/admin/pos-audit');
+    revalidatePath('/intelligence');
+    revalidatePath('/finance/oracle');
+}
+
+export async function increaseMasterStock(itemId: string, increment: number, reason: string) {
+    const actor = await requireManagerOrOwner();
+    const timestamp = new Date().toISOString();
+
+    const { data: item } = await supabaseAdmin.from('inventory_items').select('quantity, name').eq('id', itemId).single();
+    if (!item) throw new Error("Item not found");
+
+    const newQty = Number(item.quantity) + increment;
+
+    await supabaseAdmin.from('inventory_items').update({ quantity: newQty }).eq('id', itemId);
+
+    await supabaseAdmin.from('audit_log').insert({
+        id: Math.random().toString(36).substring(2, 9),
+        timestamp,
+        employee_id: actor.id,
+        action: 'MASTER_STOCK_INCREASED',
+        details: `${item.name}: +${increment} units (${reason}) by ${actor.name}`
+    });
+
+    revalidatePath('/admin/inventory-manager');
+    revalidatePath('/inventory');
+}
+
+export async function reapportionStock(itemId: string, allocations: { shopId: string; quantity: number }[]) {
+    const actor = await requireManagerOrOwner();
+    const timestamp = new Date().toISOString();
+
+    const { data: item } = await supabaseAdmin.from('inventory_items').select('quantity, name').eq('id', itemId).single();
+    if (!item) throw new Error("Item not found");
+
+    const requestedTotal = allocations.reduce((sum, a) => sum + a.quantity, 0);
+    if (requestedTotal > item.quantity) {
+        throw new Error(`Total allocations (${requestedTotal}) exceed master stock (${item.quantity})`);
+    }
+
+    for (const alloc of allocations) {
+        const { data: existing } = await supabaseAdmin
+            .from('inventory_allocations')
+            .select('id')
+            .eq('item_id', itemId)
+            .eq('shop_id', alloc.shopId)
+            .maybeSingle();
+
+        if (existing) {
+            await supabaseAdmin.from('inventory_allocations').update({ quantity: alloc.quantity }).eq('id', existing.id);
+        } else {
+            await supabaseAdmin.from('inventory_allocations').insert({
+                item_id: itemId,
+                shop_id: alloc.shopId,
+                quantity: alloc.quantity
+            });
+        }
+    }
+
+    await supabaseAdmin.from('audit_log').insert({
+        id: Math.random().toString(36).substring(2, 9),
+        timestamp,
+        employee_id: actor.id,
+        action: 'STOCKS_REAPPORTIONED',
+        details: `${item.name} reapportioned across ${allocations.length} shops by ${actor.name}`
+    });
+
+    revalidatePath('/admin/inventory-manager');
+    revalidatePath('/shops');
 }
