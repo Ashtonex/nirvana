@@ -1,0 +1,101 @@
+<!doctype html><html><head><meta charset='utf-8'/><title>Nirvana Bug Audit 2026-03-12</title><style>body{font-family:Segoe UI,Arial,sans-serif;max-width:980px;margin:32px auto;padding:0 16px;line-height:1.35;color:#0f172a}h1{font-size:28px;margin:0 0 12px}h2{margin:24px 0 8px;font-size:18px}hr{border:none;border-top:1px solid #e2e8f0;margin:18px 0}code{background:#f1f5f9;padding:1px 4px;border-radius:4px}ul{margin:8px 0 8px 22px}p{margin:6px 0}b{font-weight:600}</style></head><body><h1>Repo Bug Audit (Static scan)</h1>
+<p>Date: 2026-03-12</p>
+<h2>What was (and wasn&#x27;t) run</h2>
+<ul>
+<li>Node/npm are not available in this environment, so I could not re-run `npm run lint` or `npm run build` today.</li>
+<li>This audit is based on repo-wide static scans (ripgrep) + targeted review of API routes and auth.</li>
+</ul>
+<h2>Legend</h2>
+<ul>
+<li>🟣 **Purple** = Critical</li>
+<li>🟠 **Orange** = High/Medium</li>
+<li>🟢 **Green** = Minor</li>
+</ul>
+<hr/>
+<h2>🟣 Critical</h2>
+<p><b>1) **Hardcoded owner credentials + broken owner session validation**</b></p>
+<ul>
+<li>`app/api/owner/login/route.ts`: hardcoded `OWNER_EMAIL` + `OWNER_PASSWORD`; generated token is never persisted server-side.</li>
+<li>`lib/api-auth.ts`: `requireOwnerAccess` treats *presence* of `nirvana_owner` cookie as authenticated owner.</li>
+<li>`app/actions.ts`: treats `nirvana_owner` cookie as a “simple privileged session” and returns owner context without verifying token.</li>
+</ul>
+<p>Impact: Anyone who can send a request with a `Cookie: nirvana_owner=anything` header can bypass protections that rely on this cookie.</p>
+<p><b>2) **Unauthenticated service-role write endpoint** (`/api/sales/offline`)</b></p>
+<ul>
+<li>`app/api/sales/offline/route.ts`: uses `SUPABASE_SERVICE_ROLE_KEY` and performs inserts/updates with no auth gate.</li>
+</ul>
+<p>Impact: remote attacker can write sales + trigger inventory decrements.</p>
+<p><b>3) **Unauthenticated business data dashboard** (`/api/dashboard/realtime`)</b></p>
+<ul>
+<li>`app/api/dashboard/realtime/route.ts`: exposes today&#x27;s sales, unread messages count, pending stock requests, and active staff counts with no auth gate.</li>
+</ul>
+<p><b>4) **Unauthenticated settings mutation** (`/api/settings/update-tax`)</b></p>
+<ul>
+<li>`app/api/settings/update-tax/route.ts`: updates global tax settings via `updateGlobalSettings()` with no auth guard.</li>
+</ul>
+<p><b>5) **Unauthenticated historical EOD report generator** (`/api/eod/historical`)</b></p>
+<ul>
+<li>`app/api/eod/historical/route.ts`: reads sales/ledger and sends email with no auth gate.</li>
+</ul>
+<p><b>6) **Auth bypass via query param** (`/api/eod/pdf?test=true`)</b></p>
+<ul>
+<li>`app/api/eod/pdf/route.ts`: skips auth when `test=true`.</li>
+</ul>
+<p><b>7) **Unauthenticated staff presence manipulation + data leak** (`/api/staff/status`)</b></p>
+<ul>
+<li>`app/api/staff/status/route.ts`: POST accepts `{ employeeId }` from request body (no auth) and updates `employees.last_active`.</li>
+<li>`app/api/staff/status/route.ts`: GET returns staff names + shop IDs.</li>
+</ul>
+<p><b>8) **Unauthenticated AI/chat cost + data leakage risk** (`/api/chat`)</b></p>
+<ul>
+<li>`app/api/chat/route.ts`: no auth/rate limit; any caller can stream model output.</li>
+<li>`lib/ai-context.ts`: includes a live business snapshot in the system prompt.</li>
+</ul>
+<p><b>9) **Mobile verification can target arbitrary employees when not logged in**</b></p>
+<ul>
+<li>`app/api/verify-mobile/route.ts` + `app/api/verify-mobile/confirm/route.ts`: only blocks mismatches if a staff cookie exists; when unauthenticated (`staffId` null) it allows acting on any `employeeId`.</li>
+</ul>
+<p><b>10) **Security controls are feature-flagged off by default**</b></p>
+<ul>
+<li>`lib/api-auth.ts`: `NIRVANA_ENFORCE_API_AUTH` gates enforcement; when unset/false, routes that call `requireOwnerAccess()` allow access.</li>
+</ul>
+<p>Impact: backups/test/notifications remain effectively public unless the env flag is enabled.</p>
+<hr/>
+<h2>🟠 High/Medium</h2>
+<p><b>1) **False-success staff auth flows (missing Supabase error handling)**</b></p>
+<ul>
+<li>`app/api/staff/request/route.ts`: inserts login code but doesn&#x27;t check the insert result; can return success even if DB insert fails.</li>
+<li>`app/api/staff/verify/route.ts`: inserts staff session but doesn&#x27;t check insert result; can return success even if session wasn&#x27;t created.</li>
+</ul>
+<p><b>2) **Email matching inconsistency (case sensitivity)**</b></p>
+<ul>
+<li>`app/api/staff/login/route.ts` uses `.ilike(&#x27;email&#x27;, ...)`</li>
+<li>`app/api/staff/request/route.ts` + `app/api/staff/verify/route.ts` use `.eq(&#x27;email&#x27;, workEmail)`</li>
+</ul>
+<p>Impact: auth flow breaks if casing differs.</p>
+<p><b>3) **Admin nuke reports success even on partial failure**</b></p>
+<ul>
+<li>`app/api/admin/nuke/route.ts`: multiple `catch {}` / `.catch(() =&gt; undefined)` hide failures.</li>
+</ul>
+<p><b>4) **`/api/auth/me` token usage looks incorrect/unreliable**</b></p>
+<ul>
+<li>`app/api/auth/me/route.ts` reads Supabase cookies but calls `supabaseAdmin.auth.getUser()` without passing a token.</li>
+</ul>
+<p><b>5) **Weak default device PIN fallbacks**</b></p>
+<ul>
+<li>`app/api/staff/login/route.ts` falls back to `1234/5678/0000` when env pins are missing.</li>
+</ul>
+<hr/>
+<h2>🟢 Minor</h2>
+<p><b>1) **`secure: true` cookies break local HTTP flows**</b></p>
+<ul>
+<li>`app/api/staff/verify/route.ts` and `app/api/staff/logout/route.ts` set `secure: true` instead of env-aware `NODE_ENV === &#x27;production&#x27;`.</li>
+</ul>
+<p><b>2) **Non-UUID identifiers may collide**</b></p>
+<ul>
+<li>Multiple routes generate IDs via `Math.random().toString(36)` (returns, stock requests, staff chat, untracked/offline sales).</li>
+</ul>
+<p><b>3) **Dashboard active-staff metric quality**</b></p>
+<ul>
+<li>`app/api/dashboard/realtime/route.ts` uses `staff_sessions.created_at` for “online” rather than an activity heartbeat.</li>
+</ul></body></html>
