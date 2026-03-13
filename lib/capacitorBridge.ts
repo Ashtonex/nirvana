@@ -54,7 +54,9 @@ export async function nativeBluetoothConnect(): Promise<boolean> {
         if (perm.bluetooth !== 'granted') {
             const req = await ble.requestPermissions();
             if (req.bluetooth !== 'granted') {
-                console.error('Bluetooth permissions denied');
+                const msg = 'Bluetooth permissions denied. Please allow in system settings.';
+                if (typeof window !== 'undefined') window.alert(msg);
+                console.error(msg);
                 return false;
             }
         }
@@ -64,8 +66,9 @@ export async function nativeBluetoothConnect(): Promise<boolean> {
         // Check if Bluetooth is actually on
         const enabled = await ble.isEnabled();
         if (!enabled.enabled) {
-            console.warn('Bluetooth is disabled');
-            if (typeof window !== 'undefined') window.alert('Please turn on Bluetooth');
+            const msg = 'Bluetooth is OFF. Please turn it on in your phone settings.';
+            if (typeof window !== 'undefined') window.alert(msg);
+            console.warn(msg);
             return false;
         }
 
@@ -77,6 +80,28 @@ export async function nativeBluetoothConnect(): Promise<boolean> {
                 const deviceId = device.deviceId;
                 await ble.connect(deviceId);
 
+                // Try to find a known service/characteristic combination first
+                for (const serviceUuid of PRINTER_SERVICE_UUIDS) {
+                    for (const charUuid of PRINTER_CHAR_UUIDS) {
+                        try {
+                            // Check if this specific characteristic exists and is writable
+                            const services = await ble.getServices(deviceId);
+                            const service = services.find((s: any) => s.uuid === serviceUuid);
+                            if (service) {
+                                const char = (service.characteristics || []).find((c: any) => c.uuid === charUuid);
+                                if (char && (char.properties?.write || char.properties?.writeWithoutResponse)) {
+                                    nativeConnection = { deviceId, serviceUuid, charUuid };
+                                    resolve(true);
+                                    return;
+                                }
+                            }
+                        } catch {
+                            // Try next combination
+                        }
+                    }
+                }
+
+                // Fallback: read all services and find first writable char
                 try {
                     const services = await ble.getServices(deviceId);
                     for (const service of services) {
@@ -92,13 +117,21 @@ export async function nativeBluetoothConnect(): Promise<boolean> {
                             }
                         }
                     }
-                } catch { /* ignore */ }
+                } catch (e: any) {
+                    console.error('Service discovery failed:', e);
+                }
 
                 resolve(false);
-            }).catch(() => resolve(false));
+            }).catch((e: any) => {
+                const msg = e.message || JSON.stringify(e);
+                if (typeof window !== 'undefined') window.alert(`Scan/Connect Error: ${msg}`);
+                resolve(false);
+            });
         });
-    } catch (err) {
+    } catch (err: any) {
         console.error('Native BLE connect error:', err);
+        const msg = err.message || JSON.stringify(err);
+        if (typeof window !== 'undefined') window.alert(`Init Error: ${msg}`);
         return false;
     }
 }
