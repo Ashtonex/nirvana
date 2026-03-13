@@ -24,7 +24,9 @@ import {
     ArrowRightLeft,
     TrendingUp,
     ShieldCheck,
-    X
+    X,
+    FileText,
+    Loader2
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -136,6 +138,25 @@ export default function InventoryManagerPage() {
         });
     };
 
+    const handleDownloadPDF = async () => {
+        startTransition(async () => {
+            try {
+                const response = await fetch("/api/inventory/low-stock-pdf");
+                if (!response.ok) throw new Error("Failed to generate PDF");
+                const blob = await response.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement("a");
+                a.href = url;
+                a.download = `Low_Stock_Report_${new Date().toISOString().slice(0, 10)}.pdf`;
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+            } catch (e: any) {
+                alert(e.message);
+            }
+        });
+    };
+
     return (
         <div className="space-y-8 pb-32 pt-8">
             <div className="space-y-2 text-center max-w-3xl mx-auto">
@@ -160,14 +181,25 @@ export default function InventoryManagerPage() {
                             </CardTitle>
                             <CardDescription className="text-[10px] font-bold uppercase">All registered items across the network node.</CardDescription>
                         </div>
-                        <div className="relative max-w-sm">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
-                            <Input
-                                placeholder="Filter items..."
-                                className="pl-9 bg-slate-900 border-slate-800 h-10 text-xs font-bold"
-                                value={searchTerm}
-                                onChange={(e) => setSearchTerm(e.target.value)}
-                            />
+                        <div className="flex items-center gap-2">
+                            <Button
+                                variant="outline"
+                                className="bg-slate-900 border-slate-800 text-[10px] font-black uppercase italic tracking-widest gap-2"
+                                onClick={handleDownloadPDF}
+                                disabled={isPending}
+                            >
+                                {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileText className="h-4 w-4 text-violet-400" />}
+                                Export Low Stock
+                            </Button>
+                            <div className="relative max-w-sm">
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
+                                <Input
+                                    placeholder="Filter items..."
+                                    className="pl-9 bg-slate-900 border-slate-800 h-10 text-xs font-bold"
+                                    value={searchTerm}
+                                    onChange={(e) => setSearchTerm(e.target.value)}
+                                />
+                            </div>
                         </div>
                     </div>
                 </CardHeader>
