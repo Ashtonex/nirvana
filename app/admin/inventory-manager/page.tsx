@@ -57,6 +57,7 @@ export default function InventoryManagerPage() {
 
     // Form states
     const [adjustQty, setAdjustQty] = useState("");
+    const [adjustReason, setAdjustReason] = useState("");
     const [newAllocations, setNewAllocations] = useState<Record<string, string>>({});
 
     useEffect(() => {
@@ -78,6 +79,7 @@ export default function InventoryManagerPage() {
     const handleOpenAdjust = (item: any) => {
         setSelectedItem(item);
         setAdjustQty("");
+        setAdjustReason("");
         setIsAdjustModalOpen(true);
     };
 
@@ -98,7 +100,7 @@ export default function InventoryManagerPage() {
 
         startTransition(async () => {
             try {
-                await increaseMasterStock(selectedItem.id, qty);
+                await increaseMasterStock(selectedItem.id, qty, adjustReason || "Manual adjustment via Global Inventory");
                 setIsAdjustModalOpen(false);
                 refresh();
                 alert(`Master stock for ${selectedItem.name} updated.`);
@@ -274,6 +276,15 @@ export default function InventoryManagerPage() {
                             className="bg-slate-950 border-slate-800 h-12 text-lg font-black italic"
                             value={adjustQty}
                             onChange={(e) => setAdjustQty(e.target.value)}
+                        />
+                    </div>
+                    <div className="space-y-2">
+                        <label className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Reason for adjustment</label>
+                        <Input
+                            placeholder="e.g. Physical count discrepancy"
+                            className="bg-slate-950 border-slate-800 h-10 text-xs font-bold"
+                            value={adjustReason}
+                            onChange={(e) => setAdjustReason(e.target.value)}
                         />
                     </div>
                     <Button
