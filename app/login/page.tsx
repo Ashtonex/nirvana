@@ -87,8 +87,8 @@ function LoginForm() {
     <div className="min-h-[100svh] bg-slate-950 flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-br from-violet-600 to-indigo-600 rounded-3xl mb-4 shadow-2xl shadow-violet-500/20">
-            <Shield className="h-10 w-10 text-white" />
+          <div className="inline-flex items-center justify-center w-24 h-24 mb-4">
+            <img src="/logo.png" alt="Nirvana Logo" className="h-full w-full object-contain drop-shadow-[0_0_15px_rgba(139,92,246,0.3)]" />
           </div>
           <h1 className="text-4xl font-black italic tracking-tighter uppercase text-white">Nirvana</h1>
           <p className="text-slate-400 font-medium mt-2">Login</p>

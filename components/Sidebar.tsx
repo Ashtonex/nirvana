@@ -83,7 +83,8 @@ export default function Sidebar() {
     return (
         <div className="hidden lg:flex h-full w-64 flex-col border-r border-slate-800 bg-slate-950/50 backdrop-blur-xl">
             <div className="flex h-20 items-center px-6">
-                <h1 className="text-2xl font-bold gradient-text">NIRVANA</h1>
+                <img src="/logo.png" alt="Logo" className="h-10 w-10 object-contain mr-3" />
+                <h1 className="text-2xl font-bold gradient-text tracking-tighter uppercase italic">NIRVANA</h1>
             </div>
 
             <nav className="flex-1 space-y-1 px-3 py-4 overflow-y-auto">
