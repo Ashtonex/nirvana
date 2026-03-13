@@ -48,7 +48,26 @@ let nativeConnection: NativeBtConnection | null = null;
 export async function nativeBluetoothConnect(): Promise<boolean> {
     try {
         const ble = await getBleClient();
+        
+        // Request permissions for Android 12+
+        const perm = await ble.checkPermissions();
+        if (perm.bluetooth !== 'granted') {
+            const req = await ble.requestPermissions();
+            if (req.bluetooth !== 'granted') {
+                console.error('Bluetooth permissions denied');
+                return false;
+            }
+        }
+
         await ble.initialize({ androidNeverForLocation: true });
+
+        // Check if Bluetooth is actually on
+        const enabled = await ble.isEnabled();
+        if (!enabled.enabled) {
+            console.warn('Bluetooth is disabled');
+            if (typeof window !== 'undefined') window.alert('Please turn on Bluetooth');
+            return false;
+        }
 
         return new Promise((resolve) => {
             // Show the native device picker
@@ -128,6 +147,11 @@ let serialAddress: string | null = null;
 
 export async function nativeClassicBluetoothConnect(): Promise<boolean> {
     try {
+        // Request permissions via BLE plugin (shares same permissions on Android)
+        const ble = await getBleClient();
+        const perm = await ble.checkPermissions();
+        if (perm.bluetooth !== 'granted') await ble.requestPermissions();
+
         const serial = await getBtSerial();
         try {
             const enabled = await serial.isEnabled();
