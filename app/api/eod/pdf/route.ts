@@ -121,11 +121,11 @@ export async function GET(req: Request) {
       const weekStart = startOfWeekUTC(date);
       const monthStart = new Date(todayDate.getUTCFullYear(), todayDate.getUTCMonth(), 1).toISOString();
       const [wSalesRes, wLedgerRes, shopRes, settingsRes, mtdSalesRes] = await Promise.all([
-        supabaseAdmin.from("sales").select("id, total_with_tax, total_before_tax, tax, discount_applied, landed_cost, quantity, item_id, item_name, date, payment_method, category, seller_name, employee_name, employee_id").eq("shop_id", shopId).gte("date", weekStart).lte("date", until).catch(() => ({ data: [] })),
-        supabaseAdmin.from("ledger_entries").select("*").eq("shop_id", shopId).gte("date", weekStart).lte("date", until).catch(() => ({ data: [] })),
-        supabaseAdmin.from("shops").select("*").eq("id", shopId).single().catch(() => ({ data: null })),
-        supabaseAdmin.from("oracle_settings").select("*").single().catch(() => ({ data: null })),
-        supabaseAdmin.from("sales").select("total_with_tax").eq("shop_id", shopId).gte("date", monthStart).lte("date", until).limit(3000).catch(() => ({ data: [] })),
+        supabaseAdmin.from("sales").select("id, total_with_tax, total_before_tax, tax, discount_applied, landed_cost, quantity, item_id, item_name, date, payment_method, category, seller_name, employee_name, employee_id").eq("shop_id", shopId).gte("date", weekStart).lte("date", until).then((r: any) => r, () => ({ data: [] as any[] })),
+        supabaseAdmin.from("ledger_entries").select("*").eq("shop_id", shopId).gte("date", weekStart).lte("date", until).then((r: any) => r, () => ({ data: [] as any[] })),
+        supabaseAdmin.from("shops").select("*").eq("id", shopId).single().then((r: any) => r, () => ({ data: null })),
+        supabaseAdmin.from("oracle_settings").select("*").single().then((r: any) => r, () => ({ data: null })),
+        supabaseAdmin.from("sales").select("total_with_tax").eq("shop_id", shopId).gte("date", monthStart).lte("date", until).limit(3000).then((r: any) => r, () => ({ data: [] as any[] })),
       ]);
 
       const wSales = wSalesRes.data || [];
