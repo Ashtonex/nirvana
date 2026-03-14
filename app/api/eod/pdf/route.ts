@@ -133,7 +133,22 @@ export async function GET(req: Request) {
       : 0;
     const weeklyOverhead = monthlyOverhead / 4; // Approx
 
-    const auditResults = [];
+    const wSalesTotalWithTax = (wSales.data || []).reduce((sum: number, s: any) => sum + Number(s.total_with_tax || 0), 0);
+    const wSalesTotalBeforeTax = (wSales.data || []).reduce((sum: number, s: any) => sum + Number(s.total_before_tax || 0), 0);
+    const wSalesTotalTax = (wSales.data || []).reduce((sum: number, s: any) => sum + Number(s.tax || 0), 0);
+    const wPosExpenses = (wLedger.data || []).filter((l: any) => l.category === 'POS Expense').reduce((sum: number, l: any) => sum + Number(l.amount || 0), 0);
+
+    // Grouped Overheads
+    const shopEx: any = shop?.expenses || {};
+    const rent = Number(shopEx.rent || 0);
+    const salaries = Number(shopEx.salaries || 0);
+    const utilities = Number(shopEx.utilities || 0);
+    const misc = Number(shopEx.misc || 0);
+
+    const fixedObligations = (rent + salaries) / 4; // Monthly to Weekly
+    const operationalCosts = ((utilities + misc) / 4) + wPosExpenses;
+
+    const auditResults: any[] = [];
     // Perform audit for each day Mon-Sat
     const days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
     for (let i = 0; i < 6; i++) {
@@ -148,12 +163,55 @@ export async function GET(req: Request) {
       }
     }
 
+    // Staff Scoreboard
+    const staffMap = new Map<string, { name: string; sales: number; revenue: number }>();
+    (wSales.data || []).forEach((s: any) => {
+      const empId = s.employee_id || "Unknown";
+      const cur = staffMap.get(empId) || { name: "Unknown Employee", sales: 0, revenue: 0 };
+      cur.sales += Number(s.quantity || 0);
+      cur.revenue += Number(s.total_with_tax || 0);
+      staffMap.set(empId, cur);
+    });
+    
+    // Attempt to get employee names
+    const empIds = Array.from(staffMap.keys()).filter(id => id !== "Unknown");
+    if (empIds.length > 0) {
+      const { data: emps } = await supabaseAdmin.from("employees").select("id, name, surname").in("id", empIds);
+      (emps || []).forEach((e: any) => {
+        const cur = staffMap.get(e.id);
+        if (cur) cur.name = `${e.name} ${e.surname || ""}`.trim();
+      });
+    }
+    const staffScoreboard = Array.from(staffMap.values()).sort((a, b) => b.revenue - a.revenue);
+
+    // Inventory Velocity (Champions & Zombies)
+    const velocityMap = new Map<string, { id: string; name: string; qty: number; category: string }>();
+    (wSales.data || []).forEach((s: any) => {
+      const cur = velocityMap.get(s.item_id) || { id: s.item_id, name: s.item_name, qty: 0, category: "" };
+      cur.qty += Number(s.quantity || 0);
+      velocityMap.set(s.item_id, cur);
+    });
+    const champions = Array.from(velocityMap.values()).sort((a, b) => b.qty - a.qty).slice(0, 3);
+    
+    // Zombies: Items in shop inventory with 0 weekly sales
+    const { data: shopAllocs } = await supabaseAdmin.from("inventory_allocations").select("item_id").eq("shop_id", shopId).gt("quantity", 0);
+    const shopItemIds = (shopAllocs || []).map((a: any) => a.item_id);
+    const soldItemIds = new Set(velocityMap.keys());
+    const zombieIds = shopItemIds.filter((id: string) => !soldItemIds.has(id)).slice(0, 5);
+    let zombies: any[] = [];
+    if (zombieIds.length > 0) {
+      const { data: zItems } = await supabaseAdmin.from("inventory_items").select("id, name, category").in("id", zombieIds);
+      zombies = zItems || [];
+    }
+
     weeklyData = {
       sales: wSales.data || [],
       ledger: wLedger.data || [],
-      overhead: { monthly: monthlyOverhead, weekly: weeklyOverhead },
+      overhead: { monthly: monthlyOverhead, weekly: weeklyOverhead, fixed: fixedObligations, operational: operationalCosts },
       audit: auditResults,
-      settings: settings || {}
+      settings: settings || {},
+      staffScoreboard,
+      velocity: { champions, zombies }
     };
   }
 
@@ -365,16 +423,35 @@ export async function GET(req: Request) {
     const wTotalTax = weeklyData.sales.reduce((sum: number, s: any) => sum + Number(s.tax || 0), 0);
     const wExpenses = weeklyData.ledger.filter((l: any) => l.category === 'POS Expense').reduce((sum: number, l: any) => sum + Number(l.amount || 0), 0);
     const wNet = wTotalWithTax - wExpenses;
+    
+    // Financial Pulse Calculation
+    const wCOGS = weeklyData.sales.reduce((sum: number, s: any) => sum + (Number(s.landed_cost || 0) * s.quantity), 0);
+    const wGrossProfit = wTotalBeforeTax - wCOGS;
+    const wTotalFixed = weeklyData.overhead.fixed;
+    const wTotalOperational = weeklyData.overhead.operational;
+    const wFinalNet = wGrossProfit - wTotalFixed - (wTotalOperational - wExpenses); // Operational already includes POS expenses
+
     const overheadCovered = (wNet / weeklyData.overhead.weekly) * 100;
 
-    drawText("WEEKLY FINANCIAL CONTEXT", 11, true, COLORS.primary);
-    page.drawRectangle({ x: margin, y: y - 100, width: width - margin * 2, height: 100, color: rgb(0.98, 0.98, 1) });
+    drawText("WEEKLY FINANCIAL CONTEXT & PULSE", 11, true, COLORS.primary);
+    page.drawRectangle({ x: margin, y: y - 120, width: width - margin * 2, height: 120, color: rgb(0.98, 0.98, 1) });
     const wMetricsY = y - 20;
+    
+    // Left Column: Revenue & Profit
     page.drawText(`Weekly Gross Revenue: $${wTotalWithTax.toFixed(2)}`, { x: margin + 10, y: wMetricsY, size: 10, font: fontBold });
     page.drawText(`Weekly Pre-Tax Revenue: $${wTotalBeforeTax.toFixed(2)}`, { x: margin + 10, y: wMetricsY - 15, size: 9, font });
-    page.drawText(`Weekly Sales Tax: $${wTotalTax.toFixed(2)}`, { x: margin + 10, y: wMetricsY - 30, size: 9, font });
-    page.drawText(`Weekly Total Expenses: $${wExpenses.toFixed(2)}`, { x: margin + 10, y: wMetricsY - 45, size: 9, font });
-    page.drawText(`Weekly Net Revenue: $${wNet.toFixed(2)}`, { x: margin + 10, y: wMetricsY - 65, size: 11, font: fontBold, color: COLORS.highlight });
+    page.drawText(`Est. Cost of Goods (COGS): $${wCOGS.toFixed(2)}`, { x: margin + 10, y: wMetricsY - 30, size: 9, font, color: COLORS.warning });
+    page.drawText(`Weekly Gross Profit: $${wGrossProfit.toFixed(2)}`, { x: margin + 10, y: wMetricsY - 45, size: 10, font: fontBold, color: COLORS.highlight });
+    page.drawText(`Weekly Final Net (Pulse): $${wFinalNet.toFixed(2)}`, { x: margin + 10, y: wMetricsY - 70, size: 11, font: fontBold, color: wFinalNet > 0 ? COLORS.highlight : COLORS.warning });
+
+    // Right Column: Grouped Overheads
+    page.drawText(`FIXED OBLIGATIONS: $${wTotalFixed.toFixed(2)}`, { x: width / 2, y: wMetricsY, size: 9, font: fontBold, color: rgb(0.3, 0.3, 0.3) });
+    page.drawText(`(Rent + Salaries)`, { x: width / 2, y: wMetricsY - 10, size: 7, font });
+    
+    page.drawText(`OPERATIONAL COSTS: $${wTotalOperational.toFixed(2)}`, { x: width / 2, y: wMetricsY - 25, size: 9, font: fontBold, color: rgb(0.3, 0.3, 0.3) });
+    page.drawText(`(Utilities + Misc + POS Exp)`, { x: width / 2, y: wMetricsY - 35, size: 7, font });
+
+    page.drawText(`Total Overhead Covered: ${overheadCovered.toFixed(1)}%`, { x: width / 2, y: wMetricsY - 55, size: 10, font: fontBold, color: overheadCovered >= 100 ? COLORS.highlight : COLORS.warning });
 
     page.drawText(`Overhead Target (Weekly): $${weeklyData.overhead.weekly.toFixed(2)}`, { x: width / 2, y: wMetricsY, size: 9, font });
     page.drawText(`Coverage Status: ${overheadCovered.toFixed(1)}%`, { x: width / 2, y: wMetricsY - 15, size: 10, font: fontBold, color: overheadCovered >= 100 ? COLORS.highlight : COLORS.warning });
@@ -422,23 +499,54 @@ export async function GET(req: Request) {
     });
     y -= 150;
 
-    // Top Product
-    const itemMap = new Map<string, { name: string; qty: number; gross: number }>();
-    weeklyData.sales.forEach((s: any) => {
-      const cur = itemMap.get(s.item_id) || { name: s.item_name, qty: 0, gross: 0 };
-      cur.qty += Number(s.quantity);
-      cur.gross += Number(s.total_with_tax);
-      itemMap.set(s.item_id, cur);
-    });
-    const topMover = [...itemMap.values()].sort((a, b) => b.qty - a.qty)[0];
-
-    drawText("WEEKLY TOP PERFORMANCE", 11, true);
-    if (topMover) {
-      page.drawRectangle({ x: margin, y: y - 45, width: width - margin * 2, height: 45, color: rgb(0.95, 0.98, 0.95), borderColor: COLORS.highlight, borderWidth: 1 });
-      page.drawText(`MVP PRODUCT: ${topMover.name.toUpperCase()}`, { x: margin + 15, y: y - 20, size: 12, font: fontBold, color: COLORS.highlight });
-      page.drawText(`Total Sold: ${topMover.qty} Units  |  Total Revenue: $${topMover.gross.toFixed(2)}`, { x: margin + 15, y: y - 35, size: 9, font });
+    // Staff Scoreboard
+    ensureSpace(120);
+    drawText("STAFF PERFORMANCE SCOREBOARD", 11, true, COLORS.primary);
+    y -= 5;
+    const scoreboard = weeklyData.staffScoreboard;
+    if (scoreboard.length > 0) {
+      page.drawRectangle({ x: margin, y: y - (scoreboard.length * 15 + 10), width: width - margin * 2, height: (scoreboard.length * 15 + 10), color: rgb(0.95, 0.95, 1) });
+      scoreboard.forEach((s: any, i: number) => {
+        const rowY = y - 20 - (i * 15);
+        page.drawText(`${i + 1}. ${s.name}`, { x: margin + 10, y: rowY, size: 9, font: fontBold });
+        page.drawText(`${s.sales} Units`, { x: margin + 150, y: rowY, size: 9, font });
+        page.drawText(`Revenue: $${s.revenue.toFixed(2)}`, { x: width - margin - 120, y: rowY, size: 9, font: fontBold, color: COLORS.highlight });
+      });
+      y -= (scoreboard.length * 15 + 30);
+    } else {
+      drawText("No staff activity data recorded.", 9, false, rgb(0.5, 0.5, 0.5));
+      y -= 20;
     }
-    y -= 65;
+
+    // Inventory Velocity
+    ensureSpace(140);
+    drawText("INVENTORY VELOCITY (CHAMPIONS & ZOMBIES)", 11, true, COLORS.info);
+    y -= 15;
+    
+    // Champions
+    page.drawText("CHAMPIONS (Top Moving)", { x: margin, y, size: 9, font: fontBold, color: COLORS.highlight });
+    y -= 15;
+    weeklyData.velocity.champions.forEach((c: any) => {
+      page.drawText(`• ${c.name}`, { x: margin + 10, y, size: 8, font });
+      page.drawText(`${c.qty} sold`, { x: margin + 180, y, size: 8, font: fontBold });
+      y -= 12;
+    });
+
+    // Zombies
+    y -= 5;
+    page.drawText("ZOMBIES (Stagnant Stock)", { x: margin, y, size: 9, font: fontBold, color: COLORS.warning });
+    y -= 15;
+    if (weeklyData.velocity.zombies.length > 0) {
+      weeklyData.velocity.zombies.forEach((z: any) => {
+        page.drawText(`• ${z.name} (${z.category || 'Misc'})`, { x: margin + 10, y, size: 8, font });
+        page.drawText(`0 movement`, { x: margin + 180, y, size: 8, font, color: rgb(0.5, 0.5, 0.5) });
+        y -= 12;
+      });
+    } else {
+      page.drawText("No stagnant stock detected this week.", { x: margin + 10, y, size: 8, font, color: COLORS.highlight });
+      y -= 12;
+    }
+    y -= 20;
 
     // POS Audit Summary
     drawText("POS AUDIT & INTEGRITY CHECK", 11, true, COLORS.warning);
@@ -506,29 +614,51 @@ export async function GET(req: Request) {
     const dialogue = [];
     const questions = [];
 
+    const wTopMover = weeklyData.velocity.champions[0];
+    const wZombies = weeklyData.velocity.zombies;
+    const wStaffBest = weeklyData.staffScoreboard[0];
+    const wStaffLow = weeklyData.staffScoreboard[weeklyData.staffScoreboard.length - 1];
+
     // Analyze performance for dialogue
     if (overheadCovered < 80) {
       dialogue.push("Shop performance is critically low this week. We are struggling to cover basic overhead. We need to identify if this is a foot traffic issue or a conversion problem.");
-      questions.push("Wait, if our rent is $"+weeklyData.overhead.monthly+" and we only cleared $"+wNet.toFixed(2)+" profit this week, can we survive next month without a capital injection?");
+      questions.push(`Wait, if our weekly rent obligation is $${weeklyData.overhead.fixed.toFixed(2)} and we only cleared $${wNet.toFixed(2)} total profit this week, how many weeks of runway do we have left at this rate?`);
     } else if (overheadCovered < 100) {
       dialogue.push("We are at the breakeven point. Operations are covering themselves, but there is no growth capital being generated.");
-      questions.push("I noticed our best day was "+dailyRev.indexOf(Math.max(...dailyRev))+"—was there a specific campaign that day we can repeat?");
+      const bestDayIndex = dailyRev.indexOf(Math.max(...dailyRev));
+      const days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+      questions.push(`I noticed our best day was ${days[bestDayIndex]}—did we do something differently that day that we can turn into a standard operating procedure?`);
     } else {
       dialogue.push("Exceptional performance. The shop is scaling and generating healthy net profit after all theoretical overhead.");
-      questions.push("We are $"+(wNet - weeklyData.overhead.weekly).toFixed(2)+" above target. Shall we reinvest this into more '"+(topMover?.name || 'inventory')+"' or keep it as a safety buffer?");
+      questions.push(`We are $${(wNet - weeklyData.overhead.weekly).toFixed(2)} above target. Shall we reinvest this into more '${(wTopMover?.name || 'inventory')}' or keep it as a safety buffer?`);
     }
 
     // Variance check
     const totalVar = weeklyData.audit.reduce((s: number, a: any) => s + a.variance, 0);
     if (Math.abs(totalVar) > 10) {
       dialogue.push("Significant cash variance detected across the week. This is a system-wide integrity risk.");
-      questions.push("We lost $"+Math.abs(totalVar).toFixed(2)+" in literal cash differences this week. Who was handling the drawer during the shifts with the highest variances?");
+      questions.push(`We lost $${Math.abs(totalVar).toFixed(2)} in literal cash differences this week. Is this a training issue, or do we have a specific shift with a recurring 'leak'?`);
     }
 
+    // Staff Performance
+    if (wStaffBest && wStaffLow && wStaffBest.revenue > wStaffLow.revenue * 2) {
+      dialogue.push(`There is a massive performance gap between your top seller (${wStaffBest.name}) and bottom seller (${wStaffLow.name}).`);
+      questions.push(`What is ${wStaffBest.name} doing that ${wStaffLow.name} isn't? Can we implement a peer-mentoring session this Monday?`);
+    }
+
+    // Zombie Stock
+    if (wZombies.length > 0) {
+      dialogue.push(`${wZombies.length} items have sat completely stagnant this week, tying up capital.`);
+      questions.push(`Should we aggressively discount '${wZombies[0].name}' to 50% just to liquefy that cash for faster-moving shipments?`);
+    }
+
+    // Final strategic push
+    questions.push("If we could magically double the sales of just ONE category next week, which would it be and why aren't we marketing it harder right now?");
+
     // Inventory check
-    if (topMover && topMover.qty > 50) {
-      dialogue.push("The velocity of "+topMover.name+" is impressive. It constitutes a major part of our weekly cashflow.");
-      questions.push("If we ran out of '"+topMover.name+"' today, how much would our Monday revenue drop? Do we have enough buffer stock?");
+    if (wTopMover && wTopMover.qty > 50) {
+      dialogue.push("The velocity of "+wTopMover.name+" is impressive. It constitutes a major part of our weekly cashflow.");
+      questions.push("If we ran out of '"+wTopMover.name+"' today, how much would our Monday revenue drop? Do we have enough buffer stock?");
     }
 
     // Rendering Dialogue
