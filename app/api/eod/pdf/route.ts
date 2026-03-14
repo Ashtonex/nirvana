@@ -98,7 +98,7 @@ export async function GET(req: Request) {
     // Parallel Fetching
     const [salesRes, ledgerRes, lowStockRes, allInventoryRes, thirtyDaySalesRes, sevenDaySalesRes] = await Promise.all([
       supabaseAdmin.from("sales").select("*").eq("shop_id", shopId).gte("date", since).lte("date", until),
-      supabaseAdmin.from("ledger_entries").select("*").eq("shop_id", shopId).gte("date", since).lte("date", until),
+      supabaseAdmin.from("ledger_entries").select("id,category,amount,date,description,employee_id").eq("shop_id", shopId).gte("date", since).lte("date", until),
       supabaseAdmin.from("inventory_allocations").select("item_id, quantity").eq("shop_id", shopId).lte("quantity", 5).order("quantity", { ascending: true }).limit(15),
       supabaseAdmin.from("inventory_items").select("id, name, category, landed_cost, price"),
       supabaseAdmin.from("sales").select("item_id, quantity").eq("shop_id", shopId).gte("date", new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()),
@@ -156,20 +156,20 @@ export async function GET(req: Request) {
       const fixedObligations = (rent + salaries) / 4; // Monthly to Weekly
       const operationalCosts = ((utilities + misc) / 4) + wPosExpenses;
 
-      const auditResults: any[] = [];
       // Perform audit for each day Mon-Sat
       const days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-      for (let i = 0; i < 6; i++) {
+      const auditPromises = days.map(async (dayName, i) => {
         const d = new Date(weekStart);
         d.setUTCDate(d.getUTCDate() + i);
         const dayStr = d.toISOString().split('T')[0];
         try {
           const audit = await computePosAuditReport({ shopId, dateYYYYMMDD: dayStr });
-          auditResults.push({ day: days[i], date: dayStr, variance: audit.variance.amount || 0, flags: audit.flags });
+          return { day: dayName, date: dayStr, variance: audit.variance.amount || 0, flags: audit.flags };
         } catch (e) {
-          auditResults.push({ day: days[i], date: dayStr, variance: 0, flags: [] });
+          return { day: dayName, date: dayStr, variance: 0, flags: [] };
         }
-      }
+      });
+      const auditResults = await Promise.all(auditPromises);
 
       // Staff Scoreboard
       const staffMap = new Map<string, { name: string; sales: number; revenue: number }>();
@@ -497,6 +497,7 @@ export async function GET(req: Request) {
 
         // --- PAGE 1: STRATEGIC COMMAND ---
         {
+          try {
           page = pdf.addPage(pageSize);
           y = height - margin;
           drawText("WEEKLY STRATEGIC COMMAND ADVISORY", 18, true, COLORS.header);
@@ -573,10 +574,12 @@ export async function GET(req: Request) {
             page.drawText(dNames[i], { x: margin + (i * bSpc) + 15, y: y - chartH - 20, size: 8, font });
           });
           y -= 140;
+        } catch (err) { console.error("Page 1 fail:", err); }
         }
 
         // --- PAGE 2: PERFORMANCE SCOREBOARD ---
         {
+          try {
           page = pdf.addPage(pageSize);
           y = height - margin;
           drawText("WEEKLY PERFORMANCE SCOREBOARD", 15, true, COLORS.header);
@@ -604,10 +607,12 @@ export async function GET(req: Request) {
             page.drawText(`Profit: $${c.profit.toFixed(2)}`, { x: width - margin - 100, y: y - 13, size: 9, font: fontBold, color: COLORS.highlight });
             y -= 20;
           });
+          } catch (err) { console.error("Page 2 fail:", err); }
         }
 
         // --- PAGE 3: INVENTORY & AUDIT ---
         {
+          try {
           page = pdf.addPage(pageSize);
           y = height - margin;
           drawText("INVENTORY VELOCITY & POS AUDIT", 15, true, COLORS.header);
@@ -629,10 +634,12 @@ export async function GET(req: Request) {
             page.drawText(`Status: ${status}`, { x: width - margin - 80, y, size: 9, font: fontBold, color: status === "PASSED" ? COLORS.highlight : COLORS.warning });
             y -= 15;
           });
+          } catch (err) { console.error("Page 3 fail:", err); }
         }
 
         // --- PAGE 4: STRATEGIC DIALOGUE & RISK ---
         {
+          try {
           page = pdf.addPage(pageSize);
           y = height - margin;
           drawText("ORACLE STRATEGIC DIALOGUE & RISK", 15, true, COLORS.oracle);
@@ -678,10 +685,12 @@ export async function GET(req: Request) {
           }
           dialogue.forEach(d => { drawText(`DIAGNOSTIC: ${d}`, 9, false, rgb(0.2,0.2,0.3)); y -= 5; });
           questions.forEach(q => { drawText(`? ${q}`, 10, true); y -= 5; });
+          } catch (err) { console.error("Page 4 fail:", err); }
         }
 
         // --- PAGE 5: ACTIVITY LOGS ---
         {
+          try {
           page = pdf.addPage(pageSize);
           y = height - margin;
           drawText("WEEKLY ACTIVITY LOGS", 15, true, COLORS.header);
@@ -693,10 +702,12 @@ export async function GET(req: Request) {
             page.drawText(`$${Number(s.total_with_tax).toFixed(2)}`, { x: width - margin - 60, y, size: 8, font: fontBold });
             y -= 12;
           });
+          } catch (err) { console.error("Page 5 fail:", err); }
         }
 
         // --- PAGE 6: GROWTH & FORECASTING ---
         {
+          try {
           page = pdf.addPage(pageSize);
           y = height - margin;
           drawText("GROWTH FORECASTING & PROJECTIONS", 16, true, COLORS.header);
@@ -715,6 +726,7 @@ export async function GET(req: Request) {
           
           y -= 100;
           page.drawText("Strategic Advisory Sign-off: [G. Guri / Nirvana Admin]", { x: margin, y: 40, size: 7, font, color: rgb(0.5,0.5,0.5) });
+          } catch (err) { console.error("Page 6 fail:", err); }
         }
       } catch (e: any) {
         console.error("Weekly render failed:", e);
