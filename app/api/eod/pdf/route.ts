@@ -302,6 +302,14 @@ export async function GET(req: Request) {
       expensesByDay.get(dName)?.push(l);
     });
 
+    // Net Profit Pulse Trend
+    const profitByDay = daysArr.map(dName => {
+      const daySales = salesByDay.get(dName) || [];
+      const revenue = daySales.reduce((s: number, x: any) => s + Number(x.total_before_tax || 0), 0);
+      const cogs = daySales.reduce((s: number, x: any) => s + (Number(x.landed_cost || 0) * Number(x.quantity || 0)), 0);
+      return revenue - cogs;
+    });
+
     // Month-to-Date Progress
     const mtdRevenue = mtdSales.reduce((sum: number, s: any) => sum + Number(s.total_with_tax || 0), 0);
     const mtdProgress = monthlyOverhead > 0 ? (mtdRevenue / monthlyOverhead) * 100 : 0;
@@ -331,7 +339,8 @@ export async function GET(req: Request) {
       mtd: { revenue: mtdRevenue, progress: mtdProgress },
       overheadCovered: (weeklyOverhead > 0) ? (Number(wNet || 0) / weeklyOverhead) * 100 : 0,
       salesByDay,
-      expensesByDay
+      expensesByDay,
+      profitByDay
     };
   }
 
@@ -419,15 +428,8 @@ export async function GET(req: Request) {
     };
 
     const drawDonut = (centerX: number, centerY: number, radius: number, data: { value: number, color: any }[]) => {
-      const innerRadius = radius * 0.6;
       const total = data.reduce((s, d) => s + d.value, 0);
       if (total <= 0) return;
-      
-      let currentX = centerX - radius;
-      // Since pdf-lib doesn't have easy arc drawing, we use a "stacked bar" donut representing percentages
-      // Actually, for a "wow factor", I'll use simple concentric rectangles or a very colorful legend-based bar if arcs are too complex.
-      // But let's try a 10-step polygon approximation for a circle if we really want a "pie".
-      // For now, to be safe and clean, a "Horizontal Donut" (Stacked bar with rounded edges) is very modern.
       const barW = 120;
       const barH = 12;
       page.drawRectangle({ x: centerX - barW/2, y: centerY - barH/2, width: barW, height: barH, color: rgb(0.9,0.9,0.9) });
@@ -438,6 +440,37 @@ export async function GET(req: Request) {
           page.drawRectangle({ x: curX, y: centerY - barH/2, width: sw, height: barH, color: d.color });
           curX += sw;
         }
+      });
+    };
+
+    const drawLineGraph = (x: number, yPos: number, w: number, h: number, data: number[], color = COLORS.primary) => {
+      const max = Math.max(...data, 1);
+      const stepX = w / (data.length - 1 || 1);
+      page.drawRectangle({ x, y: yPos, width: w, height: h, color: rgb(0.97, 0.97, 0.98) });
+      for (let i = 0; i < data.length - 1; i++) {
+        const x1 = x + i * stepX;
+        const y1 = yPos + (data[i] / max) * h;
+        const x2 = x + (i + 1) * stepX;
+        const y2 = yPos + (data[i+1] / max) * h;
+        page.drawLine({ start: { x: x1, y: y1 }, end: { x: x2, y: y2 }, thickness: 2, color });
+        page.drawCircle({ x: x1, y: y1, size: 3, color });
+      }
+      page.drawCircle({ x: x + (data.length-1)*stepX, y: yPos + (data[data.length-1]/max)*h, size: 3, color });
+    };
+
+    const drawBarChart = (x: number, yPos: number, w: number, h: number, data: { label: string, value: number, color?: any }[]) => {
+      const max = Math.max(...data.map(d => d.value), 1);
+      const bW = w / data.length;
+      data.forEach((d, i) => {
+        const bh = (d.value / max) * h;
+        page.drawRectangle({ 
+          x: x + (i * bW) + 5, 
+          y: yPos, 
+          width: bW - 10, 
+          height: bh, 
+          color: d.color || COLORS.chartBar 
+        });
+        page.drawText(d.label.substring(0, 4), { x: x + (i * bW) + 5, y: yPos - 12, size: 6, font });
       });
     };
 
@@ -566,7 +599,26 @@ export async function GET(req: Request) {
           drawText("WEEKLY STRATEGIC COMMAND ADVISORY", 18, true, COLORS.header);
           drawText(`Operational Pulse & Financial Integrity — ${shopId.toUpperCase()}`, 10, true, rgb(0.3, 0.3, 0.3));
           drawText(`Audit Window: Mon ${new Date(startOfWeekUTC(date)).toLocaleDateString()} — Sat ${new Date(until).toLocaleDateString()}`, 9, false, rgb(0.5, 0.5, 0.5));
-          y -= 30;
+          y -= 15;
+
+          // RISK RADAR (New)
+          const overCovVal = weeklyData.overheadCovered || 0;
+          const riskColor = overCovVal > 120 ? COLORS.highlight : overCovVal > 100 ? COLORS.info : COLORS.warning;
+          const riskLabel = overCovVal > 120 ? "VITALITY: HIGH" : overCovVal > 100 ? "STABLE" : "RISK: ELEVATED";
+          page.drawRectangle({ x: margin, y: y - 35, width: 140, height: 35, color: riskColor });
+          page.drawText(riskLabel, { x: margin + 10, y: y - 15, size: 10, font: fontBold, color: rgb(1,1,1) });
+          page.drawText(`Margin: ${overCovVal.toFixed(1)}%`, { x: margin + 10, y: y - 28, size: 8, font, color: rgb(1,1,1) });
+
+          // STRATEGIC MICRO-CARDS (New)
+          const cardW = (width - margin * 2 - 160) / 2;
+          page.drawRectangle({ x: margin + 160, y: y - 35, width: cardW - 10, height: 35, color: rgb(0.95, 0.95, 0.98) });
+          page.drawText("⚡ EFFICIENCY", { x: margin + 170, y: y - 15, size: 8, font: fontBold, color: COLORS.primary });
+          page.drawText(`Tx Volume: ${weeklyData.basket.txCount}`, { x: margin + 170, y: y - 28, size: 7, font });
+
+          page.drawRectangle({ x: margin + 160 + cardW, y: y - 35, width: cardW - 10, height: 35, color: rgb(0.95, 0.95, 0.98) });
+          page.drawText("📈 BASKET PULSE", { x: margin + 170 + cardW, y: y - 15, size: 8, font: fontBold, color: COLORS.primary });
+          page.drawText(`Avg Value: $${weeklyData.basket.avgValue.toFixed(2)}`, { x: margin + 170 + cardW, y: y - 28, size: 7, font });
+          y -= 50;
 
           drawText("1. FINANCIAL PERFORMANCE & PULSE", 11, true, COLORS.primary);
           y -= 5;
@@ -641,7 +693,12 @@ export async function GET(req: Request) {
           const topDayIdx = dRev.indexOf(Math.max(...dRev));
           const avgRev = dRev.reduce((s, r) => s + r, 0) / 6;
           drawText(`Velocity Insight: Peak performance on ${daysArr[topDayIdx]}. Avg Daily Pulse: $${avgRev.toFixed(0)}.`, 8, true, COLORS.primary);
+          
+          y -= 10;
+          drawText("NET PROFIT PULSE (Trend)", 10, true, COLORS.oracle);
           y -= 5;
+          drawLineGraph(margin, y - 60, width - margin * 2, 60, weeklyData.profitByDay, COLORS.highlight);
+          y -= 80;
         } catch (err) { console.error("Page 1 fail:", err); }
         }
 
@@ -651,7 +708,12 @@ export async function GET(req: Request) {
           page = pdf.addPage(pageSize);
           y = height - margin;
           drawText("WEEKLY PERFORMANCE SCOREBOARD", 15, true, COLORS.header);
-          y -= 20;
+          y -= 10;
+          
+          // Micro-Insight on Page 2
+          page.drawRectangle({ x: margin, y: y - 25, width: width - margin * 2, height: 25, color: COLORS.info, opacity: 0.1 });
+          page.drawText("💡 LEVERAGE TIP: Identify segments with >30% margin and consider 'Strategic Restocking' to amplify net cash position.", { x: margin + 10, y: y - 16, size: 7, font: fontItalic, color: COLORS.primary });
+          y -= 40;
 
           drawText("STAFF PERFORMANCE RANKING", 11, true, COLORS.primary);
           y -= 10;
@@ -676,13 +738,23 @@ export async function GET(req: Request) {
             y -= 20;
           });
 
-          y -= 20;
+          y -= 30;
+          drawText("PROFITABILITY BY SEGMENT", 10, true, COLORS.primary);
+          y -= 10;
+          const barData = weeklyData.categoryContribution.slice(0, 6).map((c: any) => ({
+            label: c.name,
+            value: Number(c.profit || 0),
+            color: COLORS.highlight
+          }));
+          drawBarChart(margin, y - 50, (width - margin * 2) / 2, 50, barData);
+
           const mixData = weeklyData.categoryContribution.slice(0, 4).map((c: any, i: number) => {
             const colors = [COLORS.primary, COLORS.info, COLORS.oracle, COLORS.highlight];
             return { value: c.revenue, color: colors[i] || COLORS.chartBar };
           });
-          drawDonut(width - margin - 70, y + 50, 25, mixData);
-          page.drawText("Category Mix", { x: width - margin - 100, y: y + 20, size: 7, font: fontItalic });
+          drawDonut(width - margin - 70, y - 10, 25, mixData);
+          page.drawText("Category Revenue Mix", { x: width - margin - 110, y: y - 35, size: 7, font: fontItalic });
+          y -= 80;
           } catch (err) { console.error("Page 2 fail:", err); }
         }
 
@@ -694,11 +766,19 @@ export async function GET(req: Request) {
           drawText("INVENTORY VELOCITY & POS AUDIT", 15, true, COLORS.header);
           y -= 20;
 
-          drawText("CHAMPIONS (Top Moving)", 11, true, COLORS.highlight);
+          drawText("CHAMPIONS (Velocity Leaderboard)", 11, true, COLORS.highlight);
+          y -= 5;
+          const champBars = weeklyData.velocity.champions.slice(0, 5).map((c: any) => ({
+            label: c.name.substring(0, 10),
+            value: Number(c.qty || 0),
+            color: COLORS.highlight
+          }));
+          drawBarChart(margin, y - 40, (width - margin * 2) / 2, 40, champBars);
+          y -= 50;
+
           weeklyData.velocity.champions.forEach((c: any) => {
-            drawText(`• ${c.name} (${c.qty} sold)`, 9);
+            drawText(`• ${c.name} (${c.qty} sold)`, 8);
           });
-          y -= 10;
 
           drawText("POS AUDIT & INTEGRITY CHECK", 11, true, COLORS.warning);
           y -= 10;
@@ -753,63 +833,74 @@ export async function GET(req: Request) {
           const dialogue: string[] = [];
           const questions: string[] = [];
           if (overCov < 80) {
-            dialogue.push("Critical performance gap detected. Expenses are significantly outpacing net revenue.");
-            dialogue.push("Warning: Survival threshold is currently under pressure. Immediate cost optimization suggested.");
-            questions.push("Which specific overhead item (Rent/Staff/Utilities) is the most flexible if we need to cut down next week?");
-            questions.push("Are there stock items tying up too much cash that could be liquidated in a flash sale?");
-            questions.push("Is the current staffing level optimized for the low-activity hours discovered in the velocity analysis?");
+            dialogue.push("STRATEGIC ALERT: The business is currently in a 'High-Friction' state. Fuel consumption (Expenses) is exceeding forward thrust.");
+            dialogue.push("RISK ASSESSMENT: Burn rate suggests a diminishing runway unless fixed obligations are restructured or sales velocity is doubled.");
+            questions.push("If we were to strip the business down to its absolute core, which 3 categories are the only ones that actually matter for survival?");
+            questions.push("Why are we carrying staff costs for hours where transaction intensity is at its lowest?");
+            questions.push("Is the current physical location a strategic asset or a heavy anchor? Should we pivot to a satellite-lite model?");
           } else {
-            dialogue.push("Stable operations. The shop is maintaining healthy breakeven or profit margins.");
-            dialogue.push("Growth Opportunity: Cash pulse is strong enough to support strategic reinvestment.");
-            questions.push("With current surplus, should we invest in a 'Clearance Weekend' for stagnant stock or restock the champions?");
-            questions.push("Can we expand the inventory in our top-performing categories to capture more market share?");
-            questions.push("Should we consider a loyalty program for the top-tier customers contributing to the current success?");
+            dialogue.push("EXECUTION EXCELLENCE: The shop is operating with high metabolic efficiency. Breakeven is secured.");
+            dialogue.push("MARKET OPPORTUNITY: We have captured a stable segment. The risk now is complacency rather than collapse.");
+            questions.push("Are we scaling fast enough? If we injected $5,000 today, where would it be spent to generate a 10x return in 3 months?");
+            questions.push("Which of our 'Champion' items can we brand exclusively to build long-term customer lock-in?");
+            questions.push("If a competitor opened across the street tomorrow, what is the one thing they could never take from NIRVANA?");
           }
-          dialogue.push("Audit Alert: Daily cash variances need tighter reconciliation to ensure zero leakage.");
-          questions.push("How can we ensure staff are recording every discount into the system to keep tax obligations accurate?");
+          dialogue.push("ORACLE SYNTHESIS: The week shows a resilience in cashflow, but a vulnerability in category diversification.");
+          questions.push("Are we a business that sells products, or a business that provides a specific experience for 'Kipasa' customers? How do we charge for the latter?");
+          questions.push("Looking at the data, what is the 'hard truth' we've been avoiding about our current inventory strategy?");
+          questions.push("If we removed the most expensive 20% of our inventory today, would the customers notice? Would the business be more or less profitable?");
+          questions.push("What is the one process in the shop that currently relies 100% on the owner being present? How do we automate it by next week?");
           
-          dialogue.forEach(d => { drawText(`DIAGNOSTIC: ${d}`, 9, false, rgb(0.2,0.2,0.3)); y -= 5; });
-          y -= 10;
-          drawText("STRATEGIC QUESTIONS FOR THE OWNER:", 10, true, COLORS.oracle);
-          questions.forEach(q => { drawText(`? ${q}`, 10, true); y -= 5; });
+          y -= 5;
+          dialogue.forEach(d => { drawText(`DIAGNOSTIC: ${d}`, 8, false, rgb(0.2,0.2,0.4)); y -= 2; });
+          y -= 15;
+          drawText("STRATEGIC OWNER INTERROGATIONS:", 11, true, COLORS.oracle);
+          y -= 5;
+          questions.forEach(q => { drawText(`? ${q}`, 10, true, rgb(0.1, 0.1, 0.1)); y -= 4; });
+          
+          y -= 25;
+          drawText("ORACLE FINAL BYTE: Business is a game of momentum. This week you held the line. Next week, take the hill.", 9, true, COLORS.highlight);
           } catch (err) { console.error("Page 4 fail:", err); }
         }
 
-        // --- PAGE 5: WEEKLY ACTIVITY LOG (TABULAR) ---
+        // --- PAGE 5: WEEKLY TRANSACTION INTENSITY (HEATMAP) ---
         {
           try {
             page = pdf.addPage(pageSize);
             y = height - margin;
-            drawText("WEEKLY TRANSACTIONAL PULSE (Mon - Sat)", 15, true, COLORS.header);
-            y -= 10;
+            drawText("WEEKLY TRANSACTION INTENSITY HEATMAP", 15, true, COLORS.header);
+            y -= 20;
             
-            const colWidth = (width - margin * 2) / 3;
-            // Use daysArr defined in higher scope
+            const cellW = (width - margin * 2) / 6;
+            const cellH = 18;
+            const hours = [9, 10, 11, 12, 13, 14, 15, 16, 17, 18];
             
-            // Draw in 2 rows of 3 days
-            for (let row = 0; row < 2; row++) {
-              let startY = y;
-              let maxRowY = y;
-              for (let col = 0; col < 3; col++) {
-                const dayIdx = row * 3 + col;
-                const dName = daysArr[dayIdx];
-                const sales = weeklyData.salesByDay.get(dName) || [];
+            // Header
+            daysArr.forEach((dName, i) => {
+              page.drawText(dName.substring(0, 3), { x: margin + i * cellW + 10, y, size: 9, font: fontBold, color: COLORS.primary });
+            });
+            y -= 20;
+            
+            hours.forEach(hr => {
+              page.drawText(`${hr}:00`, { x: margin - 35, y: y + 5, size: 7, font });
+              daysArr.forEach((dName, dIdx) => {
+                const daySales = weeklyData.salesByDay.get(dName) || [];
+                const hrSales = daySales.filter((s: any) => new Date(s.date).getHours() === hr).length;
                 
-                let curY = startY;
-                page.drawText(dName.toUpperCase(), { x: margin + col * colWidth, y: curY, size: 8, font: fontBold, color: COLORS.primary });
-                curY -= 12;
+                // Color intensity based on volume
+                const intensity = Math.min(hrSales / 5, 1);
+                const color = rgb(1 - intensity * 0.2, 1 - intensity * 0.5, 1 - intensity * 0.1); 
                 
-                sales.slice(0, 25).forEach((s: any) => {
-                  if (curY < 50) return;
-                  const txt = `${s.item_name.substring(0, 12)}...`;
-                  page.drawText(`${txt}`, { x: margin + col * colWidth, y: curY, size: 6, font });
-                  page.drawText(`$${Number(s.total_with_tax || 0).toFixed(1)}`, { x: margin + col * colWidth + colWidth - 35, y: curY, size: 6, font: fontBold });
-                  curY -= 8;
-                });
-                if (curY < maxRowY) maxRowY = curY;
-              }
-              y = maxRowY - 20;
-            }
+                page.drawRectangle({ x: margin + dIdx * cellW, y, width: cellW - 2, height: cellH - 2, color });
+                if (hrSales > 0) {
+                  page.drawText(String(hrSales), { x: margin + dIdx * cellW + cellW/2 - 5, y: y + 5, size: 7, font, color: hrSales > 2 ? rgb(1,1,1) : rgb(0,0,0) });
+                }
+              });
+              y -= cellH;
+            });
+            
+            y -= 40;
+            drawText("HEATMAP LEGEND: Darker cells indicate peak transactional pressure. Align staffing to dark zones.", 8, true, COLORS.info);
           } catch (err) { console.error("Page 5 fail:", err); }
         }
 
@@ -847,6 +938,21 @@ export async function GET(req: Request) {
               }
               y = maxRowY - 20;
             }
+
+            // Expense Distribution Donut
+            const exData = [
+              { name: "Rent", val: overhead.rent || 0, col: COLORS.warning },
+              { name: "Salaries", val: overhead.salaries || 0, col: COLORS.primary },
+              { name: "Inventory", val: totals.cogs || 0, col: COLORS.highlight },
+              { name: "OpEx", val: overhead.posExpenses || 0, col: COLORS.info }
+            ].filter(d => d.val > 0);
+            
+            if (exData.length > 0) {
+              y -= 40;
+              drawText("WEEKLY CAPITAL ALLOCATION", 10, true, COLORS.primary);
+              drawDonut(width - margin - 70, y - 10, 25, exData.map(d => ({ value: d.val, color: d.col })));
+              page.drawText("Capital Distribution", { x: width - margin - 110, y: y - 35, size: 7, font: fontItalic });
+            }
           } catch (err) { console.error("Page 7 fail:", err); }
         }
 
@@ -871,7 +977,19 @@ export async function GET(req: Request) {
             
             y -= 100;
             drawText("2. GROWTH STRATEGY & MARKETING PLAYBOOK", 12, true, COLORS.oracle);
-            y -= 5;
+            y -= 8;
+
+            // Growth Channel Simulated Bar Chart
+            drawText("Recommended Marketing Mix (FB/WhatsApp/Email):", 8, true, COLORS.info);
+            y -= 10;
+            const channelData = [
+              { label: "FB Ads", value: 35, color: COLORS.primary },
+              { label: "WhatsApp", value: 25, color: COLORS.highlight },
+              { label: "Bundles", value: 40, color: COLORS.oracle }
+            ];
+            drawBarChart(margin, y - 30, 200, 30, channelData);
+            y -= 45;
+
             const topMover = weeklyData.velocity.champions[0]?.name || "inventory";
             const advice = [
               `• Leverage FLECTERE Marketing: Deploy targeted WhatsApp/Facebook campaigns for "${topMover}".`,
