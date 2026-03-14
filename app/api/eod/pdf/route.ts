@@ -136,7 +136,8 @@ export async function GET(req: Request) {
     const wSalesTotalWithTax = (wSales.data || []).reduce((sum: number, s: any) => sum + Number(s.total_with_tax || 0), 0);
     const wSalesTotalBeforeTax = (wSales.data || []).reduce((sum: number, s: any) => sum + Number(s.total_before_tax || 0), 0);
     const wSalesTotalTax = (wSales.data || []).reduce((sum: number, s: any) => sum + Number(s.tax || 0), 0);
-    const wPosExpenses = (wLedger.data || []).filter((l: any) => l.category === 'POS Expense').reduce((sum: number, l: any) => sum + Number(l.amount || 0), 0);
+    const wLedgerData = wLedger.data || [];
+    const wPosExpenses = wLedgerData.filter((l: any) => l.category === 'POS Expense').reduce((sum: number, l: any) => sum + Number(l.amount || 0), 0);
 
     // Grouped Overheads
     const shopEx: any = shop?.expenses || {};
@@ -152,56 +153,86 @@ export async function GET(req: Request) {
     // Perform audit for each day Mon-Sat
     const days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
     for (let i = 0; i < 6; i++) {
-      const d = new Date(weekStart);
-      d.setUTCDate(d.getUTCDate() + i);
-      const dayStr = d.toISOString().split('T')[0];
-      try {
-        const audit = await computePosAuditReport({ shopId, dateYYYYMMDD: dayStr });
-        auditResults.push({ day: days[i], date: dayStr, variance: audit.variance.amount || 0, flags: audit.flags });
-      } catch (e) {
-        auditResults.push({ day: days[i], date: dayStr, variance: 0, flags: [] });
-      }
+        const d = new Date(weekStart);
+        d.setUTCDate(d.getUTCDate() + i);
+        const dayStr = d.toISOString().split('T')[0];
+        try {
+            const audit = await computePosAuditReport({ shopId, dateYYYYMMDD: dayStr });
+            auditResults.push({ day: days[i], date: dayStr, variance: audit.variance.amount || 0, flags: audit.flags });
+        } catch (e) {
+            auditResults.push({ day: days[i], date: dayStr, variance: 0, flags: [] });
+        }
     }
 
     // Staff Scoreboard
     const staffMap = new Map<string, { name: string; sales: number; revenue: number }>();
     (wSales.data || []).forEach((s: any) => {
-      const empId = s.employee_id || "Unknown";
-      const cur = staffMap.get(empId) || { name: "Unknown Employee", sales: 0, revenue: 0 };
-      cur.sales += Number(s.quantity || 0);
-      cur.revenue += Number(s.total_with_tax || 0);
-      staffMap.set(empId, cur);
+        // Fallback: Use seller_name or employee_name if employee_id is missing or looks like an ID
+        const empId = s.employee_id || "Unknown";
+        const empName = s.seller_name || s.employee_name || "Unknown Employee";
+        const cur = staffMap.get(empId) || { name: empName, sales: 0, revenue: 0 };
+        cur.sales += Number(s.quantity || 0);
+        cur.revenue += Number(s.total_with_tax || 0);
+        staffMap.set(empId, cur);
     });
     
-    // Attempt to get employee names
-    const empIds = Array.from(staffMap.keys()).filter(id => id !== "Unknown");
+    // Attempt to resolve real names if empId looks like a UUID
+    const empIds = Array.from(staffMap.keys()).filter(id => id.length > 20 && id.includes('-'));
     if (empIds.length > 0) {
-      const { data: emps } = await supabaseAdmin.from("employees").select("id, name, surname").in("id", empIds);
-      (emps || []).forEach((e: any) => {
-        const cur = staffMap.get(e.id);
-        if (cur) cur.name = `${e.name} ${e.surname || ""}`.trim();
-      });
+        const { data: emps } = await supabaseAdmin.from("employees").select("id, name, surname").in("id", empIds);
+        (emps || []).forEach((e: any) => {
+            const cur = staffMap.get(e.id);
+            if (cur) cur.name = `${e.name} ${e.surname || ""}`.trim();
+        });
     }
     const staffScoreboard = Array.from(staffMap.values()).sort((a, b) => b.revenue - a.revenue);
 
     // Inventory Velocity (Champions & Zombies)
     const velocityMap = new Map<string, { id: string; name: string; qty: number; category: string }>();
     (wSales.data || []).forEach((s: any) => {
-      const cur = velocityMap.get(s.item_id) || { id: s.item_id, name: s.item_name, qty: 0, category: "" };
-      cur.qty += Number(s.quantity || 0);
-      velocityMap.set(s.item_id, cur);
+        const cur = velocityMap.get(s.item_id) || { id: s.item_id, name: s.item_name, qty: 0, category: "" };
+        cur.qty += Number(s.quantity || 0);
+        velocityMap.set(s.item_id, cur);
     });
     const champions = Array.from(velocityMap.values()).sort((a, b) => b.qty - a.qty).slice(0, 3);
     
+    // Fetch allocations for Zombies and Inventory Value
+    const { data: allocations } = await supabaseAdmin.from("inventory_allocations").select("item_id, quantity").eq("shop_id", shopId).gt("quantity", 0);
+    
     // Zombies: Items in shop inventory with 0 weekly sales
-    const { data: shopAllocs } = await supabaseAdmin.from("inventory_allocations").select("item_id").eq("shop_id", shopId).gt("quantity", 0);
-    const shopItemIds = (shopAllocs || []).map((a: any) => a.item_id);
     const soldItemIds = new Set(velocityMap.keys());
-    const zombieIds = shopItemIds.filter((id: string) => !soldItemIds.has(id)).slice(0, 5);
+    const zombieIds = (allocations || []).map((a: any) => a.item_id).filter((id: string) => !soldItemIds.has(id)).slice(0, 5);
     let zombies: any[] = [];
     if (zombieIds.length > 0) {
-      const { data: zItems } = await supabaseAdmin.from("inventory_items").select("id, name, category").in("id", zombieIds);
-      zombies = zItems || [];
+        const { data: zItems } = await supabaseAdmin.from("inventory_items").select("id, name, category").in("id", zombieIds);
+        zombies = zItems || [];
+    }
+
+    // Peak Activity Analysis (Hourly)
+    const hourMap = new Map<number, number>();
+    (wSales.data || []).forEach((s: any) => {
+      const hr = new Date(s.date).getHours();
+      hourMap.set(hr, (hourMap.get(hr) || 0) + Number(s.total_with_tax || 0));
+    });
+    const peakHours = Array.from(hourMap.entries()).sort((a, b) => b[1] - a[1]).slice(0, 3);
+
+    // Payment Mix
+    const cashTotal = (wSales.data || []).filter((s: any) => s.payment_method === 'cash').reduce((sum: number, s: any) => sum + Number(s.total_with_tax || 0), 0);
+    const ecocashTotal = (wSales.data || []).filter((s: any) => s.payment_method === 'ecocash').reduce((sum: number, s: any) => sum + Number(s.total_with_tax || 0), 0);
+    const swipeTotal = (wSales.data || []).filter((s: any) => s.payment_method === 'swipe').reduce((sum: number, s: any) => sum + Number(s.total_with_tax || 0), 0);
+    const paymentMix = { cashTotal, ecocashTotal, swipeTotal };
+
+    // Inventory Value (Shop specific)
+    let inventoryValue = 0;
+    if (allocations && allocations.length > 0) {
+      const itmIds = allocations.map((a: any) => a.item_id);
+      const { data: itemPrices } = await supabaseAdmin.from("inventory_items").select("id, landed_cost, acquisition_price").in("id", itmIds);
+      const priceMap = new Map(itemPrices?.map((i: any) => [i.id, Number(i.landed_cost || i.acquisition_price || 0)]));
+      allocations.forEach((a: any) => {
+        const qty = Number(a.quantity || 0);
+        const price = Number(priceMap.get(a.item_id) || 0);
+        inventoryValue += (qty * price);
+      });
     }
 
     weeklyData = {
@@ -211,7 +242,10 @@ export async function GET(req: Request) {
       audit: auditResults,
       settings: settings || {},
       staffScoreboard,
-      velocity: { champions, zombies }
+      velocity: { champions, zombies },
+      peakHours,
+      paymentMix,
+      inventoryValue
     };
   }
 
@@ -406,204 +440,182 @@ export async function GET(req: Request) {
     page.drawText(`$${Number(s.total_with_tax).toFixed(2)} (${s.payment_method})`, { x: width - margin - 80, y, size: 8, font });
     y -= 12;
   });
-
-  // --- WEEKLY REPORT SECTIONS ---
   if (isWeekly && weeklyData) {
+    // --- WEEKLY REPORT PAGE 1: STRATEGIC COMMAND ---
     page = pdf.addPage(pageSize);
     y = height - margin;
 
     drawText("WEEKLY STRATEGIC COMMAND ADVISORY", 18, true, COLORS.header);
-    drawText(`Performance Audit & Operational Pulse — ${shopId.toUpperCase()}`, 12, true);
-    drawText(`Week: Mon ${new Date(startOfWeekUTC(date)).toLocaleDateString()} — Sat ${new Date(until).toLocaleDateString()}`, 10, false, rgb(0.4, 0.4, 0.4));
-    y -= 15;
+    drawText(`Operational Pulse & Financial Integrity — ${shopId.toUpperCase()}`, 10, true, rgb(0.3, 0.3, 0.3));
+    drawText(`Audit Window: Mon ${new Date(startOfWeekUTC(date)).toLocaleDateString()} — Sat ${new Date(until).toLocaleDateString()}`, 9, false, rgb(0.5, 0.5, 0.5));
+    y -= 30;
 
-    // Weekly Totals
+    // Weekly Financial Pulse
     const wTotalWithTax = weeklyData.sales.reduce((sum: number, s: any) => sum + Number(s.total_with_tax || 0), 0);
     const wTotalBeforeTax = weeklyData.sales.reduce((sum: number, s: any) => sum + Number(s.total_before_tax || 0), 0);
     const wTotalTax = weeklyData.sales.reduce((sum: number, s: any) => sum + Number(s.tax || 0), 0);
     const wExpenses = weeklyData.ledger.filter((l: any) => l.category === 'POS Expense').reduce((sum: number, l: any) => sum + Number(l.amount || 0), 0);
     const wNet = wTotalWithTax - wExpenses;
     
-    // Financial Pulse Calculation
     const wCOGS = weeklyData.sales.reduce((sum: number, s: any) => sum + (Number(s.landed_cost || 0) * s.quantity), 0);
     const wGrossProfit = wTotalBeforeTax - wCOGS;
-    const wTotalFixed = weeklyData.overhead.fixed;
-    const wTotalOperational = weeklyData.overhead.operational;
-    const wFinalNet = wGrossProfit - wTotalFixed - (wTotalOperational - wExpenses); // Operational already includes POS expenses
+    const wFinalNet = wGrossProfit - weeklyData.overhead.fixed - (weeklyData.overhead.operational - wExpenses);
+
+    drawText("1. FINANCIAL PERFORMANCE & PULSE", 11, true, COLORS.primary);
+    y -= 5;
+    page.drawRectangle({ x: margin, y: y - 110, width: width - margin * 2, height: 110, color: rgb(0.98, 0.98, 1), borderColor: rgb(0.9, 0.9, 0.95), borderWidth: 1 });
+    const metY = y - 20;
+    
+    // Left: Revenue
+    page.drawText(`Weekly Gross Revenue:`, { x: margin + 10, y: metY, size: 9, font });
+    page.drawText(`$${wTotalWithTax.toFixed(2)}`, { x: margin + 110, y: metY, size: 9, font: fontBold });
+    
+    page.drawText(`Est. Gross Profit:`, { x: margin + 10, y: metY - 15, size: 9, font });
+    page.drawText(`$${wGrossProfit.toFixed(2)}`, { x: margin + 110, y: metY - 15, size: 9, font: fontBold, color: COLORS.highlight });
+
+    page.drawText(`FINAL NET PULSE:`, { x: margin + 10, y: metY - 40, size: 10, font: fontBold });
+    page.drawText(`$${wFinalNet.toFixed(2)}`, { x: margin + 110, y: metY - 40, size: 11, font: fontBold, color: wFinalNet > 0 ? COLORS.highlight : COLORS.warning });
+
+    // Right: Overheads
+    page.drawText(`Fixed Obligations:`, { x: width / 2 + 10, y: metY, size: 9, font });
+    page.drawText(`$${weeklyData.overhead.fixed.toFixed(2)}`, { x: width / 2 + 100, y: metY, size: 9, font: fontBold });
+
+    page.drawText(`Operational Costs:`, { x: width / 2 + 10, y: metY - 15, size: 9, font });
+    page.drawText(`$${weeklyData.overhead.operational.toFixed(2)}`, { x: width / 2 + 100, y: metY - 15, size: 9, font: fontBold });
 
     const overheadCovered = (wNet / weeklyData.overhead.weekly) * 100;
+    page.drawText(`Overhead Coverage:`, { x: width / 2 + 10, y: metY - 40, size: 9, font });
+    page.drawText(`${overheadCovered.toFixed(1)}%`, { x: width / 2 + 100, y: metY - 40, size: 10, font: fontBold, color: overheadCovered >= 100 ? COLORS.highlight : COLORS.warning });
 
-    drawText("WEEKLY FINANCIAL CONTEXT & PULSE", 11, true, COLORS.primary);
-    page.drawRectangle({ x: margin, y: y - 120, width: width - margin * 2, height: 120, color: rgb(0.98, 0.98, 1) });
-    const wMetricsY = y - 20;
-    
-    // Left Column: Revenue & Profit
-    page.drawText(`Weekly Gross Revenue: $${wTotalWithTax.toFixed(2)}`, { x: margin + 10, y: wMetricsY, size: 10, font: fontBold });
-    page.drawText(`Weekly Pre-Tax Revenue: $${wTotalBeforeTax.toFixed(2)}`, { x: margin + 10, y: wMetricsY - 15, size: 9, font });
-    page.drawText(`Est. Cost of Goods (COGS): $${wCOGS.toFixed(2)}`, { x: margin + 10, y: wMetricsY - 30, size: 9, font, color: COLORS.warning });
-    page.drawText(`Weekly Gross Profit: $${wGrossProfit.toFixed(2)}`, { x: margin + 10, y: wMetricsY - 45, size: 10, font: fontBold, color: COLORS.highlight });
-    page.drawText(`Weekly Final Net (Pulse): $${wFinalNet.toFixed(2)}`, { x: margin + 10, y: wMetricsY - 70, size: 11, font: fontBold, color: wFinalNet > 0 ? COLORS.highlight : COLORS.warning });
+    y -= 130;
 
-    // Right Column: Grouped Overheads
-    page.drawText(`FIXED OBLIGATIONS: $${wTotalFixed.toFixed(2)}`, { x: width / 2, y: wMetricsY, size: 9, font: fontBold, color: rgb(0.3, 0.3, 0.3) });
-    page.drawText(`(Rent + Salaries)`, { x: width / 2, y: wMetricsY - 10, size: 7, font });
-    
-    page.drawText(`OPERATIONAL COSTS: $${wTotalOperational.toFixed(2)}`, { x: width / 2, y: wMetricsY - 25, size: 9, font: fontBold, color: rgb(0.3, 0.3, 0.3) });
-    page.drawText(`(Utilities + Misc + POS Exp)`, { x: width / 2, y: wMetricsY - 35, size: 7, font });
-
-    page.drawText(`Total Overhead Covered: ${overheadCovered.toFixed(1)}%`, { x: width / 2, y: wMetricsY - 55, size: 10, font: fontBold, color: overheadCovered >= 100 ? COLORS.highlight : COLORS.warning });
-
-    page.drawText(`Overhead Target (Weekly): $${weeklyData.overhead.weekly.toFixed(2)}`, { x: width / 2, y: wMetricsY, size: 9, font });
-    page.drawText(`Coverage Status: ${overheadCovered.toFixed(1)}%`, { x: width / 2, y: wMetricsY - 15, size: 10, font: fontBold, color: overheadCovered >= 100 ? COLORS.highlight : COLORS.warning });
-    
-    // Progress Bar for Overhead
-    const barW = (width - margin * 2) / 2;
-    page.drawRectangle({ x: width / 2, y: wMetricsY - 35, width: barW - 20, height: 10, color: rgb(0.9, 0.9, 0.9) });
-    page.drawRectangle({ x: width / 2, y: wMetricsY - 35, width: (Math.min(100, overheadCovered) / 100) * (barW - 20), height: 10, color: overheadCovered >= 100 ? COLORS.highlight : COLORS.primary });
-
-    y -= 100;
-
-    // Daily Pulse Chart (Simple)
-    drawText("DAILY REVENUE PULSE (MON-SAT)", 11, true, COLORS.info);
-    const chartHeight = 100;
-    const chartWidth = width - margin * 2;
-    page.drawRectangle({ x: margin, y: y - chartHeight - 20, width: chartWidth, height: chartHeight + 20, color: COLORS.chartBg });
+    // Daily Pulse Bar Chart
+    drawText("2. DAILY REVENUE VELOCITY", 11, true, COLORS.info);
+    y -= 10;
+    const chartH = 80;
+    const chartW = width - margin * 2;
+    page.drawRectangle({ x: margin, y: y - chartH - 25, width: chartW, height: chartH + 25, color: COLORS.chartBg, opacity: 0.5 });
     
     const wStart = new Date(startOfWeekUTC(date));
-    const dailyRev: number[] = [];
+    const dRev: number[] = [];
     for (let i = 0; i < 6; i++) {
-      const d = new Date(wStart);
-      d.setUTCDate(d.getUTCDate() + i);
-      const dayStr = d.toISOString().split('T')[0];
-      const dayRev = weeklyData.sales
-        .filter((s: any) => s.date.startsWith(dayStr))
-        .reduce((sum: number, s: any) => sum + Number(s.total_with_tax || 0), 0);
-      dailyRev.push(dayRev);
+        const d = new Date(wStart);
+        d.setUTCDate(d.getUTCDate() + i);
+        const dayStr = d.toISOString().split('T')[0];
+        dRev.push(weeklyData.sales.filter((s: any) => s.date.startsWith(dayStr)).reduce((sum: number, s: any) => sum + Number(s.total_with_tax || 0), 0));
     }
-    const maxRev = Math.max(...dailyRev, 1);
-    const barSpacing = chartWidth / 6;
-    const barActualW = barSpacing * 0.6;
-
-    dailyRev.forEach((rev, i) => {
-      const barH = (rev / maxRev) * chartHeight;
-      const days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-      page.drawRectangle({
-        x: margin + (i * barSpacing) + (barSpacing - barActualW) / 2,
-        y: y - chartHeight - 10,
-        width: barActualW,
-        height: barH,
-        color: COLORS.chartBar
-      });
-      page.drawText(days[i], { x: margin + (i * barSpacing) + barSpacing / 4, y: y - chartHeight - 25, size: 8, font });
-      page.drawText(`$${rev.toFixed(0)}`, { x: margin + (i * barSpacing) + barSpacing / 8, y: y - chartHeight + barH - 5, size: 7, font: fontBold, color: rgb(1, 1, 1) });
+    const maxR = Math.max(...dRev, 1);
+    const bSpc = chartW / 6;
+    dRev.forEach((rev, i) => {
+        const bh = (rev / maxR) * chartH;
+        const dNames = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+        page.drawRectangle({ x: margin + (i * bSpc) + 10, y: y - chartH - 5, width: bSpc - 20, height: bh, color: COLORS.chartBar });
+        page.drawText(dNames[i], { x: margin + (i * bSpc) + 15, y: y - chartH - 20, size: 8, font });
+        page.drawText(`$${rev.toFixed(0)}`, { x: margin + (i * bSpc) + 10, y: y - chartH + bh - 2, size: 6, font, color: rgb(1,1,1) });
     });
-    y -= 150;
+    y -= 140;
+
+    // Peak Activity & Payment Mix
+    drawText("3. OPERATIONAL INSIGHTS", 11, true, rgb(0.1, 0.4, 0.1));
+    y -= 10;
+    page.drawRectangle({ x: margin, y: y - 70, width: width - margin * 2, height: 70, color: rgb(0.95, 1, 0.95) });
+    const insY = y - 20;
+
+    // Peak Hours
+    page.drawText("PEAK SALES PERIODS:", { x: margin + 10, y: insY, size: 9, font: fontBold });
+    weeklyData.peakHours.slice(0, 2).forEach((p: any, i: number) => {
+        const hour = p[0];
+        const ampm = hour >= 12 ? 'PM' : 'AM';
+        const displayHr = hour % 12 || 12;
+        page.drawText(`• ${displayHr}:00 ${ampm} ($${p[1].toFixed(2)})`, { x: margin + 10, y: insY - 15 - (i * 12), size: 8, font });
+    });
+
+    // Payment Mix
+    const pm = weeklyData.paymentMix;
+    const pmTotal = (pm.cashTotal + pm.ecocashTotal + pm.swipeTotal) || 1;
+    page.drawText("PAYMENT METHOD MIX:", { x: width / 2 + 10, y: insY, size: 9, font: fontBold });
+    page.drawText(`• Cash: ${((pm.cashTotal / pmTotal) * 100).toFixed(1)}%`, { x: width / 2 + 10, y: insY - 15, size: 8, font });
+    page.drawText(`• EcoCash: ${((pm.ecocashTotal / pmTotal) * 100).toFixed(1)}%`, { x: width / 2 + 10, y: insY - 27, size: 8, font });
+    
+    // Inventory Value
+    page.drawText(`Total Shop Inventory Value: $${weeklyData.inventoryValue.toFixed(2)}`, { x: margin + 10, y: insY - 45, size: 9, font: fontBold, color: COLORS.primary });
+
+    y -= 90;
+
+    // --- WEEKLY REPORT PAGE 2: EXECUTION & AUDIT ---
+    page = pdf.addPage(pageSize);
+    y = height - margin;
+    drawText("WEEKLY PERFORMANCE SCOREBOARD", 14, true, COLORS.header);
+    y -= 20;
 
     // Staff Scoreboard
-    ensureSpace(120);
-    drawText("STAFF PERFORMANCE SCOREBOARD", 11, true, COLORS.primary);
-    y -= 5;
-    const scoreboard = weeklyData.staffScoreboard;
-    if (scoreboard.length > 0) {
-      page.drawRectangle({ x: margin, y: y - (scoreboard.length * 15 + 10), width: width - margin * 2, height: (scoreboard.length * 15 + 10), color: rgb(0.95, 0.95, 1) });
-      scoreboard.forEach((s: any, i: number) => {
-        const rowY = y - 20 - (i * 15);
-        page.drawText(`${i + 1}. ${s.name}`, { x: margin + 10, y: rowY, size: 9, font: fontBold });
-        page.drawText(`${s.sales} Units`, { x: margin + 150, y: rowY, size: 9, font });
-        page.drawText(`Revenue: $${s.revenue.toFixed(2)}`, { x: width - margin - 120, y: rowY, size: 9, font: fontBold, color: COLORS.highlight });
-      });
-      y -= (scoreboard.length * 15 + 30);
-    } else {
-      drawText("No staff activity data recorded.", 9, false, rgb(0.5, 0.5, 0.5));
-      y -= 20;
-    }
-
-    // Inventory Velocity
-    ensureSpace(140);
-    drawText("INVENTORY VELOCITY (CHAMPIONS & ZOMBIES)", 11, true, COLORS.info);
-    y -= 15;
-    
-    // Champions
-    page.drawText("CHAMPIONS (Top Moving)", { x: margin, y, size: 9, font: fontBold, color: COLORS.highlight });
-    y -= 15;
-    weeklyData.velocity.champions.forEach((c: any) => {
-      page.drawText(`• ${c.name}`, { x: margin + 10, y, size: 8, font });
-      page.drawText(`${c.qty} sold`, { x: margin + 180, y, size: 8, font: fontBold });
-      y -= 12;
+    drawText("STAFF PERFORMANCE RANKING", 11, true, COLORS.primary);
+    y -= 10;
+    weeklyData.staffScoreboard.forEach((s: any, i: number) => {
+        ensureSpace(40);
+        page.drawRectangle({ x: margin, y: y - 25, width: width - margin * 2, height: 25, color: i % 2 === 0 ? rgb(0.97, 0.97, 1) : rgb(1,1,1) });
+        page.drawText(`${i + 1}. ${s.name}`, { x: margin + 10, y: y - 18, size: 10, font: fontBold });
+        page.drawText(`${s.sales} units sold`, { x: margin + 180, y: y - 18, size: 9, font });
+        page.drawText(`$${s.revenue.toFixed(2)}`, { x: width - margin - 80, y: y - 18, size: 10, font: fontBold, color: COLORS.highlight });
+        y -= 30;
     });
 
-    // Zombies
-    y -= 5;
-    page.drawText("ZOMBIES (Stagnant Stock)", { x: margin, y, size: 9, font: fontBold, color: COLORS.warning });
     y -= 15;
+    drawText("INVENTORY VELOCITY", 11, true, COLORS.info);
+    y -= 10;
+    
+    // Champions & Zombies
+    page.drawRectangle({ x: margin, y: y - 100, width: width - margin * 2, height: 100, color: rgb(0.97, 1, 0.97) });
+    const velY = y - 20;
+    page.drawText("CHAMPIONS (Top Moving)", { x: margin + 10, y: velY, size: 9, font: fontBold, color: COLORS.highlight });
+    weeklyData.velocity.champions.forEach((c: any, i: number) => {
+        page.drawText(`• ${c.name} (${c.qty} sold)`, { x: margin + 15, y: velY - 15 - (i * 12), size: 8, font });
+    });
+
+    page.drawText("ZOMBIES (Stagnant Stock)", { x: width / 2 + 10, y: velY, size: 9, font: fontBold, color: COLORS.warning });
     if (weeklyData.velocity.zombies.length > 0) {
-      weeklyData.velocity.zombies.forEach((z: any) => {
-        page.drawText(`• ${z.name} (${z.category || 'Misc'})`, { x: margin + 10, y, size: 8, font });
-        page.drawText(`0 movement`, { x: margin + 180, y, size: 8, font, color: rgb(0.5, 0.5, 0.5) });
-        y -= 12;
-      });
+        weeklyData.velocity.zombies.forEach((z: any, i: number) => {
+            page.drawText(`• ${z.name}`, { x: width / 2 + 15, y: velY - 15 - (i * 12), size: 8, font });
+        });
     } else {
-      page.drawText("No stagnant stock detected this week.", { x: margin + 10, y, size: 8, font, color: COLORS.highlight });
-      y -= 12;
+        page.drawText("No stagnant stock detected.", { x: width / 2 + 15, y: velY - 15, size: 8, font });
     }
-    y -= 20;
+    y -= 120;
 
     // POS Audit Summary
     drawText("POS AUDIT & INTEGRITY CHECK", 11, true, COLORS.warning);
-    y -= 5;
-    weeklyData.audit.forEach((a: any) => {
-      ensureSpace(40);
-      const status = Math.abs(a.variance) > 1 ? "FAILED" : "PASSED";
-      const color = status === "FAILED" ? COLORS.warning : COLORS.highlight;
-      page.drawText(`${a.day}:`, { x: margin, y, size: 9, font: fontBold });
-      page.drawText(`Variance: $${a.variance.toFixed(2)}`, { x: margin + 80, y, size: 9, font, color: a.variance < 0 ? COLORS.warning : a.variance > 0 ? COLORS.highlight : rgb(0.4, 0.4, 0.4) });
-      page.drawText(`Status: ${status}`, { x: width - margin - 80, y, size: 9, font: fontBold, color });
-      y -= 12;
-      if (a.flags.length > 0) {
-        a.flags.slice(0, 1).forEach((f: any) => {
-          page.drawText(`  ! ${f.message}`, { x: margin + 10, y, size: 7, font, color: rgb(0.5, 0.5, 0.5) });
-          y -= 10;
-        });
-      }
-    });
     y -= 10;
+    weeklyData.audit.forEach((a: any) => {
+        ensureSpace(40);
+        const status = Math.abs(a.variance) > 1 ? "FAILED" : "PASSED";
+        page.drawText(`${a.day}:`, { x: margin + 10, y, size: 9, font: fontBold });
+        page.drawText(`Variance: $${a.variance.toFixed(2)}`, { x: margin + 90, y, size: 9, font, color: a.variance < 0 ? COLORS.warning : a.variance > 0 ? COLORS.highlight : rgb(0.4, 0.4, 0.4) });
+        page.drawText(`Status: ${status}`, { x: width - margin - 80, y, size: 9, font: fontBold, color: status === "FAILED" ? COLORS.warning : COLORS.highlight });
+        y -= 15;
+    });
 
-    // Weekly Transaction Log
-    ensureSpace(120);
-    drawText("WEEKLY TRANSACTION LOG (HIGHLIGHTS)", 11, true, COLORS.primary);
+    // --- WEEKLY REPORT PAGE 3: LOGS ---
+    page = pdf.addPage(pageSize);
+    y = height - margin;
+    drawText("WEEKLY ACTIVITY LOGS", 14, true, COLORS.header);
+    y -= 20;
+
+    drawText("TRANSACTION HIGHLIGHTS", 11, true, COLORS.primary);
     y -= 5;
     page.drawLine({ start: { x: margin, y }, end: { x: width - margin, y }, thickness: 1, color: rgb(0.8, 0.8, 0.8) });
     y -= 15;
     
-    // Sort by date descending
-    const sortedWSales = [...weeklyData.sales].sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime());
-    sortedWSales.slice(0, 40).forEach((s: any) => {
-      ensureSpace(40);
-      const d = new Date(s.date);
-      const dayName = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][d.getUTCDay()];
-      page.drawText(`${dayName} ${d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} - ${s.item_name} x${s.quantity}`, { x: margin, y, size: 7, font });
-      page.drawText(`$${Number(s.total_with_tax).toFixed(2)}`, { x: width - margin - 50, y, size: 7, font });
-      y -= 9;
-    });
-    if (sortedWSales.length > 40) drawText(`...and ${sortedWSales.length - 40} more transactions this week.`, 7, false, rgb(0.4, 0.4, 0.4));
-    y -= 10;
-
-    // Weekly Expense Log
-    ensureSpace(120);
-    drawText("WEEKLY EXPENSE LOG", 11, true, rgb(0.8, 0, 0));
-    y -= 5;
-    const wPosExpenses = weeklyData.ledger.filter((l: any) => l.category === 'POS Expense').sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime());
-    wPosExpenses.forEach((e: any) => {
-      ensureSpace(40);
-      const d = new Date(e.date);
-      const dayName = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][d.getUTCDay()];
-      const desc = String(e.description || e.category || 'Expense');
-      page.drawText(`${dayName} ${d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} - ${desc}`, { x: margin, y, size: 7, font });
-      page.drawText(`-$${Number(e.amount || 0).toFixed(2)}`, { x: width - margin - 50, y, size: 7, font, color: COLORS.warning });
-      y -= 9;
+    [...weeklyData.sales].sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime()).slice(0, 50).forEach((s: any) => {
+        ensureSpace(30);
+        const d = new Date(s.date);
+        const day = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][d.getUTCDay()];
+        page.drawText(`${day} ${d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`, { x: margin + 5, y, size: 7, font });
+        page.drawText(`${s.item_name} x${s.quantity}`, { x: margin + 80, y, size: 7, font, maxWidth: 200 });
+        page.drawText(`$${Number(s.total_with_tax).toFixed(2)}`, { x: width - margin - 50, y, size: 7, font: fontBold });
+        y -= 10;
     });
 
-    // Oracle Strategic Dialogue (NEW PAGE)
+    // --- WEEKLY REPORT PAGE 4+: ORACLE DIALOGUE ---
     page = pdf.addPage(pageSize);
     y = height - margin;
 
@@ -625,7 +637,7 @@ export async function GET(req: Request) {
       questions.push(`Wait, if our weekly rent obligation is $${weeklyData.overhead.fixed.toFixed(2)} and we only cleared $${wNet.toFixed(2)} total profit this week, how many weeks of runway do we have left at this rate?`);
     } else if (overheadCovered < 100) {
       dialogue.push("We are at the breakeven point. Operations are covering themselves, but there is no growth capital being generated.");
-      const bestDayIndex = dailyRev.indexOf(Math.max(...dailyRev));
+      const bestDayIndex = dRev.indexOf(Math.max(...dRev));
       const days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
       questions.push(`I noticed our best day was ${days[bestDayIndex]}—did we do something differently that day that we can turn into a standard operating procedure?`);
     } else {
