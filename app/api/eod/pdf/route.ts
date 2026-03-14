@@ -97,11 +97,11 @@ export async function GET(req: Request) {
 
     // Parallel Fetching
     const [salesRes, ledgerRes, lowStockRes, allInventoryRes, thirtyDaySalesRes, sevenDaySalesRes] = await Promise.all([
-      supabaseAdmin.from("sales").select("*").eq("shop_id", shopId).gte("date", since).lte("date", until),
+      supabaseAdmin.from("sales").select("id, total_with_tax, total_before_tax, tax, discount_applied, payment_method, date, item_name, quantity").eq("shop_id", shopId).gte("date", since).lte("date", until),
       supabaseAdmin.from("ledger_entries").select("id,category,amount,date,description,employee_id").eq("shop_id", shopId).gte("date", since).lte("date", until),
       supabaseAdmin.from("inventory_allocations").select("item_id, quantity").eq("shop_id", shopId).lte("quantity", 5).order("quantity", { ascending: true }).limit(15),
-      supabaseAdmin.from("inventory_items").select("id, name, category, landed_cost, price"),
-      supabaseAdmin.from("sales").select("item_id, quantity").eq("shop_id", shopId).gte("date", new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()),
+      supabaseAdmin.from("inventory_items").select("id, name, category, landed_cost, price").limit(1000),
+      supabaseAdmin.from("sales").select("item_id, quantity").eq("shop_id", shopId).gte("date", new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()).limit(2000),
       supabaseAdmin.from("sales").select("item_name, total_with_tax, date").eq("shop_id", shopId).gte("date", since7).lte("date", until),
     ]);
 
@@ -121,11 +121,11 @@ export async function GET(req: Request) {
       const weekStart = startOfWeekUTC(date);
       const monthStart = new Date(todayDate.getUTCFullYear(), todayDate.getUTCMonth(), 1).toISOString();
       const [wSalesRes, wLedgerRes, shopRes, settingsRes, mtdSalesRes] = await Promise.all([
-        supabaseAdmin.from("sales").select("*").eq("shop_id", shopId).gte("date", weekStart).lte("date", until).catch(() => ({ data: [] })),
+        supabaseAdmin.from("sales").select("id, total_with_tax, total_before_tax, tax, discount_applied, landed_cost, quantity, item_id, item_name, date, payment_method, category, seller_name, employee_name, employee_id").eq("shop_id", shopId).gte("date", weekStart).lte("date", until).catch(() => ({ data: [] })),
         supabaseAdmin.from("ledger_entries").select("*").eq("shop_id", shopId).gte("date", weekStart).lte("date", until).catch(() => ({ data: [] })),
         supabaseAdmin.from("shops").select("*").eq("id", shopId).single().catch(() => ({ data: null })),
         supabaseAdmin.from("oracle_settings").select("*").single().catch(() => ({ data: null })),
-        supabaseAdmin.from("sales").select("total_with_tax").eq("shop_id", shopId).gte("date", monthStart).lte("date", until).catch(() => ({ data: [] })),
+        supabaseAdmin.from("sales").select("total_with_tax").eq("shop_id", shopId).gte("date", monthStart).lte("date", until).limit(3000).catch(() => ({ data: [] })),
       ]);
 
       const wSales = wSalesRes.data || [];
@@ -291,7 +291,7 @@ export async function GET(req: Request) {
       categoryContribution,
       basket: { avgValue: avgBasketValue, avgSize: avgBasketSize, txCount: totalTransactions },
       mtd: { revenue: mtdRevenue, progress: mtdProgress },
-      overheadCovered: (weeklyOverhead > 0) ? (wNet / weeklyOverhead) * 100 : 0
+      overheadCovered: (weeklyOverhead > 0) ? (Number(wNet || 0) / weeklyOverhead) * 100 : 0
     };
   }
 
@@ -394,19 +394,19 @@ export async function GET(req: Request) {
     drawText("FINANCIAL SUMMARY", 11, true, rgb(0.1, 0.5, 0.3));
     page.drawRectangle({ x: margin, y: y - 105, width: width - margin * 2, height: 105, color: rgb(0.97, 0.98, 1) });
     const metricsY = y - 20;
-    page.drawText(`Total Sales (Inc Tax): $${totalWithTax.toFixed(2)}`, { x: margin + 10, y: metricsY, size: 10, font: fontBold });
-    page.drawText(`Total Sales (Pre Tax): $${totalBeforeTax.toFixed(2)}`, { x: margin + 10, y: metricsY - 15, size: 9, font });
-    page.drawText(`Total Tax: $${totalTax.toFixed(2)}`, { x: margin + 10, y: metricsY - 30, size: 9, font });
-    page.drawText(`Discounts: -$${totalDiscount.toFixed(2)}`, { x: margin + 10, y: metricsY - 45, size: 9, font, color: rgb(0.8, 0, 0) });
-    page.drawText(`POS Expenses: -$${totalPosExpenses.toFixed(2)}`, { x: margin + 10, y: metricsY - 60, size: 9, font, color: rgb(0.8, 0, 0) });
-    page.drawText(`Net Revenue: $${(totalWithTax - totalPosExpenses).toFixed(2)}`, { x: margin + 10, y: metricsY - 78, size: 11, font: fontBold, color: rgb(0, 0.4, 0.1) });
+    page.drawText(`Total Sales (Inc Tax): $${Number(totalWithTax || 0).toFixed(2)}`, { x: margin + 10, y: metricsY, size: 10, font: fontBold });
+    page.drawText(`Total Sales (Pre Tax): $${Number(totalBeforeTax || 0).toFixed(2)}`, { x: margin + 10, y: metricsY - 15, size: 9, font });
+    page.drawText(`Total Tax: $${Number(totalTax || 0).toFixed(2)}`, { x: margin + 10, y: metricsY - 30, size: 9, font });
+    page.drawText(`Discounts: -$${Number(totalDiscount || 0).toFixed(2)}`, { x: margin + 10, y: metricsY - 45, size: 9, font, color: rgb(0.8, 0, 0) });
+    page.drawText(`POS Expenses: -$${Number(totalPosExpenses || 0).toFixed(2)}`, { x: margin + 10, y: metricsY - 60, size: 9, font, color: rgb(0.8, 0, 0) });
+    page.drawText(`Net Revenue: $${Number((totalWithTax || 0) - (totalPosExpenses || 0)).toFixed(2)}`, { x: margin + 10, y: metricsY - 78, size: 11, font: fontBold, color: rgb(0, 0.4, 0.1) });
 
-    page.drawText(`Cash: $${totalCashSales.toFixed(2)}`, { x: width / 2, y: metricsY, size: 10, font });
-    page.drawText(`EcoCash: $${totalEcocash.toFixed(2)}`, { x: width / 2, y: metricsY - 15, size: 10, font });
-    page.drawText(`Lay-by Collected: $${laybyCash.toFixed(2)}`, { x: width / 2, y: metricsY - 30, size: 10, font });
-    page.drawText(`Opening Drawer: $${openingCash.toFixed(2)}`, { x: width / 2, y: metricsY - 45, size: 9, font });
-    page.drawText(`Adj (Net): $${adjustmentNet.toFixed(2)}`, { x: width / 2, y: metricsY - 60, size: 9, font });
-    page.drawText(`Closing Est.: $${closingCashEstimate.toFixed(2)}`, { x: width / 2, y: metricsY - 75, size: 9, font: fontBold });
+    page.drawText(`Cash: $${Number(totalCashSales || 0).toFixed(2)}`, { x: width / 2, y: metricsY, size: 10, font });
+    page.drawText(`EcoCash: $${Number(totalEcocash || 0).toFixed(2)}`, { x: width / 2, y: metricsY - 15, size: 10, font });
+    page.drawText(`Lay-by Collected: $${Number(laybyCash || 0).toFixed(2)}`, { x: width / 2, y: metricsY - 30, size: 10, font });
+    page.drawText(`Opening Drawer: $${Number(openingCash || 0).toFixed(2)}`, { x: width / 2, y: metricsY - 45, size: 9, font });
+    page.drawText(`Adj (Net): $${Number(adjustmentNet || 0).toFixed(2)}`, { x: width / 2, y: metricsY - 60, size: 9, font });
+    page.drawText(`Closing Est.: $${Number(closingCashEstimate || 0).toFixed(2)}`, { x: width / 2, y: metricsY - 75, size: 9, font: fontBold });
     y -= 115;
 
     // Stock Intelligence
@@ -511,16 +511,16 @@ export async function GET(req: Request) {
           const metY = y - 20;
 
           page.drawText(`Weekly Gross Revenue:`, { x: margin + 10, y: metY, size: 9, font });
-          page.drawText(`$${totals.withTax.toFixed(2)}`, { x: margin + 110, y: metY, size: 9, font: fontBold });
+          page.drawText(`$${Number(totals.withTax || 0).toFixed(2)}`, { x: margin + 110, y: metY, size: 9, font: fontBold });
           page.drawText(`Tax Obligation:`, { x: margin + 10, y: metY - 15, size: 9, font });
-          page.drawText(`$${totals.tax.toFixed(2)}`, { x: margin + 110, y: metY - 15, size: 9, font });
+          page.drawText(`$${Number(totals.tax || 0).toFixed(2)}`, { x: margin + 110, y: metY - 15, size: 9, font });
           page.drawText(`Total Discounts:`, { x: margin + 10, y: metY - 30, size: 9, font });
-          page.drawText(`$${totals.discount.toFixed(2)}`, { x: margin + 110, y: metY - 30, size: 9, font, color: COLORS.warning });
+          page.drawText(`$${Number(totals.discount || 0).toFixed(2)}`, { x: margin + 110, y: metY - 30, size: 9, font, color: COLORS.warning });
           page.drawText(`Est. Gross Profit:`, { x: margin + 10, y: metY - 45, size: 9, font });
-          page.drawText(`$${wGrossProfit.toFixed(2)}`, { x: margin + 110, y: metY - 45, size: 9, font: fontBold, color: COLORS.highlight });
+          page.drawText(`$${Number(wGrossProfit || 0).toFixed(2)}`, { x: margin + 110, y: metY - 45, size: 9, font: fontBold, color: COLORS.highlight });
 
           page.drawText(`FINAL NET PULSE:`, { x: margin + 10, y: metY - 80, size: 10, font: fontBold });
-          page.drawText(`$${wFinalNet.toFixed(2)}`, { x: margin + 110, y: metY - 80, size: 11, font: fontBold, color: wFinalNet > 0 ? COLORS.highlight : COLORS.warning });
+          page.drawText(`$${Number(wFinalNet || 0).toFixed(2)}`, { x: margin + 110, y: metY - 80, size: 11, font: fontBold, color: (Number(wFinalNet || 0) > 0) ? COLORS.highlight : COLORS.warning });
 
           // Right side: Coverage & MTD
           const overCov = weeklyData.overheadCovered || 0;
@@ -530,7 +530,7 @@ export async function GET(req: Request) {
           const mtdRev = weeklyData.mtd?.revenue || 0;
           const mtdProg = weeklyData.mtd?.progress || 0;
           page.drawText(`MTD Progress:`, { x: width / 2 + 10, y: metY - 20, size: 9, font });
-          page.drawText(`$${mtdRev.toFixed(0)}`, { x: width / 2 + 105, y: metY - 20, size: 9, font: fontBold });
+          page.drawText(`$${Number(mtdRev || 0).toFixed(0)}`, { x: width / 2 + 105, y: metY - 20, size: 9, font: fontBold });
           
           const barW = 80;
           page.drawRectangle({ x: width / 2 + 10, y: metY - 35, width: barW, height: 6, color: rgb(0.9, 0.9, 0.9) });
@@ -592,7 +592,7 @@ export async function GET(req: Request) {
             page.drawRectangle({ x: margin, y: y - 22, width: width - margin * 2, height: 22, color: i % 2 === 0 ? rgb(0.97, 0.97, 1) : rgb(1, 1, 1) });
             page.drawText(`${i + 1}. ${s.name}`, { x: margin + 10, y: y - 16, size: 9, font: fontBold });
             page.drawText(`${s.sales} units`, { x: margin + 180, y: y - 16, size: 8, font });
-            page.drawText(`$${s.revenue.toFixed(2)}`, { x: width - margin - 80, y: y - 16, size: 9, font: fontBold, color: COLORS.highlight });
+            page.drawText(`$${Number(s.revenue || 0).toFixed(2)}`, { x: width - margin - 80, y: y - 16, size: 9, font: fontBold, color: COLORS.highlight });
             y -= 25;
           });
 
@@ -603,8 +603,8 @@ export async function GET(req: Request) {
             ensureSpace(25);
             page.drawRectangle({ x: margin, y: y - 20, width: width - margin * 2, height: 20, color: i % 2 === 0 ? rgb(0.98, 0.98, 1) : rgb(1, 1, 1) });
             page.drawText(c.name, { x: margin + 10, y: y - 13, size: 9, font });
-            page.drawText(`$${c.revenue.toFixed(2)}`, { x: margin + 180, y: y - 13, size: 9, font });
-            page.drawText(`Profit: $${c.profit.toFixed(2)}`, { x: width - margin - 100, y: y - 13, size: 9, font: fontBold, color: COLORS.highlight });
+            page.drawText(`$${Number(c.revenue || 0).toFixed(2)}`, { x: margin + 180, y: y - 13, size: 9, font });
+            page.drawText(`Profit: $${Number(c.profit || 0).toFixed(2)}`, { x: width - margin - 100, y: y - 13, size: 9, font: fontBold, color: COLORS.highlight });
             y -= 20;
           });
           } catch (err) { console.error("Page 2 fail:", err); }
@@ -628,9 +628,9 @@ export async function GET(req: Request) {
           y -= 10;
           weeklyData.audit.forEach((a: any) => {
             ensureSpace(30);
-            const status = Math.abs(a.variance) > 5 ? "ACTION REQ" : "PASSED";
+            const status = Math.abs(Number(a.variance || 0)) > 5 ? "ACTION REQ" : "PASSED";
             page.drawText(`${a.day}:`, { x: margin, y, size: 9, font: fontBold });
-            page.drawText(`Var: $${a.variance.toFixed(2)}`, { x: margin + 90, y, size: 9, font, color: a.variance < 0 ? COLORS.warning : COLORS.highlight });
+            page.drawText(`Var: $${Number(a.variance || 0).toFixed(2)}`, { x: margin + 90, y, size: 9, font, color: (Number(a.variance || 0) < 0) ? COLORS.warning : COLORS.highlight });
             page.drawText(`Status: ${status}`, { x: width - margin - 80, y, size: 9, font: fontBold, color: status === "PASSED" ? COLORS.highlight : COLORS.warning });
             y -= 15;
           });
@@ -651,25 +651,25 @@ export async function GET(req: Request) {
           const overCov = weeklyData.overheadCovered || 0;
           const totalVar = weeklyData.audit.reduce((s: number, a: any) => s + a.variance, 0);
 
-          const r1 = Math.abs(totalVar) > 50 ? COLORS.warning : COLORS.highlight;
+          const r1 = Math.abs(Number(totalVar || 0)) > 50 ? COLORS.warning : COLORS.highlight;
           page.drawCircle({ x: margin + 15, y: y - 15, size: 5, color: r1 });
-          page.drawText(`CASH INTEGRITY: ${Math.abs(totalVar) > 50 ? 'HIGH RISK' : 'HEALTHY'} ($${totalVar.toFixed(2)})`, { x: margin + 28, y: y - 18, size: 9, font });
+          page.drawText(`CASH INTEGRITY: ${Math.abs(Number(totalVar || 0)) > 50 ? 'HIGH RISK' : 'HEALTHY'} ($${Number(totalVar || 0).toFixed(2)})`, { x: margin + 28, y: y - 18, size: 9, font });
 
           const r2 = restockItems.length > 5 ? COLORS.warning : COLORS.highlight;
           page.drawCircle({ x: margin + 15, y: y - 32, size: 5, color: r2 });
           page.drawText(`STOCK SECURITY: ${restockItems.length > 5 ? 'ACTION REQ' : 'STABLE'} (${restockItems.length} items low)`, { x: margin + 28, y: y - 35, size: 9, font });
 
-          const r3 = overCov < 100 ? COLORS.warning : COLORS.highlight;
+          const r3 = Number(overCov || 0) < 100 ? COLORS.warning : COLORS.highlight;
           page.drawCircle({ x: margin + 15, y: y - 49, size: 5, color: r3 });
-          page.drawText(`RUNWAY HEALTH: ${overCov < 100 ? 'CONSTRAINED' : 'STRONG'} (${overCov.toFixed(0)}% cov)`, { x: margin + 28, y: y - 52, size: 9, font });
+          page.drawText(`RUNWAY HEALTH: ${Number(overCov || 0) < 100 ? 'CONSTRAINED' : 'STRONG'} (${Number(overCov || 0).toFixed(0)}% cov)`, { x: margin + 28, y: y - 52, size: 9, font });
 
           y -= 85; 
           drawText("CUSTOMER BASKET INTELLIGENCE", 11, true, COLORS.info);
           const basket = weeklyData.basket || { avgValue: 0, avgSize: 0 };
           y -= 5;
           page.drawRectangle({ x: margin, y: y - 50, width: width - margin * 2, height: 50, color: rgb(1,1,0.95) });
-          page.drawText(`Avg. Basket Value: $${basket.avgValue.toFixed(2)}`, { x: margin+15, y: y-20, size: 10, font: fontBold });
-          page.drawText(`Items per Sale: ${basket.avgSize.toFixed(1)} items`, { x: margin+15, y: y-35, size: 9, font });
+          page.drawText(`Avg. Basket Value: $${Number(basket.avgValue || 0).toFixed(2)}`, { x: margin+15, y: y-20, size: 10, font: fontBold });
+          page.drawText(`Items per Sale: ${Number(basket.avgSize || 0).toFixed(1)} items`, { x: margin+15, y: y-35, size: 9, font });
           page.drawText(`*Strategic Tip: Target categories with high net margins to offset low basket size.*`, { x: margin+15, y: y-46, size: 7, font: fontItalic, color: rgb(0.4,0.4,0.4)});
           
           y -= 70;
@@ -717,7 +717,7 @@ export async function GET(req: Request) {
           drawText("NEXT WEEK TARGETS", 12, true, COLORS.primary);
           page.drawRectangle({ x: margin, y: y - 60, width: width - margin * 2, height: 60, color: rgb(0.95, 1, 0.95) });
           page.drawText(`5% Growth Revenue Target:`, { x: margin + 10, y: y - 25, size: 10, font });
-          page.drawText(`$${growthTarget.toFixed(2)}`, { x: width - margin - 110, y: y - 25, size: 12, font: fontBold, color: COLORS.highlight });
+          page.drawText(`$${Number(growthTarget || 0).toFixed(2)}`, { x: width - margin - 110, y: y - 25, size: 12, font: fontBold, color: COLORS.highlight });
           
           const unitMargin = (totals.withTax / (weeklyData.sales.length || 1)) - (totals.cogs / (weeklyData.sales.length || 1));
           const breakEvenUnits = Math.ceil(overhead.weekly / (unitMargin || 1));
