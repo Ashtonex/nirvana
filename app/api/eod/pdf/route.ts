@@ -491,9 +491,9 @@ export async function GET(req: Request) {
       try {
         const totals = weeklyData.totals || { withTax: 0, beforeTax: 0, tax: 0, discount: 0, cogs: 0, posExpenses: 0 };
         const overhead = weeklyData.overhead || { fixed: 0, weekly: 0, operational: 0, rent: 0, salaries: 0, utilities: 0, misc: 0 };
-        const wNet = totals.withTax - totals.posExpenses;
-        const wGrossProfit = totals.beforeTax - totals.cogs;
-        const wFinalNet = wGrossProfit - overhead.fixed - (overhead.operational - totals.posExpenses);
+        const wNet = Number(totals.withTax || 0) - Number(totals.posExpenses || 0);
+        const wGrossProfit = Number(totals.beforeTax || 0) - Number(totals.cogs || 0);
+        const wFinalNet = wGrossProfit - Number(overhead.fixed || 0) - (Number(overhead.operational || 0) - Number(totals.posExpenses || 0));
 
         // --- PAGE 1: STRATEGIC COMMAND ---
         {
@@ -649,7 +649,7 @@ export async function GET(req: Request) {
           y -= 5;
           page.drawRectangle({ x: margin, y: y - 65, width: width - margin * 2, height: 65, color: rgb(0.98,0.98,1), borderColor: rgb(0.9,0.9,0.95), borderWidth: 1 });
           const overCov = weeklyData.overheadCovered || 0;
-          const totalVar = weeklyData.audit.reduce((s: number, a: any) => s + a.variance, 0);
+          const totalVar = weeklyData.audit.reduce((s: number, a: any) => s + Number(a.variance || 0), 0);
 
           const r1 = Math.abs(Number(totalVar || 0)) > 50 ? COLORS.warning : COLORS.highlight;
           page.drawCircle({ x: margin + 15, y: y - 15, size: 5, color: r1 });
