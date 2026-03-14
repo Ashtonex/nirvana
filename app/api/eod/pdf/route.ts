@@ -116,6 +116,7 @@ export async function GET(req: Request) {
     const isSaturday = todayDate.getUTCDay() === 6;
     const isWeekly = isSaturday || url.searchParams.get("weekly") === "true";
 
+    const daysArr = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
     let weeklyData: any = null;
     if (isWeekly) {
       const weekStart = startOfWeekUTC(date);
@@ -176,8 +177,7 @@ export async function GET(req: Request) {
       const operationalCosts = ((utilities + misc) / 4) + wPosExpenses;
 
       // Perform audit for each day Mon-Sat
-      const days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-      const auditPromises = days.map(async (dayName, i) => {
+      const auditPromises = daysArr.map(async (dayName, i) => {
         const d = new Date(weekStart);
         d.setUTCDate(d.getUTCDate() + i);
         const dayStr = d.toISOString().split('T')[0];
@@ -281,6 +281,27 @@ export async function GET(req: Request) {
     const avgBasketValue = wSalesTotalWithTax / totalTransactions;
     const avgBasketSize = wSales.reduce((sum: number, s: any) => sum + Number(s.quantity || 0), 0) / totalTransactions;
 
+    // Tabular Data Preparation (Mon-Sat)
+    const salesByDay = new Map<string, any[]>();
+    const expensesByDay = new Map<string, any[]>();
+    daysArr.forEach(dName => {
+      salesByDay.set(dName, []);
+      expensesByDay.set(dName, []);
+    });
+
+    wSales.forEach((s: any) => {
+      const d = new Date(s.date);
+      const dayIdx = d.getUTCDay(); // 0 Sun, 1 Mon...
+      const dName = daysArr[dayIdx === 0 ? 5 : dayIdx - 1] || "Saturday";
+      salesByDay.get(dName)?.push(s);
+    });
+    wLedger.forEach((l: any) => {
+      const d = new Date(l.date);
+      const dayIdx = d.getUTCDay();
+      const dName = daysArr[dayIdx === 0 ? 5 : dayIdx - 1] || "Saturday";
+      expensesByDay.get(dName)?.push(l);
+    });
+
     // Month-to-Date Progress
     const mtdRevenue = mtdSales.reduce((sum: number, s: any) => sum + Number(s.total_with_tax || 0), 0);
     const mtdProgress = monthlyOverhead > 0 ? (mtdRevenue / monthlyOverhead) * 100 : 0;
@@ -308,7 +329,9 @@ export async function GET(req: Request) {
       categoryContribution,
       basket: { avgValue: avgBasketValue, avgSize: avgBasketSize, txCount: totalTransactions },
       mtd: { revenue: mtdRevenue, progress: mtdProgress },
-      overheadCovered: (weeklyOverhead > 0) ? (Number(wNet || 0) / weeklyOverhead) * 100 : 0
+      overheadCovered: (weeklyOverhead > 0) ? (Number(wNet || 0) / weeklyOverhead) * 100 : 0,
+      salesByDay,
+      expensesByDay
     };
   }
 
@@ -393,6 +416,29 @@ export async function GET(req: Request) {
     const drawText = (text: string, size = 10, bold = false, color = rgb(0.1, 0.1, 0.1)) => {
       page.drawText(text, { x: margin, y, size, font: bold ? fontBold : font, color });
       y -= size + 6;
+    };
+
+    const drawDonut = (centerX: number, centerY: number, radius: number, data: { value: number, color: any }[]) => {
+      const innerRadius = radius * 0.6;
+      const total = data.reduce((s, d) => s + d.value, 0);
+      if (total <= 0) return;
+      
+      let currentX = centerX - radius;
+      // Since pdf-lib doesn't have easy arc drawing, we use a "stacked bar" donut representing percentages
+      // Actually, for a "wow factor", I'll use simple concentric rectangles or a very colorful legend-based bar if arcs are too complex.
+      // But let's try a 10-step polygon approximation for a circle if we really want a "pie".
+      // For now, to be safe and clean, a "Horizontal Donut" (Stacked bar with rounded edges) is very modern.
+      const barW = 120;
+      const barH = 12;
+      page.drawRectangle({ x: centerX - barW/2, y: centerY - barH/2, width: barW, height: barH, color: rgb(0.9,0.9,0.9) });
+      let curX = centerX - barW/2;
+      data.forEach(d => {
+        const sw = (d.value / total) * barW;
+        if (sw > 1) {
+          page.drawRectangle({ x: curX, y: centerY - barH/2, width: sw, height: barH, color: d.color });
+          curX += sw;
+        }
+      });
     };
 
     const ensureSpace = (minY = 60) => {
@@ -590,7 +636,12 @@ export async function GET(req: Request) {
             page.drawRectangle({ x: margin + (i * bSpc) + 10, y: y - chartH - 5, width: bSpc - 20, height: bh, color: COLORS.chartBar });
             page.drawText(dNames[i], { x: margin + (i * bSpc) + 15, y: y - chartH - 20, size: 8, font });
           });
+          
           y -= 140;
+          const topDayIdx = dRev.indexOf(Math.max(...dRev));
+          const avgRev = dRev.reduce((s, r) => s + r, 0) / 6;
+          drawText(`Velocity Insight: Peak performance on ${daysArr[topDayIdx]}. Avg Daily Pulse: $${avgRev.toFixed(0)}.`, 8, true, COLORS.primary);
+          y -= 5;
         } catch (err) { console.error("Page 1 fail:", err); }
         }
 
@@ -624,6 +675,14 @@ export async function GET(req: Request) {
             page.drawText(`Profit: $${Number(c.profit || 0).toFixed(2)}`, { x: width - margin - 100, y: y - 13, size: 9, font: fontBold, color: COLORS.highlight });
             y -= 20;
           });
+
+          y -= 20;
+          const mixData = weeklyData.categoryContribution.slice(0, 4).map((c: any, i: number) => {
+            const colors = [COLORS.primary, COLORS.info, COLORS.oracle, COLORS.highlight];
+            return { value: c.revenue, color: colors[i] || COLORS.chartBar };
+          });
+          drawDonut(width - margin - 70, y + 50, 25, mixData);
+          page.drawText("Category Mix", { x: width - margin - 100, y: y + 20, size: 7, font: fontItalic });
           } catch (err) { console.error("Page 2 fail:", err); }
         }
 
@@ -695,54 +754,142 @@ export async function GET(req: Request) {
           const questions: string[] = [];
           if (overCov < 80) {
             dialogue.push("Critical performance gap detected. Expenses are significantly outpacing net revenue.");
+            dialogue.push("Warning: Survival threshold is currently under pressure. Immediate cost optimization suggested.");
             questions.push("Which specific overhead item (Rent/Staff/Utilities) is the most flexible if we need to cut down next week?");
+            questions.push("Are there stock items tying up too much cash that could be liquidated in a flash sale?");
+            questions.push("Is the current staffing level optimized for the low-activity hours discovered in the velocity analysis?");
           } else {
             dialogue.push("Stable operations. The shop is maintaining healthy breakeven or profit margins.");
+            dialogue.push("Growth Opportunity: Cash pulse is strong enough to support strategic reinvestment.");
             questions.push("With current surplus, should we invest in a 'Clearance Weekend' for stagnant stock or restock the champions?");
+            questions.push("Can we expand the inventory in our top-performing categories to capture more market share?");
+            questions.push("Should we consider a loyalty program for the top-tier customers contributing to the current success?");
           }
+          dialogue.push("Audit Alert: Daily cash variances need tighter reconciliation to ensure zero leakage.");
+          questions.push("How can we ensure staff are recording every discount into the system to keep tax obligations accurate?");
+          
           dialogue.forEach(d => { drawText(`DIAGNOSTIC: ${d}`, 9, false, rgb(0.2,0.2,0.3)); y -= 5; });
+          y -= 10;
+          drawText("STRATEGIC QUESTIONS FOR THE OWNER:", 10, true, COLORS.oracle);
           questions.forEach(q => { drawText(`? ${q}`, 10, true); y -= 5; });
           } catch (err) { console.error("Page 4 fail:", err); }
         }
 
-        // --- PAGE 5: ACTIVITY LOGS ---
+        // --- PAGE 5: WEEKLY ACTIVITY LOG (TABULAR) ---
         {
           try {
-          page = pdf.addPage(pageSize);
-          y = height - margin;
-          drawText("WEEKLY ACTIVITY LOGS", 15, true, COLORS.header);
-          y -= 10;
-          [...weeklyData.sales].sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime()).slice(0, 50).forEach((s: any) => {
-            ensureSpace(20);
-            const dStr = new Date(s.date).toLocaleDateString();
-            page.drawText(`${dStr} - ${s.item_name}`, { x: margin, y, size: 8, font });
-            page.drawText(`$${Number(s.total_with_tax).toFixed(2)}`, { x: width - margin - 60, y, size: 8, font: fontBold });
-            y -= 12;
-          });
+            page = pdf.addPage(pageSize);
+            y = height - margin;
+            drawText("WEEKLY TRANSACTIONAL PULSE (Mon - Sat)", 15, true, COLORS.header);
+            y -= 10;
+            
+            const colWidth = (width - margin * 2) / 3;
+            // Use daysArr defined in higher scope
+            
+            // Draw in 2 rows of 3 days
+            for (let row = 0; row < 2; row++) {
+              let startY = y;
+              let maxRowY = y;
+              for (let col = 0; col < 3; col++) {
+                const dayIdx = row * 3 + col;
+                const dName = daysArr[dayIdx];
+                const sales = weeklyData.salesByDay.get(dName) || [];
+                
+                let curY = startY;
+                page.drawText(dName.toUpperCase(), { x: margin + col * colWidth, y: curY, size: 8, font: fontBold, color: COLORS.primary });
+                curY -= 12;
+                
+                sales.slice(0, 25).forEach((s: any) => {
+                  if (curY < 50) return;
+                  const txt = `${s.item_name.substring(0, 12)}...`;
+                  page.drawText(`${txt}`, { x: margin + col * colWidth, y: curY, size: 6, font });
+                  page.drawText(`$${Number(s.total_with_tax || 0).toFixed(1)}`, { x: margin + col * colWidth + colWidth - 35, y: curY, size: 6, font: fontBold });
+                  curY -= 8;
+                });
+                if (curY < maxRowY) maxRowY = curY;
+              }
+              y = maxRowY - 20;
+            }
           } catch (err) { console.error("Page 5 fail:", err); }
         }
 
-        // --- PAGE 6: GROWTH & FORECASTING ---
+        // --- PAGE 7: WEEKLY EXPENSE LOG (TABULAR) ---
         {
           try {
-          page = pdf.addPage(pageSize);
-          y = height - margin;
-          drawText("GROWTH FORECASTING & PROJECTIONS", 16, true, COLORS.header);
-          y -= 30;
+            page = pdf.addPage(pageSize);
+            y = height - margin;
+            drawText("WEEKLY OPERATIONAL EXPENSES (Mon - Sat)", 15, true, COLORS.header);
+            y -= 10;
+            
+            const colWidth = (width - margin * 2) / 3;
+            // Use daysArr defined in higher scope
+            
+            for (let row = 0; row < 2; row++) {
+              let startY = y;
+              let maxRowY = y;
+              for (let col = 0; col < 3; col++) {
+                const dayIdx = row * 3 + col;
+                const dName = daysArr[dayIdx];
+                const exps = weeklyData.expensesByDay.get(dName) || [];
+                
+                let curY = startY;
+                page.drawText(dName.toUpperCase(), { x: margin + col * colWidth, y: curY, size: 8, font: fontBold, color: COLORS.warning });
+                curY -= 12;
+                
+                exps.slice(0, 25).forEach((l: any) => {
+                  if (curY < 50) return;
+                  const txt = `${(l.description || l.category || "").substring(0, 15)}...`;
+                  page.drawText(`${txt}`, { x: margin + col * colWidth, y: curY, size: 6, font });
+                  page.drawText(`$${Number(l.amount || 0).toFixed(1)}`, { x: margin + col * colWidth + colWidth - 35, y: curY, size: 6, font: fontBold });
+                  curY -= 8;
+                });
+                if (curY < maxRowY) maxRowY = curY;
+              }
+              y = maxRowY - 20;
+            }
+          } catch (err) { console.error("Page 7 fail:", err); }
+        }
 
-          const growthTarget = totals.withTax * 1.05;
-          drawText("NEXT WEEK TARGETS", 12, true, COLORS.primary);
-          page.drawRectangle({ x: margin, y: y - 60, width: width - margin * 2, height: 60, color: rgb(0.95, 1, 0.95) });
-          page.drawText(`5% Growth Revenue Target:`, { x: margin + 10, y: y - 25, size: 10, font });
-          page.drawText(`$${Number(growthTarget || 0).toFixed(2)}`, { x: width - margin - 110, y: y - 25, size: 12, font: fontBold, color: COLORS.highlight });
-          
-          const unitMargin = (totals.withTax / (weeklyData.sales.length || 1)) - (totals.cogs / (weeklyData.sales.length || 1));
-          const breakEvenUnits = Math.ceil(overhead.weekly / (unitMargin || 1));
-          page.drawText(`Breakeven Unit Target:`, { x: margin + 10, y: y - 45, size: 10, font });
-          page.drawText(`${breakEvenUnits} total units`, { x: width - margin - 110, y: y - 45, size: 12, font: fontBold });
-          
-          y -= 100;
-          page.drawText("Strategic Advisory Sign-off: [G. Guri / Nirvana Admin]", { x: margin, y: 40, size: 7, font, color: rgb(0.5,0.5,0.5) });
+        // --- PAGE 6: GROWTH & FORECASTING (ENHANCED) ---
+        {
+          try {
+            page = pdf.addPage(pageSize);
+            y = height - margin;
+            drawText("GROWTH FORECASTING & STRATEGIC PLAYBOOK", 16, true, COLORS.header);
+            y -= 20;
+
+            const growthTarget = totals.withTax * 1.05;
+            drawText("1. NEXT WEEK TARGETS", 12, true, COLORS.primary);
+            page.drawRectangle({ x: margin, y: y - 60, width: width - margin * 2, height: 60, color: rgb(0.95, 1, 0.95) });
+            page.drawText(`5% Growth Revenue Target:`, { x: margin + 10, y: y - 25, size: 10, font });
+            page.drawText(`$${Number(growthTarget || 0).toFixed(2)}`, { x: width - margin - 110, y: y - 25, size: 12, font: fontBold, color: COLORS.highlight });
+            
+            const unitMargin = (totals.withTax / (weeklyData.sales.length || 1)) - (totals.cogs / (weeklyData.sales.length || 1));
+            const breakEvenUnits = Math.ceil(overhead.weekly / (unitMargin || 1));
+            page.drawText(`Breakeven Unit Target:`, { x: margin + 10, y: y - 45, size: 10, font });
+            page.drawText(`${breakEvenUnits} total units`, { x: width - margin - 110, y: y - 45, size: 12, font: fontBold });
+            
+            y -= 100;
+            drawText("2. GROWTH STRATEGY & MARKETING PLAYBOOK", 12, true, COLORS.oracle);
+            y -= 5;
+            const topMover = weeklyData.velocity.champions[0]?.name || "inventory";
+            const advice = [
+              `• Leverage FLECTERE Marketing: Deploy targeted WhatsApp/Facebook campaigns for "${topMover}".`,
+              `• Discount Strategy: Apply a 5-10% 'Volume Spark' discount on stagnant ${weeklyData.velocity.zombies[0]?.name || 'items'}.`,
+              `• Facebook Ads: Budget $20 for a 'Weekend Pulse' campaign focusing on your peak hours (${weeklyData.peakHours[0] ? weeklyData.peakHours[0][0] + ':00' : 'afternoons'}).`,
+              `• Upsell Program: Train staff to bundle ${topMover} with accessories to increase avg basket value.`
+            ];
+            advice.forEach(a => drawText(a, 9, false, rgb(0.2, 0.2, 0.2)));
+
+            y -= 20;
+            drawDonut(width/2, y, 40, [
+              { value: totals.withTax, color: COLORS.highlight },
+              { value: (growthTarget - totals.withTax), color: COLORS.info }
+            ]);
+            page.drawText("Current Rev vs. Target Gap", { x: width/2 - 50, y: y - 30, size: 7, font: fontItalic });
+
+            y -= 80;
+            page.drawText("Strategic Advisory Sign-off: [G. Guri / FLECTERE / Nirvana]", { x: margin, y: 40, size: 7, font, color: rgb(0.5,0.5,0.5) });
           } catch (err) { console.error("Page 6 fail:", err); }
         }
       } catch (e: any) {
