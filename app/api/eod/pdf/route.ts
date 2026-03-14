@@ -136,6 +136,9 @@ export async function GET(req: Request) {
     const wSalesTotalWithTax = (wSales.data || []).reduce((sum: number, s: any) => sum + Number(s.total_with_tax || 0), 0);
     const wSalesTotalBeforeTax = (wSales.data || []).reduce((sum: number, s: any) => sum + Number(s.total_before_tax || 0), 0);
     const wSalesTotalTax = (wSales.data || []).reduce((sum: number, s: any) => sum + Number(s.tax || 0), 0);
+    const wSalesTotalDiscount = (wSales.data || []).reduce((sum: number, s: any) => sum + Number(s.discount_applied || 0), 0);
+    const wSalesTotalCOGS = (wSales.data || []).reduce((sum: number, s: any) => sum + (Number(s.landed_cost || 0) * Number(s.quantity || 0)), 0);
+    
     const wLedgerData = wLedger.data || [];
     const wPosExpenses = wLedgerData.filter((l: any) => l.category === 'POS Expense').reduce((sum: number, l: any) => sum + Number(l.amount || 0), 0);
 
@@ -238,6 +241,14 @@ export async function GET(req: Request) {
     weeklyData = {
       sales: wSales.data || [],
       ledger: wLedger.data || [],
+      totals: {
+        withTax: wSalesTotalWithTax,
+        beforeTax: wSalesTotalBeforeTax,
+        tax: wSalesTotalTax,
+        discount: wSalesTotalDiscount,
+        cogs: wSalesTotalCOGS,
+        posExpenses: wPosExpenses
+      },
       overhead: { monthly: monthlyOverhead, weekly: weeklyOverhead, fixed: fixedObligations, operational: operationalCosts },
       audit: auditResults,
       settings: settings || {},
@@ -451,43 +462,47 @@ export async function GET(req: Request) {
     y -= 30;
 
     // Weekly Financial Pulse
-    const wTotalWithTax = weeklyData.sales.reduce((sum: number, s: any) => sum + Number(s.total_with_tax || 0), 0);
-    const wTotalBeforeTax = weeklyData.sales.reduce((sum: number, s: any) => sum + Number(s.total_before_tax || 0), 0);
-    const wTotalTax = weeklyData.sales.reduce((sum: number, s: any) => sum + Number(s.tax || 0), 0);
-    const wExpenses = weeklyData.ledger.filter((l: any) => l.category === 'POS Expense').reduce((sum: number, l: any) => sum + Number(l.amount || 0), 0);
-    const wNet = wTotalWithTax - wExpenses;
-    
-    const wCOGS = weeklyData.sales.reduce((sum: number, s: any) => sum + (Number(s.landed_cost || 0) * s.quantity), 0);
-    const wGrossProfit = wTotalBeforeTax - wCOGS;
-    const wFinalNet = wGrossProfit - weeklyData.overhead.fixed - (weeklyData.overhead.operational - wExpenses);
+    const { totals, overhead } = weeklyData;
+    const wNet = totals.withTax - totals.posExpenses;
+    const wGrossProfit = totals.beforeTax - totals.cogs;
+    const wFinalNet = wGrossProfit - overhead.fixed - (overhead.operational - totals.posExpenses);
 
     drawText("1. FINANCIAL PERFORMANCE & PULSE", 11, true, COLORS.primary);
     y -= 5;
-    page.drawRectangle({ x: margin, y: y - 110, width: width - margin * 2, height: 110, color: rgb(0.98, 0.98, 1), borderColor: rgb(0.9, 0.9, 0.95), borderWidth: 1 });
+    page.drawRectangle({ x: margin, y: y - 130, width: width - margin * 2, height: 130, color: rgb(0.98, 0.98, 1), borderColor: rgb(0.9, 0.9, 0.95), borderWidth: 1 });
     const metY = y - 20;
     
-    // Left: Revenue
+    // Left: Revenue & Deductions
     page.drawText(`Weekly Gross Revenue:`, { x: margin + 10, y: metY, size: 9, font });
-    page.drawText(`$${wTotalWithTax.toFixed(2)}`, { x: margin + 110, y: metY, size: 9, font: fontBold });
+    page.drawText(`$${totals.withTax.toFixed(2)}`, { x: margin + 110, y: metY, size: 9, font: fontBold });
     
-    page.drawText(`Est. Gross Profit:`, { x: margin + 10, y: metY - 15, size: 9, font });
-    page.drawText(`$${wGrossProfit.toFixed(2)}`, { x: margin + 110, y: metY - 15, size: 9, font: fontBold, color: COLORS.highlight });
+    page.drawText(`Tax Obligation:`, { x: margin + 10, y: metY - 15, size: 9, font });
+    page.drawText(`$${totals.tax.toFixed(2)}`, { x: margin + 110, y: metY - 15, size: 9, font });
 
-    page.drawText(`FINAL NET PULSE:`, { x: margin + 10, y: metY - 40, size: 10, font: fontBold });
-    page.drawText(`$${wFinalNet.toFixed(2)}`, { x: margin + 110, y: metY - 40, size: 11, font: fontBold, color: wFinalNet > 0 ? COLORS.highlight : COLORS.warning });
+    page.drawText(`Total Discounts:`, { x: margin + 10, y: metY - 30, size: 9, font });
+    page.drawText(`$${totals.discount.toFixed(2)}`, { x: margin + 110, y: metY - 30, size: 9, font, color: COLORS.warning });
+
+    page.drawText(`Est. COGS:`, { x: margin + 10, y: metY - 45, size: 9, font });
+    page.drawText(`$${totals.cogs.toFixed(2)}`, { x: margin + 110, y: metY - 45, size: 9, font });
+
+    page.drawText(`Est. Gross Profit:`, { x: margin + 10, y: metY - 65, size: 9, font });
+    page.drawText(`$${wGrossProfit.toFixed(2)}`, { x: margin + 110, y: metY - 65, size: 9, font: fontBold, color: COLORS.highlight });
+
+    page.drawText(`FINAL NET PULSE:`, { x: margin + 10, y: metY - 95, size: 10, font: fontBold });
+    page.drawText(`$${wFinalNet.toFixed(2)}`, { x: margin + 110, y: metY - 95, size: 11, font: fontBold, color: wFinalNet > 0 ? COLORS.highlight : COLORS.warning });
 
     // Right: Overheads
     page.drawText(`Fixed Obligations:`, { x: width / 2 + 10, y: metY, size: 9, font });
-    page.drawText(`$${weeklyData.overhead.fixed.toFixed(2)}`, { x: width / 2 + 100, y: metY, size: 9, font: fontBold });
+    page.drawText(`$${overhead.fixed.toFixed(2)}`, { x: width / 2 + 105, y: metY, size: 9, font: fontBold });
 
     page.drawText(`Operational Costs:`, { x: width / 2 + 10, y: metY - 15, size: 9, font });
-    page.drawText(`$${weeklyData.overhead.operational.toFixed(2)}`, { x: width / 2 + 100, y: metY - 15, size: 9, font: fontBold });
+    page.drawText(`$${overhead.operational.toFixed(2)}`, { x: width / 2 + 105, y: metY - 15, size: 9, font: fontBold });
 
-    const overheadCovered = (wNet / weeklyData.overhead.weekly) * 100;
+    const overheadCovered = (wNet / overhead.weekly) * 100;
     page.drawText(`Overhead Coverage:`, { x: width / 2 + 10, y: metY - 40, size: 9, font });
-    page.drawText(`${overheadCovered.toFixed(1)}%`, { x: width / 2 + 100, y: metY - 40, size: 10, font: fontBold, color: overheadCovered >= 100 ? COLORS.highlight : COLORS.warning });
+    page.drawText(`${overheadCovered.toFixed(1)}%`, { x: width / 2 + 105, y: metY - 40, size: 10, font: fontBold, color: overheadCovered >= 100 ? COLORS.highlight : COLORS.warning });
 
-    y -= 130;
+    y -= 150;
 
     // Daily Pulse Bar Chart
     drawText("2. DAILY REVENUE VELOCITY", 11, true, COLORS.info);
@@ -514,33 +529,6 @@ export async function GET(req: Request) {
         page.drawText(`$${rev.toFixed(0)}`, { x: margin + (i * bSpc) + 10, y: y - chartH + bh - 2, size: 6, font, color: rgb(1,1,1) });
     });
     y -= 140;
-
-    // Peak Activity & Payment Mix
-    drawText("3. OPERATIONAL INSIGHTS", 11, true, rgb(0.1, 0.4, 0.1));
-    y -= 10;
-    page.drawRectangle({ x: margin, y: y - 70, width: width - margin * 2, height: 70, color: rgb(0.95, 1, 0.95) });
-    const insY = y - 20;
-
-    // Peak Hours
-    page.drawText("PEAK SALES PERIODS:", { x: margin + 10, y: insY, size: 9, font: fontBold });
-    weeklyData.peakHours.slice(0, 2).forEach((p: any, i: number) => {
-        const hour = p[0];
-        const ampm = hour >= 12 ? 'PM' : 'AM';
-        const displayHr = hour % 12 || 12;
-        page.drawText(`• ${displayHr}:00 ${ampm} ($${p[1].toFixed(2)})`, { x: margin + 10, y: insY - 15 - (i * 12), size: 8, font });
-    });
-
-    // Payment Mix
-    const pm = weeklyData.paymentMix;
-    const pmTotal = (pm.cashTotal + pm.ecocashTotal + pm.swipeTotal) || 1;
-    page.drawText("PAYMENT METHOD MIX:", { x: width / 2 + 10, y: insY, size: 9, font: fontBold });
-    page.drawText(`• Cash: ${((pm.cashTotal / pmTotal) * 100).toFixed(1)}%`, { x: width / 2 + 10, y: insY - 15, size: 8, font });
-    page.drawText(`• EcoCash: ${((pm.ecocashTotal / pmTotal) * 100).toFixed(1)}%`, { x: width / 2 + 10, y: insY - 27, size: 8, font });
-    
-    // Inventory Value
-    page.drawText(`Total Shop Inventory Value: $${weeklyData.inventoryValue.toFixed(2)}`, { x: margin + 10, y: insY - 45, size: 9, font: fontBold, color: COLORS.primary });
-
-    y -= 90;
 
     // --- WEEKLY REPORT PAGE 2: EXECUTION & AUDIT ---
     page = pdf.addPage(pageSize);
@@ -697,6 +685,69 @@ export async function GET(req: Request) {
     ensureSpace(100);
     y = 60;
     page.drawText("This report is confidential and intended for management only. Generated by Nirvana Oracle.", { x: margin, y, size: 7, font, color: rgb(0.6, 0.6, 0.6) });
+
+    // --- WEEKLY REPORT PAGE 5: GROWTH & PROJECTIONS ---
+    page = pdf.addPage(pageSize);
+    y = height - margin;
+    drawText("FINANCIAL GROWTH & PROJECTIONS", 16, true, COLORS.header);
+    y -= 10;
+
+    // Revenue vs Expenses vs Profit Chart
+    drawText("REVENUE VS. EXPENSES (CASH PULSE)", 11, true, COLORS.info);
+    y -= 10;
+    const gChartH = 120;
+    const gChartW = width - margin * 2;
+    page.drawRectangle({ x: margin, y: y - gChartH - 25, width: gChartW, height: gChartH + 25, color: COLORS.chartBg });
+    
+    // Daily overhead approx (Fixed/6 days + Daily POS/6)
+    const dailyFixed = overhead.fixed / 6;
+    const dailyOp = (overhead.operational - totals.posExpenses) / 6;
+    
+    const trendMax = Math.max(...dRev, overhead.weekly / 6, 1);
+    const trendSpc = gChartW / 6;
+    
+    dRev.forEach((rev, i) => {
+        const x = margin + (i * trendSpc) + 10;
+        const revH = (rev / trendMax) * gChartH;
+        const expH = ((dailyFixed + dailyOp) / trendMax) * gChartH;
+        
+        // Expense Bar (Back)
+        page.drawRectangle({ x, y: y - gChartH - 5, width: trendSpc - 20, height: expH, color: COLORS.warning, opacity: 0.3 });
+        // Revenue Bar (Front)
+        page.drawRectangle({ x: x + 5, y: y - gChartH - 5, width: trendSpc - 30, height: revH, color: COLORS.primary, opacity: 0.7 });
+        
+        const dNames = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+        page.drawText(dNames[i], { x: x + 2, y: y - gChartH - 18, size: 7, font });
+    });
+
+    drawText("Legend: Green (Revenue) | Red (Burn/Overhead)", 7, false, rgb(0.4, 0.4, 0.4));
+    y -= 150;
+
+    // Forecasting Section
+    drawText("QUICK FORECAST FOR NEXT WEEK", 11, true, COLORS.primary);
+    y -= 5;
+    page.drawRectangle({ x: margin, y: y - 80, width: width - margin * 2, height: 80, color: rgb(0.95, 1, 0.95) });
+    const fY = y - 20;
+
+    const growthTarget = totals.withTax * 1.05; 
+    const avgSale = totals.withTax / (weeklyData.sales.length || 1);
+    const unitMargin = avgSale - (totals.cogs / (weeklyData.sales.length || 1));
+    const breakEvenUnits = Math.ceil(overhead.weekly / (unitMargin || 1));
+    const wTopMoverRef = weeklyData.velocity.champions[0];
+
+    page.drawText(`Next Week Target (5% Growth):`, { x: margin + 10, y: fY, size: 10, font });
+    page.drawText(`$${growthTarget.toFixed(2)}`, { x: width - margin - 100, y: fY, size: 11, font: fontBold, color: COLORS.highlight });
+
+    page.drawText(`Units to Cover All Weekly Costs:`, { x: margin + 10, y: fY - 20, size: 10, font });
+    page.drawText(`${breakEvenUnits} total units`, { x: width - margin - 100, y: fY - 20, size: 11, font: fontBold });
+
+    if (wTopMoverRef) {
+        page.drawText(`Focus on '${wTopMoverRef.name.slice(0, 30)}':`, { x: margin + 10, y: fY - 45, size: 9, font: fontBold });
+        page.drawText(`Selling ${Math.ceil(breakEvenUnits * 0.4)} units of this item covers ~40% of overhead.`, { x: margin + 10, y: fY - 57, size: 8, font });
+    }
+
+    y -= 100;
+    page.drawText("Strategic Advisory Sign-off: [G. Guri / Nirvana Admin]", { x: margin, y: 40, size: 7, font, color: rgb(0.5, 0.5, 0.5) });
   }
 
   const bytes = await pdf.save();
