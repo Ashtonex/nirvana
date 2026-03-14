@@ -97,12 +97,12 @@ export async function GET(req: Request) {
 
     // Parallel Fetching
     const [salesRes, ledgerRes, lowStockRes, allInventoryRes, thirtyDaySalesRes, sevenDaySalesRes] = await Promise.all([
-      supabaseAdmin.from("sales").select("id, total_with_tax, total_before_tax, tax, discount_applied, payment_method, date, item_name, quantity").eq("shop_id", shopId).gte("date", since).lte("date", until),
-      supabaseAdmin.from("ledger_entries").select("id,category,amount,date,description,employee_id").eq("shop_id", shopId).gte("date", since).lte("date", until),
-      supabaseAdmin.from("inventory_allocations").select("item_id, quantity").eq("shop_id", shopId).lte("quantity", 5).order("quantity", { ascending: true }).limit(15),
-      supabaseAdmin.from("inventory_items").select("id, name, category, landed_cost, price").limit(1000),
-      supabaseAdmin.from("sales").select("item_id, quantity").eq("shop_id", shopId).gte("date", new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()).limit(2000),
-      supabaseAdmin.from("sales").select("item_name, total_with_tax, date").eq("shop_id", shopId).gte("date", since7).lte("date", until),
+      supabaseAdmin.from("sales").select("id, total_with_tax, total_before_tax, tax, discount_applied, payment_method, date, item_name, quantity").eq("shop_id", shopId).gte("date", since).lte("date", until).then((r: any) => r, (e: any) => ({ data: [] })),
+      supabaseAdmin.from("ledger_entries").select("id,category,amount,date,description,employee_id").eq("shop_id", shopId).gte("date", since).lte("date", until).then((r: any) => r, (e: any) => ({ data: [] })),
+      supabaseAdmin.from("inventory_allocations").select("item_id, quantity").eq("shop_id", shopId).lte("quantity", 5).order("quantity", { ascending: true }).limit(15).then((r: any) => r, (e: any) => ({ data: [] })),
+      supabaseAdmin.from("inventory_items").select("id, name, category, landed_cost, price").limit(1000).then((r: any) => r, (e: any) => ({ data: [] })),
+      supabaseAdmin.from("sales").select("item_id, quantity").eq("shop_id", shopId).gte("date", new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()).limit(2000).then((r: any) => r, (e: any) => ({ data: [] })),
+      supabaseAdmin.from("sales").select("item_name, total_with_tax, date").eq("shop_id", shopId).gte("date", since7).lte("date", until).then((r: any) => r, (e: any) => ({ data: [] })),
     ]);
 
     const sales = salesRes.data || [];
@@ -431,22 +431,25 @@ export async function GET(req: Request) {
     const margin = 40;
     let y = height - margin;
 
-    const drawText = (text: string, size = 10, bold = false, color = rgb(0.1, 0.1, 0.1)) => {
-      page.drawText(text, { x: margin, y, size, font: bold ? fontBold : font, color });
-      y -= size + 6;
+    const drawText = (text: any, size = 10, bold = false, color = rgb(0.1, 0.1, 0.1)) => {
+      const safeText = String(text || "");
+      const safeY = Number(y) || margin;
+      page.drawText(safeText, { x: margin, y: safeY, size, font: bold ? fontBold : font, color });
+      y = safeY - (size + 6);
     };
 
     const drawDonut = (centerX: number, centerY: number, radius: number, data: { value: number, color: any }[]) => {
-      const total = data.reduce((s, d) => s + d.value, 0);
-      if (total <= 0) return;
+      const total = data.reduce((s, d) => s + (Number(d.value) || 0), 0);
+      if (total <= 0 || isNaN(total)) return;
       const barW = 120;
       const barH = 12;
-      page.drawRectangle({ x: centerX - barW/2, y: centerY - barH/2, width: barW, height: barH, color: rgb(0.9,0.9,0.9) });
+      const safeY = Number(centerY) || margin;
+      page.drawRectangle({ x: centerX - barW/2, y: safeY - barH/2, width: barW, height: barH, color: rgb(0.9,0.9,0.9) });
       let curX = centerX - barW/2;
       data.forEach(d => {
-        const sw = (d.value / total) * barW;
-        if (sw > 1) {
-          page.drawRectangle({ x: curX, y: centerY - barH/2, width: sw, height: barH, color: d.color });
+        const sw = (Number(d.value || 0) / total) * barW;
+        if (sw > 0.1 && !isNaN(sw)) {
+          page.drawRectangle({ x: curX, y: safeY - barH/2, width: sw, height: barH, color: d.color });
           curX += sw;
         }
       });
@@ -468,6 +471,7 @@ export async function GET(req: Request) {
     };
 
     const drawBarChart = (x: number, yPos: number, w: number, h: number, data: { label: string, value: number, color?: any }[]) => {
+      if (!data || data.length === 0) return;
       const max = Math.max(...data.map(d => d.value), 1);
       const bW = w / data.length;
       data.forEach((d, i) => {
@@ -479,7 +483,8 @@ export async function GET(req: Request) {
           height: bh, 
           color: d.color || COLORS.chartBar 
         });
-        page.drawText(d.label.substring(0, 4), { x: x + (i * bW) + 5, y: yPos - 12, size: 6, font });
+        const label = String(d.label || "N/A").substring(0, 4);
+        page.drawText(label, { x: x + (i * bW) + 5, y: yPos - 12, size: 6, font });
       });
     };
 
@@ -694,7 +699,8 @@ export async function GET(req: Request) {
             const d = new Date(wStart);
             d.setUTCDate(d.getUTCDate() + i);
             const dayStr = d.toISOString().split('T')[0];
-            dRev.push(weeklyData.sales.filter((s: any) => s.date.startsWith(dayStr)).reduce((sum: number, s: any) => sum + Number(s.total_with_tax || 0), 0));
+            const rev = (weeklyData.sales || []).filter((s: any) => s.date && String(s.date).startsWith(dayStr)).reduce((sum: number, s: any) => sum + Number(s.total_with_tax || 0), 0);
+            dRev.push(rev);
           }
           const maxR = Math.max(...dRev, 1);
           const bSpc = chartW / 6;
@@ -707,7 +713,7 @@ export async function GET(req: Request) {
           y -= 140;
           const topDayIdx = dRev.indexOf(Math.max(...dRev));
           const avgRev = dRev.reduce((s, r) => s + r, 0) / 6;
-          drawText(`Velocity Insight: Peak performance on ${daysArr[topDayIdx]}. Avg Daily Pulse: $${avgRev.toFixed(0)}.`, 8, true, COLORS.primary);
+          drawText(`Velocity Insight: Peak performance on ${daysArr[topDayIdx] || "N/A"}. Avg Daily Pulse: $${avgRev.toFixed(0)}.`, 8, true, COLORS.primary);
           
           y -= 10;
           drawText("NET PROFIT PULSE (Trend)", 10, true, COLORS.oracle);
@@ -1053,9 +1059,15 @@ export async function GET(req: Request) {
         console.error("Weekly render failed:", e);
         page = pdf.addPage(pageSize);
         y = height/2;
-        page.drawText("WEEKLY DATA SUPPLEMENT UNAVAILABLE", { x: margin, y, size: 14, font: fontBold, color: COLORS.warning });
-        page.drawText("Error: " + (e.message || "Rendering timeout or data gap"), { x: margin, y: y-20, size: 10, font });
+        page.drawText("WEEKLY DATA SUPPLEMENT ERROR", { x: margin, y, size: 14, font: fontBold, color: COLORS.warning });
+        page.drawText("Detailed Error: " + (e.message || String(e)), { x: margin, y: y-20, size: 8, font });
       }
+    } else if (isWeekly) {
+      // isWeekly is true but weeklyData is null
+      page = pdf.addPage(pageSize);
+      y = height/2;
+      page.drawText("WEEKLY DATA PREPARATION FAILED", { x: margin, y, size: 14, font: fontBold, color: COLORS.warning });
+      page.drawText("This occurs if the shop data fetch timed out or returned invalid structures.", { x: margin, y: y-20, size: 10, font });
     }
 
     const bytes = await pdf.save();
