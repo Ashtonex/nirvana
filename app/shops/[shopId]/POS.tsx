@@ -955,7 +955,7 @@ Generated via NIRVANA POS`;
             console.log('Generating EOD PDF...');
             try {
                 const dayStamp = new Date().toISOString().slice(0, 10);
-                const pdfRes = await fetch(`/api/eod/pdf?shopId=${encodeURIComponent(shopId)}&date=${encodeURIComponent(dayStamp)}`, { 
+                const pdfRes = await fetch(`/api/eod/pdf?shopId=${encodeURIComponent(shopId)}&date=${encodeURIComponent(dayStamp)}&weekly=${encodeURIComponent(String(isWeeklyDay))}`, { 
                     cache: 'no-store',
                     credentials: 'include'
                 });

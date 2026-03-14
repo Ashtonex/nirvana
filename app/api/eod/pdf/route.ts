@@ -361,16 +361,20 @@ export async function GET(req: Request) {
 
     // Weekly Totals
     const wTotalWithTax = weeklyData.sales.reduce((sum: number, s: any) => sum + Number(s.total_with_tax || 0), 0);
+    const wTotalBeforeTax = weeklyData.sales.reduce((sum: number, s: any) => sum + Number(s.total_before_tax || 0), 0);
+    const wTotalTax = weeklyData.sales.reduce((sum: number, s: any) => sum + Number(s.tax || 0), 0);
     const wExpenses = weeklyData.ledger.filter((l: any) => l.category === 'POS Expense').reduce((sum: number, l: any) => sum + Number(l.amount || 0), 0);
     const wNet = wTotalWithTax - wExpenses;
     const overheadCovered = (wNet / weeklyData.overhead.weekly) * 100;
 
     drawText("WEEKLY FINANCIAL CONTEXT", 11, true, COLORS.primary);
-    page.drawRectangle({ x: margin, y: y - 80, width: width - margin * 2, height: 80, color: rgb(0.98, 0.98, 1) });
+    page.drawRectangle({ x: margin, y: y - 100, width: width - margin * 2, height: 100, color: rgb(0.98, 0.98, 1) });
     const wMetricsY = y - 20;
     page.drawText(`Weekly Gross Revenue: $${wTotalWithTax.toFixed(2)}`, { x: margin + 10, y: wMetricsY, size: 10, font: fontBold });
-    page.drawText(`Weekly Total Expenses: $${wExpenses.toFixed(2)}`, { x: margin + 10, y: wMetricsY - 15, size: 9, font });
-    page.drawText(`Weekly Net Revenue: $${wNet.toFixed(2)}`, { x: margin + 10, y: wMetricsY - 35, size: 11, font: fontBold, color: COLORS.highlight });
+    page.drawText(`Weekly Pre-Tax Revenue: $${wTotalBeforeTax.toFixed(2)}`, { x: margin + 10, y: wMetricsY - 15, size: 9, font });
+    page.drawText(`Weekly Sales Tax: $${wTotalTax.toFixed(2)}`, { x: margin + 10, y: wMetricsY - 30, size: 9, font });
+    page.drawText(`Weekly Total Expenses: $${wExpenses.toFixed(2)}`, { x: margin + 10, y: wMetricsY - 45, size: 9, font });
+    page.drawText(`Weekly Net Revenue: $${wNet.toFixed(2)}`, { x: margin + 10, y: wMetricsY - 65, size: 11, font: fontBold, color: COLORS.highlight });
 
     page.drawText(`Overhead Target (Weekly): $${weeklyData.overhead.weekly.toFixed(2)}`, { x: width / 2, y: wMetricsY, size: 9, font });
     page.drawText(`Coverage Status: ${overheadCovered.toFixed(1)}%`, { x: width / 2, y: wMetricsY - 15, size: 10, font: fontBold, color: overheadCovered >= 100 ? COLORS.highlight : COLORS.warning });
@@ -455,6 +459,41 @@ export async function GET(req: Request) {
       }
     });
     y -= 10;
+
+    // Weekly Transaction Log
+    ensureSpace(120);
+    drawText("WEEKLY TRANSACTION LOG (HIGHLIGHTS)", 11, true, COLORS.primary);
+    y -= 5;
+    page.drawLine({ start: { x: margin, y }, end: { x: width - margin, y }, thickness: 1, color: rgb(0.8, 0.8, 0.8) });
+    y -= 15;
+    
+    // Sort by date descending
+    const sortedWSales = [...weeklyData.sales].sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    sortedWSales.slice(0, 40).forEach((s: any) => {
+      ensureSpace(40);
+      const d = new Date(s.date);
+      const dayName = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][d.getUTCDay()];
+      page.drawText(`${dayName} ${d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} - ${s.item_name} x${s.quantity}`, { x: margin, y, size: 7, font });
+      page.drawText(`$${Number(s.total_with_tax).toFixed(2)}`, { x: width - margin - 50, y, size: 7, font });
+      y -= 9;
+    });
+    if (sortedWSales.length > 40) drawText(`...and ${sortedWSales.length - 40} more transactions this week.`, 7, false, rgb(0.4, 0.4, 0.4));
+    y -= 10;
+
+    // Weekly Expense Log
+    ensureSpace(120);
+    drawText("WEEKLY EXPENSE LOG", 11, true, rgb(0.8, 0, 0));
+    y -= 5;
+    const wPosExpenses = weeklyData.ledger.filter((l: any) => l.category === 'POS Expense').sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    wPosExpenses.forEach((e: any) => {
+      ensureSpace(40);
+      const d = new Date(e.date);
+      const dayName = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][d.getUTCDay()];
+      const desc = String(e.description || e.category || 'Expense');
+      page.drawText(`${dayName} ${d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} - ${desc}`, { x: margin, y, size: 7, font });
+      page.drawText(`-$${Number(e.amount || 0).toFixed(2)}`, { x: width - margin - 50, y, size: 7, font, color: COLORS.warning });
+      y -= 9;
+    });
 
     // Oracle Strategic Dialogue (NEW PAGE)
     page = pdf.addPage(pageSize);
