@@ -119,13 +119,15 @@ export async function GET(req: Request) {
   let weeklyData: any = null;
   if (isWeekly) {
     const weekStart = startOfWeekUTC(date);
-    const [wSales, wLedger, shopRes, settingsRes] = await Promise.all([
-      supabaseAdmin.from("sales").select("*").eq("shop_id", shopId).gte("date", weekStart).lte("date", until),
-      supabaseAdmin.from("ledger_entries").select("*").eq("shop_id", shopId).gte("date", weekStart).lte("date", until),
-      supabaseAdmin.from("shops").select("*").eq("id", shopId).single(),
-      supabaseAdmin.from("oracle_settings").select("*").single(),
+    const [wSalesRes, wLedgerRes, shopRes, settingsRes] = await Promise.all([
+      supabaseAdmin.from("sales").select("*").eq("shop_id", shopId).gte("date", weekStart).lte("date", until).catch(() => ({ data: [] })),
+      supabaseAdmin.from("ledger_entries").select("*").eq("shop_id", shopId).gte("date", weekStart).lte("date", until).catch(() => ({ data: [] })),
+      supabaseAdmin.from("shops").select("*").eq("id", shopId).single().catch(() => ({ data: null })),
+      supabaseAdmin.from("oracle_settings").select("*").single().catch(() => ({ data: null })),
     ]);
 
+    const wSales = wSalesRes.data || [];
+    const wLedger = wLedgerRes.data || [];
     const shop = shopRes.data;
     const settings = settingsRes.data;
     const monthlyOverhead = shop?.expenses 
@@ -133,14 +135,13 @@ export async function GET(req: Request) {
       : 0;
     const weeklyOverhead = monthlyOverhead / 4; // Approx
 
-    const wSalesTotalWithTax = (wSales.data || []).reduce((sum: number, s: any) => sum + Number(s.total_with_tax || 0), 0);
-    const wSalesTotalBeforeTax = (wSales.data || []).reduce((sum: number, s: any) => sum + Number(s.total_before_tax || 0), 0);
-    const wSalesTotalTax = (wSales.data || []).reduce((sum: number, s: any) => sum + Number(s.tax || 0), 0);
-    const wSalesTotalDiscount = (wSales.data || []).reduce((sum: number, s: any) => sum + Number(s.discount_applied || 0), 0);
-    const wSalesTotalCOGS = (wSales.data || []).reduce((sum: number, s: any) => sum + (Number(s.landed_cost || 0) * Number(s.quantity || 0)), 0);
+    const wSalesTotalWithTax = wSales.reduce((sum: number, s: any) => sum + Number(s.total_with_tax || 0), 0);
+    const wSalesTotalBeforeTax = wSales.reduce((sum: number, s: any) => sum + Number(s.total_before_tax || 0), 0);
+    const wSalesTotalTax = wSales.reduce((sum: number, s: any) => sum + Number(s.tax || 0), 0);
+    const wSalesTotalDiscount = wSales.reduce((sum: number, s: any) => sum + Number(s.discount_applied || 0), 0);
+    const wSalesTotalCOGS = wSales.reduce((sum: number, s: any) => sum + (Number(s.landed_cost || 0) * Number(s.quantity || 0)), 0);
     
-    const wLedgerData = wLedger.data || [];
-    const wPosExpenses = wLedgerData.filter((l: any) => l.category === 'POS Expense').reduce((sum: number, l: any) => sum + Number(l.amount || 0), 0);
+    const wPosExpenses = wLedger.filter((l: any) => l.category === 'POS Expense').reduce((sum: number, l: any) => sum + Number(l.amount || 0), 0);
 
     // Grouped Overheads
     const shopEx: any = shop?.expenses || {};
@@ -169,7 +170,7 @@ export async function GET(req: Request) {
 
     // Staff Scoreboard
     const staffMap = new Map<string, { name: string; sales: number; revenue: number }>();
-    (wSales.data || []).forEach((s: any) => {
+    wSales.forEach((s: any) => {
         // Fallback: Use seller_name or employee_name if employee_id is missing or looks like an ID
         const empId = s.employee_id || "Unknown";
         const empName = s.seller_name || s.employee_name || "Unknown Employee";
@@ -192,7 +193,7 @@ export async function GET(req: Request) {
 
     // Inventory Velocity (Champions & Zombies)
     const velocityMap = new Map<string, { id: string; name: string; qty: number; category: string }>();
-    (wSales.data || []).forEach((s: any) => {
+    wSales.forEach((s: any) => {
         const cur = velocityMap.get(s.item_id) || { id: s.item_id, name: s.item_name, qty: 0, category: "" };
         cur.qty += Number(s.quantity || 0);
         velocityMap.set(s.item_id, cur);
@@ -213,16 +214,16 @@ export async function GET(req: Request) {
 
     // Peak Activity Analysis (Hourly)
     const hourMap = new Map<number, number>();
-    (wSales.data || []).forEach((s: any) => {
+    wSales.forEach((s: any) => {
       const hr = new Date(s.date).getHours();
       hourMap.set(hr, (hourMap.get(hr) || 0) + Number(s.total_with_tax || 0));
     });
     const peakHours = Array.from(hourMap.entries()).sort((a, b) => b[1] - a[1]).slice(0, 3);
 
     // Payment Mix
-    const cashTotal = (wSales.data || []).filter((s: any) => s.payment_method === 'cash').reduce((sum: number, s: any) => sum + Number(s.total_with_tax || 0), 0);
-    const ecocashTotal = (wSales.data || []).filter((s: any) => s.payment_method === 'ecocash').reduce((sum: number, s: any) => sum + Number(s.total_with_tax || 0), 0);
-    const swipeTotal = (wSales.data || []).filter((s: any) => s.payment_method === 'swipe').reduce((sum: number, s: any) => sum + Number(s.total_with_tax || 0), 0);
+    const cashTotal = wSales.filter((s: any) => s.payment_method === 'cash').reduce((sum: number, s: any) => sum + Number(s.total_with_tax || 0), 0);
+    const ecocashTotal = wSales.filter((s: any) => s.payment_method === 'ecocash').reduce((sum: number, s: any) => sum + Number(s.total_with_tax || 0), 0);
+    const swipeTotal = wSales.filter((s: any) => s.payment_method === 'swipe').reduce((sum: number, s: any) => sum + Number(s.total_with_tax || 0), 0);
     const paymentMix = { cashTotal, ecocashTotal, swipeTotal };
 
     // Inventory Value (Shop specific)
@@ -239,8 +240,8 @@ export async function GET(req: Request) {
     }
 
     weeklyData = {
-      sales: wSales.data || [],
-      ledger: wLedger.data || [],
+      sales: wSales,
+      ledger: wLedger,
       totals: {
         withTax: wSalesTotalWithTax,
         beforeTax: wSalesTotalBeforeTax,
@@ -462,10 +463,12 @@ export async function GET(req: Request) {
     y -= 30;
 
     // Weekly Financial Pulse
-    const { totals, overhead } = weeklyData;
+    const totals = weeklyData.totals || { withTax: 0, beforeTax: 0, tax: 0, discount: 0, cogs: 0, posExpenses: 0 };
+    const overhead = weeklyData.overhead || { fixed: 0, weekly: 0, operational: 0 };
+    
     const wNet = totals.withTax - totals.posExpenses;
     const wGrossProfit = totals.beforeTax - totals.cogs;
-    const wFinalNet = wGrossProfit - overhead.fixed - (overhead.operational - totals.posExpenses);
+    const wFinalNet = wGrossProfit - (overhead.fixed || 0) - ((overhead.operational || 0) - totals.posExpenses);
 
     drawText("1. FINANCIAL PERFORMANCE & PULSE", 11, true, COLORS.primary);
     y -= 5;
@@ -474,16 +477,16 @@ export async function GET(req: Request) {
     
     // Left: Revenue & Deductions
     page.drawText(`Weekly Gross Revenue:`, { x: margin + 10, y: metY, size: 9, font });
-    page.drawText(`$${totals.withTax.toFixed(2)}`, { x: margin + 110, y: metY, size: 9, font: fontBold });
+    page.drawText(`$${(totals.withTax || 0).toFixed(2)}`, { x: margin + 110, y: metY, size: 9, font: fontBold });
     
     page.drawText(`Tax Obligation:`, { x: margin + 10, y: metY - 15, size: 9, font });
-    page.drawText(`$${totals.tax.toFixed(2)}`, { x: margin + 110, y: metY - 15, size: 9, font });
+    page.drawText(`$${(totals.tax || 0).toFixed(2)}`, { x: margin + 110, y: metY - 15, size: 9, font });
 
     page.drawText(`Total Discounts:`, { x: margin + 10, y: metY - 30, size: 9, font });
-    page.drawText(`$${totals.discount.toFixed(2)}`, { x: margin + 110, y: metY - 30, size: 9, font, color: COLORS.warning });
+    page.drawText(`$${(totals.discount || 0).toFixed(2)}`, { x: margin + 110, y: metY - 30, size: 9, font, color: COLORS.warning });
 
     page.drawText(`Est. COGS:`, { x: margin + 10, y: metY - 45, size: 9, font });
-    page.drawText(`$${totals.cogs.toFixed(2)}`, { x: margin + 110, y: metY - 45, size: 9, font });
+    page.drawText(`$${(totals.cogs || 0).toFixed(2)}`, { x: margin + 110, y: metY - 45, size: 9, font });
 
     page.drawText(`Est. Gross Profit:`, { x: margin + 10, y: metY - 65, size: 9, font });
     page.drawText(`$${wGrossProfit.toFixed(2)}`, { x: margin + 110, y: metY - 65, size: 9, font: fontBold, color: COLORS.highlight });
@@ -493,12 +496,12 @@ export async function GET(req: Request) {
 
     // Right: Overheads
     page.drawText(`Fixed Obligations:`, { x: width / 2 + 10, y: metY, size: 9, font });
-    page.drawText(`$${overhead.fixed.toFixed(2)}`, { x: width / 2 + 105, y: metY, size: 9, font: fontBold });
+    page.drawText(`$${(overhead.fixed || 0).toFixed(2)}`, { x: width / 2 + 105, y: metY, size: 9, font: fontBold });
 
     page.drawText(`Operational Costs:`, { x: width / 2 + 10, y: metY - 15, size: 9, font });
-    page.drawText(`$${overhead.operational.toFixed(2)}`, { x: width / 2 + 105, y: metY - 15, size: 9, font: fontBold });
+    page.drawText(`$${(overhead.operational || 0).toFixed(2)}`, { x: width / 2 + 105, y: metY - 15, size: 9, font: fontBold });
 
-    const overheadCovered = (wNet / overhead.weekly) * 100;
+    const overheadCovered = (overhead.weekly > 0) ? (wNet / overhead.weekly) * 100 : 0;
     page.drawText(`Overhead Coverage:`, { x: width / 2 + 10, y: metY - 40, size: 9, font });
     page.drawText(`${overheadCovered.toFixed(1)}%`, { x: width / 2 + 105, y: metY - 40, size: 10, font: fontBold, color: overheadCovered >= 100 ? COLORS.highlight : COLORS.warning });
 
@@ -625,12 +628,13 @@ export async function GET(req: Request) {
       questions.push(`Wait, if our weekly rent obligation is $${weeklyData.overhead.fixed.toFixed(2)} and we only cleared $${wNet.toFixed(2)} total profit this week, how many weeks of runway do we have left at this rate?`);
     } else if (overheadCovered < 100) {
       dialogue.push("We are at the breakeven point. Operations are covering themselves, but there is no growth capital being generated.");
-      const bestDayIndex = dRev.indexOf(Math.max(...dRev));
+      const maxRev = Math.max(...dRev);
+      const bestDayIndex = maxRev > 0 ? dRev.indexOf(maxRev) : 0;
       const days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
       questions.push(`I noticed our best day was ${days[bestDayIndex]}—did we do something differently that day that we can turn into a standard operating procedure?`);
     } else {
       dialogue.push("Exceptional performance. The shop is scaling and generating healthy net profit after all theoretical overhead.");
-      questions.push(`We are $${(wNet - weeklyData.overhead.weekly).toFixed(2)} above target. Shall we reinvest this into more '${(wTopMover?.name || 'inventory')}' or keep it as a safety buffer?`);
+      questions.push(`We are $${(wNet - (overhead.weekly || 0)).toFixed(2)} above target. Shall we reinvest this into more '${(wTopMover?.name || 'inventory')}' or keep it as a safety buffer?`);
     }
 
     // Variance check
@@ -729,11 +733,12 @@ export async function GET(req: Request) {
     page.drawRectangle({ x: margin, y: y - 80, width: width - margin * 2, height: 80, color: rgb(0.95, 1, 0.95) });
     const fY = y - 20;
 
-    const growthTarget = totals.withTax * 1.05; 
-    const avgSale = totals.withTax / (weeklyData.sales.length || 1);
-    const unitMargin = avgSale - (totals.cogs / (weeklyData.sales.length || 1));
-    const breakEvenUnits = Math.ceil(overhead.weekly / (unitMargin || 1));
-    const wTopMoverRef = weeklyData.velocity.champions[0];
+    const growthTarget = (totals.withTax || 0) * 1.05; 
+    const salesCount = weeklyData.sales?.length || 1;
+    const avgSale = (totals.withTax || 0) / salesCount;
+    const unitMargin = avgSale - ((totals.cogs || 0) / salesCount);
+    const breakEvenUnits = Math.ceil((overhead.weekly || 0) / (unitMargin || 1));
+    const wTopMoverRef = weeklyData.velocity?.champions?.[0];
 
     page.drawText(`Next Week Target (5% Growth):`, { x: margin + 10, y: fY, size: 10, font });
     page.drawText(`$${growthTarget.toFixed(2)}`, { x: width - margin - 100, y: fY, size: 11, font: fontBold, color: COLORS.highlight });
@@ -742,7 +747,7 @@ export async function GET(req: Request) {
     page.drawText(`${breakEvenUnits} total units`, { x: width - margin - 100, y: fY - 20, size: 11, font: fontBold });
 
     if (wTopMoverRef) {
-        page.drawText(`Focus on '${wTopMoverRef.name.slice(0, 30)}':`, { x: margin + 10, y: fY - 45, size: 9, font: fontBold });
+        page.drawText(`Focus on '${wTopMoverRef.name?.slice(0, 30)}':`, { x: margin + 10, y: fY - 45, size: 9, font: fontBold });
         page.drawText(`Selling ${Math.ceil(breakEvenUnits * 0.4)} units of this item covers ~40% of overhead.`, { x: margin + 10, y: fY - 57, size: 8, font });
     }
 
@@ -762,8 +767,12 @@ export async function GET(req: Request) {
     },
   });
 
-  } catch (err) {
+  } catch (err: any) {
     console.error('EOD PDF route failed:', err);
-    return NextResponse.json({ error: 'Failed to generate PDF' }, { status: 500 });
+    return NextResponse.json({ 
+      error: 'Failed to generate PDF', 
+      details: err?.message || String(err),
+      stack: err?.stack
+    }, { status: 500 });
   }
 }
