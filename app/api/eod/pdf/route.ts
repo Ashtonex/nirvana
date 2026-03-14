@@ -119,14 +119,20 @@ export async function GET(req: Request) {
     const daysArr = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
     let weeklyData: any = null;
     if (isWeekly) {
-      const weekStart = startOfWeekUTC(date);
+      const wWeekStart = startOfWeekUTC(date);
+      const wWeekStartObj = new Date(wWeekStart);
+      const wUntilObj = new Date(wWeekStartObj);
+      wUntilObj.setUTCDate(wUntilObj.getUTCDate() + 6);
+      wUntilObj.setUTCHours(23, 59, 59, 999);
+      const wUntil = wUntilObj.toISOString();
+
       const monthStart = new Date(todayDate.getUTCFullYear(), todayDate.getUTCMonth(), 1).toISOString();
       const [wSalesRes, wLedgerRes, shopRes, settingsRes, mtdSalesRes] = await Promise.all([
-        supabaseAdmin.from("sales").select("id, total_with_tax, total_before_tax, tax, discount_applied, quantity, item_id, item_name, date, payment_method, employee_id").eq("shop_id", shopId).gte("date", weekStart).lte("date", until).then((r: any) => r, () => ({ data: [] as any[] })),
-        supabaseAdmin.from("ledger_entries").select("*").eq("shop_id", shopId).gte("date", weekStart).lte("date", until).then((r: any) => r, () => ({ data: [] as any[] })),
+        supabaseAdmin.from("sales").select("id, total_with_tax, total_before_tax, tax, discount_applied, quantity, item_id, item_name, date, payment_method, employee_id").eq("shop_id", shopId).gte("date", wWeekStart).lte("date", wUntil).then((r: any) => r, () => ({ data: [] as any[] })),
+        supabaseAdmin.from("ledger_entries").select("*").eq("shop_id", shopId).gte("date", wWeekStart).lte("date", wUntil).then((r: any) => r, () => ({ data: [] as any[] })),
         supabaseAdmin.from("shops").select("*").eq("id", shopId).single().then((r: any) => r, () => ({ data: null })),
         supabaseAdmin.from("oracle_settings").select("*").single().then((r: any) => r, () => ({ data: null })),
-        supabaseAdmin.from("sales").select("total_with_tax").eq("shop_id", shopId).gte("date", monthStart).lte("date", until).limit(3000).then((r: any) => r, () => ({ data: [] as any[] })),
+        supabaseAdmin.from("sales").select("total_with_tax").eq("shop_id", shopId).gte("date", monthStart).lte("date", wUntil).limit(3000).then((r: any) => r, () => ({ data: [] as any[] })),
       ]);
 
       const wSalesBase = wSalesRes.data || [];
@@ -178,7 +184,7 @@ export async function GET(req: Request) {
 
       // Perform audit for each day Mon-Sat
       const auditPromises = daysArr.map(async (dayName, i) => {
-        const d = new Date(weekStart);
+        const d = new Date(wWeekStart);
         d.setUTCDate(d.getUTCDate() + i);
         const dayStr = d.toISOString().split('T')[0];
         try {
@@ -206,10 +212,12 @@ export async function GET(req: Request) {
         const { data: emps } = await supabaseAdmin.from("employees").select("id, name, surname").in("id", empIds);
         (emps || []).forEach((e: any) => {
           const cur = staffMap.get(e.id);
-          if (cur) cur.name = `${e.name} ${e.surname || ""}`.trim();
+          if (cur) cur.name = `${e.name || ""} ${e.surname || ""}`.trim() || `Staff ${e.id.substring(0,4)}`;
         });
       }
-      const staffScoreboard = Array.from(staffMap.values()).sort((a, b) => b.revenue - a.revenue);
+      const staffScoreboard = Array.from(staffMap.values())
+        .map(s => ({ ...s, name: s.name === "Unknown Employee" ? "Unnamed Staff" : s.name }))
+        .sort((a, b) => b.revenue - a.revenue);
 
       // Inventory Velocity (Champions & Zombies)
       const velocityMap = new Map<string, { id: string; name: string; qty: number; category: string }>();
@@ -340,7 +348,8 @@ export async function GET(req: Request) {
       overheadCovered: (weeklyOverhead > 0) ? (Number(wNet || 0) / weeklyOverhead) * 100 : 0,
       salesByDay,
       expensesByDay,
-      profitByDay
+      profitByDay,
+      period: { start: wWeekStart, end: wUntil }
     };
   }
 
@@ -598,7 +607,7 @@ export async function GET(req: Request) {
           y = height - margin;
           drawText("WEEKLY STRATEGIC COMMAND ADVISORY", 18, true, COLORS.header);
           drawText(`Operational Pulse & Financial Integrity — ${shopId.toUpperCase()}`, 10, true, rgb(0.3, 0.3, 0.3));
-          drawText(`Audit Window: Mon ${new Date(startOfWeekUTC(date)).toLocaleDateString()} — Sat ${new Date(until).toLocaleDateString()}`, 9, false, rgb(0.5, 0.5, 0.5));
+          drawText(`Audit Window: Mon ${new Date(weeklyData.period.start).toLocaleDateString()} — Sat ${new Date(weeklyData.period.end).toLocaleDateString()}`, 9, false, rgb(0.5, 0.5, 0.5));
           y -= 15;
 
           // RISK RADAR (New)
@@ -636,6 +645,12 @@ export async function GET(req: Request) {
 
           page.drawText(`FINAL NET PULSE:`, { x: margin + 10, y: metY - 80, size: 10, font: fontBold });
           page.drawText(`$${Number(wFinalNet || 0).toFixed(2)}`, { x: margin + 110, y: metY - 80, size: 11, font: fontBold, color: (Number(wFinalNet || 0) > 0) ? COLORS.highlight : COLORS.warning });
+
+          // Weekly Payment Mix (Added back)
+          const pm = weeklyData.paymentMix;
+          page.drawText(`Cash: $${Number(pm.cashTotal || 0).toFixed(0)}`, { x: margin + 10, y: metY - 95, size: 8, font });
+          page.drawText(`Eco: $${Number(pm.ecocashTotal || 0).toFixed(0)}`, { x: margin + 70, y: metY - 95, size: 8, font });
+          page.drawText(`Swipe: $${Number(pm.swipeTotal || 0).toFixed(0)}`, { x: margin + 130, y: metY - 95, size: 8, font });
 
           // Right side: Coverage & MTD
           const overCov = weeklyData.overheadCovered || 0;
@@ -722,7 +737,7 @@ export async function GET(req: Request) {
             page.drawRectangle({ x: margin, y: y - 22, width: width - margin * 2, height: 22, color: i % 2 === 0 ? rgb(0.97, 0.97, 1) : rgb(1, 1, 1) });
             page.drawText(`${i + 1}. ${s.name}`, { x: margin + 10, y: y - 16, size: 9, font: fontBold });
             page.drawText(`${s.sales} units`, { x: margin + 180, y: y - 16, size: 8, font });
-            page.drawText(`$${Number(s.revenue || 0).toFixed(2)}`, { x: width - margin - 80, y: y - 16, size: 9, font: fontBold, color: COLORS.highlight });
+            page.drawText(`$${Number(s.revenue || 0).toFixed(0)}`, { x: width - margin - 80, y: y - 16, size: 9, font: fontBold, color: COLORS.highlight });
             y -= 25;
           });
 
@@ -850,6 +865,9 @@ export async function GET(req: Request) {
           questions.push("Looking at the data, what is the 'hard truth' we've been avoiding about our current inventory strategy?");
           questions.push("If we removed the most expensive 20% of our inventory today, would the customers notice? Would the business be more or less profitable?");
           questions.push("What is the one process in the shop that currently relies 100% on the owner being present? How do we automate it by next week?");
+          questions.push("If NIRVANA was an explorer, what new territory (category or service) would we claim by next month to stay ahead of the map?");
+          questions.push("How can we turn our 'Peak Intensity' hours (see Heatmap) into a high-engagement 'Happy Hour' for premium items?");
+          questions.push("What is the 'Invisible Revenue' we are missing? Is it untapped staff potential, or products we haven't bundled yet?");
           
           y -= 5;
           dialogue.forEach(d => { drawText(`DIAGNOSTIC: ${d}`, 8, false, rgb(0.2,0.2,0.4)); y -= 2; });
@@ -863,19 +881,53 @@ export async function GET(req: Request) {
           } catch (err) { console.error("Page 4 fail:", err); }
         }
 
-        // --- PAGE 5: WEEKLY TRANSACTION INTENSITY (HEATMAP) ---
+        // --- PAGE 5: WEEKLY ACTIVITY LOG (TABULAR) ---
         {
           try {
             page = pdf.addPage(pageSize);
             y = height - margin;
-            drawText("WEEKLY TRANSACTION INTENSITY HEATMAP", 15, true, COLORS.header);
+            drawText("WEEKLY TRANSACTIONAL LOG", 15, true, COLORS.header);
+            y -= 10;
+            
+            const colWidth = (width - margin * 2) / 3;
+            for (let row = 0; row < 2; row++) {
+              let startY = y;
+              let maxRowY = y;
+              for (let col = 0; col < 3; col++) {
+                const dayIdx = row * 3 + col;
+                const dName = daysArr[dayIdx];
+                const sales = weeklyData.salesByDay.get(dName) || [];
+                
+                let curY = startY;
+                page.drawText(dName.toUpperCase(), { x: margin + col * colWidth, y: curY, size: 8, font: fontBold, color: COLORS.primary });
+                curY -= 12;
+                
+                sales.slice(0, 30).forEach((s: any) => {
+                  if (curY < 40) return;
+                  const txt = `${s.item_name.substring(0, 15)}...`;
+                  page.drawText(txt, { x: margin + col * colWidth, y: curY, size: 6, font });
+                  page.drawText(`$${Number(s.total_with_tax || 0).toFixed(0)}`, { x: margin + col * colWidth + colWidth - 30, y: curY, size: 6, font: fontBold });
+                  curY -= 8;
+                });
+                if (curY < maxRowY) maxRowY = curY;
+              }
+              y = maxRowY - 20;
+            }
+          } catch (err) { console.error("Page 5 fail:", err); }
+        }
+
+        // --- PAGE 6: TRANSACTION INTENSITY & PEAK HOURS ---
+        {
+          try {
+            page = pdf.addPage(pageSize);
+            y = height - margin;
+            drawText("TRANSACTION INTENSITY HEATMAP", 15, true, COLORS.header);
             y -= 20;
             
             const cellW = (width - margin * 2) / 6;
             const cellH = 18;
             const hours = [9, 10, 11, 12, 13, 14, 15, 16, 17, 18];
             
-            // Header
             daysArr.forEach((dName, i) => {
               page.drawText(dName.substring(0, 3), { x: margin + i * cellW + 10, y, size: 9, font: fontBold, color: COLORS.primary });
             });
@@ -886,11 +938,8 @@ export async function GET(req: Request) {
               daysArr.forEach((dName, dIdx) => {
                 const daySales = weeklyData.salesByDay.get(dName) || [];
                 const hrSales = daySales.filter((s: any) => new Date(s.date).getHours() === hr).length;
-                
-                // Color intensity based on volume
                 const intensity = Math.min(hrSales / 5, 1);
                 const color = rgb(1 - intensity * 0.2, 1 - intensity * 0.5, 1 - intensity * 0.1); 
-                
                 page.drawRectangle({ x: margin + dIdx * cellW, y, width: cellW - 2, height: cellH - 2, color });
                 if (hrSales > 0) {
                   page.drawText(String(hrSales), { x: margin + dIdx * cellW + cellW/2 - 5, y: y + 5, size: 7, font, color: hrSales > 2 ? rgb(1,1,1) : rgb(0,0,0) });
@@ -900,8 +949,8 @@ export async function GET(req: Request) {
             });
             
             y -= 40;
-            drawText("HEATMAP LEGEND: Darker cells indicate peak transactional pressure. Align staffing to dark zones.", 8, true, COLORS.info);
-          } catch (err) { console.error("Page 5 fail:", err); }
+            drawText("Align staffing shifts with high-intensity darker zones for maximum coverage.", 8, true, COLORS.info);
+          } catch (err) { console.error("Page 6 fail:", err); }
         }
 
         // --- PAGE 7: WEEKLY EXPENSE LOG (TABULAR) ---
@@ -909,12 +958,10 @@ export async function GET(req: Request) {
           try {
             page = pdf.addPage(pageSize);
             y = height - margin;
-            drawText("WEEKLY OPERATIONAL EXPENSES (Mon - Sat)", 15, true, COLORS.header);
+            drawText("WEEKLY OPERATIONAL EXPENSE LOG", 15, true, COLORS.header);
             y -= 10;
             
             const colWidth = (width - margin * 2) / 3;
-            // Use daysArr defined in higher scope
-            
             for (let row = 0; row < 2; row++) {
               let startY = y;
               let maxRowY = y;
@@ -927,11 +974,11 @@ export async function GET(req: Request) {
                 page.drawText(dName.toUpperCase(), { x: margin + col * colWidth, y: curY, size: 8, font: fontBold, color: COLORS.warning });
                 curY -= 12;
                 
-                exps.slice(0, 25).forEach((l: any) => {
-                  if (curY < 50) return;
-                  const txt = `${(l.description || l.category || "").substring(0, 15)}...`;
-                  page.drawText(`${txt}`, { x: margin + col * colWidth, y: curY, size: 6, font });
-                  page.drawText(`$${Number(l.amount || 0).toFixed(1)}`, { x: margin + col * colWidth + colWidth - 35, y: curY, size: 6, font: fontBold });
+                exps.slice(0, 30).forEach((l: any) => {
+                  if (curY < 40) return;
+                  const txt = `${(l.description || l.category || "").substring(0, 18)}...`;
+                  page.drawText(txt, { x: margin + col * colWidth, y: curY, size: 6, font });
+                  page.drawText(`$${Number(l.amount || 0).toFixed(0)}`, { x: margin + col * colWidth + colWidth - 30, y: curY, size: 6, font: fontBold });
                   curY -= 8;
                 });
                 if (curY < maxRowY) maxRowY = curY;
@@ -951,12 +998,12 @@ export async function GET(req: Request) {
               y -= 40;
               drawText("WEEKLY CAPITAL ALLOCATION", 10, true, COLORS.primary);
               drawDonut(width - margin - 70, y - 10, 25, exData.map(d => ({ value: d.val, color: d.col })));
-              page.drawText("Capital Distribution", { x: width - margin - 110, y: y - 35, size: 7, font: fontItalic });
+              page.drawText("Capital Breakdown", { x: width - margin - 110, y: y - 35, size: 7, font: fontItalic });
             }
           } catch (err) { console.error("Page 7 fail:", err); }
         }
 
-        // --- PAGE 6: GROWTH & FORECASTING (ENHANCED) ---
+        // --- PAGE 8: GROWTH & FORECASTING (ENHANCED) ---
         {
           try {
             page = pdf.addPage(pageSize);
@@ -978,10 +1025,7 @@ export async function GET(req: Request) {
             y -= 100;
             drawText("2. GROWTH STRATEGY & MARKETING PLAYBOOK", 12, true, COLORS.oracle);
             y -= 8;
-
-            // Growth Channel Simulated Bar Chart
-            drawText("Recommended Marketing Mix (FB/WhatsApp/Email):", 8, true, COLORS.info);
-            y -= 10;
+            
             const channelData = [
               { label: "FB Ads", value: 35, color: COLORS.primary },
               { label: "WhatsApp", value: 25, color: COLORS.highlight },
@@ -994,21 +1038,16 @@ export async function GET(req: Request) {
             const advice = [
               `• Leverage FLECTERE Marketing: Deploy targeted WhatsApp/Facebook campaigns for "${topMover}".`,
               `• Discount Strategy: Apply a 5-10% 'Volume Spark' discount on stagnant ${weeklyData.velocity.zombies[0]?.name || 'items'}.`,
-              `• Facebook Ads: Budget $20 for a 'Weekend Pulse' campaign focusing on your peak hours (${weeklyData.peakHours[0] ? weeklyData.peakHours[0][0] + ':00' : 'afternoons'}).`,
-              `• Upsell Program: Train staff to bundle ${topMover} with accessories to increase avg basket value.`
+              `• Facebook Ads: Budget $20 for a 'Weekend Pulse' campaign.`,
+              `• Upsell Program: Train staff to bundle items at the POS.`
             ];
             advice.forEach(a => drawText(a, 9, false, rgb(0.2, 0.2, 0.2)));
 
             y -= 20;
-            drawDonut(width/2, y, 40, [
-              { value: totals.withTax, color: COLORS.highlight },
-              { value: (growthTarget - totals.withTax), color: COLORS.info }
-            ]);
-            page.drawText("Current Rev vs. Target Gap", { x: width/2 - 50, y: y - 30, size: 7, font: fontItalic });
-
+            drawDonut(width/2, y, 40, [{ value: totals.withTax, color: COLORS.highlight }, { value: (growthTarget - totals.withTax), color: COLORS.info }]);
             y -= 80;
             page.drawText("Strategic Advisory Sign-off: [G. Guri / FLECTERE / Nirvana]", { x: margin, y: 40, size: 7, font, color: rgb(0.5,0.5,0.5) });
-          } catch (err) { console.error("Page 6 fail:", err); }
+          } catch (err) { console.error("Page 8 fail:", err); }
         }
       } catch (e: any) {
         console.error("Weekly render failed:", e);
