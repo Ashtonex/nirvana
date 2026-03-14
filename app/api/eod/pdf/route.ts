@@ -121,18 +121,37 @@ export async function GET(req: Request) {
       const weekStart = startOfWeekUTC(date);
       const monthStart = new Date(todayDate.getUTCFullYear(), todayDate.getUTCMonth(), 1).toISOString();
       const [wSalesRes, wLedgerRes, shopRes, settingsRes, mtdSalesRes] = await Promise.all([
-        supabaseAdmin.from("sales").select("id, total_with_tax, total_before_tax, tax, discount_applied, landed_cost, quantity, item_id, item_name, date, payment_method, category, seller_name, employee_name, employee_id").eq("shop_id", shopId).gte("date", weekStart).lte("date", until).then((r: any) => r, () => ({ data: [] as any[] })),
+        supabaseAdmin.from("sales").select("id, total_with_tax, total_before_tax, tax, discount_applied, quantity, item_id, item_name, date, payment_method, employee_id").eq("shop_id", shopId).gte("date", weekStart).lte("date", until).then((r: any) => r, () => ({ data: [] as any[] })),
         supabaseAdmin.from("ledger_entries").select("*").eq("shop_id", shopId).gte("date", weekStart).lte("date", until).then((r: any) => r, () => ({ data: [] as any[] })),
         supabaseAdmin.from("shops").select("*").eq("id", shopId).single().then((r: any) => r, () => ({ data: null })),
         supabaseAdmin.from("oracle_settings").select("*").single().then((r: any) => r, () => ({ data: null })),
         supabaseAdmin.from("sales").select("total_with_tax").eq("shop_id", shopId).gte("date", monthStart).lte("date", until).limit(3000).then((r: any) => r, () => ({ data: [] as any[] })),
       ]);
 
-      const wSales = wSalesRes.data || [];
+      const wSalesBase = wSalesRes.data || [];
       const mtdSales = mtdSalesRes.data || [];
       const wLedger = wLedgerRes.data || [];
       const shop = shopRes.data;
       const settings = settingsRes.data;
+
+      // Resolve missing sales metadata (landed_cost, category)
+      const wItemIds = Array.from(new Set(wSalesBase.map((s: any) => s.item_id).filter(Boolean)));
+      let itemMeta: any[] = [];
+      if (wItemIds.length > 0) {
+        const { data: metas } = await supabaseAdmin.from("inventory_items").select("id, landed_cost, category").in("id", wItemIds);
+        itemMeta = metas || [];
+      }
+      const itemMetaMap = new Map(itemMeta.map(m => [m.id, m]));
+
+      const wSales = wSalesBase.map((s: any) => {
+        const meta = itemMetaMap.get(s.item_id);
+        return {
+          ...s,
+          landed_cost: Number(meta?.landed_cost || 0),
+          category: meta?.category || "General"
+        };
+      });
+
       const monthlyOverhead = shop?.expenses
         ? Object.values(shop.expenses).reduce((a: number, b: any) => a + Number(b), 0)
         : 0;
@@ -174,10 +193,8 @@ export async function GET(req: Request) {
       // Staff Scoreboard
       const staffMap = new Map<string, { name: string; sales: number; revenue: number }>();
       wSales.forEach((s: any) => {
-        // Fallback: Use seller_name or employee_name if employee_id is missing or looks like an ID
         const empId = s.employee_id || "Unknown";
-        const empName = s.seller_name || s.employee_name || "Unknown Employee";
-        const cur = staffMap.get(empId) || { name: empName, sales: 0, revenue: 0 };
+        const cur = staffMap.get(empId) || { name: "Unknown Employee", sales: 0, revenue: 0 };
         cur.sales += Number(s.quantity || 0);
         cur.revenue += Number(s.total_with_tax || 0);
         staffMap.set(empId, cur);
