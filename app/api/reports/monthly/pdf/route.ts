@@ -186,7 +186,7 @@ export async function GET(req: Request) {
     // Save PDF
     const pdfBytes = await pdf.save();
 
-    return new Response(pdfBytes, {
+    return new Response(pdfBytes as any, {
       headers: {
         "Content-Type": "application/pdf",
         "Content-Disposition": `attachment; filename="Monthly_Strategic_Report_${shopId}_${month}.pdf"`,
