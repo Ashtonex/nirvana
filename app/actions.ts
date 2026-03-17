@@ -1151,7 +1151,9 @@ export async function recordPosExpense(shopId: string, amount: number, descripti
     revalidatePath('/admin/pos-audit');
 }
 
+
 export async function getOracleMasterPulse() {
+
     const { data: settings } = await supabaseAdmin.from('oracle_settings').select('*').single();
     const { data: inventory } = await supabaseAdmin.from('inventory_items').select('*, inventory_allocations(*)');
     const { data: sales } = await supabaseAdmin.from('sales').select('*');
@@ -2150,7 +2152,153 @@ export async function printZIMRALog() {
     }
 }
 
+
+export async function getMonthlyReportData(shopId: string, monthISO: string) {
+    const actor = await requireManagerOrOwner();
+    const targetDate = new Date(monthISO);
+    const year = targetDate.getUTCFullYear();
+    const month = targetDate.getUTCMonth();
+
+    const startOfMonth = new Date(Date.UTC(year, month, 1, 0, 0, 0, 0)).toISOString();
+    const endOfMonth = new Date(Date.UTC(year, month + 1, 0, 23, 59, 59, 999)).toISOString();
+
+    // Fetch all relevant data for the month
+    const [salesRes, ledgerRes, shopRes, settingsRes, prevSalesRes] = await Promise.all([
+        supabaseAdmin.from("sales").select("*").eq("shop_id", shopId).gte("date", startOfMonth).lte("date", endOfMonth),
+        supabaseAdmin.from("ledger_entries").select("*").eq("shop_id", shopId).gte("date", startOfMonth).lte("date", endOfMonth),
+        supabaseAdmin.from("shops").select("*").eq("id", shopId).single(),
+        supabaseAdmin.from("oracle_settings").select("*").single(),
+        supabaseAdmin.from("sales").select("client_name").eq("shop_id", shopId).lt("date", startOfMonth)
+    ]);
+
+    const sales = salesRes.data || [];
+    const ledger = ledgerRes.data || [];
+    const shop = shopRes.data;
+    const settings = settingsRes.data;
+    const prevSalesClients = new Set((prevSalesRes.data || []).map((s: any) => String(s.client_name || "").toLowerCase()).filter(Boolean));
+
+    const revenue = sales.reduce((sum: number, s: any) => sum + Number(s.total_with_tax || 0), 0);
+    const revenuePreTax = sales.reduce((sum: number, s: any) => sum + Number(s.total_before_tax || 0), 0);
+    const tax = sales.reduce((sum: number, s: any) => sum + Number(s.tax || 0), 0);
+    
+    // Per user request: COGS is 35% of revenue
+    const estimatedCOGS = revenuePreTax * 0.35;
+    const grossProfit = revenuePreTax - estimatedCOGS;
+    const grossMargin = revenuePreTax > 0 ? (grossProfit / revenuePreTax) * 100 : 0;
+
+    // Weekly breakdowns (Mon-Sat)
+    const weeks: any[] = [];
+    let currentWeekStart = new Date(startOfMonth);
+    while (currentWeekStart <= new Date(endOfMonth)) {
+        const day = currentWeekStart.getUTCDay();
+        const diff = currentWeekStart.getUTCDate() - (day === 0 ? 6 : day - 1);
+        const mon = new Date(currentWeekStart);
+        mon.setUTCDate(diff);
+        mon.setUTCHours(0,0,0,0);
+        
+        const sat = new Date(mon);
+        sat.setUTCDate(mon.getUTCDate() + 5);
+        sat.setUTCHours(23,59,59,999);
+
+        const wStart = mon.toISOString();
+        const wEnd = sat.toISOString();
+
+        const wSales = sales.filter((s: any) => s.date >= wStart && s.date <= wEnd);
+        const wLedger = ledger.filter((l: any) => l.date >= wStart && l.date <= wEnd);
+
+        weeks.push({
+            start: wStart,
+            end: wEnd,
+            sales: wSales.reduce((sum: number, s: any) => sum + Number(s.total_with_tax || 0), 0),
+            expenses: wLedger.reduce((sum: number, l: any) => sum + Number(l.amount || 0), 0),
+        });
+
+        currentWeekStart.setUTCDate(currentWeekStart.getUTCDate() + 7);
+        if (weeks.length > 5) break; // Safety
+    }
+
+    // Category Performance
+    const itemIds = Array.from(new Set(sales.map((s: any) => s.item_id).filter(Boolean)));
+    const { data: items } = await supabaseAdmin.from("inventory_items").select("id, name, category").in("id", itemIds);
+    const itemMap = new Map((items as any[] || []).map(i => [i.id, i]));
+
+    const catStats = new Map<string, { revenue: number, profit: number, qty: number }>();
+    sales.forEach((s: any) => {
+        const item = itemMap.get(s.item_id) as any;
+        const cat = item?.category || "General";
+
+        const cur = catStats.get(cat) || { revenue: 0, profit: 0, qty: 0 };
+        const rev = Number(s.total_before_tax || 0);
+        cur.revenue += rev;
+        cur.profit += rev * 0.65; // Since COGS is 35%
+        cur.qty += Number(s.quantity || 0);
+        catStats.set(cat, cur);
+    });
+
+    // Customer Acquisition
+    let newCustomers = 0;
+    let returningCustomers = 0;
+    const monthlyClients = new Set<string>();
+    sales.forEach((s: any) => {
+        const name = String(s.client_name || "").toLowerCase();
+        if (!name || name === "general walk-in") return;
+        if (monthlyClients.has(name)) return;
+        
+        monthlyClients.add(name);
+        if (prevSalesClients.has(name)) {
+            returningCustomers++;
+        } else {
+            newCustomers++;
+        }
+    });
+
+    // Costs
+    const shopEx = shop?.expenses || { rent: 0, salaries: 0, utilities: 0, misc: 0 };
+    const fixedCosts = Number(shopEx.rent || 0) + Number(shopEx.salaries || 0);
+    const variableCosts = Number(shopEx.utilities || 0) + Number(shopEx.misc || 0) + ledger.filter((l: any) => l.category !== 'Fixed').reduce((sum: number, l: any) => sum + Number(l.amount || 0), 0);
+
+
+    // Inventory Turnover (Approx)
+    // Avg Inventory = (Total possible stock values) / 2
+    // For now, let's use a simplified turnover: COGS / Avg Inventory Value
+    // We'll approximate Avg Inventory Value as the current inventory value in the shop
+    const { data: allocations } = await supabaseAdmin.from("inventory_allocations").select("item_id, quantity").eq("shop_id", shopId).gt("quantity", 0);
+    let currentInvValue = 0;
+    if (allocations && allocations.length > 0) {
+        const itmIds = allocations.map((a: any) => a.item_id);
+        const { data: itemPrices } = await supabaseAdmin.from("inventory_items").select("id, landed_cost, acquisition_price").in("id", itmIds);
+        const priceMap = new Map((itemPrices as any[] || []).map((i: any) => [i.id, Number(i.landed_cost || i.acquisition_price || 0)]));
+        allocations.forEach((a: any) => {
+            currentInvValue += (Number(a.quantity || 0) * (Number(priceMap.get(a.item_id)) || 0));
+        });
+    }
+
+    const turnover = currentInvValue > 0 ? estimatedCOGS / currentInvValue : 0;
+
+    return {
+        period: { year, month: month + 1, start: startOfMonth, end: endOfMonth },
+        finances: {
+            revenue,
+            revenuePreTax,
+            tax,
+            estimatedCOGS,
+            grossProfit,
+            grossMargin,
+            fixedCosts,
+            variableCosts,
+            netProfit: grossProfit - fixedCosts - variableCosts
+        },
+        weeks,
+        categories: Array.from(catStats.entries()).map(([name, stats]) => ({ name, ...stats })),
+        customers: { new: newCustomers, returning: returningCustomers, total: monthlyClients.size },
+        turnover,
+        shopName: shop?.name || shopId
+    };
+}
+
+
 export async function updatePosExpense(id: string, updates: { amount?: number; description?: string }) {
+
     const actor = await requireManagerOrOwner();
     const timestamp = new Date().toISOString();
 

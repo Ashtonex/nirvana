@@ -2,6 +2,13 @@ export const dynamic = 'force-dynamic';
 
 import { getOracleMasterPulse, triggerAutomatedReports } from "../actions";
 import { OraclePulse } from "@/components/OraclePulse";
+import { MonthlyReportGenerator } from "@/components/MonthlyReportGenerator";
+
+import {
+    Input,
+    Badge,
+    Button
+} from "@/components/ui";
 import {
     Compass,
     Flame,
@@ -10,9 +17,19 @@ import {
     Zap,
     ShieldCheck,
     Calendar,
-    ArrowUpRight
+    ArrowUpRight,
+    FileBarChart,
+    Download,
+    ChevronRight,
+    Target,
+    Sparkles,
+    Loader2
 } from "lucide-react";
-import { Badge, Button } from "@/components/ui";
+
+interface ShopPerformanceItem {
+    id: string;
+    name: string;
+}
 
 export default async function IntelligencePage() {
     const pulse = await getOracleMasterPulse();
@@ -81,7 +98,13 @@ export default async function IntelligencePage() {
             {/* PULSE CONTENT */}
             <OraclePulse data={pulse} />
 
+            <div className="max-w-6xl mx-auto mt-12 px-4 shadow-sm">
+                <MonthlyReportGenerator shops={pulse.shopPerformance.map((s: any) => ({ id: s.id, name: s.name }))} />
+            </div>
+
+
             {/* AD-HOC SIMULATION (For User to test the automation) */}
+
             <div className="mt-12 flex flex-col items-center gap-4">
                 <p className="text-[10px] font-black text-slate-600 uppercase italic tracking-[0.3em]">Manual Scrying overrides (Simulation Only)</p>
                 <div className="flex flex-wrap justify-center gap-4">
