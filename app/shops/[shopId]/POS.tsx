@@ -938,16 +938,26 @@ Generated via NIRVANA POS`;
             }
 
             const totals = data?.totals;
-            const isWeeklyDay = data?.isWeeklyDay;
+            const now = new Date();
+            const dayOfWeek = now.getDay();
+            const todayDate = now.getDate();
+            const lastDayOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+            
+            const isWeeklyDay = dayOfWeek === 6; // Saturday
+            let isMonthlyDay = false;
+            if ((todayDate === 30 || todayDate === 31 || todayDate === lastDayOfMonth) && dayOfWeek !== 0) {
+                isMonthlyDay = true;
+            }
             
             const msgLines = [
                 `NIRVANA EOD — ${shopId.toUpperCase()}`,
                 `Date: ${new Date().toLocaleDateString()}`,
                 isWeeklyDay ? '📊 Weekly Report Also Generated!' : null,
+                isMonthlyDay ? '📈 Monthly Strategic Report Included!' : null,
                 totals ? `Transactions: ${totals.count}` : null,
                 totals ? `Total (inc tax): $${Number(totals.totalWithTax || 0).toFixed(2)}` : null,
                 totals ? `Net Revenue: $${Number((totals.totalWithTax || 0) - (totals.totalExpenses || 0)).toFixed(2)}` : null,
-                `Report PDF is attached.`
+                `Report PDFs attached.`
             ].filter(Boolean);
             setEodShareText(msgLines.join('\n'));
 
@@ -982,6 +992,20 @@ Generated via NIRVANA POS`;
                     const err = await pdfRes.json().catch(() => ({}));
                     console.error('EOD PDF failed:', err);
                     alert("PDF generation failed, but you can still log out. Check 'Reports' later.");
+                }
+
+                if (isMonthlyDay) {
+                     const moRes = await fetch(`/api/reports/monthly/pdf?shopId=${encodeURIComponent(shopId)}`);
+                     if (moRes.ok) {
+                         const moBlob = await moRes.blob();
+                         const fileUrl = window.URL.createObjectURL(moBlob);
+                         const a = document.createElement("a");
+                         a.href = fileUrl;
+                         a.download = `Monthly_Strategic_${shopId}_${dayStamp}.pdf`;
+                         document.body.appendChild(a);
+                         a.click();
+                         window.URL.revokeObjectURL(fileUrl);
+                     }
                 }
             } catch (e) {
                 console.error('EOD PDF exception:', e);

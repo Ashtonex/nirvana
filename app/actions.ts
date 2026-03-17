@@ -2389,6 +2389,140 @@ export async function reapportionStock(itemId: string, allocations: { shopId: st
         details: `${item.name} reapportioned across ${allocations.length} shops by ${actor.name}`
     });
 
-    revalidatePath('/admin/inventory-manager');
     revalidatePath('/shops');
+}
+
+export async function getQuarterlyReportData(shopId: string, monthISO: string) {
+    const actor = await requireManagerOrOwner();
+    const targetDate = new Date(monthISO);
+    
+    // We want the quarter ending on this month (i.e. this month is the last of the 3 months)
+    const year = targetDate.getUTCFullYear();
+    const endMonth = targetDate.getUTCMonth();
+    
+    // Calculate the start of the quarter (3 months backward including the target month)
+    const startDate = new Date(Date.UTC(year, endMonth - 2, 1, 0, 0, 0, 0));
+    
+    const startOfQuarter = startDate.toISOString();
+    const endOfQuarter = new Date(Date.UTC(year, endMonth + 1, 0, 23, 59, 59, 999)).toISOString();
+
+    // Fetch all relevant data for the quarter
+    const [salesRes, ledgerRes, shopRes, settingsRes, prevSalesRes] = await Promise.all([
+        supabaseAdmin.from("sales").select("*").eq("shop_id", shopId).gte("date", startOfQuarter).lte("date", endOfQuarter),
+        supabaseAdmin.from("ledger_entries").select("*").eq("shop_id", shopId).gte("date", startOfQuarter).lte("date", endOfQuarter),
+        supabaseAdmin.from("shops").select("*").eq("id", shopId).single(),
+        supabaseAdmin.from("oracle_settings").select("*").single(),
+        supabaseAdmin.from("sales").select("client_name").eq("shop_id", shopId).lt("date", startOfQuarter)
+    ]);
+
+    const sales = salesRes.data || [];
+    const ledger = ledgerRes.data || [];
+    const shop = shopRes.data;
+    const settings = settingsRes.data;
+    const prevSalesClients = new Set((prevSalesRes.data || []).map((s: any) => String(s.client_name || "").toLowerCase()).filter(Boolean));
+
+    const revenue = sales.reduce((sum: number, s: any) => sum + Number(s.total_with_tax || 0), 0);
+    const revenuePreTax = sales.reduce((sum: number, s: any) => sum + Number(s.total_before_tax || 0), 0);
+    const tax = sales.reduce((sum: number, s: any) => sum + Number(s.tax || 0), 0);
+    
+    // Per user request: COGS is 35% of revenue
+    const estimatedCOGS = revenuePreTax * 0.35;
+    const grossProfit = revenuePreTax - estimatedCOGS;
+    const grossMargin = revenuePreTax > 0 ? (grossProfit / revenuePreTax) * 100 : 0;
+
+    // Monthly breakdowns for the 3 months
+    const months: any[] = [];
+    for (let m = 0; m < 3; m++) {
+        const currentMonthStart = new Date(Date.UTC(startDate.getUTCFullYear(), startDate.getUTCMonth() + m, 1, 0, 0, 0, 0));
+        const currentMonthEnd = new Date(Date.UTC(currentMonthStart.getUTCFullYear(), currentMonthStart.getUTCMonth() + 1, 0, 23, 59, 59, 999));
+        
+        const mStart = currentMonthStart.toISOString();
+        const mEnd = currentMonthEnd.toISOString();
+
+        const mSales = sales.filter((s: any) => s.date >= mStart && s.date <= mEnd);
+        const mLedger = ledger.filter((l: any) => l.date >= mStart && l.date <= mEnd);
+
+        months.push({
+            start: mStart,
+            end: mEnd,
+            sales: mSales.reduce((sum: number, s: any) => sum + Number(s.total_with_tax || 0), 0),
+            expenses: mLedger.reduce((sum: number, l: any) => sum + Number(l.amount || 0), 0),
+        });
+    }
+
+    // Category Performance
+    const itemIds = Array.from(new Set(sales.map((s: any) => s.item_id).filter(Boolean)));
+    const { data: items } = await supabaseAdmin.from("inventory_items").select("id, name, category").in("id", itemIds);
+    const itemMap = new Map((items as any[] || []).map(i => [i.id, i]));
+
+    const catStats = new Map<string, { revenue: number, profit: number, qty: number }>();
+    sales.forEach((s: any) => {
+        const item = itemMap.get(s.item_id) as any;
+        const cat = item?.category || "General";
+
+        const cur = catStats.get(cat) || { revenue: 0, profit: 0, qty: 0 };
+        const rev = Number(s.total_before_tax || 0);
+        cur.revenue += rev;
+        cur.profit += rev * 0.65; // Since COGS is 35%
+        cur.qty += Number(s.quantity || 0);
+        catStats.set(cat, cur);
+    });
+
+    // Customer Acquisition
+    let newCustomers = 0;
+    let returningCustomers = 0;
+    const quarterlyClients = new Set<string>();
+    sales.forEach((s: any) => {
+        const name = String(s.client_name || "").toLowerCase();
+        if (!name || name === "general walk-in") return;
+        if (quarterlyClients.has(name)) return;
+        
+        quarterlyClients.add(name);
+        if (prevSalesClients.has(name)) {
+            returningCustomers++;
+        } else {
+            newCustomers++;
+        }
+    });
+
+    // Costs
+    const shopEx = shop?.expenses || { rent: 0, salaries: 0, utilities: 0, misc: 0 };
+    // Multiply fixed shop expenses by 3 since it's a quarter
+    const fixedCosts = (Number(shopEx.rent || 0) + Number(shopEx.salaries || 0)) * 3;
+    const variableCosts = (Number(shopEx.utilities || 0) + Number(shopEx.misc || 0)) * 3 + ledger.filter((l: any) => l.category !== 'Fixed').reduce((sum: number, l: any) => sum + Number(l.amount || 0), 0);
+
+
+    // Inventory Turnover (Approx)
+    const { data: allocations } = await supabaseAdmin.from("inventory_allocations").select("item_id, quantity").eq("shop_id", shopId).gt("quantity", 0);
+    let currentInvValue = 0;
+    if (allocations && allocations.length > 0) {
+        const itmIds = allocations.map((a: any) => a.item_id);
+        const { data: itemPrices } = await supabaseAdmin.from("inventory_items").select("id, landed_cost, acquisition_price").in("id", itmIds);
+        const priceMap = new Map((itemPrices as any[] || []).map((i: any) => [i.id, Number(i.landed_cost || i.acquisition_price || 0)]));
+        allocations.forEach((a: any) => {
+            currentInvValue += (Number(a.quantity || 0) * (Number(priceMap.get(a.item_id)) || 0));
+        });
+    }
+
+    const turnover = currentInvValue > 0 ? estimatedCOGS / currentInvValue : 0;
+
+    return {
+        period: { year, startMonth: startDate.getUTCMonth() + 1, endMonth: endMonth + 1, start: startOfQuarter, end: endOfQuarter },
+        finances: {
+            revenue,
+            revenuePreTax,
+            tax,
+            estimatedCOGS,
+            grossProfit,
+            grossMargin,
+            fixedCosts,
+            variableCosts,
+            netProfit: grossProfit - fixedCosts - variableCosts
+        },
+        months,
+        categories: Array.from(catStats.entries()).map(([name, stats]) => ({ name, ...stats })),
+        customers: { new: newCustomers, returning: returningCustomers, total: quarterlyClients.size },
+        turnover,
+        shopName: shop?.name || shopId
+    };
 }

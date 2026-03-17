@@ -1,0 +1,23 @@
+
+> nirvana@0.1.0 build
+> next build
+
+Γû▓ Next.js 16.1.6 (Turbopack)
+- Environments: .env.local
+
+  Creating an optimized production build ...
+Γ£ô Compiled successfully in 50s
+  Running TypeScript ...
+Failed to compile.
+
+.next/dev/types/validator.ts:548:39
+Type error: Cannot find module '../../../app/api/test/route.js' or its corresponding type declarations.
+
+  546 | {
+  547 |   type __IsExpected<Specific extends RouteHandlerConfig<"/api/test">> = Specific
+> 548 |   const handler = {} as typeof import("../../../app/api/test/route.js")
+      |                                       ^
+  549 |   type __Check = __IsExpected<typeof handler>
+  550 |   // @ts-ignore
+  551 |   type __Unused = __Check
+Next.js build worker exited with code: 1 and signal: null

@@ -1,0 +1,86 @@
+
+> nirvana@0.1.0 build
+> next build
+
+Γû▓ Next.js 16.1.6 (Turbopack)
+- Environments: .env.local
+
+  Creating an optimized production build ...
+Γ£ô Compiled successfully in 45s
+  Running TypeScript ...
+  Collecting page data using 7 workers ...
+  Generating static pages using 7 workers (0/39) ...
+  Generating static pages using 7 workers (9/39) 
+  Generating static pages using 7 workers (19/39) 
+  Generating static pages using 7 workers (29/39) 
+Γ£ô Generating static pages using 7 workers (39/39) in 3.5s
+  Finalizing page optimization ...
+
+Route (app)
+Γöî ╞Æ /
+Γö£ Γùï /_not-found
+Γö£ Γùï /admin/audit
+Γö£ Γùï /admin/backups
+Γö£ ╞Æ /admin/eod
+Γö£ Γùï /admin/inventory-manager
+Γö£ Γùï /admin/pos-audit
+Γö£ ╞Æ /admin/settings
+Γö£ ╞Æ /admin/tax
+Γö£ ╞Æ /api/admin/nuke
+Γö£ ╞Æ /api/auth/me
+Γö£ ╞Æ /api/backups
+Γö£ ╞Æ /api/backups/download
+Γö£ ╞Æ /api/backups/restore
+Γö£ ╞Æ /api/chat
+Γö£ ╞Æ /api/dashboard/realtime
+Γö£ ╞Æ /api/docs/tax-guide
+Γö£ ╞Æ /api/eod
+Γö£ ╞Æ /api/eod/historical
+Γö£ ╞Æ /api/eod/pdf
+Γö£ ╞Æ /api/inventory/low-stock-pdf
+Γö£ ╞Æ /api/inventory/purge
+Γö£ ╞Æ /api/notifications
+Γö£ ╞Æ /api/notifications/[id]
+Γö£ ╞Æ /api/owner/login
+Γö£ ╞Æ /api/owner/logout
+Γö£ ╞Æ /api/pos-audit/pdf
+Γö£ ╞Æ /api/reports/monthly/pdf
+Γö£ ╞Æ /api/reports/quarterly/pdf
+Γö£ ╞Æ /api/returns
+Γö£ ╞Æ /api/sales/offline
+Γö£ ╞Æ /api/sales/untracked
+Γö£ ╞Æ /api/settings/update-tax
+Γö£ ╞Æ /api/staff/chat
+Γö£ ╞Æ /api/staff/login
+Γö£ ╞Æ /api/staff/logout
+Γö£ ╞Æ /api/staff/me
+Γö£ ╞Æ /api/staff/request
+Γö£ ╞Æ /api/staff/status
+Γö£ ╞Æ /api/staff/verify
+Γö£ ╞Æ /api/stock-requests
+Γö£ ╞Æ /api/verify-mobile
+Γö£ ╞Æ /api/verify-mobile/confirm
+Γö£ Γùï /chat
+Γö£ ╞Æ /employees
+Γö£ ╞Æ /employees/leaderboard
+Γö£ ╞Æ /finance
+Γö£ ╞Æ /finance/oracle
+Γö£ ╞Æ /intelligence
+Γö£ ╞Æ /inventory
+Γö£ ╞Æ /inventory/history
+Γö£ Γùï /inventory/stocktake
+Γö£ Γùï /login
+Γö£ ╞Æ /mobile-menu
+Γö£ ╞Æ /quotations/[quoteId]
+Γö£ ╞Æ /reports
+Γö£ ╞Æ /shops/[shopId]
+Γö£ Γùï /staff-chat
+Γö£ Γùï /staff-login
+Γöö ╞Æ /transfers
+
+
+╞Æ Proxy (Middleware)
+
+Γùï  (Static)   prerendered as static content
+╞Æ  (Dynamic)  server-rendered on demand
+
