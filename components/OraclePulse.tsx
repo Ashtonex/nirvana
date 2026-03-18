@@ -38,13 +38,32 @@ interface OraclePulseProps {
 }
 
 export function OraclePulse({ data }: OraclePulseProps) {
+    // Guard against malformed data
+    if (!data || typeof data !== 'object') {
+        return (
+            <div className="text-center text-slate-500 py-10">
+                Loading pulse data...
+            </div>
+        );
+    }
+
+    const safeData = {
+        totalUnits: typeof data.totalUnits === 'number' ? data.totalUnits : 0,
+        categoryBreakdown: data.categoryBreakdown || {},
+        finances: data.finances || { revenue: 0, tax: 0, grossProfit: 0, netIncome: 0 },
+        shopPerformance: Array.isArray(data.shopPerformance) ? data.shopPerformance : [],
+        deadCapital: typeof data.deadCapital === 'number' ? data.deadCapital : 0,
+        zombieCount: typeof data.zombieCount === 'number' ? data.zombieCount : 0,
+        recentEmails: Array.isArray(data.recentEmails) ? data.recentEmails : [],
+    };
+
     return (
         <div className="space-y-6">
             <div className="grid gap-4 md:grid-cols-4">
                 <Card className="bg-slate-900/50 border-slate-800">
                     <CardHeader className="pb-2">
                         <CardDescription className="text-[10px] font-black uppercase tracking-widest text-slate-500">Total Global Inventory</CardDescription>
-                        <CardTitle className="text-2xl font-black italic">{data.totalUnits.toLocaleString()} units</CardTitle>
+                        <CardTitle className="text-2xl font-black italic">{safeData.totalUnits.toLocaleString()} units</CardTitle>
                     </CardHeader>
                     <CardContent>
                         <div className="flex items-center gap-1.5 text-[10px] font-bold text-emerald-500 uppercase">
@@ -56,7 +75,7 @@ export function OraclePulse({ data }: OraclePulseProps) {
                 <Card className="bg-slate-900/50 border-slate-800">
                     <CardHeader className="pb-2">
                         <CardDescription className="text-[10px] font-black uppercase tracking-widest text-slate-500">Gross Contribution</CardDescription>
-                        <CardTitle className="text-2xl font-black italic text-emerald-400">${data.finances.grossProfit.toLocaleString()}</CardTitle>
+                        <CardTitle className="text-2xl font-black italic text-emerald-400">${safeData.finances.grossProfit.toLocaleString()}</CardTitle>
                     </CardHeader>
                     <CardContent>
                         <div className="text-[10px] font-bold text-slate-500 uppercase">After Landed Costs</div>
@@ -66,7 +85,7 @@ export function OraclePulse({ data }: OraclePulseProps) {
                 <Card className="bg-slate-900/50 border-slate-800">
                     <CardHeader className="pb-2">
                         <CardDescription className="text-[10px] font-black uppercase tracking-widest text-slate-500">Tax Obligation (15.5%)</CardDescription>
-                        <CardTitle className="text-2xl font-black italic text-amber-500">${data.finances.tax.toLocaleString()}</CardTitle>
+                        <CardTitle className="text-2xl font-black italic text-amber-500">${safeData.finances.tax.toLocaleString()}</CardTitle>
                     </CardHeader>
                     <CardContent>
                         <div className="text-[10px] font-bold text-slate-500 uppercase italic">Provisioned for Revenue Auth</div>
@@ -76,11 +95,11 @@ export function OraclePulse({ data }: OraclePulseProps) {
                 <Card className="bg-slate-900/50 border-rose-500/20">
                     <CardHeader className="pb-2">
                         <CardDescription className="text-[10px] font-black uppercase tracking-widest text-rose-500/50">Dead Revenue (Zombies)</CardDescription>
-                        <CardTitle className="text-2xl font-black italic text-rose-500">${data.deadCapital.toLocaleString()}</CardTitle>
+                        <CardTitle className="text-2xl font-black italic text-rose-500">${safeData.deadCapital.toLocaleString()}</CardTitle>
                     </CardHeader>
                     <CardContent>
                         <div className="flex items-center gap-1.5 text-[10px] font-bold text-rose-500 uppercase">
-                            <Skull className="h-3 w-3" /> {data.zombieCount} items stagnant
+                            <Skull className="h-3 w-3" /> {safeData.zombieCount} items stagnant
                         </div>
                     </CardContent>
                 </Card>
@@ -95,7 +114,7 @@ export function OraclePulse({ data }: OraclePulseProps) {
                         <CardDescription className="text-[10px] font-bold uppercase">Revenue vs Base Expenses (Targets)</CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-6">
-                        {data.shopPerformance.map(shop => (
+                        {safeData.shopPerformance.map(shop => (
                             <div key={shop.id} className="space-y-2">
                                 <div className="flex justify-between items-end">
                                     <div>
@@ -135,9 +154,9 @@ export function OraclePulse({ data }: OraclePulseProps) {
                     </CardHeader>
                     <CardContent>
                         <div className="space-y-4">
-                            {data.recentEmails.length === 0 ? (
+                            {safeData.recentEmails.length === 0 ? (
                                 <p className="text-center py-10 text-[10px] font-black text-slate-600 uppercase italic">No transmission history detected</p>
-                            ) : data.recentEmails.map(email => (
+                            ) : safeData.recentEmails.map(email => (
                                 <div key={email.id} className="p-3 rounded-lg bg-slate-900/50 border border-slate-800 space-y-1">
                                     <div className="flex justify-between items-start">
                                         <Badge variant="outline" className={cn(

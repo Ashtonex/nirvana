@@ -29,10 +29,14 @@ interface MonthlyReportGeneratorProps {
     shops: { id: string, name: string }[];
 }
 
-export function MonthlyReportGenerator({ shops }: MonthlyReportGeneratorProps) {
+export function MonthlyReportGenerator({ shops: shopsProp }: MonthlyReportGeneratorProps) {
+    const shops = Array.isArray(shopsProp) ? shopsProp : [];
     const [selectedShop, setSelectedShop] = useState(shops[0]?.id || "");
     const [selectedMonth, setSelectedMonth] = useState(() => new Date().toISOString().substring(0, 7));
     const [isPending, startTransition] = useTransition();
+
+    // Default to first shop if selectedShop is empty but shops exist
+    const effectiveSelectedShop = selectedShop || shops[0]?.id || "";
 
     const handleGenerate = async () => {
         if (!selectedShop || !selectedMonth) return;
