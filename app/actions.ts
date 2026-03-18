@@ -2205,6 +2205,9 @@ export async function getMonthlyReportData(shopId: string, monthISO: string) {
     const startOfMonth = new Date(Date.UTC(year, month, 1, 0, 0, 0, 0)).toISOString();
     const endOfMonth = new Date(Date.UTC(year, month + 1, 0, 23, 59, 59, 999)).toISOString();
 
+    const prevMonthStart = new Date(Date.UTC(year, month - 1, 1, 0, 0, 0, 0)).toISOString();
+    const prevMonthEnd = new Date(Date.UTC(year, month, 0, 23, 59, 59, 999)).toISOString();
+
     const { data: globalShops } = isGlobal
         ? await supabaseAdmin.from("shops").select("*")
         : { data: null as any };
@@ -2213,8 +2216,8 @@ export async function getMonthlyReportData(shopId: string, monthISO: string) {
         ? (globalShops || []).map((s: any) => String(s?.id || "")).filter(Boolean)
         : [shopId].filter(Boolean);
 
-    // Fetch all relevant data for the month
-    const [salesRes, ledgerRes, shopRes, settingsRes, prevSalesRes] = await Promise.all([
+    // Fetch all relevant data for the month (+ previous month for comparison)
+    const [salesRes, ledgerRes, shopRes, settingsRes, prevSalesRes, prevPeriodSalesRes, prevPeriodLedgerRes] = await Promise.all([
         shopIds.length
             ? supabaseAdmin.from("sales").select("*").in("shop_id", shopIds).gte("date", startOfMonth).lte("date", endOfMonth)
             : Promise.resolve({ data: [] } as any),
@@ -2225,6 +2228,12 @@ export async function getMonthlyReportData(shopId: string, monthISO: string) {
         supabaseAdmin.from("oracle_settings").select("*").single(),
         shopIds.length
             ? supabaseAdmin.from("sales").select("client_name").in("shop_id", shopIds).lt("date", startOfMonth)
+            : Promise.resolve({ data: [] } as any),
+        shopIds.length
+            ? supabaseAdmin.from("sales").select("*").in("shop_id", shopIds).gte("date", prevMonthStart).lte("date", prevMonthEnd)
+            : Promise.resolve({ data: [] } as any),
+        shopIds.length
+            ? supabaseAdmin.from("ledger_entries").select("*").in("shop_id", shopIds).gte("date", prevMonthStart).lte("date", prevMonthEnd)
             : Promise.resolve({ data: [] } as any)
     ]);
 
@@ -2233,6 +2242,8 @@ export async function getMonthlyReportData(shopId: string, monthISO: string) {
     const shop = shopRes.data;
     const settings = settingsRes.data;
     const prevSalesClients = new Set((prevSalesRes.data || []).map((s: any) => String(s.client_name || "").toLowerCase()).filter(Boolean));
+    const prevSalesPeriod = prevPeriodSalesRes?.data || [];
+    const prevLedgerPeriod = prevPeriodLedgerRes?.data || [];
 
     const revenue = sales.reduce((sum: number, s: any) => sum + Number(s.total_with_tax || 0), 0);
     const revenuePreTax = sales.reduce((sum: number, s: any) => sum + Number(s.total_before_tax || 0), 0);
@@ -2334,6 +2345,8 @@ export async function getMonthlyReportData(shopId: string, monthISO: string) {
         variableCostsBase +
         ledger.filter((l: any) => l.category !== 'Fixed').reduce((sum: number, l: any) => sum + Number(l.amount || 0), 0);
 
+    const operatingExpenses = fixedCosts + variableCosts;
+
 
     // Inventory Turnover (Approx)
     // Avg Inventory = (Total possible stock values) / 2
@@ -2355,6 +2368,84 @@ export async function getMonthlyReportData(shopId: string, monthISO: string) {
     }
 
     const turnover = currentInvValue > 0 ? estimatedCOGS / currentInvValue : 0;
+    const daysInMonth = Math.max(1, new Date(endOfMonth).getUTCDate());
+    const estimatedCogsPerDay = estimatedCOGS / daysInMonth;
+    const daysOfInventory = estimatedCogsPerDay > 0 ? currentInvValue / estimatedCogsPerDay : 0;
+
+    const expenseByCategory = (ledger || []).reduce((acc: Record<string, number>, l: any) => {
+        const cat = String(l?.category || "Uncategorized");
+        acc[cat] = (acc[cat] || 0) + Number(l?.amount || 0);
+        return acc;
+    }, {});
+
+    const expenseCategories = Object.entries(expenseByCategory)
+        .map(([category, amount]) => ({ category, amount }))
+        .sort((a: any, b: any) => Number(b.amount || 0) - Number(a.amount || 0));
+
+    const salesByShop = (sales || []).reduce((acc: Record<string, any[]>, s: any) => {
+        const sid = String(s?.shop_id || "");
+        if (!sid) return acc;
+        acc[sid] = acc[sid] || [];
+        acc[sid].push(s);
+        return acc;
+    }, {} as Record<string, any[]>);
+
+    const ledgerByShop = (ledger || []).reduce((acc: Record<string, any[]>, l: any) => {
+        const sid = String(l?.shop_id || "");
+        if (!sid) return acc;
+        acc[sid] = acc[sid] || [];
+        acc[sid].push(l);
+        return acc;
+    }, {} as Record<string, any[]>);
+
+    const baseShops = (isGlobal ? (globalShops || []) : [shop]).filter(Boolean);
+    const perShop = baseShops.map((s: any) => {
+        const sid = String(s?.id || shopId);
+        const sSales = salesByShop[sid] || [];
+        const sLedger = ledgerByShop[sid] || [];
+        const sRevenuePreTax = sSales.reduce((sum: number, r: any) => sum + Number(r.total_before_tax || 0), 0);
+        const sRevenue = sSales.reduce((sum: number, r: any) => sum + Number(r.total_with_tax || 0), 0);
+        const sTax = sSales.reduce((sum: number, r: any) => sum + Number(r.tax || 0), 0);
+        const sEstimatedCOGS = sRevenuePreTax * 0.35;
+        const sGrossProfit = sRevenuePreTax - sEstimatedCOGS;
+        const sGrossMargin = sRevenuePreTax > 0 ? (sGrossProfit / sRevenuePreTax) * 100 : 0;
+        const structured = Object.values((s as any)?.expenses || {}).reduce((sum: number, v: any) => sum + Number(v || 0), 0);
+        const ledgerExp = sLedger.reduce((sum: number, r: any) => sum + Number(r.amount || 0), 0);
+        const sOperatingExpenses = structured + ledgerExp;
+        const sNetProfit = sGrossProfit - sOperatingExpenses;
+
+        return {
+            id: sid,
+            name: String((s as any)?.name || sid),
+            revenue: sRevenue,
+            revenuePreTax: sRevenuePreTax,
+            tax: sTax,
+            grossProfit: sGrossProfit,
+            grossMargin: sGrossMargin,
+            operatingExpenses: sOperatingExpenses,
+            netProfit: sNetProfit,
+        };
+    });
+
+    const prevRevenuePreTax = (prevSalesPeriod || []).reduce((sum: number, s: any) => sum + Number(s.total_before_tax || 0), 0);
+    const prevEstimatedCOGS = prevRevenuePreTax * 0.35;
+    const prevGrossProfit = prevRevenuePreTax - prevEstimatedCOGS;
+    const prevVariableCosts = variableCostsBase + (prevLedgerPeriod || []).filter((l: any) => l.category !== 'Fixed').reduce((sum: number, l: any) => sum + Number(l.amount || 0), 0);
+    const prevOperatingExpenses = fixedCosts + prevVariableCosts;
+    const prevNetProfit = prevGrossProfit - prevOperatingExpenses;
+
+    const comparison = {
+        prev: {
+            revenuePreTax: prevRevenuePreTax,
+            operatingExpenses: prevOperatingExpenses,
+            netProfit: prevNetProfit
+        },
+        delta: {
+            revenuePreTax: revenuePreTax - prevRevenuePreTax,
+            operatingExpenses: operatingExpenses - prevOperatingExpenses,
+            netProfit: (grossProfit - operatingExpenses) - prevNetProfit
+        }
+    };
 
     return {
         period: { year, month: month + 1, start: startOfMonth, end: endOfMonth },
@@ -2367,12 +2458,18 @@ export async function getMonthlyReportData(shopId: string, monthISO: string) {
             grossMargin,
             fixedCosts,
             variableCosts,
+            operatingExpenses,
+            inventoryValue: currentInvValue,
+            daysOfInventory,
             netProfit: grossProfit - fixedCosts - variableCosts
         },
         weeks,
         categories: Array.from(catStats.entries()).map(([name, stats]) => ({ name, ...stats })),
         customers: { new: newCustomers, returning: returningCustomers, total: monthlyClients.size },
         turnover,
+        perShop,
+        expenseCategories,
+        comparison,
         shopName: isGlobal ? "Global Synthesis" : (shop?.name || shopId)
     };
 }
@@ -2542,6 +2639,8 @@ export async function getQuarterlyReportData(shopId: string, monthISO: string) {
             start: mStart,
             end: mEnd,
             sales: mSales.reduce((sum: number, s: any) => sum + Number(s.total_with_tax || 0), 0),
+            salesPreTax: mSales.reduce((sum: number, s: any) => sum + Number(s.total_before_tax || 0), 0),
+            tax: mSales.reduce((sum: number, s: any) => sum + Number(s.tax || 0), 0),
             expenses: mLedger.reduce((sum: number, l: any) => sum + Number(l.amount || 0), 0),
         });
     }
@@ -2626,6 +2725,60 @@ export async function getQuarterlyReportData(shopId: string, monthISO: string) {
 
     const turnover = currentInvValue > 0 ? estimatedCOGS / currentInvValue : 0;
 
+    const expenseByCategory = (ledger || []).reduce((acc: Record<string, number>, l: any) => {
+        const cat = String(l?.category || "Uncategorized");
+        acc[cat] = (acc[cat] || 0) + Number(l?.amount || 0);
+        return acc;
+    }, {});
+
+    const expenseCategories = Object.entries(expenseByCategory)
+        .map(([category, amount]) => ({ category, amount }))
+        .sort((a: any, b: any) => Number(b.amount || 0) - Number(a.amount || 0));
+
+    const salesByShop = (sales || []).reduce((acc: Record<string, any[]>, s: any) => {
+        const sid = String(s?.shop_id || "");
+        if (!sid) return acc;
+        acc[sid] = acc[sid] || [];
+        acc[sid].push(s);
+        return acc;
+    }, {} as Record<string, any[]>);
+
+    const ledgerByShop = (ledger || []).reduce((acc: Record<string, any[]>, l: any) => {
+        const sid = String(l?.shop_id || "");
+        if (!sid) return acc;
+        acc[sid] = acc[sid] || [];
+        acc[sid].push(l);
+        return acc;
+    }, {} as Record<string, any[]>);
+
+    const baseShops = (isGlobal ? (globalShops || []) : [shop]).filter(Boolean);
+    const perShop = baseShops.map((s: any) => {
+        const sid = String(s?.id || shopId);
+        const sSales = salesByShop[sid] || [];
+        const sLedger = ledgerByShop[sid] || [];
+        const sRevenuePreTax = sSales.reduce((sum: number, r: any) => sum + Number(r.total_before_tax || 0), 0);
+        const sRevenue = sSales.reduce((sum: number, r: any) => sum + Number(r.total_with_tax || 0), 0);
+        const sTax = sSales.reduce((sum: number, r: any) => sum + Number(r.tax || 0), 0);
+        const sEstimatedCOGS = sRevenuePreTax * 0.35;
+        const sGrossProfit = sRevenuePreTax - sEstimatedCOGS;
+        const sGrossMargin = sRevenuePreTax > 0 ? (sGrossProfit / sRevenuePreTax) * 100 : 0;
+        const structured = Object.values((s as any)?.expenses || {}).reduce((sum: number, v: any) => sum + Number(v || 0), 0);
+        const ledgerExp = sLedger.reduce((sum: number, r: any) => sum + Number(r.amount || 0), 0);
+        const sOperatingExpenses = structured + ledgerExp;
+        const sNetProfit = sGrossProfit - sOperatingExpenses;
+        return {
+            id: sid,
+            name: String((s as any)?.name || sid),
+            revenue: sRevenue,
+            revenuePreTax: sRevenuePreTax,
+            tax: sTax,
+            grossProfit: sGrossProfit,
+            grossMargin: sGrossMargin,
+            operatingExpenses: sOperatingExpenses,
+            netProfit: sNetProfit,
+        };
+    });
+
     return {
         period: { year, startMonth: startDate.getUTCMonth() + 1, endMonth: endMonth + 1, start: startOfQuarter, end: endOfQuarter },
         finances: {
@@ -2637,12 +2790,16 @@ export async function getQuarterlyReportData(shopId: string, monthISO: string) {
             grossMargin,
             fixedCosts,
             variableCosts,
+            operatingExpenses: fixedCosts + variableCosts,
+            inventoryValue: currentInvValue,
             netProfit: grossProfit - fixedCosts - variableCosts
         },
         months,
         categories: Array.from(catStats.entries()).map(([name, stats]) => ({ name, ...stats })),
         customers: { new: newCustomers, returning: returningCustomers, total: quarterlyClients.size },
         turnover,
+        perShop,
+        expenseCategories,
         shopName: isGlobal ? "Global Synthesis" : (shop?.name || shopId)
     };
 }
