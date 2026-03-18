@@ -189,6 +189,53 @@ export async function GET(req: Request) {
       const fixedObligations = (rent + salaries) / 4; // Monthly to Weekly
       const operationalCosts = ((utilities + misc) / 4) + wPosExpenses;
 
+      // Sales winners/losers (by revenue + qty)
+      const itemAgg = new Map<string, { name: string; qty: number; revenueWithTax: number; revenuePreTax: number; tax: number; discount: number; cogs: number; category: string }>();
+      wSales.forEach((s: any) => {
+        const name = String(s.item_name || "Unknown");
+        const prev = itemAgg.get(name) || { name, qty: 0, revenueWithTax: 0, revenuePreTax: 0, tax: 0, discount: 0, cogs: 0, category: String(s.category || "General") };
+        prev.qty += Number(s.quantity || 0);
+        prev.revenueWithTax += Number(s.total_with_tax || 0);
+        prev.revenuePreTax += Number(s.total_before_tax || 0);
+        prev.tax += Number(s.tax || 0);
+        prev.discount += Number(s.discount_applied || 0);
+        prev.cogs += Number(s.landed_cost || 0) * Number(s.quantity || 0);
+        if (!prev.category && s.category) prev.category = String(s.category || "General");
+        itemAgg.set(name, prev);
+      });
+      const topByRevenue = [...itemAgg.values()].sort((a, b) => b.revenuePreTax - a.revenuePreTax).slice(0, 12);
+      const topByQty = [...itemAgg.values()].sort((a, b) => b.qty - a.qty).slice(0, 12);
+
+      // Expenses (ledger) breakdown
+      const isExpenseEntry = (l: any) => {
+        const t = String(l?.type || "").toLowerCase();
+        if (t === "expense") return true;
+        if (t === "income") return false;
+        // Fallback heuristics: POS Expense is always an expense.
+        return String(l?.category || "") === "POS Expense";
+      };
+      const wLedgerExpenses = wLedger.filter(isExpenseEntry);
+      const wLedgerExpenseTotal = wLedgerExpenses.reduce((sum: number, l: any) => sum + Number(l.amount || 0), 0);
+      const expenseByCategory = wLedgerExpenses.reduce((acc: Record<string, number>, l: any) => {
+        const cat = String(l?.category || "Uncategorized");
+        acc[cat] = (acc[cat] || 0) + Number(l?.amount || 0);
+        return acc;
+      }, {} as Record<string, number>);
+      const expenseTop = Object.entries(expenseByCategory)
+        .map(([category, amount]) => ({ category, amount }))
+        .sort((a: any, b: any) => Number(b.amount || 0) - Number(a.amount || 0))
+        .slice(0, 10);
+
+      // Compliance / integrity metrics
+      const expectedTax = wSalesTotalBeforeTax * 0.155;
+      const taxVariance = wSalesTotalTax - expectedTax;
+      const discountRate = wSalesTotalBeforeTax > 0 ? (wSalesTotalDiscount / wSalesTotalBeforeTax) * 100 : 0;
+      const grossProfitPreTax = wSalesTotalBeforeTax - wSalesTotalCOGS;
+      const grossMarginPct = wSalesTotalBeforeTax > 0 ? (grossProfitPreTax / wSalesTotalBeforeTax) * 100 : 0;
+      const overheadWeekly = fixedObligations + (utilities + misc) / 4;
+      const opexTotal = overheadWeekly + wLedgerExpenseTotal; // includes POS Expense via ledger
+      const opexRatio = wSalesTotalBeforeTax > 0 ? (opexTotal / wSalesTotalBeforeTax) * 100 : 0;
+
       // Perform audit for each day Mon-Sat
       const auditPromises = daysArr.map(async (dayName, i) => {
         const d = new Date(wWeekStart);
@@ -329,10 +376,10 @@ export async function GET(req: Request) {
     const mtdRevenue = mtdSales.reduce((sum: number, s: any) => sum + Number(s.total_with_tax || 0), 0);
     const mtdProgress = monthlyOverhead > 0 ? (mtdRevenue / monthlyOverhead) * 100 : 0;
 
-    const wNet = wSalesTotalWithTax - wPosExpenses;
-    weeklyData = {
-      sales: wSales,
-      ledger: wLedger,
+      const wNet = wSalesTotalWithTax - wPosExpenses;
+      weeklyData = {
+        sales: wSales,
+        ledger: wLedger,
       totals: {
         withTax: wSalesTotalWithTax,
         beforeTax: wSalesTotalBeforeTax,
@@ -356,6 +403,9 @@ export async function GET(req: Request) {
       salesByDay,
       expensesByDay,
       profitByDay,
+      items: { topByRevenue, topByQty },
+      expensesSummary: { total: wLedgerExpenseTotal, top: expenseTop },
+      compliance: { expectedTax, taxVariance, discountRate, grossMarginPct, opexRatio, opexTotal },
       period: { start: wWeekStart, end: wUntil }
     };
   }
@@ -536,7 +586,7 @@ export async function GET(req: Request) {
     drawText("Restock Watchlist (Low stock <= 5):", 10, true);
     if (restockItems.length === 0) drawText("None. No low-stock items detected.", 9, false, rgb(0.5, 0.5, 0.5));
     else {
-      restockItems.slice(0, 5).forEach((i: any) => drawText(`• ${i.name} (${i.category}) — Qty: ${i.qty}`, 9));
+      restockItems.slice(0, 5).forEach((i: any) => drawText(`- ${i.name} (${i.category}) - Qty: ${i.qty}`, 9));
       if (restockItems.length > 5) drawText(`...and ${restockItems.length - 5} more items.`, 8, false, rgb(0.4, 0.4, 0.4));
     }
     y -= 10;
@@ -544,7 +594,7 @@ export async function GET(req: Request) {
     drawText("Dead Stock (No sales in 30 days - High investment):", 10, true);
     if (deadStock.length === 0) drawText("None. Inventory is moving well.", 9, false, rgb(0.5, 0.5, 0.5));
     else {
-      deadStock.forEach((i: any) => drawText(`• ${i.name} - Investment: $${Number(i.landed_cost).toFixed(2)}`, 9));
+      deadStock.forEach((i: any) => drawText(`- ${i.name} - Investment: $${Number(i.landed_cost).toFixed(2)}`, 9));
     }
     y -= 10;
 
@@ -558,7 +608,7 @@ export async function GET(req: Request) {
         ensureSpace(70);
         const t = new Date(e.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
         const desc = String(e.description || 'POS Expense');
-        drawText(`• ${t}  ${desc}  (-$${Number(e.amount || 0).toFixed(2)})`, 8);
+        drawText(`- ${t}  ${desc}  (-$${Number(e.amount || 0).toFixed(2)})`, 8);
       });
       if (posExpenses.length > 10) drawText(`...and ${posExpenses.length - 10} more expenses`, 8, false, rgb(0.4, 0.4, 0.4));
     }
@@ -572,7 +622,7 @@ export async function GET(req: Request) {
     } else {
       dailyPulse.slice(-7).forEach((d: any) => {
         ensureSpace(70);
-        drawText(`• ${d.date}: $${Number(d.gross || 0).toFixed(2)}`, 9);
+        drawText(`- ${d.date}: $${Number(d.gross || 0).toFixed(2)}`, 9);
       });
     }
     y -= 6;
@@ -641,7 +691,7 @@ export async function GET(req: Request) {
           pDrawText(`Tx Volume: ${weeklyData.basket.txCount}`, { x: margin + 170, y: y - 28, size: 7, font });
 
           page.drawRectangle({ x: margin + 160 + cardW, y: y - 35, width: cardW - 10, height: 35, color: rgb(0.95, 0.95, 0.98) });
-          pDrawText("📈 BASKET PULSE", { x: margin + 170 + cardW, y: y - 15, size: 8, font: fontBold, color: COLORS.primary });
+          pDrawText("BASKET PULSE", { x: margin + 170 + cardW, y: y - 15, size: 8, font: fontBold, color: COLORS.primary });
           pDrawText(`Avg Value: $${weeklyData.basket.avgValue.toFixed(2)}`, { x: margin + 170 + cardW, y: y - 28, size: 7, font });
           y -= 50;
 
@@ -696,6 +746,29 @@ export async function GET(req: Request) {
             page.drawRectangle({ x: curX, y: metY - 78, width: (barW * rentP / 100), height: 8, color: COLORS.warning });
           }
           pDrawText(`Blue: Stock | Org: Rent`, { x: width / 2 + 10, y: metY - 92, size: 6, font });
+
+          // Oracle strictness: compliance + cost ratios (numbers-first)
+          const compliance = weeklyData.compliance || { expectedTax: 0, taxVariance: 0, discountRate: 0, grossMarginPct: 0, opexRatio: 0 };
+          pDrawText(`Discount Rate: ${Number(compliance.discountRate || 0).toFixed(1)}%`, { x: width / 2 + 10, y: metY - 105, size: 7, font: fontBold, color: Number(compliance.discountRate || 0) > 10 ? COLORS.warning : COLORS.info });
+          pDrawText(`Tax Variance: $${Number(compliance.taxVariance || 0).toFixed(2)}`, { x: width / 2 + 10, y: metY - 117, size: 7, font: fontBold, color: Math.abs(Number(compliance.taxVariance || 0)) > 5 ? COLORS.warning : COLORS.highlight });
+          pDrawText(`OpEx Ratio: ${Number(compliance.opexRatio || 0).toFixed(0)}%`, { x: width / 2 + 10, y: metY - 129, size: 7, font: fontBold, color: Number(compliance.opexRatio || 0) > 60 ? COLORS.warning : COLORS.info });
+
+          // ORACLE ORDERS (short, strict, high-signal)
+          const orders: string[] = [];
+          if (overCov < 100) orders.push(`Overhead not covered (${overCov.toFixed(0)}%). Cut discretionary OpEx and push basket value immediately.`);
+          if (Math.abs(Number(compliance.taxVariance || 0)) > 5) orders.push(`Tax mismatch ($${Number(compliance.taxVariance || 0).toFixed(2)}). Reconcile sales tax postings before next Saturday.`);
+          if (Number(compliance.discountRate || 0) > 10) orders.push(`Discounting is ${Number(compliance.discountRate || 0).toFixed(1)}%. Lock discount permissions; require approval above 5%.`);
+          if (Number(compliance.opexRatio || 0) > 60) orders.push(`OpEx ratio ${Number(compliance.opexRatio || 0).toFixed(0)}%. Freeze non-essential spend until ratio < 55%.`);
+          const zombieCount = (weeklyData.velocity?.zombies || []).length;
+          if (zombieCount > 8) orders.push(`Zombie inventory high (${zombieCount}). Run clearance bundles + reorder only top movers.`);
+          if ((weeklyData.items?.topByRevenue || []).length > 0) orders.push(`Restock: prioritize "${weeklyData.items.topByRevenue[0]?.name || "top mover"}" and keep 7-day coverage.`);
+
+          if (orders.length > 0) {
+            pDrawText("ORACLE ORDERS (NON-NEGOTIABLE):", { x: margin + 10, y: metY - 112, size: 7, font: fontBold, color: COLORS.warning });
+            orders.slice(0, 3).forEach((o, idx) => {
+              pDrawText(`${idx + 1}. ${o}`, { x: margin + 10, y: metY - 124 - idx * 12, size: 6.5, font, color: rgb(0.2, 0.2, 0.2), maxWidth: width - margin * 2 - 20 });
+            });
+          }
           y -= 150;
 
           drawText("2. DAILY REVENUE VELOCITY", 11, true, COLORS.info);
@@ -809,8 +882,52 @@ export async function GET(req: Request) {
           y -= 50;
 
           weeklyData.velocity.champions.forEach((c: any) => {
-            drawText(`• ${c.name} (${c.qty} sold)`, 8);
+            drawText(`- ${c.name} (${c.qty} sold)`, 8);
           });
+
+          y -= 10;
+          drawText("TOP SELLERS (Revenue — Pre-Tax)", 11, true, COLORS.primary);
+          y -= 5;
+          const topByRevenue = weeklyData.items?.topByRevenue || [];
+          if (topByRevenue.length === 0) {
+            drawText("No sales recorded in this week window.", 8, true, COLORS.warning);
+          } else {
+            topByRevenue.slice(0, 10).forEach((it: any, i: number) => {
+              ensureSpace(18);
+              const profit = Number(it.revenuePreTax || 0) - Number(it.cogs || 0);
+              pDrawText(`${i + 1}. ${String(it.name || "Unknown").slice(0, 28)}`, { x: margin, y, size: 8, font: fontBold });
+              pDrawText(`Qty ${Number(it.qty || 0)}`, { x: margin + 250, y, size: 8, font });
+              pDrawText(`$${Number(it.revenuePreTax || 0).toFixed(0)}`, { x: width - margin - 120, y, size: 8, font: fontBold });
+              pDrawText(`P $${profit.toFixed(0)}`, { x: width - margin - 55, y, size: 8, font: fontBold, color: profit >= 0 ? COLORS.highlight : COLORS.warning });
+              y -= 12;
+            });
+          }
+
+          y -= 8;
+          drawText("NON-SELLERS (Zombie Watchlist — No Sales This Week)", 11, true, COLORS.warning);
+          y -= 5;
+          const zombies = weeklyData.velocity?.zombies || [];
+          if (zombies.length === 0) {
+            drawText("No zombies detected (or allocations unavailable).", 8, true, COLORS.highlight);
+          } else {
+            zombies.slice(0, 12).forEach((z: any) => {
+              ensureSpace(12);
+              drawText(`- ${String(z.name || "Unknown").slice(0, 40)} (stock ${Number(z.qty || 0)})`, 8);
+            });
+          }
+
+          y -= 8;
+          drawText("EXPENSE HOTSPOTS (Ledger — This Week)", 11, true, COLORS.warning);
+          y -= 5;
+          const exTop = weeklyData.expensesSummary?.top || [];
+          if (exTop.length === 0) {
+            drawText("No ledger expenses recorded (or missing types).", 8, true, COLORS.neutral);
+          } else {
+            exTop.slice(0, 6).forEach((e: any) => {
+              ensureSpace(12);
+              drawText(`- ${String(e.category || "Uncategorized").slice(0, 30)}: $${Number(e.amount || 0).toFixed(0)}`, 8);
+            });
+          }
 
           drawText("POS AUDIT & INTEGRITY CHECK", 11, true, COLORS.warning);
           y -= 10;
@@ -835,9 +952,10 @@ export async function GET(req: Request) {
 
           drawText("ORACLE RISK ASSESSMENT BOARD", 12, true, COLORS.primary);
           y -= 5;
-          page.drawRectangle({ x: margin, y: y - 65, width: width - margin * 2, height: 65, color: rgb(0.98,0.98,1), borderColor: rgb(0.9,0.9,0.95), borderWidth: 1 });
+          page.drawRectangle({ x: margin, y: y - 100, width: width - margin * 2, height: 100, color: rgb(0.98,0.98,1), borderColor: rgb(0.9,0.9,0.95), borderWidth: 1 });
           const overCov = weeklyData.overheadCovered || 0;
           const totalVar = weeklyData.audit.reduce((s: number, a: any) => s + Number(a.variance || 0), 0);
+          const compliance = weeklyData.compliance || { taxVariance: 0, discountRate: 0, opexRatio: 0 };
 
           const r1 = Math.abs(Number(totalVar || 0)) > 50 ? COLORS.warning : COLORS.highlight;
           page.drawCircle({ x: margin + 15, y: y - 15, size: 5, color: r1 });
@@ -851,7 +969,15 @@ export async function GET(req: Request) {
           page.drawCircle({ x: margin + 15, y: y - 49, size: 5, color: r3 });
           pDrawText(`RUNWAY HEALTH: ${Number(overCov || 0) < 100 ? 'CONSTRAINED' : 'STRONG'} (${Number(overCov || 0).toFixed(0)}% cov)`, { x: margin + 28, y: y - 52, size: 9, font });
 
-          y -= 85; 
+          const r4 = Math.abs(Number(compliance.taxVariance || 0)) > 5 ? COLORS.warning : COLORS.highlight;
+          page.drawCircle({ x: margin + 15, y: y - 66, size: 5, color: r4 });
+          pDrawText(`TAX INTEGRITY: ${Math.abs(Number(compliance.taxVariance || 0)) > 5 ? 'CHECK NOW' : 'OK'} ($${Number(compliance.taxVariance || 0).toFixed(2)} var)`, { x: margin + 28, y: y - 69, size: 9, font });
+
+          const r5 = Number(compliance.discountRate || 0) > 10 || Number(compliance.opexRatio || 0) > 60 ? COLORS.warning : COLORS.highlight;
+          page.drawCircle({ x: margin + 15, y: y - 83, size: 5, color: r5 });
+          pDrawText(`MARGIN DRAIN: ${Number(compliance.discountRate || 0).toFixed(1)}% discounts | ${Number(compliance.opexRatio || 0).toFixed(0)}% OpEx`, { x: margin + 28, y: y - 86, size: 9, font });
+
+          y -= 120; 
           drawText("CUSTOMER BASKET INTELLIGENCE", 11, true, COLORS.info);
           const basket = weeklyData.basket || { avgValue: 0, avgSize: 0 };
           y -= 5;
@@ -1053,10 +1179,10 @@ export async function GET(req: Request) {
 
             const topMover = weeklyData.velocity.champions[0]?.name || "inventory";
             const advice = [
-              `• Leverage FLECTERE Marketing: Deploy targeted WhatsApp/Facebook campaigns for "${topMover}".`,
-              `• Discount Strategy: Apply a 5-10% 'Volume Spark' discount on stagnant ${weeklyData.velocity.zombies[0]?.name || 'items'}.`,
-              `• Facebook Ads: Budget $20 for a 'Weekend Pulse' campaign.`,
-              `• Upsell Program: Train staff to bundle items at the POS.`
+              `- Focus on the winner: run a 7-day availability plan for "${topMover}" (no stock-outs).`,
+              `- Kill discount leakage: cap staff discounts at 5% and log approvals.`,
+              `- Clear zombies: bundle/clearance the slowest 10 items by Wednesday.`,
+              `- Push basket value: train bundles + attach accessories to every sale.`
             ];
             advice.forEach(a => drawText(a, 9, false, rgb(0.2, 0.2, 0.2)));
 

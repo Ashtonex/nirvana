@@ -1,10 +1,17 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
+import { createHash } from "crypto";
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 import { getMonthlyReportData } from "@/app/actions";
+import { supabaseAdmin } from "@/lib/supabase";
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
+
+function isAdminLikeRole(role: string | null | undefined) {
+  const r = String(role || "").toLowerCase();
+  return r === "owner" || r === "admin";
+}
 
 function winAnsiSafe(text: string) {
   // pdf-lib StandardFonts are WinAnsi encoded; strip unsupported unicode (emoji, etc.)
@@ -42,6 +49,38 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    // Staff access control: staff can only export their own shop; global requires owner/admin.
+    if (!ownerToken && staffToken) {
+      const tokenHash = createHash("sha256").update(staffToken).digest("hex");
+      const { data: session } = await supabaseAdmin
+        .from("staff_sessions")
+        .select("employee_id, expires_at")
+        .eq("token_hash", tokenHash)
+        .maybeSingle();
+
+      if (!session || (session.expires_at && new Date(session.expires_at).getTime() < Date.now())) {
+        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      }
+
+      const { data: staff } = await supabaseAdmin
+        .from("employees")
+        .select("id, shop_id, role")
+        .eq("id", session.employee_id)
+        .maybeSingle();
+
+      if (!staff?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      if (shopId === "global" || shopId === "all") {
+        if (!isAdminLikeRole((staff as any).role)) {
+          return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+        }
+      } else {
+        const isAdminLike = isAdminLikeRole((staff as any).role);
+        if (!isAdminLike && String((staff as any).shop_id || "") !== shopId) {
+          return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+        }
+      }
+    }
+
     // Fetch monthly data
     const data = await getMonthlyReportData(shopId, `${month}-01T12:00:00Z`);
     if (!data) {
@@ -63,6 +102,10 @@ export async function GET(req: Request) {
     const drawText = (text: string, size = 10, bold = false, color = rgb(0, 0, 0), x = margin) => {
       page.drawText(winAnsiSafe(text), { x, y, size, font: bold ? fontBold : font, color });
       y -= (size + 6);
+    };
+
+    const pText = (text: any, opts: Parameters<typeof page.drawText>[1]) => {
+      page.drawText(winAnsiSafe(String(text ?? "")), opts);
     };
 
     const drawLine = (color = rgb(0.8, 0.8, 0.8), thickness = 1) => {
@@ -94,17 +137,17 @@ export async function GET(req: Request) {
     y -= 5;
     page.drawRectangle({ x: margin, y: y - 85, width: width - margin * 2, height: 85, color: COLORS.bg });
     let cardY = y - 20;
-    page.drawText(`Revenue (Pre Tax):`, { x: margin + 15, y: cardY, size: 10, font });
-    page.drawText(`$${Number(data.finances.revenuePreTax || 0).toLocaleString()}`, { x: margin + 160, y: cardY, size: 10, font: fontBold });
+    pText(`Revenue (Pre Tax):`, { x: margin + 15, y: cardY, size: 10, font });
+    pText(`$${Number(data.finances.revenuePreTax || 0).toLocaleString()}`, { x: margin + 160, y: cardY, size: 10, font: fontBold });
     
-    page.drawText(`Tax Provision:`, { x: margin + 15, y: cardY - 20, size: 10, font });
-    page.drawText(`$${Number(data.finances.tax || 0).toLocaleString()}`, { x: margin + 160, y: cardY - 20, size: 10, font: fontBold, color: COLORS.neutral });
+    pText(`Tax Provision:`, { x: margin + 15, y: cardY - 20, size: 10, font });
+    pText(`$${Number(data.finances.tax || 0).toLocaleString()}`, { x: margin + 160, y: cardY - 20, size: 10, font: fontBold, color: COLORS.neutral });
 
-    page.drawText(`Operating Expenses:`, { x: margin + 15, y: cardY - 40, size: 10, font });
-    page.drawText(`$${Number(data.finances.operatingExpenses || 0).toLocaleString()}`, { x: margin + 160, y: cardY - 40, size: 10, font: fontBold, color: COLORS.expense });
+    pText(`Operating Expenses:`, { x: margin + 15, y: cardY - 40, size: 10, font });
+    pText(`$${Number(data.finances.operatingExpenses || 0).toLocaleString()}`, { x: margin + 160, y: cardY - 40, size: 10, font: fontBold, color: COLORS.expense });
 
-    page.drawText(`Net Profit (Model):`, { x: margin + 15, y: cardY - 62, size: 12, font: fontBold });
-    page.drawText(`$${Number(data.finances.netProfit || 0).toLocaleString()}`, { x: margin + 160, y: cardY - 62, size: 12, font: fontBold, color: Number(data.finances.netProfit || 0) >= 0 ? COLORS.profit : COLORS.expense });
+    pText(`Net Profit (Model):`, { x: margin + 15, y: cardY - 62, size: 12, font: fontBold });
+    pText(`$${Number(data.finances.netProfit || 0).toLocaleString()}`, { x: margin + 160, y: cardY - 62, size: 12, font: fontBold, color: Number(data.finances.netProfit || 0) >= 0 ? COLORS.profit : COLORS.expense });
     y -= 95;
 
     // --- MOM DELTAS ---
@@ -131,19 +174,19 @@ export async function GET(req: Request) {
 
       const shops = (data as any).perShop as any[];
       const col = [margin, margin + 175, margin + 325, margin + 450];
-      page.drawText("Shop", { x: col[0], y, size: 9, font: fontBold });
-      page.drawText("Revenue (Pre Tax)", { x: col[1], y, size: 9, font: fontBold });
-      page.drawText("OpEx", { x: col[2], y, size: 9, font: fontBold });
-      page.drawText("Net", { x: col[3], y, size: 9, font: fontBold });
+      pText("Shop", { x: col[0], y, size: 9, font: fontBold });
+      pText("Revenue (Pre Tax)", { x: col[1], y, size: 9, font: fontBold });
+      pText("OpEx", { x: col[2], y, size: 9, font: fontBold });
+      pText("Net", { x: col[3], y, size: 9, font: fontBold });
       y -= 15;
       drawLine();
 
       shops.forEach((s, i) => {
         const net = Number(s.netProfit || 0);
-        page.drawText(winAnsiSafe(String(s.name || s.id)), { x: col[0], y, size: 9, font });
-        page.drawText(`$${Number(s.revenuePreTax || 0).toLocaleString()}`, { x: col[1], y, size: 9, font });
-        page.drawText(`$${Number(s.operatingExpenses || 0).toLocaleString()}`, { x: col[2], y, size: 9, font, color: COLORS.expense });
-        page.drawText(`$${net.toLocaleString()}`, { x: col[3], y, size: 9, font: fontBold, color: net >= 0 ? COLORS.profit : COLORS.expense });
+        pText(String(s.name || s.id), { x: col[0], y, size: 9, font });
+        pText(`$${Number(s.revenuePreTax || 0).toLocaleString()}`, { x: col[1], y, size: 9, font });
+        pText(`$${Number(s.operatingExpenses || 0).toLocaleString()}`, { x: col[2], y, size: 9, font, color: COLORS.expense });
+        pText(`$${net.toLocaleString()}`, { x: col[3], y, size: 9, font: fontBold, color: net >= 0 ? COLORS.profit : COLORS.expense });
         y -= 18;
         if (i % 2 === 0) {
           page.drawRectangle({ x: margin, y: y + 2, width: width - margin * 2, height: 18, color: COLORS.bg, opacity: 0.25 });
@@ -159,10 +202,10 @@ export async function GET(req: Request) {
     
     // Header for table
     const colStarts = [margin, margin + 100, margin + 250, margin + 400];
-    page.drawText("Week Range", { x: colStarts[0], y, size: 9, font: fontBold });
-    page.drawText("Sales Revenue", { x: colStarts[1], y, size: 9, font: fontBold });
-    page.drawText("Expenses", { x: colStarts[2], y, size: 9, font: fontBold });
-    page.drawText("Net Contribution", { x: colStarts[3], y, size: 9, font: fontBold });
+    pText("Week Range", { x: colStarts[0], y, size: 9, font: fontBold });
+    pText("Sales Revenue", { x: colStarts[1], y, size: 9, font: fontBold });
+    pText("Expenses", { x: colStarts[2], y, size: 9, font: fontBold });
+    pText("Net Contribution", { x: colStarts[3], y, size: 9, font: fontBold });
     y -= 15;
     drawLine();
 
@@ -171,10 +214,10 @@ export async function GET(req: Request) {
       const endD = new Date(w.end).toLocaleDateString();
       const net = w.sales - w.expenses;
       
-      page.drawText(winAnsiSafe(`${startD} - ${endD.split('/')[0]}/${endD.split('/')[1]}`), { x: colStarts[0], y, size: 9, font });
-      page.drawText(`$${w.sales.toLocaleString()}`, { x: colStarts[1], y, size: 9, font });
-      page.drawText(`$${w.expenses.toLocaleString()}`, { x: colStarts[2], y, size: 9, font, color: COLORS.expense });
-      page.drawText(`$${net.toLocaleString()}`, { x: colStarts[3], y, size: 9, font: fontBold, color: net >= 0 ? COLORS.profit : COLORS.expense });
+      pText(`${startD} - ${endD.split('/')[0]}/${endD.split('/')[1]}`, { x: colStarts[0], y, size: 9, font });
+      pText(`$${w.sales.toLocaleString()}`, { x: colStarts[1], y, size: 9, font });
+      pText(`$${w.expenses.toLocaleString()}`, { x: colStarts[2], y, size: 9, font, color: COLORS.expense });
+      pText(`$${net.toLocaleString()}`, { x: colStarts[3], y, size: 9, font: fontBold, color: net >= 0 ? COLORS.profit : COLORS.expense });
       y -= 18;
       
       if (i % 2 === 0) {
@@ -189,10 +232,10 @@ export async function GET(req: Request) {
     y -= 10;
     data.categories.sort((a, b) => b.revenue - a.revenue).slice(0, 5).forEach((cat: any) => {
         const barW = (cat.revenue / data.finances.revenuePreTax) * 300;
-        page.drawText(winAnsiSafe(cat.name), { x: margin, y, size: 9, font: fontBold });
+        pText(cat.name, { x: margin, y, size: 9, font: fontBold });
         page.drawRectangle({ x: margin + 100, y: y - 2, width: 300, height: 10, color: rgb(0.9, 0.9, 0.9) });
         page.drawRectangle({ x: margin + 100, y: y - 2, width: Math.max(1, barW), height: 10, color: COLORS.primary });
-        page.drawText(`$${cat.revenue.toLocaleString()}`, { x: margin + 410, y, size: 9, font });
+        pText(`$${cat.revenue.toLocaleString()}`, { x: margin + 410, y, size: 9, font });
         y -= 15;
     });
     y -= 20;
@@ -228,8 +271,8 @@ export async function GET(req: Request) {
         const ix = i % 2 === 0 ? margin : margin + (width - margin * 2) / 2;
         const iy = y - (Math.floor(i / 2) * 50);
         page.drawRectangle({ x: ix, y: iy - 40, width: (width - margin * 2) / 2 - 10, height: 40, color: COLORS.bg });
-        page.drawText(winAnsiSafe(`${ins.label}`), { x: ix + 10, y: iy - 15, size: 8, font: fontBold, color: COLORS.neutral });
-        page.drawText(String(ins.value), { x: ix + 10, y: iy - 32, size: 12, font: fontBold, color: COLORS.header });
+        pText(`${ins.label}`, { x: ix + 10, y: iy - 15, size: 8, font: fontBold, color: COLORS.neutral });
+        pText(String(ins.value), { x: ix + 10, y: iy - 32, size: 12, font: fontBold, color: COLORS.header });
     });
     y -= 110;
 

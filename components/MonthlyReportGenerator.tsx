@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, Button, Input } from "@/components/ui";
 import {
     FileBarChart,
@@ -27,6 +27,19 @@ export function MonthlyReportGenerator({ shops: shopsProp }: MonthlyReportGenera
     const [selectedShopId, setSelectedShopId] = useState<string>(shops[0]?.id || "");
     const [selectedMonth, setSelectedMonth] = useState<string>(new Date().toISOString().substring(0, 7));
     const [isPending, setIsPending] = useState(false);
+
+    useEffect(() => {
+        try {
+            const savedShopId = window.localStorage.getItem("nirvana_oracle_shop");
+            const savedMonth = window.localStorage.getItem("nirvana_oracle_month");
+
+            if (savedShopId && nodes.some((n) => n.id === savedShopId)) setSelectedShopId(savedShopId);
+            if (savedMonth && /^\d{4}-\d{2}$/.test(savedMonth)) setSelectedMonth(savedMonth);
+        } catch {
+            // ignore
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
     // Guard against empty shops
     if (shops.length === 0) {

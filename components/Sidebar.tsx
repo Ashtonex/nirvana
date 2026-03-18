@@ -62,8 +62,9 @@ export default function Sidebar() {
 
     // Staff should only see POS. No sidebar navigation.
     const staffRole = String(staff?.role || "").toLowerCase();
-    const isOwnerViaCookie = !ownerUser && staffRole === "owner";
-    if (staff && !ownerUser && !isOwnerViaCookie) return null;
+    const isPrivilegedStaff = !ownerUser && (staffRole === "owner" || staffRole === "admin");
+    const isOwnerViaCookie = isPrivilegedStaff && staffRole === "owner";
+    if (staff && !ownerUser && !isPrivilegedStaff) return null;
 
     const handleLogout = async () => {
         try {

@@ -939,21 +939,23 @@ Generated via NIRVANA POS`;
 
             const totals = data?.totals;
             const now = new Date();
-            const dayOfWeek = now.getDay();
+            const dayOfWeek = now.getDay(); // local
+            const isSunday = dayOfWeek === 0;
             const todayDate = now.getDate();
             const lastDayOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+
+            const pad2 = (n: number) => String(n).padStart(2, "0");
+            const dayStamp = `${now.getFullYear()}-${pad2(now.getMonth() + 1)}-${pad2(now.getDate())}`; // local YYYY-MM-DD
+            const monthStamp = dayStamp.slice(0, 7); // YYYY-MM
             
             const isWeeklyDay = dayOfWeek === 6; // Saturday
-            let isMonthlyDay = false;
-            if ((todayDate === 30 || todayDate === 31 || todayDate === lastDayOfMonth) && dayOfWeek !== 0) {
-                isMonthlyDay = true;
-            }
+            const isMonthlyDay = !isSunday && todayDate === lastDayOfMonth;
             
             const msgLines = [
                 `NIRVANA EOD — ${shopId.toUpperCase()}`,
-                `Date: ${new Date().toLocaleDateString()}`,
-                isWeeklyDay ? '📊 Weekly Report Also Generated!' : null,
-                isMonthlyDay ? '📈 Monthly Strategic Report Included!' : null,
+                `Date: ${now.toLocaleDateString()}`,
+                isWeeklyDay ? 'Weekly Report Generated.' : null,
+                isMonthlyDay ? 'Monthly Strategic Report Generated.' : null,
                 totals ? `Transactions: ${totals.count}` : null,
                 totals ? `Total (inc tax): $${Number(totals.totalWithTax || 0).toFixed(2)}` : null,
                 totals ? `Net Revenue: $${Number((totals.totalWithTax || 0) - (totals.totalExpenses || 0)).toFixed(2)}` : null,
@@ -964,7 +966,6 @@ Generated via NIRVANA POS`;
             // 2. Generate report PDF for sharing
             console.log('Generating EOD PDF...');
             try {
-                const dayStamp = new Date().toISOString().slice(0, 10);
                 const pdfRes = await fetch(`/api/eod/pdf?shopId=${encodeURIComponent(shopId)}&date=${encodeURIComponent(dayStamp)}&weekly=${encodeURIComponent(String(isWeeklyDay))}`, { 
                     cache: 'no-store',
                     credentials: 'include'
@@ -995,16 +996,22 @@ Generated via NIRVANA POS`;
                 }
 
                 if (isMonthlyDay) {
-                     const moRes = await fetch(`/api/reports/monthly/pdf?shopId=${encodeURIComponent(shopId)}`);
+                     const moRes = await fetch(`/api/reports/monthly/pdf?shopId=${encodeURIComponent(shopId)}&month=${encodeURIComponent(monthStamp)}`, {
+                        cache: "no-store",
+                        credentials: "include"
+                     });
                      if (moRes.ok) {
                          const moBlob = await moRes.blob();
                          const fileUrl = window.URL.createObjectURL(moBlob);
                          const a = document.createElement("a");
                          a.href = fileUrl;
-                         a.download = `Monthly_Strategic_${shopId}_${dayStamp}.pdf`;
+                         a.download = `Monthly_Strategic_${shopId}_${monthStamp}.pdf`;
                          document.body.appendChild(a);
                          a.click();
                          window.URL.revokeObjectURL(fileUrl);
+                     } else {
+                        const err = await moRes.json().catch(() => ({}));
+                        console.error("Monthly PDF failed:", err);
                      }
                 }
             } catch (e) {

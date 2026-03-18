@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { 
     Button, 
     Badge 
@@ -31,6 +31,31 @@ export function StrategicReportVault({ shops, defaultShopId }: StrategicReportVa
     const [selectedShopId, setSelectedShopId] = useState<string>(defaultShopId || shops?.[0]?.id || "");
     const [selectedMonth, setSelectedMonth] = useState<string>(new Date().toISOString().substring(0, 7)); // YYYY-MM
     const [selectedDay, setSelectedDay] = useState<string>(new Date().toISOString().split("T")[0]); // YYYY-MM-DD
+
+    useEffect(() => {
+        try {
+            const savedShopId = window.localStorage.getItem("nirvana_oracle_shop");
+            const savedMonth = window.localStorage.getItem("nirvana_oracle_month");
+            const savedDay = window.localStorage.getItem("nirvana_oracle_day");
+
+            if (savedShopId && nodes.some((n) => n.id === savedShopId)) setSelectedShopId(savedShopId);
+            if (savedMonth && /^\d{4}-\d{2}$/.test(savedMonth)) setSelectedMonth(savedMonth);
+            if (savedDay && /^\d{4}-\d{2}-\d{2}$/.test(savedDay)) setSelectedDay(savedDay);
+        } catch {
+            // ignore (storage may be unavailable)
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
+    useEffect(() => {
+        try {
+            if (selectedShopId) window.localStorage.setItem("nirvana_oracle_shop", selectedShopId);
+            if (selectedMonth) window.localStorage.setItem("nirvana_oracle_month", selectedMonth);
+            if (selectedDay) window.localStorage.setItem("nirvana_oracle_day", selectedDay);
+        } catch {
+            // ignore
+        }
+    }, [selectedShopId, selectedMonth, selectedDay]);
 
     const isGlobal = selectedShopId === "global";
 
