@@ -33,7 +33,9 @@ export function AccessGate({ children }: { children: React.ReactNode }) {
       // If not staff, check owner session (Next route)
       try {
         const r2 = await fetch("/api/auth/me", { cache: "no-store", credentials: "include" });
-        setOwnerOk(r2.ok);
+        const data2 = await r2.json().catch(() => ({}));
+        const role = String(data2?.employee?.role || "").toLowerCase();
+        setOwnerOk(role === "owner" || role === "admin");
       } catch {
         setOwnerOk(false);
       }

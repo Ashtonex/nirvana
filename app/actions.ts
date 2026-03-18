@@ -1442,12 +1442,50 @@ export async function deleteEmployee(id: string) {
 }
 
 export async function transferInventory(itemId: string, fromShopId: string, toShopId: string, quantity: number) {
-    const { data: fromAlloc } = await supabase.from('inventory_allocations').select('quantity').eq('item_id', itemId).eq('shop_id', fromShopId).single();
-    if (!fromAlloc || fromAlloc.quantity < quantity) throw new Error("Stock error");
-    await supabase.from('inventory_allocations').update({ quantity: fromAlloc.quantity - quantity }).eq('item_id', itemId).eq('shop_id', fromShopId);
-    const { data: toAlloc } = await supabase.from('inventory_allocations').select('quantity').eq('item_id', itemId).eq('shop_id', toShopId).single();
-    if (toAlloc) await supabase.from('inventory_allocations').update({ quantity: toAlloc.quantity + quantity }).eq('item_id', itemId).eq('shop_id', toShopId);
-    else await supabase.from('inventory_allocations').insert({ item_id: itemId, shop_id: toShopId, quantity });
+    await requireManagerOrOwner();
+
+    const { data: fromAlloc, error: fromError } = await supabaseAdmin
+        .from('inventory_allocations')
+        .select('quantity')
+        .eq('item_id', itemId)
+        .eq('shop_id', fromShopId)
+        .maybeSingle();
+
+    if (fromError) throw new Error(fromError.message);
+    if (!fromAlloc || Number(fromAlloc.quantity || 0) < quantity) throw new Error("Insufficient stock");
+
+    const newFromQty = Number(fromAlloc.quantity || 0) - quantity;
+    const updFrom = await supabaseAdmin
+        .from('inventory_allocations')
+        .update({ quantity: newFromQty })
+        .eq('item_id', itemId)
+        .eq('shop_id', fromShopId);
+
+    if (updFrom.error) throw new Error(updFrom.error.message);
+
+    const { data: toAlloc, error: toError } = await supabaseAdmin
+        .from('inventory_allocations')
+        .select('quantity')
+        .eq('item_id', itemId)
+        .eq('shop_id', toShopId)
+        .maybeSingle();
+
+    if (toError) throw new Error(toError.message);
+
+    if (toAlloc) {
+        const updTo = await supabaseAdmin
+            .from('inventory_allocations')
+            .update({ quantity: Number(toAlloc.quantity || 0) + quantity })
+            .eq('item_id', itemId)
+            .eq('shop_id', toShopId);
+        if (updTo.error) throw new Error(updTo.error.message);
+    } else {
+        const insTo = await supabaseAdmin
+            .from('inventory_allocations')
+            .insert({ item_id: itemId, shop_id: toShopId, quantity });
+        if (insTo.error) throw new Error(insTo.error.message);
+    }
+
     revalidatePath("/transfers");
 }
 
@@ -1690,8 +1728,11 @@ export async function createStockRequest(request: {
 export async function updateStockRequestStatus(
     requestId: string,
     status: 'approved' | 'rejected' | 'completed',
-    approvedBy: string
+    approvedBy?: string
 ) {
+    const actor = await requireManagerOrOwner();
+    const approverId = actor.id || approvedBy || "owner";
+
     const { data: request } = await supabaseAdmin
         .from('stock_requests')
         .select('*')
@@ -1702,7 +1743,7 @@ export async function updateStockRequestStatus(
 
     await supabaseAdmin.from('stock_requests').update({
         status,
-        approved_by: approvedBy,
+        approved_by: approverId,
         updated_at: new Date().toISOString()
     }).eq('id', requestId);
 
@@ -1713,7 +1754,8 @@ export async function updateStockRequestStatus(
             to_shop_id: request.to_shop_id,
             quantity: request.quantity,
             status: 'pending',
-            requested_by: request.requested_by
+            requested_by: request.requested_by,
+            approved_by: approverId,
         });
     }
 

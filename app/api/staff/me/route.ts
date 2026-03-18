@@ -4,7 +4,24 @@ import { createHash } from "crypto";
 import { supabaseAdmin } from "@/lib/supabase";
 
 export async function GET() {
-  const token = (await cookies()).get("nirvana_staff")?.value;
+  const jar = await cookies();
+
+  const ownerToken = jar.get("nirvana_owner")?.value;
+  if (ownerToken) {
+    return NextResponse.json({
+      staff: {
+        id: "owner",
+        name: "Owner",
+        surname: "",
+        shop_id: null,
+        role: "owner",
+        is_active: true,
+        active: true,
+      },
+    });
+  }
+
+  const token = jar.get("nirvana_staff")?.value;
   if (!token) {
     return NextResponse.json({ staff: null }, { status: 401 });
   }

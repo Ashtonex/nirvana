@@ -24,7 +24,6 @@ import {
 } from "lucide-react";
 
 import { transferInventory, getStockRequests, updateStockRequestStatus } from "../actions";
-import { useAuth } from "@/components/AuthProvider";
 
 export default function TransfersPage({ db }: { db: any }) {
     const [isPending, startTransition] = useTransition();
@@ -33,15 +32,10 @@ export default function TransfersPage({ db }: { db: any }) {
     const [selectedItem, setSelectedItem] = useState("");
     const [quantity, setQuantity] = useState(1);
     const [stockRequests, setStockRequests] = useState<any[]>([]);
-    const { user } = useAuth();
-    const [currentUserId, setCurrentUserId] = useState<string>("");
 
     useEffect(() => {
         loadStockRequests();
-        if (user) {
-            setCurrentUserId(user.id);
-        }
-    }, [user]);
+    }, []);
 
     const loadStockRequests = async () => {
         const requests = await getStockRequests();
@@ -52,14 +46,14 @@ export default function TransfersPage({ db }: { db: any }) {
 
     const handleApprove = (requestId: string) => {
         startTransition(async () => {
-            await updateStockRequestStatus(requestId, 'approved', currentUserId);
+            await updateStockRequestStatus(requestId, 'approved');
             loadStockRequests();
         });
     };
 
     const handleReject = (requestId: string) => {
         startTransition(async () => {
-            await updateStockRequestStatus(requestId, 'rejected', currentUserId);
+            await updateStockRequestStatus(requestId, 'rejected');
             loadStockRequests();
         });
     };
