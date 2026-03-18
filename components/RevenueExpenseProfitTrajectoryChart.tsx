@@ -18,6 +18,33 @@ export function RevenueExpenseProfitTrajectoryChart({ datasets }: RevenueExpense
     setMounted(true);
   }, []);
 
+  const availableShops = useMemo(() => {
+    const keys = Object.keys(datasets || {});
+    const preferredOrder = ["kipasa", "dubdub", "tradecenter", "global"];
+    return keys.sort((a, b) => {
+      const ai = preferredOrder.indexOf(a);
+      const bi = preferredOrder.indexOf(b);
+      if (ai !== -1 || bi !== -1) return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi);
+      return a.localeCompare(b);
+    });
+  }, [datasets]);
+
+  const defaultTab = useMemo(() => {
+    if (!availableShops.length) return "global";
+    try {
+      const stored = typeof window !== "undefined" ? window.localStorage.getItem("nirvana.revexp.activeShop") : null;
+      if (stored && availableShops.includes(stored)) return stored;
+    } catch { /* ignore */ }
+    const firstNonGlobal = availableShops.find((k) => k !== "global");
+    return firstNonGlobal || availableShops[0] || "global";
+  }, [availableShops]);
+
+  const [activeTab, setActiveTab] = useState(defaultTab);
+
+  useEffect(() => {
+    if (!availableShops.includes(activeTab)) setActiveTab(defaultTab);
+  }, [activeTab, availableShops, defaultTab]);
+
   if (!mounted) {
     return (
       <Card className="col-span-4 border-sky-500/20 bg-slate-900/50">
@@ -52,33 +79,7 @@ export function RevenueExpenseProfitTrajectoryChart({ datasets }: RevenueExpense
     );
   }
 
-  const availableShops = useMemo(() => {
-    const keys = Object.keys(datasets || {});
-    const preferredOrder = ["kipasa", "dubdub", "tradecenter", "global"];
-    return keys.sort((a, b) => {
-      const ai = preferredOrder.indexOf(a);
-      const bi = preferredOrder.indexOf(b);
-      if (ai !== -1 || bi !== -1) return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi);
-      return a.localeCompare(b);
-    });
-  }, [datasets]);
-
-  const defaultTab = useMemo(() => {
-    if (!availableShops.length) return "global";
-    try {
-      const stored = typeof window !== "undefined" ? window.localStorage.getItem("nirvana.revexp.activeShop") : null;
-      if (stored && availableShops.includes(stored)) return stored;
-    } catch { /* ignore */ }
-    const firstNonGlobal = availableShops.find((k) => k !== "global");
-    return firstNonGlobal || availableShops[0] || "global";
-  }, [availableShops]);
-
-  const [activeTab, setActiveTab] = useState(defaultTab);
   const data = datasets?.[activeTab] || [];
-
-  useEffect(() => {
-    if (!availableShops.includes(activeTab)) setActiveTab(defaultTab);
-  }, [activeTab, availableShops, defaultTab]);
 
   const onTabChange = (next: string) => {
     setActiveTab(next);
