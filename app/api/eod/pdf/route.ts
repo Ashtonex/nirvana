@@ -44,6 +44,7 @@ const COLORS = {
   info: rgb(0.2, 0.4, 0.8),
   highlight: rgb(0.2, 0.4, 0.1),
   oracle: rgb(0.4, 0.2, 0.6),
+  neutral: rgb(0.4, 0.4, 0.4),
   chartBar: rgb(0.3, 0.6, 0.9),
   chartBg: rgb(0.95, 0.96, 0.98),
 };
