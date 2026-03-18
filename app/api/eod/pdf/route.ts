@@ -626,7 +626,7 @@ export async function GET(req: Request) {
           // STRATEGIC MICRO-CARDS (New)
           const cardW = (width - margin * 2 - 160) / 2;
           page.drawRectangle({ x: margin + 160, y: y - 35, width: cardW - 10, height: 35, color: rgb(0.95, 0.95, 0.98) });
-          page.drawText("⚡ EFFICIENCY", { x: margin + 170, y: y - 15, size: 8, font: fontBold, color: COLORS.primary });
+          page.drawText("EFFICIENCY", { x: margin + 170, y: y - 15, size: 8, font: fontBold, color: COLORS.primary });
           page.drawText(`Tx Volume: ${weeklyData.basket.txCount}`, { x: margin + 170, y: y - 28, size: 7, font });
 
           page.drawRectangle({ x: margin + 160 + cardW, y: y - 35, width: cardW - 10, height: 35, color: rgb(0.95, 0.95, 0.98) });

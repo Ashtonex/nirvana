@@ -1,12 +1,18 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
-import { createHash } from "crypto";
-import { supabaseAdmin } from "@/lib/supabase";
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 import { getQuarterlyReportData } from "@/app/actions";
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
+
+function winAnsiSafe(text: string) {
+  // pdf-lib StandardFonts are WinAnsi encoded; strip unsupported unicode (emoji, etc.)
+  return String(text || "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/[^\x20-\xFF]/g, "");
+}
 
 const COLORS = {
   header: rgb(0.1, 0.1, 0.4),
@@ -55,7 +61,7 @@ export async function GET(req: Request) {
     let y = height - margin;
 
     const drawText = (text: string, size = 10, bold = false, color = rgb(0, 0, 0), x = margin) => {
-      page.drawText(text, { x, y, size, font: bold ? fontBold : font, color });
+      page.drawText(winAnsiSafe(text), { x, y, size, font: bold ? fontBold : font, color });
       y -= (size + 6);
     };
 
@@ -78,7 +84,7 @@ export async function GET(req: Request) {
 
     // --- TITLE SECTION ---
     drawText("NIRVANA STRATEGIC COMMAND", 22, true, COLORS.header);
-    drawText(`Quarterly Performance Report | ${data.shopName.toUpperCase()}`, 12, true, COLORS.neutral);
+    drawText(`Quarterly Performance Report | ${winAnsiSafe(data.shopName).toUpperCase()}`, 12, true, COLORS.neutral);
     drawText(`Fiscal Period: ${month}`, 10, false, COLORS.neutral);
     y -= 20;
     drawLine(COLORS.header, 2);
@@ -120,7 +126,7 @@ export async function GET(req: Request) {
       const endD = new Date(w.end).toLocaleDateString();
       const net = w.sales - w.expenses;
       
-      page.drawText(`${startD} - ${endD.split('/')[0]}/${endD.split('/')[1]}`, { x: colStarts[0], y, size: 9, font });
+      page.drawText(winAnsiSafe(`${startD} - ${endD.split('/')[0]}/${endD.split('/')[1]}`), { x: colStarts[0], y, size: 9, font });
       page.drawText(`$${w.sales.toLocaleString()}`, { x: colStarts[1], y, size: 9, font });
       page.drawText(`$${w.expenses.toLocaleString()}`, { x: colStarts[2], y, size: 9, font, color: COLORS.expense });
       page.drawText(`$${net.toLocaleString()}`, { x: colStarts[3], y, size: 9, font: fontBold, color: net >= 0 ? COLORS.profit : COLORS.expense });
@@ -138,7 +144,7 @@ export async function GET(req: Request) {
     y -= 10;
     data.categories.sort((a, b) => b.revenue - a.revenue).slice(0, 5).forEach((cat: any) => {
         const barW = (cat.revenue / data.finances.revenuePreTax) * 300;
-        page.drawText(cat.name, { x: margin, y, size: 9, font: fontBold });
+        page.drawText(winAnsiSafe(cat.name), { x: margin, y, size: 9, font: fontBold });
         page.drawRectangle({ x: margin + 100, y: y - 2, width: 300, height: 10, color: rgb(0.9, 0.9, 0.9) });
         page.drawRectangle({ x: margin + 100, y: y - 2, width: Math.max(1, barW), height: 10, color: COLORS.primary });
         page.drawText(`$${cat.revenue.toLocaleString()}`, { x: margin + 410, y, size: 9, font });
@@ -152,17 +158,17 @@ export async function GET(req: Request) {
     y -= 10;
     
     const insights = [
-        { label: "New Customers Acquired", value: data.customers.new, icon: "👤" },
-        { label: "Returning Client Base", value: data.customers.returning, icon: "🔄" },
-        { label: "Fixed Overhead (Salaries/Rent)", value: `$${data.finances.fixedCosts.toLocaleString()}`, icon: "🏢" },
-        { label: "Inventory Turnover Ratio", value: data.turnover.toFixed(2), icon: "📦" }
+        { label: "New Customers Acquired", value: data.customers.new },
+        { label: "Returning Client Base", value: data.customers.returning },
+        { label: "Fixed Overhead (Salaries/Rent)", value: `$${data.finances.fixedCosts.toLocaleString()}` },
+        { label: "Inventory Turnover Ratio", value: data.turnover.toFixed(2) }
     ];
 
     insights.forEach((ins, i) => {
         const ix = i % 2 === 0 ? margin : margin + (width - margin * 2) / 2;
         const iy = y - (Math.floor(i / 2) * 50);
         page.drawRectangle({ x: ix, y: iy - 40, width: (width - margin * 2) / 2 - 10, height: 40, color: COLORS.bg });
-        page.drawText(`${ins.icon} ${ins.label}`, { x: ix + 10, y: iy - 15, size: 8, font: fontBold, color: COLORS.neutral });
+        page.drawText(winAnsiSafe(`${ins.label}`), { x: ix + 10, y: iy - 15, size: 8, font: fontBold, color: COLORS.neutral });
         page.drawText(String(ins.value), { x: ix + 10, y: iy - 32, size: 12, font: fontBold, color: COLORS.header });
     });
     y -= 110;
