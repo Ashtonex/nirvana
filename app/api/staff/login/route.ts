@@ -61,6 +61,16 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: insert.error.message }, { status: 500 });
   }
 
+  // Avoid auth conflicts: if this browser previously had an owner cookie, clear it so staff auth can be detected.
+  // (AccessGate relies on /api/staff/me which should prefer staff sessions.)
+  (await cookies()).set("nirvana_owner", "", {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    path: "/",
+    maxAge: 0,
+  });
+
   (await cookies()).set("nirvana_staff", token, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",

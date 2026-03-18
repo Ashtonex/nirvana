@@ -25,6 +25,14 @@ export function AccessGate({ children }: { children: React.ReactNode }) {
             setChecked(true);
             return;
           }
+
+          // Privileged session (owner/admin) without a shop_id should still be allowed through.
+          const r = String(data?.staff?.role || "").toLowerCase();
+          if (data?.staff && (r === "owner" || r === "admin")) {
+            setOwnerOk(true);
+            setChecked(true);
+            return;
+          }
         }
       } catch (e) {
         // Not staff

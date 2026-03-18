@@ -22,7 +22,7 @@ export function StaffProvider({ children }: { children: React.ReactNode }) {
 
   const refresh = async () => {
     try {
-      const res = await fetch("/api/staff/me", { cache: "no-store" });
+      const res = await fetch("/api/staff/me", { cache: "no-store", credentials: "include" });
       if (!res.ok) {
         setStaff(null);
         return;
