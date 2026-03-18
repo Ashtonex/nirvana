@@ -61,10 +61,17 @@ export default function Sidebar() {
     const { signOut: staffSignOut, staff } = useStaff();
 
     // Staff should only see POS. No sidebar navigation.
-    if (staff && !ownerUser) return null;
+    const staffRole = String(staff?.role || "").toLowerCase();
+    const isOwnerViaCookie = !ownerUser && staffRole === "owner";
+    if (staff && !ownerUser && !isOwnerViaCookie) return null;
 
     const handleLogout = async () => {
         try {
+            if (isOwnerViaCookie) {
+                await fetch("/api/owner/logout", { method: "POST" });
+                router.push("/login");
+                return;
+            }
             if (ownerUser?.email === "flectere@dev.com") {
                 await fetch("/api/owner/logout", { method: "POST" });
                 router.push('/login');
