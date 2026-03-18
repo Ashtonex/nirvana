@@ -9,6 +9,7 @@ import { sendEmail } from "@/lib/email";
 import { sendWhatsAppMessage } from "@/lib/twilio";
 import { cookies } from "next/headers";
 import { computePosAuditReport } from "@/lib/posAudit";
+import { createOperationsLedgerEntry } from "@/lib/operations";
 
 function getPublicBaseUrl() {
     const url =
@@ -1489,6 +1490,57 @@ export async function transferInventory(itemId: string, fromShopId: string, toSh
     revalidatePath("/transfers");
 }
 
+export async function postDrawerToOperations(input: { shopId: string; amount: number; notes?: string }) {
+    const actor = await requireManagerOrOwner();
+    const shopId = String(input?.shopId || "").trim();
+    const amount = Number(input?.amount);
+    const notes = input?.notes ? String(input.notes) : "";
+
+    if (!shopId) throw new Error("Missing shopId");
+    if (!Number.isFinite(amount) || amount <= 0) throw new Error("Invalid amount");
+
+    if (actor.kind === "staff" && actor.shopId && actor.shopId !== shopId) {
+        throw new Error("Forbidden");
+    }
+
+    const timestamp = new Date().toISOString();
+    const dayStamp = timestamp.split("T")[0];
+
+    const drawerLedgerId = Math.random().toString(36).substring(2, 9);
+    await supabaseAdmin.from("ledger_entries").insert([{
+        id: drawerLedgerId,
+        shop_id: shopId,
+        type: "transfer",
+        category: "Operations Transfer",
+        amount,
+        date: timestamp,
+        description: `Posted to Operations (Master Vault)${notes ? ` | ${notes}` : ""}`,
+        employee_id: actor.id
+    }]);
+
+    await createOperationsLedgerEntry({
+        amount,
+        kind: "drawer_post",
+        shopId,
+        title: `Drawer → Operations (${shopId})`,
+        notes: notes || null,
+        effectiveDate: dayStamp,
+        employeeId: actor.kind === "staff" ? actor.id : null,
+        metadata: {
+            source: "pos",
+            drawerLedgerId
+        }
+    });
+
+    // Revalidate the key surfaces
+    revalidatePath(`/shops/${shopId}`);
+    revalidatePath("/operations");
+    revalidatePath("/logic");
+    revalidatePath("/intelligence");
+
+    return { success: true, drawerLedgerId };
+}
+
 export async function recordQuotation(quotation: any) {
     const id = Math.random().toString(36).substring(2, 9);
     const date = new Date().toISOString();
@@ -2248,8 +2300,15 @@ export async function getMonthlyReportData(
     const shop = shopRes.data;
     const settings = settingsRes.data;
     const prevSalesClients = new Set((prevSalesRes.data || []).map((s: any) => String(s.client_name || "").toLowerCase()).filter(Boolean));
+
+    // Only count real expenses in strategic reporting; exclude assets, adjustments, transfers, etc.
+    const expenseLedger = (ledger || []).filter((l: any) => String(l?.type || "").toLowerCase() === "expense");
     const prevSalesPeriod = prevPeriodSalesRes?.data || [];
     const prevLedgerPeriod = prevPeriodLedgerRes?.data || [];
+
+    // Only count real expenses in strategic reporting; exclude assets, adjustments, transfers, etc.
+    const expenseLedger = (ledger || []).filter((l: any) => String(l?.type || "").toLowerCase() === "expense");
+    const prevExpenseLedgerPeriod = (prevLedgerPeriod || []).filter((l: any) => String(l?.type || "").toLowerCase() === "expense");
 
     const revenue = sales.reduce((sum: number, s: any) => sum + Number(s.total_with_tax || 0), 0);
     const revenuePreTax = sales.reduce((sum: number, s: any) => sum + Number(s.total_before_tax || 0), 0);
@@ -2278,7 +2337,7 @@ export async function getMonthlyReportData(
         const wEnd = sat.toISOString();
 
         const wSales = sales.filter((s: any) => s.date >= wStart && s.date <= wEnd);
-        const wLedger = ledger.filter((l: any) => l.date >= wStart && l.date <= wEnd);
+        const wLedger = expenseLedger.filter((l: any) => l.date >= wStart && l.date <= wEnd);
 
         weeks.push({
             start: wStart,
@@ -2349,7 +2408,7 @@ export async function getMonthlyReportData(
 
     const variableCosts =
         variableCostsBase +
-        ledger.filter((l: any) => l.category !== 'Fixed').reduce((sum: number, l: any) => sum + Number(l.amount || 0), 0);
+        expenseLedger.filter((l: any) => l.category !== 'Fixed').reduce((sum: number, l: any) => sum + Number(l.amount || 0), 0);
 
     const operatingExpenses = fixedCosts + variableCosts;
 
@@ -2378,7 +2437,7 @@ export async function getMonthlyReportData(
     const estimatedCogsPerDay = estimatedCOGS / daysInMonth;
     const daysOfInventory = estimatedCogsPerDay > 0 ? currentInvValue / estimatedCogsPerDay : 0;
 
-    const expenseByCategory = (ledger || []).reduce((acc: Record<string, number>, l: any) => {
+    const expenseByCategory = (expenseLedger || []).reduce((acc: Record<string, number>, l: any) => {
         const cat = String(l?.category || "Uncategorized");
         acc[cat] = (acc[cat] || 0) + Number(l?.amount || 0);
         return acc;
@@ -2396,7 +2455,7 @@ export async function getMonthlyReportData(
         return acc;
     }, {} as Record<string, any[]>);
 
-    const ledgerByShop = (ledger || []).reduce((acc: Record<string, any[]>, l: any) => {
+    const ledgerByShop = (expenseLedger || []).reduce((acc: Record<string, any[]>, l: any) => {
         const sid = String(l?.shop_id || "");
         if (!sid) return acc;
         acc[sid] = acc[sid] || [];
@@ -2436,7 +2495,9 @@ export async function getMonthlyReportData(
     const prevRevenuePreTax = (prevSalesPeriod || []).reduce((sum: number, s: any) => sum + Number(s.total_before_tax || 0), 0);
     const prevEstimatedCOGS = prevRevenuePreTax * 0.35;
     const prevGrossProfit = prevRevenuePreTax - prevEstimatedCOGS;
-    const prevVariableCosts = variableCostsBase + (prevLedgerPeriod || []).filter((l: any) => l.category !== 'Fixed').reduce((sum: number, l: any) => sum + Number(l.amount || 0), 0);
+    const prevVariableCosts =
+        variableCostsBase +
+        (prevExpenseLedgerPeriod || []).filter((l: any) => l.category !== 'Fixed').reduce((sum: number, l: any) => sum + Number(l.amount || 0), 0);
     const prevOperatingExpenses = fixedCosts + prevVariableCosts;
     const prevNetProfit = prevGrossProfit - prevOperatingExpenses;
 
@@ -2645,7 +2706,7 @@ export async function getQuarterlyReportData(
         const mEnd = currentMonthEnd.toISOString();
 
         const mSales = sales.filter((s: any) => s.date >= mStart && s.date <= mEnd);
-        const mLedger = ledger.filter((l: any) => l.date >= mStart && l.date <= mEnd);
+        const mLedger = expenseLedger.filter((l: any) => l.date >= mStart && l.date <= mEnd);
 
         months.push({
             start: mStart,
@@ -2716,7 +2777,7 @@ export async function getQuarterlyReportData(
 
     const variableCosts =
         variableCostsBase +
-        ledger.filter((l: any) => l.category !== 'Fixed').reduce((sum: number, l: any) => sum + Number(l.amount || 0), 0);
+        expenseLedger.filter((l: any) => l.category !== 'Fixed').reduce((sum: number, l: any) => sum + Number(l.amount || 0), 0);
 
 
     // Inventory Turnover (Approx)
@@ -2737,7 +2798,7 @@ export async function getQuarterlyReportData(
 
     const turnover = currentInvValue > 0 ? estimatedCOGS / currentInvValue : 0;
 
-    const expenseByCategory = (ledger || []).reduce((acc: Record<string, number>, l: any) => {
+    const expenseByCategory = (expenseLedger || []).reduce((acc: Record<string, number>, l: any) => {
         const cat = String(l?.category || "Uncategorized");
         acc[cat] = (acc[cat] || 0) + Number(l?.amount || 0);
         return acc;
@@ -2755,7 +2816,7 @@ export async function getQuarterlyReportData(
         return acc;
     }, {} as Record<string, any[]>);
 
-    const ledgerByShop = (ledger || []).reduce((acc: Record<string, any[]>, l: any) => {
+    const ledgerByShop = (expenseLedger || []).reduce((acc: Record<string, any[]>, l: any) => {
         const sid = String(l?.shop_id || "");
         if (!sid) return acc;
         acc[sid] = acc[sid] || [];

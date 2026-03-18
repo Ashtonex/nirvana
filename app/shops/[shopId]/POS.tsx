@@ -48,6 +48,7 @@ import {
     recordUntrackedSale,
     openCashRegister,
     recordPosExpense,
+    postDrawerToOperations,
     recordLayby,
     updateLaybyPayment
 } from "../../actions";
@@ -225,6 +226,11 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
     const [expenseAmount, setExpenseAmount] = useState("");
     const [expenseDescription, setExpenseDescription] = useState("");
 
+    // Operations vault posting (drawer → master vault)
+    const [isOpsPostModalOpen, setIsOpsPostModalOpen] = useState(false);
+    const [opsPostAmount, setOpsPostAmount] = useState("");
+    const [opsPostNotes, setOpsPostNotes] = useState("");
+
     // Receipt context & Modal state
     const [activeReceipt, setActiveReceipt] = useState<any | null>(null);
     const [isSuccessModalOpen, setIsSuccessModalOpen] = useState(false);
@@ -268,6 +274,7 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
     // Calculate Cash Drawer Math
     const ledger = db.ledger || [];
     const todayStr = new Date().toISOString().split('T')[0];
+    const CASH_OUT_CATEGORIES = new Set(["POS Expense", "Operations Transfer"]);
 
     // 1. Did we open today?
     const todaysOpening = ledger.find((l: any) => l.category === 'Cash Drawer Opening' && l.shopId === shopId && String(l.date).startsWith(todayStr));
@@ -293,7 +300,12 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
         carryOverSales = salesSinceLastOpen.reduce((sum: number, s: any) => sum + Number(s.totalWithTax || 0), 0);
 
         // POS Expenses after last opening, before today
-        const expensesSinceLastOpen = ledger.filter((l: any) => l.category === 'POS Expense' && l.shopId === shopId && new Date(l.date).getTime() >= lastOpenDate && !String(l.date).startsWith(todayStr));
+        const expensesSinceLastOpen = ledger.filter((l: any) =>
+            CASH_OUT_CATEGORIES.has(String(l.category || "")) &&
+            l.shopId === shopId &&
+            new Date(l.date).getTime() >= lastOpenDate &&
+            !String(l.date).startsWith(todayStr)
+        );
         carryOverExpenses = expensesSinceLastOpen.reduce((sum: number, l: any) => sum + Number(l.amount || 0), 0);
 
         expectedOpeningCash = carryOverBaseline + carryOverSales - carryOverExpenses;
@@ -307,14 +319,20 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
         String(s.date).startsWith(todayStr)
     ).reduce((sum: number, s: any) => sum + Number(s.totalWithTax || 0), 0);
 
-    const todaysExpenses = ledger.filter((l: any) =>
+    const todaysPosExpenses = ledger.filter((l: any) =>
         l.category === 'POS Expense' &&
         l.shopId === shopId &&
         String(l.date).startsWith(todayStr)
     ).reduce((sum: number, l: any) => sum + Number(l.amount || 0), 0);
 
+    const todaysOpsPosts = ledger.filter((l: any) =>
+        l.category === 'Operations Transfer' &&
+        l.shopId === shopId &&
+        String(l.date).startsWith(todayStr)
+    ).reduce((sum: number, l: any) => sum + Number(l.amount || 0), 0);
+
     const baseBalance = hasOpenedRegister ? Number(todaysOpening.amount) : expectedOpeningCash;
-    const liveCashInDrawer = baseBalance + todaysCashSales - todaysExpenses;
+    const liveCashInDrawer = baseBalance + todaysCashSales - (todaysPosExpenses + todaysOpsPosts);
 
     const SHOP_SERVICES = [
         { id: 'service_engraving', name: 'Engraving', category: 'Service', basePrice: 1 },
@@ -371,6 +389,30 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
                 alert("Expense recorded successfully.");
             } catch (e) {
                 alert("Failed to record expense.");
+            }
+        });
+    };
+
+    const handlePostToOperations = async () => {
+        const val = parseFloat(opsPostAmount);
+        if (isNaN(val) || val <= 0) {
+            alert("Please provide a valid amount.");
+            return;
+        }
+        if (val > liveCashInDrawer + 0.01) {
+            alert(`Not enough cash in drawer. Drawer shows $${liveCashInDrawer.toFixed(2)}.`);
+            return;
+        }
+
+        startTransition(async () => {
+            try {
+                await postDrawerToOperations({ shopId, amount: val, notes: opsPostNotes });
+                setIsOpsPostModalOpen(false);
+                setOpsPostAmount("");
+                setOpsPostNotes("");
+                alert("Posted to Operations successfully.");
+            } catch (e: any) {
+                alert(e?.message || "Failed to post to Operations.");
             }
         });
     };
@@ -1269,6 +1311,19 @@ Generated via NIRVANA POS`;
 
                     <Button
                         onClick={() => {
+                            setOpsPostAmount("");
+                            setOpsPostNotes("");
+                            setIsOpsPostModalOpen(true);
+                        }}
+                        variant="outline"
+                        className="h-10 px-3 border-emerald-500/30 text-emerald-200 hover:bg-emerald-500/10 text-[10px] font-black uppercase italic flex items-center gap-2"
+                        title="Post cash from drawer to Operations (Master Vault)"
+                    >
+                        <Coins className="h-4 w-4" /> Post Ops
+                    </Button>
+
+                    <Button
+                        onClick={() => {
                             setReturnStatus("");
                             setIsReturnModalOpen(true);
                         }}
@@ -1408,7 +1463,15 @@ Generated via NIRVANA POS`;
                         <AlertCircle className="h-4 w-4 text-rose-400" />
                         <div className="flex flex-col">
                             <span className="text-[10px] text-slate-500 uppercase font-black leading-none">Today's Exp.</span>
-                            <span className="text-xs font-bold text-slate-200">${todaysExpenses.toFixed(2)}</span>
+                            <span className="text-xs font-bold text-slate-200">${todaysPosExpenses.toFixed(2)}</span>
+                        </div>
+                    </div>
+
+                    <div className="bg-slate-900 border border-slate-800 px-4 py-2 rounded-lg flex items-center gap-3 h-10 shadow-lg min-w-max">
+                        <Coins className="h-4 w-4 text-emerald-400" />
+                        <div className="flex flex-col">
+                            <span className="text-[10px] text-slate-500 uppercase font-black leading-none">Ops Posted</span>
+                            <span className="text-xs font-bold text-slate-200">${todaysOpsPosts.toFixed(2)}</span>
                         </div>
                     </div>
                 </div>
@@ -2136,6 +2199,56 @@ Generated via NIRVANA POS`;
                     </Button>
                 </div>
             </Modal >
+
+            {/* Operations Post Modal */}
+            <Modal
+                isOpen={isOpsPostModalOpen}
+                onClose={() => setIsOpsPostModalOpen(false)}
+                title="Post Cash to Operations (Master Vault)"
+            >
+                <div className="space-y-4 pt-2">
+                    <p className="text-sm text-slate-400 font-medium">
+                        This moves cash from the drawer into the business Operations vault. Drawer cash will decrease and Operations will increase.
+                    </p>
+
+                    <div className="rounded-xl border border-slate-800 bg-slate-950/50 p-3 text-[10px] font-bold text-slate-400 uppercase">
+                        Drawer cash now: <span className="text-slate-200">${liveCashInDrawer.toFixed(2)}</span>
+                    </div>
+
+                    <div>
+                        <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Amount</label>
+                        <div className="relative mt-1">
+                            <span className="absolute left-3 top-[10px] text-slate-500 font-mono font-bold text-lg">$</span>
+                            <Input
+                                type="number"
+                                placeholder="0.00"
+                                step="0.01"
+                                className="pl-8 bg-slate-950 border-emerald-500/30 text-lg font-mono font-black h-12 text-emerald-300"
+                                value={opsPostAmount}
+                                onChange={(e) => setOpsPostAmount(e.target.value)}
+                            />
+                        </div>
+                    </div>
+
+                    <div>
+                        <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Notes (optional)</label>
+                        <Input
+                            placeholder="e.g. Bank deposit / safe drop / transport to HQ"
+                            className="bg-slate-950 border-slate-800 mt-1 placeholder:text-slate-700 font-bold h-12"
+                            value={opsPostNotes}
+                            onChange={(e) => setOpsPostNotes(e.target.value)}
+                        />
+                    </div>
+
+                    <Button
+                        className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-black uppercase italic tracking-wider h-12 mt-4"
+                        onClick={handlePostToOperations}
+                        disabled={isPending}
+                    >
+                        {isPending ? "Posting..." : "Post to Operations"}
+                    </Button>
+                </div>
+            </Modal>
 
             <Modal
                 isOpen={isEodShareModalOpen}
