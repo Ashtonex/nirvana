@@ -8,11 +8,36 @@ import { computePosAuditReport } from "@/lib/posAudit";
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 function winAnsiSafe(text: any) {
-  // pdf-lib StandardFonts are WinAnsi encoded; strip unsupported unicode (emoji, private-use, etc.)
-  return String(text ?? "")
+  // pdf-lib StandardFonts are WinAnsi encoded; aggressively strip unsupported unicode (emoji, private-use, etc.)
+  // Use code-point iteration to reliably remove astral symbols (surrogate pairs).
+  const normalized = String(text ?? "")
     .replace(/\s+/g, " ")
     .trim()
-    .replace(/[^\x20-\xFF]/g, "");
+    .normalize("NFKD");
+
+  let out = "";
+  for (const ch of normalized) {
+    const cp = ch.codePointAt(0) ?? 0;
+    // Keep basic printable ASCII. (Anything else risks WinAnsi encoding failures.)
+    if (cp >= 0x20 && cp <= 0x7e) {
+      out += ch;
+      continue;
+    }
+
+    // Map a few common punctuation characters into ASCII.
+    if (ch === "’" || ch === "‘") { out += "'"; continue; }
+    if (ch === "“" || ch === "”") { out += "\""; continue; }
+    if (ch === "–" || ch === "—") { out += "-"; continue; }
+    if (ch === "•") { out += "-"; continue; }
+    if (ch === "…" ) { out += "..."; continue; }
+
+    // Allow Latin-1 supplement as a best-effort (still safe for many WinAnsi glyphs).
+    if (cp >= 0xa0 && cp <= 0xff) {
+      out += ch;
+    }
+  }
+
+  return out;
 }
 
 function startOfDayUTC(date?: string | null) {

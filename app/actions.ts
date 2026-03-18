@@ -2195,8 +2195,14 @@ export async function printZIMRALog() {
 }
 
 
-export async function getMonthlyReportData(shopId: string, monthISO: string) {
-    const actor = await requireManagerOrOwner();
+export async function getMonthlyReportData(
+    shopId: string,
+    monthISO: string,
+    opts?: { skipAuth?: boolean }
+) {
+    if (!opts?.skipAuth) {
+        await requireManagerOrOwner();
+    }
     const isGlobal = String(shopId || "") === "global" || String(shopId || "") === "all";
     const targetDate = new Date(monthISO);
     const year = targetDate.getUTCFullYear();
@@ -2570,8 +2576,14 @@ export async function reapportionStock(itemId: string, allocations: { shopId: st
     revalidatePath('/shops');
 }
 
-export async function getQuarterlyReportData(shopId: string, monthISO: string) {
-    const actor = await requireManagerOrOwner();
+export async function getQuarterlyReportData(
+    shopId: string,
+    monthISO: string,
+    opts?: { skipAuth?: boolean }
+) {
+    if (!opts?.skipAuth) {
+        await requireManagerOrOwner();
+    }
     const isGlobal = String(shopId || "") === "global" || String(shopId || "") === "all";
     const targetDate = new Date(monthISO);
     

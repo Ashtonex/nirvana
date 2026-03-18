@@ -13,12 +13,26 @@ function isAdminLikeRole(role: string | null | undefined) {
   return r === "owner" || r === "admin";
 }
 
-function winAnsiSafe(text: string) {
-  // pdf-lib StandardFonts are WinAnsi encoded; strip unsupported unicode (emoji, etc.)
-  return String(text || "")
+function winAnsiSafe(text: any) {
+  // pdf-lib StandardFonts are WinAnsi encoded; aggressively strip unsupported unicode (emoji, private-use, etc.)
+  // Use code-point iteration to reliably remove astral symbols (surrogate pairs).
+  const normalized = String(text ?? "")
     .replace(/\s+/g, " ")
     .trim()
-    .replace(/[^\x20-\xFF]/g, "");
+    .normalize("NFKD");
+
+  let out = "";
+  for (const ch of normalized) {
+    const cp = ch.codePointAt(0) ?? 0;
+    if (cp >= 0x20 && cp <= 0x7e) { out += ch; continue; }
+    if (ch === "’" || ch === "‘") { out += "'"; continue; }
+    if (ch === "“" || ch === "”") { out += "\""; continue; }
+    if (ch === "–" || ch === "—") { out += "-"; continue; }
+    if (ch === "•") { out += "-"; continue; }
+    if (ch === "…") { out += "..."; continue; }
+    if (cp >= 0xa0 && cp <= 0xff) { out += ch; }
+  }
+  return out;
 }
 
 const COLORS = {
@@ -82,7 +96,7 @@ export async function GET(req: Request) {
     }
 
     // Fetch monthly data
-    const data = await getMonthlyReportData(shopId, `${month}-01T12:00:00Z`);
+    const data = await getMonthlyReportData(shopId, `${month}-01T12:00:00Z`, { skipAuth: true });
     if (!data) {
       return NextResponse.json({ error: "Failed to fetch report data" }, { status: 500 });
     }
