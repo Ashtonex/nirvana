@@ -1019,6 +1019,34 @@ Generated via NIRVANA POS`;
                 alert("Could not generate PDF report. Network error?");
             }
 
+            // 3. Post cash to Operations (Master Vault)
+            try {
+                const depositRaw = prompt("How much are you posting to Operations (Master Vault) today?", "");
+                if (depositRaw != null && String(depositRaw).trim() !== "") {
+                    const deposit = Number(String(depositRaw).trim());
+                    if (Number.isFinite(deposit) && deposit > 0) {
+                        const postRes = await fetch("/api/operations/ledger", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            credentials: "include",
+                            body: JSON.stringify({
+                                amount: deposit,
+                                kind: "eod_deposit",
+                                shopId,
+                                title: `EOD deposit ${dayStamp} (${shopId})`,
+                                effectiveDate: dayStamp,
+                            }),
+                        });
+                        if (!postRes.ok) {
+                            const err = await postRes.json().catch(() => ({}));
+                            console.warn("Operations deposit failed:", err);
+                        }
+                    }
+                }
+            } catch (e) {
+                console.warn("Operations deposit prompt failed:", e);
+            }
+
             // Always open the modal if we got this far
             setIsEodShareModalOpen(true);
 

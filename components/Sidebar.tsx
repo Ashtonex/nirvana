@@ -19,7 +19,10 @@ import {
     ShieldCheck,
     Scale,
     LogOut,
-    FileText
+    FileText,
+    Wallet,
+    HandCoins,
+    Cpu
 } from 'lucide-react';
 import { useAuth } from '@/components/AuthProvider';
 import { useStaff } from '@/components/StaffProvider';
@@ -48,6 +51,9 @@ const navItems = [
     { name: 'Tax Ledger', href: '/admin/tax', icon: Scale },
     { name: 'Financials', href: '/finance', icon: BarChart3 },
     { name: 'Reports', href: '/reports', icon: BarChart3 },
+    { name: 'Operations', href: '/operations', icon: Wallet },
+    { name: 'Invest', href: '/invest', icon: HandCoins },
+    { name: 'Logic', href: '/logic', icon: Cpu },
     { name: 'EOD Reports', href: '/admin/eod', icon: FileText },
     { name: 'Data Vault', href: '/admin/backups', icon: ShieldCheck },
 ];
