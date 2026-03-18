@@ -71,7 +71,11 @@ export function AccessGate({ children }: { children: React.ReactNode }) {
       pathname === "/admin/audit" ||
       pathname === "/admin/settings" ||
       pathname === "/admin/pos-audit" ||
-      pathname.startsWith("/admin/pos-audit/");
+      pathname.startsWith("/admin/pos-audit/") ||
+      pathname === "/intelligence" ||
+      pathname.startsWith("/intelligence/") ||
+      pathname === "/finance/oracle" ||
+      pathname.startsWith("/finance/");
     
     if (onTheirShop || onStaffChat || (isManager && managerAllowed)) {
       return <>{children}</>;

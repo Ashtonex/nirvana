@@ -35,9 +35,15 @@ interface ShopPerformanceItem {
 }
 
 export default async function IntelligencePage() {
-    const pulse = await getOracleMasterPulse();
+    let pulse = null;
+    try {
+        pulse = await getOracleMasterPulse();
+    } catch (e) {
+        console.error('[Intelligence] getOracleMasterPulse failed:', e);
+    }
 
-    if (!pulse) {
+    // Guard: if pulse is null or missing expected structure, show fallback
+    if (!pulse || !pulse.shopPerformance || !Array.isArray(pulse.shopPerformance)) {
         return (
             <div className="space-y-8 pb-32 pt-8">
                 <div className="space-y-2 text-center max-w-3xl mx-auto">
