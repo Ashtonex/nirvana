@@ -87,8 +87,8 @@ export function SalesChart({ data, forecast }: SalesChartProps) {
                 </div>
             </CardHeader>
             <CardContent>
-                <div className="w-full mt-4" style={{ height: 300 }}>
-                    <ResponsiveContainer width="100%" height="100%">
+                <div className="w-full mt-4 min-h-[300px]">
+                    <ResponsiveContainer width="100%" height={300}>
                         <AreaChart
                             data={data}
                             margin={{ top: 10, right: 10, left: 0, bottom: 0 }}

@@ -140,8 +140,8 @@ export function BreakEvenChart({ datasets }: BreakEvenChartProps) {
                         <p className="text-slate-500 text-sm mt-1">Sales will appear here once transactions are recorded</p>
                     </div>
                 ) : (
-                    <div className="w-full h-[400px] mt-2">
-                        <ResponsiveContainer width="100%" height="100%">
+                    <div className="w-full min-h-[400px]">
+                        <ResponsiveContainer width="100%" height={400}>
                             <LineChart data={data} margin={{ top: 20, right: 30, left: 10, bottom: 10 }}>
                                 <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
                                 <XAxis

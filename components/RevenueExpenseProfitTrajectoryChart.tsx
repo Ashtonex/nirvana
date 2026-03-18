@@ -138,8 +138,8 @@ export function RevenueExpenseProfitTrajectoryChart({ datasets }: RevenueExpense
             <p className="text-slate-400 font-medium">No data available for {getShopDisplayName(activeTab)}</p>
           </div>
         ) : (
-          <div className="w-full mt-2" style={{ height: 380 }}>
-            <ResponsiveContainer width="100%" height="100%">
+          <div className="w-full min-h-[380px]">
+            <ResponsiveContainer width="100%" height={380}>
               <LineChart data={data} margin={{ top: 10, right: 30, left: 10, bottom: 10 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
                 <XAxis dataKey="day" stroke="#475569" fontSize={10} tickLine={false} axisLine={false} />
