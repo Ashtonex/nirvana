@@ -21,6 +21,9 @@ export default async function IntelligencePage() {
   const invalidPulse =
     !pulse || !pulse.shopPerformance || !Array.isArray(pulse.shopPerformance) || Boolean(error);
 
+  const errorMessage =
+    error instanceof Error ? error.message : error ? String(error) : null;
+
   if (invalidPulse) {
     return (
       <div className="space-y-8 pb-32 pt-8">
@@ -53,9 +56,9 @@ export default async function IntelligencePage() {
             401 issue. Please check the server logs for details on the error, as the data fetching process
             terminated prematurely.
           </p>
-          {error && (
+          {errorMessage && (
             <p className="text-[10px] mt-2 text-red-300 font-mono whitespace-pre-wrap">
-              Error: {error instanceof Error ? error.message : String(error)}
+              Error: {errorMessage}
             </p>
           )}
         </div>
