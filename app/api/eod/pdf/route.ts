@@ -7,6 +7,13 @@ import { computePosAuditReport } from "@/lib/posAudit";
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
+function winAnsiSafe(text: any) {
+  // pdf-lib StandardFonts are WinAnsi encoded; strip unsupported unicode (emoji, private-use, etc.)
+  return String(text ?? "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/[^\x20-\xFF]/g, "");
+}
 
 function startOfDayUTC(date?: string | null) {
   const d = date ? new Date(`${date}T00:00:00.000Z`) : new Date();
@@ -431,10 +438,14 @@ export async function GET(req: Request) {
     const margin = 40;
     let y = height - margin;
 
+    const pDrawText = (text: any, options: any) => {
+      (page as any).drawText(winAnsiSafe(text), options);
+    };
+
     const drawText = (text: any, size = 10, bold = false, color = rgb(0.1, 0.1, 0.1)) => {
       const safeText = String(text || "");
       const safeY = Number(y) || margin;
-      page.drawText(safeText, { x: margin, y: safeY, size, font: bold ? fontBold : font, color });
+      pDrawText(safeText, { x: margin, y: safeY, size, font: bold ? fontBold : font, color });
       y = safeY - (size + 6);
     };
 
@@ -484,7 +495,7 @@ export async function GET(req: Request) {
           color: d.color || COLORS.chartBar 
         });
         const label = String(d.label || "N/A").substring(0, 4);
-        page.drawText(label, { x: x + (i * bW) + 5, y: yPos - 12, size: 6, font });
+        pDrawText(label, { x: x + (i * bW) + 5, y: yPos - 12, size: 6, font });
       });
     };
 
@@ -504,19 +515,19 @@ export async function GET(req: Request) {
     drawText("FINANCIAL SUMMARY", 11, true, rgb(0.1, 0.5, 0.3));
     page.drawRectangle({ x: margin, y: y - 105, width: width - margin * 2, height: 105, color: rgb(0.97, 0.98, 1) });
     const metricsY = y - 20;
-    page.drawText(`Total Sales (Inc Tax): $${Number(totalWithTax || 0).toFixed(2)}`, { x: margin + 10, y: metricsY, size: 10, font: fontBold });
-    page.drawText(`Total Sales (Pre Tax): $${Number(totalBeforeTax || 0).toFixed(2)}`, { x: margin + 10, y: metricsY - 15, size: 9, font });
-    page.drawText(`Total Tax: $${Number(totalTax || 0).toFixed(2)}`, { x: margin + 10, y: metricsY - 30, size: 9, font });
-    page.drawText(`Discounts: -$${Number(totalDiscount || 0).toFixed(2)}`, { x: margin + 10, y: metricsY - 45, size: 9, font, color: rgb(0.8, 0, 0) });
-    page.drawText(`POS Expenses: -$${Number(totalPosExpenses || 0).toFixed(2)}`, { x: margin + 10, y: metricsY - 60, size: 9, font, color: rgb(0.8, 0, 0) });
-    page.drawText(`Net Revenue: $${Number((totalWithTax || 0) - (totalPosExpenses || 0)).toFixed(2)}`, { x: margin + 10, y: metricsY - 78, size: 11, font: fontBold, color: rgb(0, 0.4, 0.1) });
+    pDrawText(`Total Sales (Inc Tax): $${Number(totalWithTax || 0).toFixed(2)}`, { x: margin + 10, y: metricsY, size: 10, font: fontBold });
+    pDrawText(`Total Sales (Pre Tax): $${Number(totalBeforeTax || 0).toFixed(2)}`, { x: margin + 10, y: metricsY - 15, size: 9, font });
+    pDrawText(`Total Tax: $${Number(totalTax || 0).toFixed(2)}`, { x: margin + 10, y: metricsY - 30, size: 9, font });
+    pDrawText(`Discounts: -$${Number(totalDiscount || 0).toFixed(2)}`, { x: margin + 10, y: metricsY - 45, size: 9, font, color: rgb(0.8, 0, 0) });
+    pDrawText(`POS Expenses: -$${Number(totalPosExpenses || 0).toFixed(2)}`, { x: margin + 10, y: metricsY - 60, size: 9, font, color: rgb(0.8, 0, 0) });
+    pDrawText(`Net Revenue: $${Number((totalWithTax || 0) - (totalPosExpenses || 0)).toFixed(2)}`, { x: margin + 10, y: metricsY - 78, size: 11, font: fontBold, color: rgb(0, 0.4, 0.1) });
 
-    page.drawText(`Cash: $${Number(totalCashSales || 0).toFixed(2)}`, { x: width / 2, y: metricsY, size: 10, font });
-    page.drawText(`EcoCash: $${Number(totalEcocash || 0).toFixed(2)}`, { x: width / 2, y: metricsY - 15, size: 10, font });
-    page.drawText(`Lay-by Collected: $${Number(laybyCash || 0).toFixed(2)}`, { x: width / 2, y: metricsY - 30, size: 10, font });
-    page.drawText(`Opening Drawer: $${Number(openingCash || 0).toFixed(2)}`, { x: width / 2, y: metricsY - 45, size: 9, font });
-    page.drawText(`Adj (Net): $${Number(adjustmentNet || 0).toFixed(2)}`, { x: width / 2, y: metricsY - 60, size: 9, font });
-    page.drawText(`Closing Est.: $${Number(closingCashEstimate || 0).toFixed(2)}`, { x: width / 2, y: metricsY - 75, size: 9, font: fontBold });
+    pDrawText(`Cash: $${Number(totalCashSales || 0).toFixed(2)}`, { x: width / 2, y: metricsY, size: 10, font });
+    pDrawText(`EcoCash: $${Number(totalEcocash || 0).toFixed(2)}`, { x: width / 2, y: metricsY - 15, size: 10, font });
+    pDrawText(`Lay-by Collected: $${Number(laybyCash || 0).toFixed(2)}`, { x: width / 2, y: metricsY - 30, size: 10, font });
+    pDrawText(`Opening Drawer: $${Number(openingCash || 0).toFixed(2)}`, { x: width / 2, y: metricsY - 45, size: 9, font });
+    pDrawText(`Adj (Net): $${Number(adjustmentNet || 0).toFixed(2)}`, { x: width / 2, y: metricsY - 60, size: 9, font });
+    pDrawText(`Closing Est.: $${Number(closingCashEstimate || 0).toFixed(2)}`, { x: width / 2, y: metricsY - 75, size: 9, font: fontBold });
     y -= 115;
 
     // Stock Intelligence
@@ -579,7 +590,7 @@ export async function GET(req: Request) {
     if (advice.length === 0) advice.push("PERFORMANCE: Steady operations. Focus on upselling premium accessories to increase basket size.");
 
     advice.forEach(a => {
-      page.drawText(a, { x: margin + 10, y: adviceY, size: 8, font, color: rgb(0.2, 0.2, 0.2), maxWidth: width - margin * 2 - 20 });
+      pDrawText(a, { x: margin + 10, y: adviceY, size: 8, font, color: rgb(0.2, 0.2, 0.2), maxWidth: width - margin * 2 - 20 });
       adviceY -= 20;
     });
     y -= 120;
@@ -593,8 +604,8 @@ export async function GET(req: Request) {
     sales.slice(0, 30).forEach((s: any) => {
       ensureSpace(60);
       const time = new Date(s.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-      page.drawText(`${time} - ${s.item_name} x${s.quantity}`, { x: margin, y, size: 8, font });
-      page.drawText(`$${Number(s.total_with_tax).toFixed(2)} (${s.payment_method})`, { x: width - margin - 80, y, size: 8, font });
+      pDrawText(`${time} - ${s.item_name} x${s.quantity}`, { x: margin, y, size: 8, font });
+      pDrawText(`$${Number(s.total_with_tax).toFixed(2)} (${s.payment_method})`, { x: width - margin - 80, y, size: 8, font });
       y -= 12;
     });
     if (isWeekly && weeklyData) {
@@ -620,18 +631,18 @@ export async function GET(req: Request) {
           const riskColor = overCovVal > 120 ? COLORS.highlight : overCovVal > 100 ? COLORS.info : COLORS.warning;
           const riskLabel = overCovVal > 120 ? "VITALITY: HIGH" : overCovVal > 100 ? "STABLE" : "RISK: ELEVATED";
           page.drawRectangle({ x: margin, y: y - 35, width: 140, height: 35, color: riskColor });
-          page.drawText(riskLabel, { x: margin + 10, y: y - 15, size: 10, font: fontBold, color: rgb(1,1,1) });
-          page.drawText(`Margin: ${overCovVal.toFixed(1)}%`, { x: margin + 10, y: y - 28, size: 8, font, color: rgb(1,1,1) });
+          pDrawText(riskLabel, { x: margin + 10, y: y - 15, size: 10, font: fontBold, color: rgb(1,1,1) });
+          pDrawText(`Margin: ${overCovVal.toFixed(1)}%`, { x: margin + 10, y: y - 28, size: 8, font, color: rgb(1,1,1) });
 
           // STRATEGIC MICRO-CARDS (New)
           const cardW = (width - margin * 2 - 160) / 2;
           page.drawRectangle({ x: margin + 160, y: y - 35, width: cardW - 10, height: 35, color: rgb(0.95, 0.95, 0.98) });
-          page.drawText("EFFICIENCY", { x: margin + 170, y: y - 15, size: 8, font: fontBold, color: COLORS.primary });
-          page.drawText(`Tx Volume: ${weeklyData.basket.txCount}`, { x: margin + 170, y: y - 28, size: 7, font });
+          pDrawText("EFFICIENCY", { x: margin + 170, y: y - 15, size: 8, font: fontBold, color: COLORS.primary });
+          pDrawText(`Tx Volume: ${weeklyData.basket.txCount}`, { x: margin + 170, y: y - 28, size: 7, font });
 
           page.drawRectangle({ x: margin + 160 + cardW, y: y - 35, width: cardW - 10, height: 35, color: rgb(0.95, 0.95, 0.98) });
-          page.drawText("📈 BASKET PULSE", { x: margin + 170 + cardW, y: y - 15, size: 8, font: fontBold, color: COLORS.primary });
-          page.drawText(`Avg Value: $${weeklyData.basket.avgValue.toFixed(2)}`, { x: margin + 170 + cardW, y: y - 28, size: 7, font });
+          pDrawText("📈 BASKET PULSE", { x: margin + 170 + cardW, y: y - 15, size: 8, font: fontBold, color: COLORS.primary });
+          pDrawText(`Avg Value: $${weeklyData.basket.avgValue.toFixed(2)}`, { x: margin + 170 + cardW, y: y - 28, size: 7, font });
           y -= 50;
 
           drawText("1. FINANCIAL PERFORMANCE & PULSE", 11, true, COLORS.primary);
@@ -639,33 +650,33 @@ export async function GET(req: Request) {
           page.drawRectangle({ x: margin, y: y - 130, width: width - margin * 2, height: 130, color: rgb(0.98, 0.98, 1), borderColor: rgb(0.9, 0.9, 0.95), borderWidth: 1 });
           const metY = y - 20;
 
-          page.drawText(`Weekly Gross Revenue:`, { x: margin + 10, y: metY, size: 9, font });
-          page.drawText(`$${Number(totals.withTax || 0).toFixed(2)}`, { x: margin + 110, y: metY, size: 9, font: fontBold });
-          page.drawText(`Tax Obligation:`, { x: margin + 10, y: metY - 15, size: 9, font });
-          page.drawText(`$${Number(totals.tax || 0).toFixed(2)}`, { x: margin + 110, y: metY - 15, size: 9, font });
-          page.drawText(`Total Discounts:`, { x: margin + 10, y: metY - 30, size: 9, font });
-          page.drawText(`$${Number(totals.discount || 0).toFixed(2)}`, { x: margin + 110, y: metY - 30, size: 9, font, color: COLORS.warning });
-          page.drawText(`Est. Gross Profit:`, { x: margin + 10, y: metY - 45, size: 9, font });
-          page.drawText(`$${Number(wGrossProfit || 0).toFixed(2)}`, { x: margin + 110, y: metY - 45, size: 9, font: fontBold, color: COLORS.highlight });
+          pDrawText(`Weekly Gross Revenue:`, { x: margin + 10, y: metY, size: 9, font });
+          pDrawText(`$${Number(totals.withTax || 0).toFixed(2)}`, { x: margin + 110, y: metY, size: 9, font: fontBold });
+          pDrawText(`Tax Obligation:`, { x: margin + 10, y: metY - 15, size: 9, font });
+          pDrawText(`$${Number(totals.tax || 0).toFixed(2)}`, { x: margin + 110, y: metY - 15, size: 9, font });
+          pDrawText(`Total Discounts:`, { x: margin + 10, y: metY - 30, size: 9, font });
+          pDrawText(`$${Number(totals.discount || 0).toFixed(2)}`, { x: margin + 110, y: metY - 30, size: 9, font, color: COLORS.warning });
+          pDrawText(`Est. Gross Profit:`, { x: margin + 10, y: metY - 45, size: 9, font });
+          pDrawText(`$${Number(wGrossProfit || 0).toFixed(2)}`, { x: margin + 110, y: metY - 45, size: 9, font: fontBold, color: COLORS.highlight });
 
-          page.drawText(`FINAL NET PULSE:`, { x: margin + 10, y: metY - 80, size: 10, font: fontBold });
-          page.drawText(`$${Number(wFinalNet || 0).toFixed(2)}`, { x: margin + 110, y: metY - 80, size: 11, font: fontBold, color: (Number(wFinalNet || 0) > 0) ? COLORS.highlight : COLORS.warning });
+          pDrawText(`FINAL NET PULSE:`, { x: margin + 10, y: metY - 80, size: 10, font: fontBold });
+          pDrawText(`$${Number(wFinalNet || 0).toFixed(2)}`, { x: margin + 110, y: metY - 80, size: 11, font: fontBold, color: (Number(wFinalNet || 0) > 0) ? COLORS.highlight : COLORS.warning });
 
           // Weekly Payment Mix (Added back)
           const pm = weeklyData.paymentMix;
-          page.drawText(`Cash: $${Number(pm.cashTotal || 0).toFixed(0)}`, { x: margin + 10, y: metY - 95, size: 8, font });
-          page.drawText(`Eco: $${Number(pm.ecocashTotal || 0).toFixed(0)}`, { x: margin + 70, y: metY - 95, size: 8, font });
-          page.drawText(`Swipe: $${Number(pm.swipeTotal || 0).toFixed(0)}`, { x: margin + 130, y: metY - 95, size: 8, font });
+          pDrawText(`Cash: $${Number(pm.cashTotal || 0).toFixed(0)}`, { x: margin + 10, y: metY - 95, size: 8, font });
+          pDrawText(`Eco: $${Number(pm.ecocashTotal || 0).toFixed(0)}`, { x: margin + 70, y: metY - 95, size: 8, font });
+          pDrawText(`Swipe: $${Number(pm.swipeTotal || 0).toFixed(0)}`, { x: margin + 130, y: metY - 95, size: 8, font });
 
           // Right side: Coverage & MTD
           const overCov = weeklyData.overheadCovered || 0;
-          page.drawText(`Overhead Coverage:`, { x: width / 2 + 10, y: metY, size: 9, font });
-          page.drawText(`${overCov.toFixed(1)}%`, { x: width / 2 + 105, y: metY, size: 10, font: fontBold, color: overCov >= 100 ? COLORS.highlight : COLORS.warning });
+          pDrawText(`Overhead Coverage:`, { x: width / 2 + 10, y: metY, size: 9, font });
+          pDrawText(`${overCov.toFixed(1)}%`, { x: width / 2 + 105, y: metY, size: 10, font: fontBold, color: overCov >= 100 ? COLORS.highlight : COLORS.warning });
 
           const mtdRev = weeklyData.mtd?.revenue || 0;
           const mtdProg = weeklyData.mtd?.progress || 0;
-          page.drawText(`MTD Progress:`, { x: width / 2 + 10, y: metY - 20, size: 9, font });
-          page.drawText(`$${Number(mtdRev || 0).toFixed(0)}`, { x: width / 2 + 105, y: metY - 20, size: 9, font: fontBold });
+          pDrawText(`MTD Progress:`, { x: width / 2 + 10, y: metY - 20, size: 9, font });
+          pDrawText(`$${Number(mtdRev || 0).toFixed(0)}`, { x: width / 2 + 105, y: metY - 20, size: 9, font: fontBold });
           
           const barW = 80;
           page.drawRectangle({ x: width / 2 + 10, y: metY - 35, width: barW, height: 6, color: rgb(0.9, 0.9, 0.9) });
@@ -675,7 +686,7 @@ export async function GET(req: Request) {
           const totalOut = (totals.cogs || 0) + (overhead.weekly || 0);
           const cogsP = totalOut > 0 ? (totals.cogs / totalOut) * 100 : 0;
           const rentP = totalOut > 0 ? ((overhead.rent || 0) / 4 / totalOut) * 100 : 0;
-          page.drawText(`EXPENSE MIX:`, { x: width / 2 + 10, y: metY - 65, size: 8, font: fontBold });
+          pDrawText(`EXPENSE MIX:`, { x: width / 2 + 10, y: metY - 65, size: 8, font: fontBold });
           let curX = width / 2 + 10;
           if (cogsP > 1) { 
             page.drawRectangle({ x: curX, y: metY - 78, width: (barW * cogsP / 100), height: 8, color: COLORS.primary });
@@ -684,7 +695,7 @@ export async function GET(req: Request) {
           if (rentP > 1) {
             page.drawRectangle({ x: curX, y: metY - 78, width: (barW * rentP / 100), height: 8, color: COLORS.warning });
           }
-          page.drawText(`Blue: Stock | Org: Rent`, { x: width / 2 + 10, y: metY - 92, size: 6, font });
+          pDrawText(`Blue: Stock | Org: Rent`, { x: width / 2 + 10, y: metY - 92, size: 6, font });
           y -= 150;
 
           drawText("2. DAILY REVENUE VELOCITY", 11, true, COLORS.info);
@@ -707,7 +718,7 @@ export async function GET(req: Request) {
           dRev.forEach((rev, i) => {
             const bh = (rev / maxR) * chartH;
             page.drawRectangle({ x: margin + (i * bSpc) + 10, y: y - chartH - 5, width: bSpc - 20, height: bh, color: COLORS.chartBar });
-            page.drawText(dNames[i], { x: margin + (i * bSpc) + 15, y: y - chartH - 20, size: 8, font });
+            pDrawText(dNames[i], { x: margin + (i * bSpc) + 15, y: y - chartH - 20, size: 8, font });
           });
           
           y -= 140;
@@ -733,7 +744,7 @@ export async function GET(req: Request) {
           
           // Micro-Insight on Page 2
           page.drawRectangle({ x: margin, y: y - 25, width: width - margin * 2, height: 25, color: COLORS.info, opacity: 0.1 });
-          page.drawText("💡 LEVERAGE TIP: Identify segments with >30% margin and consider 'Strategic Restocking' to amplify net cash position.", { x: margin + 10, y: y - 16, size: 7, font: fontItalic, color: COLORS.primary });
+          pDrawText("💡 LEVERAGE TIP: Identify segments with >30% margin and consider 'Strategic Restocking' to amplify net cash position.", { x: margin + 10, y: y - 16, size: 7, font: fontItalic, color: COLORS.primary });
           y -= 40;
 
           drawText("STAFF PERFORMANCE RANKING", 11, true, COLORS.primary);
@@ -741,9 +752,9 @@ export async function GET(req: Request) {
           weeklyData.staffScoreboard.slice(0, 10).forEach((s: any, i: number) => {
             ensureSpace(30);
             page.drawRectangle({ x: margin, y: y - 22, width: width - margin * 2, height: 22, color: i % 2 === 0 ? rgb(0.97, 0.97, 1) : rgb(1, 1, 1) });
-            page.drawText(`${i + 1}. ${s.name}`, { x: margin + 10, y: y - 16, size: 9, font: fontBold });
-            page.drawText(`${s.sales} units`, { x: margin + 180, y: y - 16, size: 8, font });
-            page.drawText(`$${Number(s.revenue || 0).toFixed(0)}`, { x: width - margin - 80, y: y - 16, size: 9, font: fontBold, color: COLORS.highlight });
+            pDrawText(`${i + 1}. ${s.name}`, { x: margin + 10, y: y - 16, size: 9, font: fontBold });
+            pDrawText(`${s.sales} units`, { x: margin + 180, y: y - 16, size: 8, font });
+            pDrawText(`$${Number(s.revenue || 0).toFixed(0)}`, { x: width - margin - 80, y: y - 16, size: 9, font: fontBold, color: COLORS.highlight });
             y -= 25;
           });
 
@@ -753,9 +764,9 @@ export async function GET(req: Request) {
           weeklyData.categoryContribution.slice(0, 5).forEach((c: any, i: number) => {
             ensureSpace(25);
             page.drawRectangle({ x: margin, y: y - 20, width: width - margin * 2, height: 20, color: i % 2 === 0 ? rgb(0.98, 0.98, 1) : rgb(1, 1, 1) });
-            page.drawText(c.name, { x: margin + 10, y: y - 13, size: 9, font });
-            page.drawText(`$${Number(c.revenue || 0).toFixed(2)}`, { x: margin + 180, y: y - 13, size: 9, font });
-            page.drawText(`Profit: $${Number(c.profit || 0).toFixed(2)}`, { x: width - margin - 100, y: y - 13, size: 9, font: fontBold, color: COLORS.highlight });
+            pDrawText(c.name, { x: margin + 10, y: y - 13, size: 9, font });
+            pDrawText(`$${Number(c.revenue || 0).toFixed(2)}`, { x: margin + 180, y: y - 13, size: 9, font });
+            pDrawText(`Profit: $${Number(c.profit || 0).toFixed(2)}`, { x: width - margin - 100, y: y - 13, size: 9, font: fontBold, color: COLORS.highlight });
             y -= 20;
           });
 
@@ -774,7 +785,7 @@ export async function GET(req: Request) {
             return { value: c.revenue, color: colors[i] || COLORS.chartBar };
           });
           drawDonut(width - margin - 70, y - 10, 25, mixData);
-          page.drawText("Category Revenue Mix", { x: width - margin - 110, y: y - 35, size: 7, font: fontItalic });
+          pDrawText("Category Revenue Mix", { x: width - margin - 110, y: y - 35, size: 7, font: fontItalic });
           y -= 80;
           } catch (err) { console.error("Page 2 fail:", err); }
         }
@@ -806,9 +817,9 @@ export async function GET(req: Request) {
           weeklyData.audit.forEach((a: any) => {
             ensureSpace(30);
             const status = Math.abs(Number(a.variance || 0)) > 5 ? "ACTION REQ" : "PASSED";
-            page.drawText(`${a.day}:`, { x: margin, y, size: 9, font: fontBold });
-            page.drawText(`Var: $${Number(a.variance || 0).toFixed(2)}`, { x: margin + 90, y, size: 9, font, color: (Number(a.variance || 0) < 0) ? COLORS.warning : COLORS.highlight });
-            page.drawText(`Status: ${status}`, { x: width - margin - 80, y, size: 9, font: fontBold, color: status === "PASSED" ? COLORS.highlight : COLORS.warning });
+            pDrawText(`${a.day}:`, { x: margin, y, size: 9, font: fontBold });
+            pDrawText(`Var: $${Number(a.variance || 0).toFixed(2)}`, { x: margin + 90, y, size: 9, font, color: (Number(a.variance || 0) < 0) ? COLORS.warning : COLORS.highlight });
+            pDrawText(`Status: ${status}`, { x: width - margin - 80, y, size: 9, font: fontBold, color: status === "PASSED" ? COLORS.highlight : COLORS.warning });
             y -= 15;
           });
           } catch (err) { console.error("Page 3 fail:", err); }
@@ -830,24 +841,24 @@ export async function GET(req: Request) {
 
           const r1 = Math.abs(Number(totalVar || 0)) > 50 ? COLORS.warning : COLORS.highlight;
           page.drawCircle({ x: margin + 15, y: y - 15, size: 5, color: r1 });
-          page.drawText(`CASH INTEGRITY: ${Math.abs(Number(totalVar || 0)) > 50 ? 'HIGH RISK' : 'HEALTHY'} ($${Number(totalVar || 0).toFixed(2)})`, { x: margin + 28, y: y - 18, size: 9, font });
+          pDrawText(`CASH INTEGRITY: ${Math.abs(Number(totalVar || 0)) > 50 ? 'HIGH RISK' : 'HEALTHY'} ($${Number(totalVar || 0).toFixed(2)})`, { x: margin + 28, y: y - 18, size: 9, font });
 
           const r2 = restockItems.length > 5 ? COLORS.warning : COLORS.highlight;
           page.drawCircle({ x: margin + 15, y: y - 32, size: 5, color: r2 });
-          page.drawText(`STOCK SECURITY: ${restockItems.length > 5 ? 'ACTION REQ' : 'STABLE'} (${restockItems.length} items low)`, { x: margin + 28, y: y - 35, size: 9, font });
+          pDrawText(`STOCK SECURITY: ${restockItems.length > 5 ? 'ACTION REQ' : 'STABLE'} (${restockItems.length} items low)`, { x: margin + 28, y: y - 35, size: 9, font });
 
           const r3 = Number(overCov || 0) < 100 ? COLORS.warning : COLORS.highlight;
           page.drawCircle({ x: margin + 15, y: y - 49, size: 5, color: r3 });
-          page.drawText(`RUNWAY HEALTH: ${Number(overCov || 0) < 100 ? 'CONSTRAINED' : 'STRONG'} (${Number(overCov || 0).toFixed(0)}% cov)`, { x: margin + 28, y: y - 52, size: 9, font });
+          pDrawText(`RUNWAY HEALTH: ${Number(overCov || 0) < 100 ? 'CONSTRAINED' : 'STRONG'} (${Number(overCov || 0).toFixed(0)}% cov)`, { x: margin + 28, y: y - 52, size: 9, font });
 
           y -= 85; 
           drawText("CUSTOMER BASKET INTELLIGENCE", 11, true, COLORS.info);
           const basket = weeklyData.basket || { avgValue: 0, avgSize: 0 };
           y -= 5;
           page.drawRectangle({ x: margin, y: y - 50, width: width - margin * 2, height: 50, color: rgb(1,1,0.95) });
-          page.drawText(`Avg. Basket Value: $${Number(basket.avgValue || 0).toFixed(2)}`, { x: margin+15, y: y-20, size: 10, font: fontBold });
-          page.drawText(`Items per Sale: ${Number(basket.avgSize || 0).toFixed(1)} items`, { x: margin+15, y: y-35, size: 9, font });
-          page.drawText(`*Strategic Tip: Target categories with high net margins to offset low basket size.*`, { x: margin+15, y: y-46, size: 7, font: fontItalic, color: rgb(0.4,0.4,0.4)});
+          pDrawText(`Avg. Basket Value: $${Number(basket.avgValue || 0).toFixed(2)}`, { x: margin+15, y: y-20, size: 10, font: fontBold });
+          pDrawText(`Items per Sale: ${Number(basket.avgSize || 0).toFixed(1)} items`, { x: margin+15, y: y-35, size: 9, font });
+          pDrawText(`*Strategic Tip: Target categories with high net margins to offset low basket size.*`, { x: margin+15, y: y-46, size: 7, font: fontItalic, color: rgb(0.4,0.4,0.4)});
           
           y -= 70;
           drawText("ORACLE DIAGNOSTIC & QUESTIONS", 11, true, COLORS.oracle);
@@ -905,14 +916,14 @@ export async function GET(req: Request) {
                 const sales = weeklyData.salesByDay.get(dName) || [];
                 
                 let curY = startY;
-                page.drawText(dName.toUpperCase(), { x: margin + col * colWidth, y: curY, size: 8, font: fontBold, color: COLORS.primary });
+                pDrawText(dName.toUpperCase(), { x: margin + col * colWidth, y: curY, size: 8, font: fontBold, color: COLORS.primary });
                 curY -= 12;
                 
                 sales.slice(0, 30).forEach((s: any) => {
                   if (curY < 40) return;
                   const txt = `${s.item_name.substring(0, 15)}...`;
-                  page.drawText(txt, { x: margin + col * colWidth, y: curY, size: 6, font });
-                  page.drawText(`$${Number(s.total_with_tax || 0).toFixed(0)}`, { x: margin + col * colWidth + colWidth - 30, y: curY, size: 6, font: fontBold });
+                  pDrawText(txt, { x: margin + col * colWidth, y: curY, size: 6, font });
+                  pDrawText(`$${Number(s.total_with_tax || 0).toFixed(0)}`, { x: margin + col * colWidth + colWidth - 30, y: curY, size: 6, font: fontBold });
                   curY -= 8;
                 });
                 if (curY < maxRowY) maxRowY = curY;
@@ -935,12 +946,12 @@ export async function GET(req: Request) {
             const hours = [9, 10, 11, 12, 13, 14, 15, 16, 17, 18];
             
             daysArr.forEach((dName, i) => {
-              page.drawText(dName.substring(0, 3), { x: margin + i * cellW + 10, y, size: 9, font: fontBold, color: COLORS.primary });
+              pDrawText(dName.substring(0, 3), { x: margin + i * cellW + 10, y, size: 9, font: fontBold, color: COLORS.primary });
             });
             y -= 20;
             
             hours.forEach(hr => {
-              page.drawText(`${hr}:00`, { x: margin - 35, y: y + 5, size: 7, font });
+              pDrawText(`${hr}:00`, { x: margin - 35, y: y + 5, size: 7, font });
               daysArr.forEach((dName, dIdx) => {
                 const daySales = weeklyData.salesByDay.get(dName) || [];
                 const hrSales = daySales.filter((s: any) => new Date(s.date).getHours() === hr).length;
@@ -948,7 +959,7 @@ export async function GET(req: Request) {
                 const color = rgb(1 - intensity * 0.2, 1 - intensity * 0.5, 1 - intensity * 0.1); 
                 page.drawRectangle({ x: margin + dIdx * cellW, y, width: cellW - 2, height: cellH - 2, color });
                 if (hrSales > 0) {
-                  page.drawText(String(hrSales), { x: margin + dIdx * cellW + cellW/2 - 5, y: y + 5, size: 7, font, color: hrSales > 2 ? rgb(1,1,1) : rgb(0,0,0) });
+                  pDrawText(String(hrSales), { x: margin + dIdx * cellW + cellW/2 - 5, y: y + 5, size: 7, font, color: hrSales > 2 ? rgb(1,1,1) : rgb(0,0,0) });
                 }
               });
               y -= cellH;
@@ -977,14 +988,14 @@ export async function GET(req: Request) {
                 const exps = weeklyData.expensesByDay.get(dName) || [];
                 
                 let curY = startY;
-                page.drawText(dName.toUpperCase(), { x: margin + col * colWidth, y: curY, size: 8, font: fontBold, color: COLORS.warning });
+                pDrawText(dName.toUpperCase(), { x: margin + col * colWidth, y: curY, size: 8, font: fontBold, color: COLORS.warning });
                 curY -= 12;
                 
                 exps.slice(0, 30).forEach((l: any) => {
                   if (curY < 40) return;
                   const txt = `${(l.description || l.category || "").substring(0, 18)}...`;
-                  page.drawText(txt, { x: margin + col * colWidth, y: curY, size: 6, font });
-                  page.drawText(`$${Number(l.amount || 0).toFixed(0)}`, { x: margin + col * colWidth + colWidth - 30, y: curY, size: 6, font: fontBold });
+                  pDrawText(txt, { x: margin + col * colWidth, y: curY, size: 6, font });
+                  pDrawText(`$${Number(l.amount || 0).toFixed(0)}`, { x: margin + col * colWidth + colWidth - 30, y: curY, size: 6, font: fontBold });
                   curY -= 8;
                 });
                 if (curY < maxRowY) maxRowY = curY;
@@ -1004,7 +1015,7 @@ export async function GET(req: Request) {
               y -= 40;
               drawText("WEEKLY CAPITAL ALLOCATION", 10, true, COLORS.primary);
               drawDonut(width - margin - 70, y - 10, 25, exData.map(d => ({ value: d.val, color: d.col })));
-              page.drawText("Capital Breakdown", { x: width - margin - 110, y: y - 35, size: 7, font: fontItalic });
+              pDrawText("Capital Breakdown", { x: width - margin - 110, y: y - 35, size: 7, font: fontItalic });
             }
           } catch (err) { console.error("Page 7 fail:", err); }
         }
@@ -1020,13 +1031,13 @@ export async function GET(req: Request) {
             const growthTarget = totals.withTax * 1.05;
             drawText("1. NEXT WEEK TARGETS", 12, true, COLORS.primary);
             page.drawRectangle({ x: margin, y: y - 60, width: width - margin * 2, height: 60, color: rgb(0.95, 1, 0.95) });
-            page.drawText(`5% Growth Revenue Target:`, { x: margin + 10, y: y - 25, size: 10, font });
-            page.drawText(`$${Number(growthTarget || 0).toFixed(2)}`, { x: width - margin - 110, y: y - 25, size: 12, font: fontBold, color: COLORS.highlight });
+            pDrawText(`5% Growth Revenue Target:`, { x: margin + 10, y: y - 25, size: 10, font });
+            pDrawText(`$${Number(growthTarget || 0).toFixed(2)}`, { x: width - margin - 110, y: y - 25, size: 12, font: fontBold, color: COLORS.highlight });
             
             const unitMargin = (totals.withTax / (weeklyData.sales.length || 1)) - (totals.cogs / (weeklyData.sales.length || 1));
             const breakEvenUnits = Math.ceil(overhead.weekly / (unitMargin || 1));
-            page.drawText(`Breakeven Unit Target:`, { x: margin + 10, y: y - 45, size: 10, font });
-            page.drawText(`${breakEvenUnits} total units`, { x: width - margin - 110, y: y - 45, size: 12, font: fontBold });
+            pDrawText(`Breakeven Unit Target:`, { x: margin + 10, y: y - 45, size: 10, font });
+            pDrawText(`${breakEvenUnits} total units`, { x: width - margin - 110, y: y - 45, size: 12, font: fontBold });
             
             y -= 100;
             drawText("2. GROWTH STRATEGY & MARKETING PLAYBOOK", 12, true, COLORS.oracle);
@@ -1052,22 +1063,22 @@ export async function GET(req: Request) {
             y -= 20;
             drawDonut(width/2, y, 40, [{ value: totals.withTax, color: COLORS.highlight }, { value: (growthTarget - totals.withTax), color: COLORS.info }]);
             y -= 80;
-            page.drawText("Strategic Advisory Sign-off: [G. Guri / FLECTERE / Nirvana]", { x: margin, y: 40, size: 7, font, color: rgb(0.5,0.5,0.5) });
+            pDrawText("Strategic Advisory Sign-off: [G. Guri / FLECTERE / Nirvana]", { x: margin, y: 40, size: 7, font, color: rgb(0.5,0.5,0.5) });
           } catch (err) { console.error("Page 8 fail:", err); }
         }
       } catch (e: any) {
         console.error("Weekly render failed:", e);
         page = pdf.addPage(pageSize);
         y = height/2;
-        page.drawText("WEEKLY DATA SUPPLEMENT ERROR", { x: margin, y, size: 14, font: fontBold, color: COLORS.warning });
-        page.drawText("Detailed Error: " + (e.message || String(e)), { x: margin, y: y-20, size: 8, font });
+        pDrawText("WEEKLY DATA SUPPLEMENT ERROR", { x: margin, y, size: 14, font: fontBold, color: COLORS.warning });
+        pDrawText("Detailed Error: " + (e.message || String(e)), { x: margin, y: y-20, size: 8, font });
       }
     } else if (isWeekly) {
       // isWeekly is true but weeklyData is null
       page = pdf.addPage(pageSize);
       y = height/2;
-      page.drawText("WEEKLY DATA PREPARATION FAILED", { x: margin, y, size: 14, font: fontBold, color: COLORS.warning });
-      page.drawText("This occurs if the shop data fetch timed out or returned invalid structures.", { x: margin, y: y-20, size: 10, font });
+      pDrawText("WEEKLY DATA PREPARATION FAILED", { x: margin, y, size: 14, font: fontBold, color: COLORS.warning });
+      pDrawText("This occurs if the shop data fetch timed out or returned invalid structures.", { x: margin, y: y-20, size: 10, font });
     }
 
     const bytes = await pdf.save();

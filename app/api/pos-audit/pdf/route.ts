@@ -8,6 +8,14 @@ import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+function winAnsiSafe(text: any) {
+  // pdf-lib StandardFonts are WinAnsi encoded; strip unsupported unicode (emoji, private-use, etc.)
+  return String(text ?? "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/[^\x20-\xFF]/g, "");
+}
+
 function isManagerRole(role: string | null | undefined) {
   const r = String(role || "").toLowerCase();
   return r === "owner" || r === "admin" || r === "manager" || r === "lead_manager" || r === "lead manager";
@@ -88,14 +96,14 @@ export async function GET(req: Request) {
 
     const drawText = (txt: string, size = 11, bold = false, color = rgb(1, 1, 1)) => {
       ensureSpace(size + 8);
-      page.drawText(txt, { x: 40, y, size, font: bold ? fontBold : font, color });
+      page.drawText(winAnsiSafe(txt), { x: 40, y, size, font: bold ? fontBold : font, color });
       y -= size + 6;
     };
 
     const drawKV = (k: string, v: string) => {
       ensureSpace(18);
-      page.drawText(k, { x: 40, y, size: 10, font: fontBold, color: rgb(0.7, 0.7, 0.7) });
-      page.drawText(v, { x: 260, y, size: 10, font, color: rgb(1, 1, 1) });
+      page.drawText(winAnsiSafe(k), { x: 40, y, size: 10, font: fontBold, color: rgb(0.7, 0.7, 0.7) });
+      page.drawText(winAnsiSafe(v), { x: 260, y, size: 10, font, color: rgb(1, 1, 1) });
       y -= 16;
     };
 

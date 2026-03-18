@@ -8,6 +8,14 @@ export const dynamic = 'force-dynamic';
 const PREMIUM_MULTIPLIER = 1.65;
 const TAX_BUFFER = 1.155; // 15.5%
 
+function winAnsiSafe(text: any) {
+    // pdf-lib StandardFonts are WinAnsi encoded; strip unsupported unicode (emoji, private-use, etc.)
+    return String(text ?? "")
+        .replace(/\s+/g, " ")
+        .trim()
+        .replace(/[^\x20-\xFF]/g, "");
+}
+
 export async function GET() {
     try {
         // Fetch low stock items across all shops
@@ -32,7 +40,7 @@ export async function GET() {
         let y = height - margin;
 
         const drawText = (text: string, size = 10, bold = false, color = rgb(0.1, 0.1, 0.1)) => {
-            page.drawText(text, { x: margin, y, size, font: bold ? fontBold : font, color });
+            page.drawText(winAnsiSafe(text), { x: margin, y, size, font: bold ? fontBold : font, color });
             y -= size + 6;
         };
 
@@ -60,9 +68,9 @@ export async function GET() {
             color: rgb(0.9, 0.9, 0.95),
         });
 
-        page.drawText("PRODUCT", { x: col1, y, size: 10, font: fontBold });
-        page.drawText("QTY", { x: col2, y, size: 10, font: fontBold });
-        page.drawText("PREMIUM PRICE", { x: col3, y, size: 10, font: fontBold });
+        page.drawText(winAnsiSafe("PRODUCT"), { x: col1, y, size: 10, font: fontBold });
+        page.drawText(winAnsiSafe("QTY"), { x: col2, y, size: 10, font: fontBold });
+        page.drawText(winAnsiSafe("PREMIUM PRICE"), { x: col3, y, size: 10, font: fontBold });
         y -= 25;
 
         // Table Rows
@@ -75,9 +83,9 @@ export async function GET() {
                 const landedCost = Number(item.landed_cost || 0);
                 const premiumPrice = landedCost * PREMIUM_MULTIPLIER * TAX_BUFFER;
                 
-                page.drawText(String(item.name || "Unknown"), { x: col1, y, size: 9, font });
-                page.drawText(String(item.quantity || 0), { x: col2, y, size: 9, font });
-                page.drawText(`$${premiumPrice.toFixed(2)}`, { x: col3, y, size: 9, font, color: rgb(0.1, 0.5, 0.2) });
+                page.drawText(winAnsiSafe(String(item.name || "Unknown")), { x: col1, y, size: 9, font });
+                page.drawText(winAnsiSafe(String(item.quantity || 0)), { x: col2, y, size: 9, font });
+                page.drawText(winAnsiSafe(`$${premiumPrice.toFixed(2)}`), { x: col3, y, size: 9, font, color: rgb(0.1, 0.5, 0.2) });
                 
                 y -= 15;
                 

@@ -2197,6 +2197,7 @@ export async function printZIMRALog() {
 
 export async function getMonthlyReportData(shopId: string, monthISO: string) {
     const actor = await requireManagerOrOwner();
+    const isGlobal = String(shopId || "") === "global" || String(shopId || "") === "all";
     const targetDate = new Date(monthISO);
     const year = targetDate.getUTCFullYear();
     const month = targetDate.getUTCMonth();
@@ -2204,13 +2205,27 @@ export async function getMonthlyReportData(shopId: string, monthISO: string) {
     const startOfMonth = new Date(Date.UTC(year, month, 1, 0, 0, 0, 0)).toISOString();
     const endOfMonth = new Date(Date.UTC(year, month + 1, 0, 23, 59, 59, 999)).toISOString();
 
+    const { data: globalShops } = isGlobal
+        ? await supabaseAdmin.from("shops").select("*")
+        : { data: null as any };
+
+    const shopIds = isGlobal
+        ? (globalShops || []).map((s: any) => String(s?.id || "")).filter(Boolean)
+        : [shopId].filter(Boolean);
+
     // Fetch all relevant data for the month
     const [salesRes, ledgerRes, shopRes, settingsRes, prevSalesRes] = await Promise.all([
-        supabaseAdmin.from("sales").select("*").eq("shop_id", shopId).gte("date", startOfMonth).lte("date", endOfMonth),
-        supabaseAdmin.from("ledger_entries").select("*").eq("shop_id", shopId).gte("date", startOfMonth).lte("date", endOfMonth),
-        supabaseAdmin.from("shops").select("*").eq("id", shopId).single(),
+        shopIds.length
+            ? supabaseAdmin.from("sales").select("*").in("shop_id", shopIds).gte("date", startOfMonth).lte("date", endOfMonth)
+            : Promise.resolve({ data: [] } as any),
+        shopIds.length
+            ? supabaseAdmin.from("ledger_entries").select("*").in("shop_id", shopIds).gte("date", startOfMonth).lte("date", endOfMonth)
+            : Promise.resolve({ data: [] } as any),
+        isGlobal ? Promise.resolve({ data: null } as any) : supabaseAdmin.from("shops").select("*").eq("id", shopId).single(),
         supabaseAdmin.from("oracle_settings").select("*").single(),
-        supabaseAdmin.from("sales").select("client_name").eq("shop_id", shopId).lt("date", startOfMonth)
+        shopIds.length
+            ? supabaseAdmin.from("sales").select("client_name").in("shop_id", shopIds).lt("date", startOfMonth)
+            : Promise.resolve({ data: [] } as any)
     ]);
 
     const sales = salesRes.data || [];
@@ -2259,9 +2274,11 @@ export async function getMonthlyReportData(shopId: string, monthISO: string) {
         if (weeks.length > 5) break; // Safety
     }
 
-    // Category Performance
+    // Category Performance (guard against empty IN list)
     const itemIds = Array.from(new Set(sales.map((s: any) => s.item_id).filter(Boolean)));
-    const { data: items } = await supabaseAdmin.from("inventory_items").select("id, name, category").in("id", itemIds);
+    const { data: items } = itemIds.length
+        ? await supabaseAdmin.from("inventory_items").select("id, name, category").in("id", itemIds)
+        : ({ data: [] } as any);
     const itemMap = new Map((items as any[] || []).map(i => [i.id, i]));
 
     const catStats = new Map<string, { revenue: number, profit: number, qty: number }>();
@@ -2295,20 +2312,42 @@ export async function getMonthlyReportData(shopId: string, monthISO: string) {
     });
 
     // Costs
-    const shopEx = shop?.expenses || { rent: 0, salaries: 0, utilities: 0, misc: 0 };
-    const fixedCosts = Number(shopEx.rent || 0) + Number(shopEx.salaries || 0);
-    const variableCosts = Number(shopEx.utilities || 0) + Number(shopEx.misc || 0) + ledger.filter((l: any) => l.category !== 'Fixed').reduce((sum: number, l: any) => sum + Number(l.amount || 0), 0);
+    const shopEx = isGlobal
+        ? null
+        : (shop?.expenses || { rent: 0, salaries: 0, utilities: 0, misc: 0 });
+
+    const fixedCosts = isGlobal
+        ? (globalShops || []).reduce((sum: number, s: any) => {
+            const ex = (s as any)?.expenses || {};
+            return sum + Number(ex.rent || 0) + Number(ex.salaries || 0);
+        }, 0)
+        : Number((shopEx as any)?.rent || 0) + Number((shopEx as any)?.salaries || 0);
+
+    const variableCostsBase = isGlobal
+        ? (globalShops || []).reduce((sum: number, s: any) => {
+            const ex = (s as any)?.expenses || {};
+            return sum + Number(ex.utilities || 0) + Number(ex.misc || 0);
+        }, 0)
+        : Number((shopEx as any)?.utilities || 0) + Number((shopEx as any)?.misc || 0);
+
+    const variableCosts =
+        variableCostsBase +
+        ledger.filter((l: any) => l.category !== 'Fixed').reduce((sum: number, l: any) => sum + Number(l.amount || 0), 0);
 
 
     // Inventory Turnover (Approx)
     // Avg Inventory = (Total possible stock values) / 2
     // For now, let's use a simplified turnover: COGS / Avg Inventory Value
     // We'll approximate Avg Inventory Value as the current inventory value in the shop
-    const { data: allocations } = await supabaseAdmin.from("inventory_allocations").select("item_id, quantity").eq("shop_id", shopId).gt("quantity", 0);
+    const { data: allocations } = shopIds.length
+        ? await supabaseAdmin.from("inventory_allocations").select("item_id, quantity").in("shop_id", shopIds).gt("quantity", 0)
+        : ({ data: [] } as any);
     let currentInvValue = 0;
     if (allocations && allocations.length > 0) {
         const itmIds = allocations.map((a: any) => a.item_id);
-        const { data: itemPrices } = await supabaseAdmin.from("inventory_items").select("id, landed_cost, acquisition_price").in("id", itmIds);
+        const { data: itemPrices } = itmIds.length
+            ? await supabaseAdmin.from("inventory_items").select("id, landed_cost, acquisition_price").in("id", itmIds)
+            : ({ data: [] } as any);
         const priceMap = new Map((itemPrices as any[] || []).map((i: any) => [i.id, Number(i.landed_cost || i.acquisition_price || 0)]));
         allocations.forEach((a: any) => {
             currentInvValue += (Number(a.quantity || 0) * (Number(priceMap.get(a.item_id)) || 0));
@@ -2334,7 +2373,7 @@ export async function getMonthlyReportData(shopId: string, monthISO: string) {
         categories: Array.from(catStats.entries()).map(([name, stats]) => ({ name, ...stats })),
         customers: { new: newCustomers, returning: returningCustomers, total: monthlyClients.size },
         turnover,
-        shopName: shop?.name || shopId
+        shopName: isGlobal ? "Global Synthesis" : (shop?.name || shopId)
     };
 }
 
@@ -2436,6 +2475,7 @@ export async function reapportionStock(itemId: string, allocations: { shopId: st
 
 export async function getQuarterlyReportData(shopId: string, monthISO: string) {
     const actor = await requireManagerOrOwner();
+    const isGlobal = String(shopId || "") === "global" || String(shopId || "") === "all";
     const targetDate = new Date(monthISO);
     
     // We want the quarter ending on this month (i.e. this month is the last of the 3 months)
@@ -2448,13 +2488,27 @@ export async function getQuarterlyReportData(shopId: string, monthISO: string) {
     const startOfQuarter = startDate.toISOString();
     const endOfQuarter = new Date(Date.UTC(year, endMonth + 1, 0, 23, 59, 59, 999)).toISOString();
 
+    const { data: globalShops } = isGlobal
+        ? await supabaseAdmin.from("shops").select("*")
+        : { data: null as any };
+
+    const shopIds = isGlobal
+        ? (globalShops || []).map((s: any) => String(s?.id || "")).filter(Boolean)
+        : [shopId].filter(Boolean);
+
     // Fetch all relevant data for the quarter
     const [salesRes, ledgerRes, shopRes, settingsRes, prevSalesRes] = await Promise.all([
-        supabaseAdmin.from("sales").select("*").eq("shop_id", shopId).gte("date", startOfQuarter).lte("date", endOfQuarter),
-        supabaseAdmin.from("ledger_entries").select("*").eq("shop_id", shopId).gte("date", startOfQuarter).lte("date", endOfQuarter),
-        supabaseAdmin.from("shops").select("*").eq("id", shopId).single(),
+        shopIds.length
+            ? supabaseAdmin.from("sales").select("*").in("shop_id", shopIds).gte("date", startOfQuarter).lte("date", endOfQuarter)
+            : Promise.resolve({ data: [] } as any),
+        shopIds.length
+            ? supabaseAdmin.from("ledger_entries").select("*").in("shop_id", shopIds).gte("date", startOfQuarter).lte("date", endOfQuarter)
+            : Promise.resolve({ data: [] } as any),
+        isGlobal ? Promise.resolve({ data: null } as any) : supabaseAdmin.from("shops").select("*").eq("id", shopId).single(),
         supabaseAdmin.from("oracle_settings").select("*").single(),
-        supabaseAdmin.from("sales").select("client_name").eq("shop_id", shopId).lt("date", startOfQuarter)
+        shopIds.length
+            ? supabaseAdmin.from("sales").select("client_name").in("shop_id", shopIds).lt("date", startOfQuarter)
+            : Promise.resolve({ data: [] } as any)
     ]);
 
     const sales = salesRes.data || [];
@@ -2492,9 +2546,11 @@ export async function getQuarterlyReportData(shopId: string, monthISO: string) {
         });
     }
 
-    // Category Performance
+    // Category Performance (guard against empty IN list)
     const itemIds = Array.from(new Set(sales.map((s: any) => s.item_id).filter(Boolean)));
-    const { data: items } = await supabaseAdmin.from("inventory_items").select("id, name, category").in("id", itemIds);
+    const { data: items } = itemIds.length
+        ? await supabaseAdmin.from("inventory_items").select("id, name, category").in("id", itemIds)
+        : ({ data: [] } as any);
     const itemMap = new Map((items as any[] || []).map(i => [i.id, i]));
 
     const catStats = new Map<string, { revenue: number, profit: number, qty: number }>();
@@ -2528,18 +2584,40 @@ export async function getQuarterlyReportData(shopId: string, monthISO: string) {
     });
 
     // Costs
-    const shopEx = shop?.expenses || { rent: 0, salaries: 0, utilities: 0, misc: 0 };
+    const shopEx = isGlobal
+        ? null
+        : (shop?.expenses || { rent: 0, salaries: 0, utilities: 0, misc: 0 });
+
     // Multiply fixed shop expenses by 3 since it's a quarter
-    const fixedCosts = (Number(shopEx.rent || 0) + Number(shopEx.salaries || 0)) * 3;
-    const variableCosts = (Number(shopEx.utilities || 0) + Number(shopEx.misc || 0)) * 3 + ledger.filter((l: any) => l.category !== 'Fixed').reduce((sum: number, l: any) => sum + Number(l.amount || 0), 0);
+    const fixedCosts = isGlobal
+        ? (globalShops || []).reduce((sum: number, s: any) => {
+            const ex = (s as any)?.expenses || {};
+            return sum + (Number(ex.rent || 0) + Number(ex.salaries || 0)) * 3;
+        }, 0)
+        : (Number((shopEx as any)?.rent || 0) + Number((shopEx as any)?.salaries || 0)) * 3;
+
+    const variableCostsBase = isGlobal
+        ? (globalShops || []).reduce((sum: number, s: any) => {
+            const ex = (s as any)?.expenses || {};
+            return sum + (Number(ex.utilities || 0) + Number(ex.misc || 0)) * 3;
+        }, 0)
+        : (Number((shopEx as any)?.utilities || 0) + Number((shopEx as any)?.misc || 0)) * 3;
+
+    const variableCosts =
+        variableCostsBase +
+        ledger.filter((l: any) => l.category !== 'Fixed').reduce((sum: number, l: any) => sum + Number(l.amount || 0), 0);
 
 
     // Inventory Turnover (Approx)
-    const { data: allocations } = await supabaseAdmin.from("inventory_allocations").select("item_id, quantity").eq("shop_id", shopId).gt("quantity", 0);
+    const { data: allocations } = shopIds.length
+        ? await supabaseAdmin.from("inventory_allocations").select("item_id, quantity").in("shop_id", shopIds).gt("quantity", 0)
+        : ({ data: [] } as any);
     let currentInvValue = 0;
     if (allocations && allocations.length > 0) {
         const itmIds = allocations.map((a: any) => a.item_id);
-        const { data: itemPrices } = await supabaseAdmin.from("inventory_items").select("id, landed_cost, acquisition_price").in("id", itmIds);
+        const { data: itemPrices } = itmIds.length
+            ? await supabaseAdmin.from("inventory_items").select("id, landed_cost, acquisition_price").in("id", itmIds)
+            : ({ data: [] } as any);
         const priceMap = new Map((itemPrices as any[] || []).map((i: any) => [i.id, Number(i.landed_cost || i.acquisition_price || 0)]));
         allocations.forEach((a: any) => {
             currentInvValue += (Number(a.quantity || 0) * (Number(priceMap.get(a.item_id)) || 0));
@@ -2565,6 +2643,6 @@ export async function getQuarterlyReportData(shopId: string, monthISO: string) {
         categories: Array.from(catStats.entries()).map(([name, stats]) => ({ name, ...stats })),
         customers: { new: newCustomers, returning: returningCustomers, total: quarterlyClients.size },
         turnover,
-        shopName: shop?.name || shopId
+        shopName: isGlobal ? "Global Synthesis" : (shop?.name || shopId)
     };
 }

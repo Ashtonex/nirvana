@@ -97,7 +97,10 @@ export default async function IntelligencePage() {
       </div>
 
       <div className="mt-12">
-        <StrategicReportVault firstShopId={pulse.shopPerformance[0]?.id || "kipasa"} />
+        <StrategicReportVault
+          shops={pulse.shopPerformance.map((s: any) => ({ id: s.id, name: s.name }))}
+          defaultShopId={pulse.shopPerformance[0]?.id || "kipasa"}
+        />
       </div>
 
       <div className="max-w-2xl mx-auto mt-20 p-6 rounded-2xl bg-gradient-to-br from-slate-900 to-slate-950 border border-slate-800 text-center space-y-4">

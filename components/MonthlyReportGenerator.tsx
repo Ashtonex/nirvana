@@ -1,15 +1,14 @@
 "use client";
 
+import { useMemo, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, Button, Input } from "@/components/ui";
 import {
     FileBarChart,
-    Download,
     Calendar,
     ChevronRight,
     Target,
     Zap,
     Sparkles,
-    Loader2
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -19,9 +18,15 @@ interface MonthlyReportGeneratorProps {
 
 export function MonthlyReportGenerator({ shops: shopsProp }: MonthlyReportGeneratorProps) {
     const shops = Array.isArray(shopsProp) ? shopsProp : [];
-    const selectedShopRef = { current: shops[0]?.id || "" };
-    const selectedMonthRef = { current: new Date().toISOString().substring(0, 7) };
-    const isPendingRef = { current: false };
+
+    const nodes = useMemo(() => {
+        const base = shops.map((s) => ({ id: s.id, name: s.name }));
+        return [{ id: "global", name: "Global Synthesis" }, ...base];
+    }, [shops]);
+
+    const [selectedShopId, setSelectedShopId] = useState<string>(shops[0]?.id || "");
+    const [selectedMonth, setSelectedMonth] = useState<string>(new Date().toISOString().substring(0, 7));
+    const [isPending, setIsPending] = useState(false);
 
     // Guard against empty shops
     if (shops.length === 0) {
@@ -36,10 +41,13 @@ export function MonthlyReportGenerator({ shops: shopsProp }: MonthlyReportGenera
 
     const handleGenerate = async (selectedShop: string, selectedMonth: string) => {
         if (!selectedShop || !selectedMonth) return;
-        isPendingRef.current = true;
+        setIsPending(true);
         try {
             const response = await fetch(`/api/reports/monthly/pdf?shopId=${encodeURIComponent(selectedShop)}&month=${encodeURIComponent(selectedMonth)}`);
-            if (!response.ok) throw new Error("Failed to generate report");
+            if (!response.ok) {
+                const data = await response.json().catch(() => ({}));
+                throw new Error(data?.error || "Failed to generate report");
+            }
             
             const blob = await response.blob();
             const url = window.URL.createObjectURL(blob);
@@ -53,7 +61,7 @@ export function MonthlyReportGenerator({ shops: shopsProp }: MonthlyReportGenera
         } catch (err: any) {
             alert(err.message || "An error occurred while generating the report");
         } finally {
-            isPendingRef.current = false;
+            setIsPending(false);
         }
     };
 
@@ -85,15 +93,19 @@ export function MonthlyReportGenerator({ shops: shopsProp }: MonthlyReportGenera
                             <Target className="h-3 w-3" /> Select Operational Node
                         </label>
                         <div className="flex flex-wrap gap-2">
-                            {shops.map((shop, idx) => (
+                            {nodes.map((shop) => (
                                 <button
                                     key={shop.id}
-                                    onClick={() => { selectedShopRef.current = shop.id; }}
+                                    type="button"
+                                    onClick={() => { setSelectedShopId(shop.id); }}
                                     className={cn(
                                         "px-4 py-2 rounded-lg text-[10px] font-black uppercase italic tracking-widest border transition-all duration-300",
-                                        idx === 0
+                                        selectedShopId === shop.id
                                             ? "bg-violet-600/20 border-violet-500 text-white shadow-[0_0_10px_rgba(139,92,246,0.2)]"
-                                            : "bg-slate-900/50 border-slate-800 text-slate-500 hover:border-slate-700 hover:text-slate-300"
+                                            : "bg-slate-900/50 border-slate-800 text-slate-500 hover:border-slate-700 hover:text-slate-300",
+                                        shop.id === "global" && selectedShopId === shop.id
+                                            ? "bg-emerald-600/20 border-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.2)]"
+                                            : null
                                     )}
                                 >
                                     {shop.name}
@@ -108,8 +120,8 @@ export function MonthlyReportGenerator({ shops: shopsProp }: MonthlyReportGenera
                         </label>
                         <Input
                             type="month"
-                            defaultValue={new Date().toISOString().substring(0, 7)}
-                            onChange={(e) => { selectedMonthRef.current = e.target.value; }}
+                            value={selectedMonth}
+                            onChange={(e) => { setSelectedMonth(e.target.value); }}
                             max={new Date().toISOString().substring(0, 7)}
                             className="bg-slate-900 border-slate-800 font-black italic text-sky-400 h-11 focus:ring-violet-500/50"
                         />
@@ -118,12 +130,13 @@ export function MonthlyReportGenerator({ shops: shopsProp }: MonthlyReportGenera
 
                 <div className="pt-4 border-t border-slate-800/50">
                     <Button
-                        onClick={() => handleGenerate(selectedShopRef.current, selectedMonthRef.current)}
+                        onClick={() => handleGenerate(selectedShopId, selectedMonth)}
+                        disabled={isPending || !selectedShopId || !selectedMonth}
                         className="w-full h-14 bg-gradient-to-r from-violet-600 to-sky-600 hover:from-violet-500 hover:to-sky-500 text-white font-black uppercase italic tracking-widest shadow-xl group/btn overflow-hidden relative"
                     >
                         <span className="relative flex items-center justify-center gap-3">
                             <Zap className="h-5 w-5 fill-current" />
-                            EXECUTE STRATEGIC SYNTHESIS
+                            {isPending ? "SYNTHESIZING..." : "EXECUTE STRATEGIC SYNTHESIS"}
                             <ChevronRight className="h-5 w-5" />
                         </span>
                     </Button>
