@@ -3,6 +3,7 @@
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui";
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import { TrendingUp } from "lucide-react";
+import { useState, useEffect } from "react";
 
 interface SalesChartProps {
     data: {
@@ -18,6 +19,49 @@ interface SalesChartProps {
 }
 
 export function SalesChart({ data, forecast }: SalesChartProps) {
+    const [mounted, setMounted] = useState(false);
+
+    useEffect(() => {
+        setMounted(true);
+    }, []);
+
+    if (!mounted) {
+        return (
+            <Card className="col-span-4 border-violet-500/20 bg-slate-900/50">
+                <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                        <TrendingUp className="text-emerald-400" />
+                        Revenue Trajectory
+                    </CardTitle>
+                    <CardDescription>30-Day Performance Overview</CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <div className="h-[300px] flex items-center justify-center text-slate-500">
+                        Loading chart...
+                    </div>
+                </CardContent>
+            </Card>
+        );
+    }
+
+    if (!data || data.length === 0) {
+        return (
+            <Card className="col-span-4 border-violet-500/20 bg-slate-900/50">
+                <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                        <TrendingUp className="text-emerald-400" />
+                        Revenue Trajectory
+                    </CardTitle>
+                    <CardDescription>30-Day Performance Overview</CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <div className="h-[300px] flex items-center justify-center text-slate-500">
+                        No data available
+                    </div>
+                </CardContent>
+            </Card>
+        );
+    }
     return (
         <Card className="col-span-4 border-violet-500/20 bg-slate-900/50">
             <CardHeader>

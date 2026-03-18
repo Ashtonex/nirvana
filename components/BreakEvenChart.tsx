@@ -11,6 +11,48 @@ interface BreakEvenChartProps {
 }
 
 export function BreakEvenChart({ datasets }: BreakEvenChartProps) {
+    const [mounted, setMounted] = useState(false);
+
+    useEffect(() => {
+        setMounted(true);
+    }, []);
+
+    if (!mounted) {
+        return (
+            <Card className="col-span-3 border-emerald-500/20 bg-slate-900/50">
+                <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                        <Target className="text-emerald-400" />
+                        Break-Even Analysis
+                    </CardTitle>
+                </CardHeader>
+                <CardContent>
+                    <div className="h-[300px] flex items-center justify-center text-slate-500">
+                        Loading chart...
+                    </div>
+                </CardContent>
+            </Card>
+        );
+    }
+
+    if (!datasets || Object.keys(datasets).length === 0) {
+        return (
+            <Card className="col-span-3 border-emerald-500/20 bg-slate-900/50">
+                <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                        <Target className="text-emerald-400" />
+                        Break-Even Analysis
+                    </CardTitle>
+                </CardHeader>
+                <CardContent>
+                    <div className="h-[300px] flex items-center justify-center text-slate-500">
+                        No data available
+                    </div>
+                </CardContent>
+            </Card>
+        );
+    }
+
     const availableShops = useMemo(() => {
         const keys = Object.keys(datasets || {});
         const preferredOrder = ["kipasa", "dubdub", "tradecenter", "global"];

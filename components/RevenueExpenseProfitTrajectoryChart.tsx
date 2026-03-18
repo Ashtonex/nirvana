@@ -12,6 +12,46 @@ interface RevenueExpenseProfitTrajectoryChartProps {
 }
 
 export function RevenueExpenseProfitTrajectoryChart({ datasets }: RevenueExpenseProfitTrajectoryChartProps) {
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  if (!mounted) {
+    return (
+      <Card className="col-span-4 border-sky-500/20 bg-slate-900/50">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <BarChart3 className="text-emerald-400" /> Revenue vs Expenses vs Profit (Daily)
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="h-[300px] flex items-center justify-center text-slate-500">
+            Loading chart...
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (!datasets || Object.keys(datasets).length === 0) {
+    return (
+      <Card className="col-span-4 border-sky-500/20 bg-slate-900/50">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <BarChart3 className="text-emerald-400" /> Revenue vs Expenses vs Profit (Daily)
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="h-[300px] flex items-center justify-center text-slate-500">
+            No data available
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
   const availableShops = useMemo(() => {
     const keys = Object.keys(datasets || {});
     const preferredOrder = ["kipasa", "dubdub", "tradecenter", "global"];
