@@ -20,10 +20,12 @@ export function MobileNav() {
     const { staff } = useStaff();
     const [canShow, setCanShow] = useState(false);
 
-    // Don't show for staff
-    if (staff) return null;
-
     useEffect(() => {
+        // Don't show for staff (and avoid firing owner auth checks).
+        if (staff) {
+            setCanShow(false);
+            return;
+        }
         fetch("/api/auth/me", { cache: "no-store", credentials: "include" })
             .then(res => res.json())
             .then(data => {
@@ -32,7 +34,10 @@ export function MobileNav() {
                 }
             })
             .catch(() => {});
-    }, []);
+    }, [staff]);
+
+    // Don't show for staff
+    if (staff) return null;
 
     // Only show for specific allowed user
     if (!canShow) return null;
