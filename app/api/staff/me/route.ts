@@ -50,13 +50,24 @@ export async function GET() {
     return NextResponse.json({ staff: null }, { status: 401 });
   }
 
-  const { data: staff } = await supabaseAdmin
+  const { data: staff, error: staffError } = await supabaseAdmin
     .from("employees")
     .select("id,name,surname,shop_id,role,is_active,active")
     .eq("id", session.employee_id)
     .maybeSingle();
 
-  console.log("[/api/staff/me] session.employee_id:", session.employee_id);
+  console.log("[/api/staff/me] session.employee_id:", session.employee_id, "type:", typeof session.employee_id);
+  console.log("[/api/staff/me] Staff query error:", staffError?.message);
   console.log("[/api/staff/me] Staff data:", JSON.stringify(staff));
-  return NextResponse.json({ staff: staff || null });
+  
+  // Try explicit string conversion
+  const empId = String(session.employee_id);
+  const { data: staff2 } = await supabaseAdmin
+    .from("employees")
+    .select("id,name,surname,shop_id,role")
+    .eq("id", empId)
+    .maybeSingle();
+  console.log("[/api/staff/me] Staff data (string cast):", JSON.stringify(staff2));
+  
+  return NextResponse.json({ staff: staff || staff2 || null });
 }
