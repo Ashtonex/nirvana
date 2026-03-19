@@ -328,6 +328,56 @@ export function InvestConsole() {
             </Card>
           </div>
 
+          {(() => {
+            const byShop: Record<string, { total: number; withdrawn: number; available: number }> = {};
+            deposits.forEach((d) => {
+              const shop = d.shop_id || "unknown";
+              if (!byShop[shop]) byShop[shop] = { total: 0, withdrawn: 0, available: 0 };
+              byShop[shop].total += Number(d.amount || 0);
+              byShop[shop].withdrawn += Number(d.withdrawn_amount || 0);
+              byShop[shop].available += (Number(d.amount || 0) - Number(d.withdrawn_amount || 0));
+            });
+            
+            return (
+              <Card className="bg-sky-950/20 border-sky-800/30">
+                <CardHeader>
+                  <CardTitle className="text-lg font-black uppercase italic text-sky-400">Perfume Deposits by Shop</CardTitle>
+                  <CardDescription className="text-[10px]">Each shop's contribution to growth capital</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  {Object.entries(byShop).map(([shop, data]) => (
+                    <div key={shop} className="flex items-center justify-between p-3 bg-slate-900/50 rounded-lg border border-slate-800">
+                      <div className="flex items-center gap-3">
+                        <div className="w-3 h-3 rounded-full bg-sky-500" />
+                        <div>
+                          <div className="text-sm font-black text-white uppercase">{shop}</div>
+                          <div className="text-[10px] text-slate-500">
+                            Total: ${data.total.toFixed(2)} • Withdrawn: ${data.withdrawn.toFixed(2)}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-lg font-black italic text-sky-400">${data.available.toFixed(2)}</div>
+                        <div className="text-[10px] text-slate-500">Available</div>
+                      </div>
+                    </div>
+                  ))}
+                  {Object.keys(byShop).length === 0 && (
+                    <div className="text-center py-4 text-slate-600 italic">No shop deposits yet</div>
+                  )}
+                  {Object.keys(byShop).length > 1 && (
+                    <div className="flex items-center justify-between p-3 bg-sky-950/30 rounded-lg border border-sky-700/30 mt-4">
+                      <div className="text-sm font-black text-sky-400">TOTAL ACROSS ALL SHOPS</div>
+                      <div className="text-right">
+                        <div className="text-lg font-black italic text-sky-400">${totalAvailable.toFixed(2)}</div>
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            );
+          })()}
+
           <Card className="bg-slate-950/60 border-slate-800">
             <CardHeader>
               <CardTitle className="text-lg font-black uppercase italic">Record Perfume Deposit</CardTitle>

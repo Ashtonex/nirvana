@@ -1135,13 +1135,17 @@ export async function recordPosExpense(
 
     // Auto-detect perfume expenses
     const isPerfumeExpense = descLower.includes("perfume") || descLower.includes("parfum");
+    
+    // Auto-detect overhead expenses (rent, utilities, etc.)
+    const overheadKeywords = ["rent", "utilities", "utility", "electric", "electricity", "water", "internet", "wifi", "rates", "rates", "municipal", "insurance", "security", "cleaning", "maintenance", "repair", "overhead", "salary", "wages", "staff", "payroll"];
+    const isOverheadExpense = overheadKeywords.some(kw => descLower.includes(kw));
 
     // Log expense to ledger
-    await supabaseAdmin.from('ledger_entries').insert([{
+    const ledgerEntry = await supabaseAdmin.from('ledger_entries').insert([{
         id,
         shop_id: shopId,
         type: 'expense',
-        category: 'POS Expense',
+        category: isPerfumeExpense ? 'Perfume' : isOverheadExpense ? 'Overhead' : 'POS Expense',
         amount: amount,
         date: timestamp,
         description: description,
@@ -1157,27 +1161,36 @@ export async function recordPosExpense(
         });
     }
 
-    // Auto-create Operations entry if manually toggled or for rent/utilities
-    const isRentExpense = descLower.includes("rent") || descLower.includes("utility") || descLower.includes("electric") || descLower.includes("water") || descLower.includes("internet");
-    if (options?.toOperations || isRentExpense) {
-        const opsKind = isRentExpense ? "overhead_payment" : "eod_deposit";
+    // Auto-create Operations entry for overhead expenses OR if manually toggled
+    // IMPORTANT: EOD deposits (from Post to Ops) should NOT affect drift - only overhead balances may cause drift
+    if (options?.toOperations || isOverheadExpense) {
+        const opsKind = isOverheadExpense ? "overhead_payment" : "eod_deposit";
         await supabaseAdmin.from('operations_ledger').insert({
             amount: amount,
             kind: opsKind,
             shop_id: shopId,
             title: description,
+            notes: `Auto-routed from POS expense: ${isOverheadExpense ? 'Overhead' : 'Manual'}`,
             employee_id: employeeId,
             effective_date: new Date().toISOString().split('T')[0],
         });
     }
 
-    // Optional: Log to audit trail
+    // Log to audit trail with full details
     await supabaseAdmin.from('audit_log').insert([{
         id: Math.random().toString(36).substring(2, 9),
         action: 'record_pos_expense',
         shop_id: shopId,
         employee_id: employeeId,
-        details: { amount, description, toInvest: isPerfumeExpense || options?.toInvest, toOperations: options?.toOperations || isRentExpense },
+        details: { 
+            amount, 
+            description, 
+            toInvest: isPerfumeExpense || options?.toInvest, 
+            toOperations: options?.toOperations || isOverheadExpense,
+            isPerfume: isPerfumeExpense,
+            isOverhead: isOverheadExpense,
+            kind: isOverheadExpense ? "overhead_payment" : "eod_deposit"
+        },
         timestamp
     }]);
 

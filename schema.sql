@@ -16,7 +16,6 @@ CREATE TABLE IF NOT EXISTS operations_ledger (
   created_at TIMESTAMPTZ DEFAULT now()
 );
 
--- Enable RLS
 ALTER TABLE operations_ledger ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Allow all operations on operations_ledger" ON operations_ledger FOR ALL USING (true) WITH CHECK (true);
 
@@ -29,6 +28,24 @@ CREATE TABLE IF NOT EXISTS operations_state (
 
 ALTER TABLE operations_state ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Allow all operations on operations_state" ON operations_state FOR ALL USING (true) WITH CHECK (true);
+
+-- Cash Handshakes Table (for tracking cash transfers between shops)
+CREATE TABLE IF NOT EXISTS operations_handshakes (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  from_shop TEXT NOT NULL,
+  to_shop TEXT NOT NULL,
+  amount NUMERIC(12,2) NOT NULL,
+  associate TEXT,
+  initiated_by TEXT,
+  acknowledged_by TEXT,
+  notes TEXT,
+  status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'in_transit', 'completed', 'cancelled')),
+  created_at TIMESTAMPTZ DEFAULT now(),
+  acknowledged_at TIMESTAMPTZ
+);
+
+ALTER TABLE operations_handshakes ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow all operations on operations_handshakes" ON operations_handshakes FOR ALL USING (true) WITH CHECK (true);
 
 -- Invest Peer Cycles Table
 CREATE TABLE IF NOT EXISTS invest_peer_cycles (
@@ -71,6 +88,7 @@ CREATE TABLE IF NOT EXISTS invest_deposits (
   withdrawn_at TIMESTAMPTZ,
   withdrawn_by TEXT,
   withdraw_title TEXT,
+  withdraw_shop_id TEXT,
   status TEXT DEFAULT 'active' CHECK (status IN ('active', 'withdrawn', 'partial'))
 );
 

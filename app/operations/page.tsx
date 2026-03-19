@@ -142,7 +142,7 @@ export default async function OperationsPage() {
           </CardContent>
         </Card>
 
-        <OperationsConsole shops={shops} initialState={opsState} initialLedger={ledger} />
+        <OperationsConsole shops={shops} initialLedger={ledger} />
       </div>
     </div>
   );
