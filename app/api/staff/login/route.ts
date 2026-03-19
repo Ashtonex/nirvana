@@ -46,6 +46,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Invalid device PIN" }, { status: 401 });
   }
 
+  // Create staff session
   const token = randomBytes(32).toString("hex");
   const tokenHash = createHash("sha256").update(token).digest("hex");
   const expiresAt = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString();
@@ -60,6 +61,8 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: insert.error.message }, { status: 500 });
   }
 
+  // Avoid auth conflicts: if this browser previously had an owner cookie, clear it so staff auth can be detected.
+  // (AccessGate relies on /api/staff/me which should prefer staff sessions.)
   (await cookies()).set("nirvana_owner", "", {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",

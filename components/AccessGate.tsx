@@ -26,6 +26,7 @@ export function AccessGate({ children }: { children: React.ReactNode }) {
             return;
           }
 
+          // Privileged session (owner/admin) without a shop_id should still be allowed through.
           const r = String(data?.staff?.role || "").toLowerCase();
           if (data?.staff && (r === "owner" || r === "admin")) {
             setOwnerOk(true);
@@ -37,6 +38,7 @@ export function AccessGate({ children }: { children: React.ReactNode }) {
         // Not staff
       }
 
+      // If not staff, check owner session (Next route)
       try {
         const r2 = await fetch("/api/auth/me", { cache: "no-store", credentials: "include" });
         const data2 = await r2.json().catch(() => ({}));
@@ -48,7 +50,7 @@ export function AccessGate({ children }: { children: React.ReactNode }) {
       setChecked(true);
     }
     checkStaff();
-  }, [pathname]);
+  }, []);
 
   // Always allow login page
   if (pathname === "/login" || pathname === "/staff-login") {
@@ -83,13 +85,7 @@ export function AccessGate({ children }: { children: React.ReactNode }) {
       pathname === "/intelligence" ||
       pathname.startsWith("/intelligence/") ||
       pathname === "/finance/oracle" ||
-      pathname.startsWith("/finance/") ||
-      pathname === "/operations" ||
-      pathname.startsWith("/operations/") ||
-      pathname === "/invest" ||
-      pathname.startsWith("/invest/") ||
-      pathname === "/logic" ||
-      pathname.startsWith("/logic/");
+      pathname.startsWith("/finance/");
     
     if (onTheirShop || onStaffChat || (isManager && managerAllowed)) {
       return <>{children}</>;
@@ -101,9 +97,7 @@ export function AccessGate({ children }: { children: React.ReactNode }) {
   }
 
   // Not staff - let through (owner AuthProvider will handle owner check)
-  if (ownerOk) {
-    return <>{children}</>;
-  }
+  if (ownerOk) return <>{children}</>;
 
   // Neither staff nor owner: force login instead of falling through to Command Center
   const staffPreferred = pathname.startsWith("/shops") || pathname.startsWith("/staff-chat");

@@ -42,30 +42,11 @@ export async function GET() {
     return NextResponse.json({ staff: null }, { status: 401 });
   }
 
-  const employeeId = String(session.employee_id || "").trim();
-  if (!employeeId) {
-    return NextResponse.json({ staff: null }, { status: 401 });
-  }
-
   const { data: staff } = await supabaseAdmin
     .from("employees")
     .select("id,name,surname,shop_id,role,is_active,active")
-    .eq("id", employeeId)
+    .eq("id", session.employee_id)
     .maybeSingle();
 
-  if (!staff) {
-    const { data: allStaff } = await supabaseAdmin
-      .from("employees")
-      .select("id,name,surname,shop_id,role,is_active,active")
-      .limit(5);
-    console.error("[/api/staff/me] Employee not found for id:", employeeId, "Available:", allStaff?.map((e: any) => e.id));
-    return NextResponse.json({ staff: null }, { status: 401 });
-  }
-
-  const active = Boolean(staff.is_active ?? staff.active ?? true);
-  if (!active) {
-    return NextResponse.json({ staff: null }, { status: 403 });
-  }
-
-  return NextResponse.json({ staff });
+  return NextResponse.json({ staff: staff || null });
 }
