@@ -1157,8 +1157,8 @@ Generated via NIRVANA POS`;
     );
 
     return (
-        <div className="grid gap-6 md:grid-cols-12">
-            <div className="md:col-span-8 space-y-6">
+        <div className="grid gap-4 md:gap-6 md:grid-cols-12 grid-cols-1">
+            <div className="md:col-span-8 col-span-1 space-y-4 md:space-y-6">
                 {/* Full-width Search Bar */}
                 <div className="relative w-full group">
                     <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-500 group-focus-within:text-violet-400 transition-colors" />
@@ -1622,7 +1622,7 @@ Generated via NIRVANA POS`;
                 )}
             </div>
 
-            <Card className="md:col-span-4 h-fit sticky top-6 border-slate-800 bg-slate-950/40 backdrop-blur-md">
+            <Card className="md:col-span-4 col-span-1 md:sticky md:top-6 border-slate-800 bg-slate-950/40 backdrop-blur-md mb-safe">
                 <CardHeader>
                     {/* Daily Sales Total Badge */}
                     <div className="mb-3 p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/20">

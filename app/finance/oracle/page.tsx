@@ -1,6 +1,8 @@
+"use client";
+
 export const dynamic = 'force-dynamic';
 
-import { getOracleMasterPulse, getZombieStockReport } from "../../actions";
+import { useEffect, useState } from "react";
 import {
     Card,
     CardContent,
@@ -25,14 +27,44 @@ import {
     Skull,
     Ghost,
     AlertTriangle,
-    Banknote
+    Banknote,
+    Loader2
 } from "lucide-react";
 
-export default async function OraclePage() {
-    const pulse = await getOracleMasterPulse();
-    const zombies = await getZombieStockReport();
+export default function OraclePage() {
+    const [pulse, setPulse] = useState<any>(null);
+    const [zombies, setZombies] = useState<any[]>([]);
+    const [loading, setLoading] = useState(true);
 
-    if (!pulse) return <div>Contacting the Oracle...</div>;
+    useEffect(() => {
+        async function load() {
+            try {
+                const [p, z] = await Promise.all([
+                    fetch("/api/oracle/pulse", { cache: "no-store", credentials: "include" }).then(r => r.json()),
+                    fetch("/api/oracle/zombies", { cache: "no-store", credentials: "include" }).then(r => r.json())
+                ]);
+                setPulse(p);
+                setZombies(z || []);
+            } catch (e) {
+                console.error("Oracle load failed:", e);
+            } finally {
+                setLoading(false);
+            }
+        }
+        load();
+    }, []);
+
+    if (loading) return (
+        <div className="min-h-screen flex items-center justify-center">
+            <Loader2 className="h-8 w-8 animate-spin text-violet-500" />
+        </div>
+    );
+
+    if (!pulse || pulse.error) return (
+        <div className="min-h-screen flex items-center justify-center text-slate-500">
+            Oracle is consulting the void...
+        </div>
+    );
 
     const { finances, shopPerformance, deadCapital } = pulse;
     const monthlyBurn = finances.monthlyBurn || 0;
@@ -251,7 +283,33 @@ export default async function OraclePage() {
             </div>
 
             <div className="flex justify-center">
-                <Button className="bg-transparent border-2 border-slate-800 text-slate-500 font-black text-[10px] uppercase h-10 px-8 hover:bg-slate-900 hover:text-white transition-all">
+                <Button 
+                    className="bg-transparent border-2 border-slate-800 text-slate-500 font-black text-[10px] uppercase h-10 px-8 hover:bg-slate-900 hover:text-white transition-all"
+                    onClick={async () => {
+                        const now = new Date();
+                        const monthStamp = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+                        try {
+                            const res = await fetch(`/api/reports/monthly/pdf?shopId=all&month=${encodeURIComponent(monthStamp)}`, {
+                                cache: "no-store",
+                                credentials: "include"
+                            });
+                            if (res.ok) {
+                                const blob = await res.blob();
+                                const url = URL.createObjectURL(blob);
+                                const a = document.createElement("a");
+                                a.href = url;
+                                a.download = `Oracle_Forecast_${monthStamp}.pdf`;
+                                document.body.appendChild(a);
+                                a.click();
+                                URL.revokeObjectURL(url);
+                            } else {
+                                alert("Failed to generate forecast PDF");
+                            }
+                        } catch (e) {
+                            alert("Error generating forecast: " + (e as Error).message);
+                        }
+                    }}
+                >
                     Generate Full Forecast PDF <ArrowUpRight className="ml-2 h-4 w-4" />
                 </Button>
             </div>
