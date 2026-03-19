@@ -1119,9 +1119,22 @@ export async function getPosAuditReport(input: { shopId: string; dateYYYYMMDD: s
     return computePosAuditReport({ shopId, dateYYYYMMDD: day });
 }
 
-export async function recordPosExpense(shopId: string, amount: number, description: string, employeeId: string) {
+export async function recordPosExpense(
+    shopId: string, 
+    amount: number, 
+    description: string, 
+    employeeId: string,
+    options?: {
+        toInvest?: boolean;
+        toOperations?: boolean;
+    }
+) {
     const timestamp = new Date().toISOString();
     const id = Math.random().toString(36).substring(2, 9);
+    const descLower = String(description || "").toLowerCase();
+
+    // Auto-detect perfume expenses
+    const isPerfumeExpense = descLower.includes("perfume") || descLower.includes("parfum");
 
     // Log expense to ledger
     await supabaseAdmin.from('ledger_entries').insert([{
@@ -1135,19 +1148,44 @@ export async function recordPosExpense(shopId: string, amount: number, descripti
         employee_id: employeeId
     }]);
 
+    // Auto-create Invest deposit for perfume expenses or if manually toggled
+    if (isPerfumeExpense || options?.toInvest) {
+        await supabaseAdmin.from('invest_deposits').insert({
+            shop_id: shopId,
+            amount: amount,
+            deposited_by: employeeId,
+        });
+    }
+
+    // Auto-create Operations entry if manually toggled or for rent/utilities
+    const isRentExpense = descLower.includes("rent") || descLower.includes("utility") || descLower.includes("electric") || descLower.includes("water") || descLower.includes("internet");
+    if (options?.toOperations || isRentExpense) {
+        const opsKind = isRentExpense ? "overhead_payment" : "eod_deposit";
+        await supabaseAdmin.from('operations_ledger').insert({
+            amount: amount,
+            kind: opsKind,
+            shop_id: shopId,
+            title: description,
+            employee_id: employeeId,
+            effective_date: new Date().toISOString().split('T')[0],
+        });
+    }
+
     // Optional: Log to audit trail
     await supabaseAdmin.from('audit_log').insert([{
         id: Math.random().toString(36).substring(2, 9),
         action: 'record_pos_expense',
         shop_id: shopId,
         employee_id: employeeId,
-        details: { amount, description },
+        details: { amount, description, toInvest: isPerfumeExpense || options?.toInvest, toOperations: options?.toOperations || isRentExpense },
         timestamp
     }]);
 
     revalidatePath(`/shops/${shopId}`);
     revalidatePath('/');
     revalidatePath('/intelligence');
+    revalidatePath('/operations');
+    revalidatePath('/invest');
     revalidatePath('/finance/oracle');
     revalidatePath('/admin/pos-audit');
 }

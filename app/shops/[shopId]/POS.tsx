@@ -225,6 +225,8 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
     const [isExpenseModalOpen, setIsExpenseModalOpen] = useState(false);
     const [expenseAmount, setExpenseAmount] = useState("");
     const [expenseDescription, setExpenseDescription] = useState("");
+    const [expenseToInvest, setExpenseToInvest] = useState(false);
+    const [expenseToOperations, setExpenseToOperations] = useState(false);
 
     // Operations vault posting (drawer → master vault)
     const [isOpsPostModalOpen, setIsOpsPostModalOpen] = useState(false);
@@ -382,10 +384,21 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
         }
         startTransition(async () => {
             try {
-                await recordPosExpense(shopId, val, expenseDescription, selectedEmployeeId || "system");
+                await recordPosExpense(
+                    shopId, 
+                    val, 
+                    expenseDescription, 
+                    selectedEmployeeId || "system",
+                    {
+                        toInvest: expenseToInvest,
+                        toOperations: expenseToOperations
+                    }
+                );
                 setIsExpenseModalOpen(false);
                 setExpenseAmount("");
                 setExpenseDescription("");
+                setExpenseToInvest(false);
+                setExpenseToOperations(false);
                 alert("Expense recorded successfully.");
             } catch (e) {
                 alert("Failed to record expense.");
@@ -2183,11 +2196,57 @@ Generated via NIRVANA POS`;
                     <div>
                         <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Description / Reason</label>
                         <Input
-                            placeholder="e.g. Lunch for staff"
+                            placeholder="e.g. Perfume restock, Rent payment, Lunch"
                             className="bg-slate-950 border-slate-800 mt-1 placeholder:text-slate-700 font-bold h-12"
                             value={expenseDescription}
                             onChange={(e) => setExpenseDescription(e.target.value)}
                         />
+                    </div>
+
+                    {/* Auto-detection info */}
+                    <div className="text-[10px] text-slate-500 bg-slate-950/50 rounded-lg p-2 space-y-1">
+                        <div className="flex items-center gap-2">
+                            <span className="text-sky-400">Perfume</span> in description → Auto-deposits to Invest
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <span className="text-amber-400">Rent/Utilities</span> in description → Auto-deposits to Operations
+                        </div>
+                    </div>
+
+                    {/* Manual toggles */}
+                    <div className="grid grid-cols-2 gap-2">
+                        <button
+                            type="button"
+                            onClick={() => setExpenseToInvest(!expenseToInvest)}
+                            className={`p-3 rounded-lg border text-xs font-black uppercase tracking-wider transition-all ${
+                                expenseToInvest 
+                                    ? 'bg-sky-500/20 border-sky-500 text-sky-400' 
+                                    : 'bg-slate-950 border-slate-800 text-slate-500'
+                            }`}
+                        >
+                            <div className="flex items-center gap-2 justify-center">
+                                <div className={`h-4 w-4 rounded border ${expenseToInvest ? 'bg-sky-500 border-sky-500' : 'border-slate-600'}`}>
+                                    {expenseToInvest && <span className="text-[8px]">✓</span>}
+                                </div>
+                                Deposit to Invest
+                            </div>
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setExpenseToOperations(!expenseToOperations)}
+                            className={`p-3 rounded-lg border text-xs font-black uppercase tracking-wider transition-all ${
+                                expenseToOperations 
+                                    ? 'bg-emerald-500/20 border-emerald-500 text-emerald-400' 
+                                    : 'bg-slate-950 border-slate-800 text-slate-500'
+                            }`}
+                        >
+                            <div className="flex items-center gap-2 justify-center">
+                                <div className={`h-4 w-4 rounded border ${expenseToOperations ? 'bg-emerald-500 border-emerald-500' : 'border-slate-600'}`}>
+                                    {expenseToOperations && <span className="text-[8px]">✓</span>}
+                                </div>
+                                Deposit to Operations
+                            </div>
+                        </button>
                     </div>
 
                     <Button
