@@ -56,6 +56,7 @@ export async function GET() {
     .eq("id", session.employee_id)
     .maybeSingle();
 
+  console.log("[/api/staff/me] session.employee_id:", session.employee_id);
   console.log("[/api/staff/me] Staff data:", JSON.stringify(staff));
   return NextResponse.json({ staff: staff || null });
 }
