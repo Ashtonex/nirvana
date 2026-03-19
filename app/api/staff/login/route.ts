@@ -66,11 +66,21 @@ export async function POST(req: Request) {
     expires_at: expiresAt,
   });
 
+  console.log("[/api/staff/login] Insert result:", JSON.stringify(insert));
+
   if (insert.error) {
     console.log("[/api/staff/login] Session insert error:", insert.error.message);
     return NextResponse.json({ error: insert.error.message }, { status: 500 });
   }
   console.log("[/api/staff/login] Session created successfully");
+
+  // Immediately verify the session was created
+  const { data: verifySession } = await supabaseAdmin
+    .from("staff_sessions")
+    .select("id, employee_id, expires_at")
+    .eq("token_hash", tokenHash)
+    .maybeSingle();
+  console.log("[/api/staff/login] Session verified in DB:", JSON.stringify(verifySession));
 
   // Avoid auth conflicts: if this browser previously had an owner cookie, clear it so staff auth can be detected.
   // (AccessGate relies on /api/staff/me which should prefer staff sessions.)
