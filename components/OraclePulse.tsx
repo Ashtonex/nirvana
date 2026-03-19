@@ -29,6 +29,7 @@ interface OraclePulseProps {
             name: string;
             revenue: number;
             expenses: number;
+            deposits?: number;
             progress: number;
         }[];
         deadCapital: number;
@@ -140,10 +141,11 @@ export function OraclePulse({ data }: OraclePulseProps) {
                     </div>
 
                     <div className="rounded-xl border border-slate-800 overflow-hidden">
-                        <div className="grid grid-cols-4 gap-2 px-4 py-2 bg-slate-900/70 text-[10px] font-black uppercase tracking-widest text-slate-400">
+                        <div className="grid grid-cols-5 gap-2 px-4 py-2 bg-slate-900/70 text-[10px] font-black uppercase tracking-widest text-slate-400">
                             <div>Shop</div>
                             <div className="text-right">Revenue</div>
-                            <div className="text-right">Expenses</div>
+                            <div className="text-right">Deposits</div>
+                            <div className="text-right">Overhead</div>
                             <div className="text-right">Coverage</div>
                         </div>
                         {safeData.shopPerformance.length === 0 ? (
@@ -152,9 +154,10 @@ export function OraclePulse({ data }: OraclePulseProps) {
                             </div>
                         ) : (
                             safeData.shopPerformance.map((shop) => (
-                                <div key={shop.id} className="grid grid-cols-4 gap-2 px-4 py-2 border-t border-slate-800 text-[10px] font-bold text-slate-300">
+                                <div key={shop.id} className="grid grid-cols-5 gap-2 px-4 py-2 border-t border-slate-800 text-[10px] font-bold text-slate-300">
                                     <div className="truncate">{shop.name}</div>
-                                    <div className="text-right">${Number(shop.revenue || 0).toLocaleString()}</div>
+                                    <div className="text-right text-emerald-400">${Number(shop.revenue || 0).toLocaleString()}</div>
+                                    <div className="text-right text-sky-400">${Number(shop.deposits || 0).toLocaleString()}</div>
                                     <div className="text-right text-rose-300">${Number(shop.expenses || 0).toLocaleString()}</div>
                                     <div className={cn(
                                         "text-right font-black",
@@ -175,7 +178,7 @@ export function OraclePulse({ data }: OraclePulseProps) {
                         <CardTitle className="text-lg font-black uppercase italic flex items-center gap-2">
                             <Target className="h-5 w-5 text-violet-500" /> Network Node Performance
                         </CardTitle>
-                        <CardDescription className="text-[10px] font-bold uppercase">Revenue vs Base Expenses (Targets)</CardDescription>
+                        <CardDescription className="text-[10px] font-bold uppercase">Coverage = (Revenue + Perfume Deposits) / Overhead Target</CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-6">
                         {safeData.shopPerformance.map(shop => (
@@ -184,8 +187,7 @@ export function OraclePulse({ data }: OraclePulseProps) {
                                     <div>
                                         <p className="text-sm font-black text-white uppercase italic">{shop.name}</p>
                                         <p className="text-[10px] font-bold text-slate-500 uppercase">
-                                            ${shop.revenue.toLocaleString()} revenue / 
-                                            <span className="text-rose-400"> ${shop.expenses.toLocaleString()} expenses</span>
+                                            <span className="text-emerald-400">${shop.revenue.toLocaleString()}</span> revenue + <span className="text-sky-400">${Number(shop.deposits || 0).toLocaleString()}</span> deposits / <span className="text-rose-400">${shop.expenses.toLocaleString()}</span> overhead
                                         </p>
                                     </div>
                                     <Badge className={cn(
@@ -199,7 +201,7 @@ export function OraclePulse({ data }: OraclePulseProps) {
                                     <div
                                         className={cn(
                                             "h-full transition-all duration-1000",
-                                            shop.progress >= 100 ? "bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.3)]" : "bg-rose-500"
+                                            shop.progress >= 100 ? "bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.3)]" : "bg-sky-500"
                                         )}
                                         style={{ width: `${Math.min(100, shop.progress)}%` }}
                                     />

@@ -102,6 +102,16 @@ export function OperationsConsole({
     }
   };
 
+  const quickEntry = (kind: string, amount: string, title: string, overheadCategory?: string) => {
+    setEntry((e) => ({
+      ...e,
+      kind,
+      amount,
+      title,
+      overheadCategory: overheadCategory || "",
+    }));
+  };
+
   const deltaBadge =
     Math.abs(state.delta || 0) < 0.01 ? (
       <Badge className="bg-emerald-500/10 text-emerald-500 border-emerald-500/20">Balanced</Badge>
@@ -167,6 +177,56 @@ export function OperationsConsole({
 
       <Card className="bg-slate-950/60 border-slate-800">
         <CardHeader>
+          <CardTitle className="text-lg font-black uppercase italic">Quick Actions</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-wrap gap-2">
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="text-[10px] font-black uppercase border-emerald-600/50 text-emerald-400 hover:bg-emerald-600/20"
+              onClick={() => quickEntry("eod_deposit", "", "EOD Deposit", "")}
+            >
+              + EOD Deposit
+            </Button>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="text-[10px] font-black uppercase border-sky-600/50 text-sky-400 hover:bg-sky-600/20"
+              onClick={() => quickEntry("capital_injection", "", "Capital Injection", "")}
+            >
+              + Capital Injection
+            </Button>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="text-[10px] font-black uppercase border-amber-600/50 text-amber-400 hover:bg-amber-600/20"
+              onClick={() => quickEntry("business_expense", "", "Business Expense", "")}
+            >
+              + Expense
+            </Button>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="text-[10px] font-black uppercase border-violet-600/50 text-violet-400 hover:bg-violet-600/20"
+              onClick={() => quickEntry("peer_contribution", "", "Peer Contribution", "")}
+            >
+              + Peer Contribution
+            </Button>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="text-[10px] font-black uppercase border-rose-600/50 text-rose-400 hover:bg-rose-600/20"
+              onClick={() => quickEntry("peer_payout", "", "Peer Payout", "")}
+            >
+              + Peer Payout
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card className="bg-slate-950/60 border-slate-800">
+        <CardHeader>
           <CardTitle className="text-lg font-black uppercase italic">Post to Operations Ledger</CardTitle>
           <CardDescription className="text-[10px] font-bold uppercase italic">
             Deposits, expenses, overhead movements, injections (everything routes through Operations).
@@ -185,8 +245,19 @@ export function OperationsConsole({
               value={entry.kind}
               onChange={(e) => setEntry((s) => ({ ...s, kind: e.target.value }))}
               className="bg-slate-900 border-slate-800 font-mono md:col-span-1"
-              placeholder="kind (eod_deposit)"
+              placeholder="kind"
+              list="ops-kinds"
             />
+            <datalist id="ops-kinds">
+              <option value="eod_deposit" />
+              <option value="overhead_deposit" />
+              <option value="overhead_payment" />
+              <option value="capital_injection" />
+              <option value="business_expense" />
+              <option value="peer_contribution" />
+              <option value="peer_payout" />
+              <option value="adjustment" />
+            </datalist>
             <Input
               value={entry.shopId}
               onChange={(e) => setEntry((s) => ({ ...s, shopId: e.target.value }))}
@@ -206,7 +277,14 @@ export function OperationsConsole({
               onChange={(e) => setEntry((s) => ({ ...s, overheadCategory: e.target.value }))}
               className="bg-slate-900 border-slate-800 font-mono md:col-span-1"
               placeholder="overhead (rent)"
+              list="ops-categories"
             />
+            <datalist id="ops-categories">
+              <option value="rent" />
+              <option value="salaries" />
+              <option value="utilities" />
+              <option value="misc" />
+            </datalist>
             <Input
               value={entry.effectiveDate}
               onChange={(e) => setEntry((s) => ({ ...s, effectiveDate: e.target.value }))}
@@ -275,4 +353,3 @@ export function OperationsConsole({
     </div>
   );
 }
-

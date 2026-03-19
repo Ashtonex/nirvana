@@ -1160,6 +1160,7 @@ export async function getOracleMasterPulse() {
     const { data: sales } = await supabaseAdmin.from('sales').select('*');
     const { data: shops } = await supabaseAdmin.from('shops').select('*');
     const { data: ledger } = await supabaseAdmin.from('ledger_entries').select('*');
+    const { data: investDeposits } = await supabaseAdmin.from('invest_deposits').select('*');
     if (!inventory || !sales || !shops || !settings) return null;
 
     const totalRevenue = sales.reduce((sum: number, s: any) => sum + Number(s.total_with_tax), 0);
@@ -1177,7 +1178,11 @@ export async function getOracleMasterPulse() {
         return acc;
     }, {});
 
-    // Calculate total expenses per shop: structured expenses + ledger expenses
+    const calculateShopOverheadTarget = (shopId: string) => {
+        const shopExpenses = shops?.find((s: any) => s.id === shopId)?.expenses || {};
+        return Object.values(shopExpenses).reduce((acc: number, val: any) => acc + Number(val || 0), 0);
+    };
+
     const calculateShopExpenses = (shopId: string) => {
         const structuredExpenses = Object.values(
             shops?.find((s: any) => s.id === shopId)?.expenses || {}
@@ -1190,6 +1195,12 @@ export async function getOracleMasterPulse() {
         return structuredExpenses + ledgerExpenses;
     };
 
+    const calculateShopInvestDeposits = (shopId: string) => {
+        return (investDeposits || [])
+            .filter((d: any) => d.shop_id === shopId)
+            .reduce((acc: number, d: any) => acc + Number(d.amount || 0), 0);
+    };
+
     return {
         totalUnits: inventory.reduce((sum: number, i: any) => sum + i.quantity, 0),
         categoryBreakdown,
@@ -1198,14 +1209,18 @@ export async function getOracleMasterPulse() {
             const shopRevenue = (sales || [])
                 .filter((sa: any) => sa.shop_id === s.id)
                 .reduce((acc: number, sa: any) => acc + Number(sa.total_with_tax), 0);
-            const shopExpenses = calculateShopExpenses(s.id);
-            const progress = shopExpenses > 0 ? (shopRevenue / shopExpenses) * 100 : 100;
+            
+            const overheadTarget = calculateShopOverheadTarget(s.id);
+            const perfumeDeposits = calculateShopInvestDeposits(s.id);
+            const coverageAmount = shopRevenue + perfumeDeposits;
+            const progress = overheadTarget > 0 ? (coverageAmount / overheadTarget) * 100 : 100;
             
             return {
                 id: s.id,
                 name: s.name,
                 revenue: shopRevenue,
-                expenses: shopExpenses,
+                expenses: overheadTarget,
+                deposits: perfumeDeposits,
                 progress
             };
         }),
