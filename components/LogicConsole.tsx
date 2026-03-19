@@ -44,6 +44,7 @@ type AuditEntry = {
   employee_id?: string;
   details?: any;
   timestamp: string;
+  amount?: number;
 };
 
 type SessionEntry = {
@@ -53,6 +54,7 @@ type SessionEntry = {
   shop_id?: string;
   action: string;
   amount?: number;
+  ip_address?: string;
   timestamp: string;
 };
 
@@ -85,7 +87,7 @@ function AnimatedNumber({ value, prefix = "", suffix = "" }: { value: number; pr
   return <span>{prefix}{display.toFixed(2)}{suffix}</span>;
 }
 
-function TypingText({ text, speed = 20, className = "" }: { text: string; speed?: number; className?: string }) {
+function TypingText({ text, speed = 80, className = "" }: { text: string; speed?: number; className?: string }) {
   const [displayed, setDisplayed] = useState("");
   const indexRef = useRef(0);
   
@@ -249,6 +251,7 @@ function AuditItem({ entry, isNew, typingDelay = 0 }: { entry: AuditEntry; isNew
   const hasError = entry.action?.includes("error") || entry.action?.includes("failed") || entry.details?.error;
   const ref = useRef<HTMLDivElement>(null);
   const [startTyping, setStartTyping] = useState(false);
+  const [expanded, setExpanded] = useState(false);
   
   useEffect(() => {
     const timer = setTimeout(() => setStartTyping(true), typingDelay);
@@ -262,72 +265,133 @@ function AuditItem({ entry, isNew, typingDelay = 0 }: { entry: AuditEntry; isNew
     }
   }, [isNew]);
   
-  const actionText = entry.action || "action";
+  const actionText = entry.action || "system_activity";
   const descText = entry.details?.description || entry.details?.message || entry.table_name || "—";
   const timeText = new Date(entry.timestamp).toLocaleTimeString();
+  const dateText = new Date(entry.timestamp).toLocaleDateString();
   const actorText = entry.employee_id || entry.shop_id || "system";
+  const ipText = entry.details?.ip_address || "192.168.1.1";
+  const shopText = entry.shop_id || entry.details?.shop_id || "—";
+  const employeeName = entry.details?.employee_name || entry.employee_id || "System";
+  const amountVal = entry.details?.amount || entry.amount;
+  const tableText = entry.table_name || entry.details?.table || "—";
   
   return (
     <div 
       ref={ref}
       className={cn(
-        "relative flex items-start gap-3 p-3 rounded-xl border transition-all duration-300",
+        "rounded-xl border transition-all duration-300 overflow-hidden cursor-pointer",
         hasError 
           ? "bg-rose-950/40 border-rose-500/30" 
           : "bg-slate-900/40 border-slate-800/50 hover:border-slate-700",
         isNew && "ring-1 ring-emerald-500/30"
       )}
+      onClick={() => setExpanded(!expanded)}
     >
-      <div className={cn(
-        "flex items-center justify-center w-10 h-10 rounded-xl shrink-0",
-        hasError ? "bg-rose-500/20 text-rose-400 animate-pulse" :
-        entry.action?.includes("sale") ? "bg-emerald-500/20 text-emerald-400" :
-        entry.action?.includes("expense") ? "bg-rose-500/20 text-rose-400" :
-        entry.action?.includes("login") ? "bg-violet-500/20 text-violet-400" :
-        entry.action?.includes("transfer") ? "bg-sky-500/20 text-sky-400" :
-        "bg-slate-800 text-slate-400"
-      )}>
-        {hasError ? <ShieldAlert className="h-5 w-5" /> :
-         entry.action?.includes("sale") ? <ShoppingCart className="h-5 w-5" /> :
-         entry.action?.includes("expense") ? <Minus className="h-5 w-5" /> :
-         entry.action?.includes("login") ? <UserCheck className="h-5 w-5" /> :
-         entry.action?.includes("transfer") ? <ArrowRightLeft className="h-5 w-5" /> :
-         <Activity className="h-5 w-5" />}
-      </div>
-      
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2">
-          {startTyping ? (
-            <TypingText text={actionText} speed={15} className="text-[10px] font-black uppercase tracking-widest text-slate-400" />
-          ) : (
-            <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 opacity-0">{"M".repeat(actionText.length)}</span>
-          )}
-          {isNew && (
-            <Badge className="bg-emerald-500/20 text-emerald-400 border-emerald-500/30 text-[8px] animate-pulse">
-              NEW
+      <div className="flex items-start gap-3 p-3">
+        <div className={cn(
+          "flex items-center justify-center w-10 h-10 rounded-xl shrink-0",
+          hasError ? "bg-rose-500/20 text-rose-400 animate-pulse" :
+          entry.action?.includes("sale") ? "bg-emerald-500/20 text-emerald-400" :
+          entry.action?.includes("expense") ? "bg-rose-500/20 text-rose-400" :
+          entry.action?.includes("login") ? "bg-violet-500/20 text-violet-400" :
+          entry.action?.includes("transfer") ? "bg-sky-500/20 text-sky-400" :
+          "bg-slate-800 text-slate-400"
+        )}>
+          {hasError ? <ShieldAlert className="h-5 w-5" /> :
+           entry.action?.includes("sale") ? <ShoppingCart className="h-5 w-5" /> :
+           entry.action?.includes("expense") ? <Minus className="h-5 w-5" /> :
+           entry.action?.includes("login") ? <UserCheck className="h-5 w-5" /> :
+           entry.action?.includes("transfer") ? <ArrowRightLeft className="h-5 w-5" /> :
+           <Activity className="h-5 w-5" />}
+        </div>
+        
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2">
+            {startTyping ? (
+              <TypingText text={actionText} speed={80} className="text-[10px] font-black uppercase tracking-widest text-slate-400" />
+            ) : (
+              <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 opacity-0">{"M".repeat(actionText.length)}</span>
+            )}
+            {isNew && (
+              <Badge className="bg-emerald-500/20 text-emerald-400 border-emerald-500/30 text-[8px] animate-pulse">
+                NEW
+              </Badge>
+            )}
+            <span className="text-slate-600 ml-auto">
+              {expanded ? "▲" : "▼"}
+            </span>
+          </div>
+          <div className="mt-0.5 min-h-[1.25rem]">
+            {startTyping ? (
+              <TypingText text={descText} speed={60} className="text-sm font-bold text-white" />
+            ) : (
+              <span className="text-sm font-bold text-transparent bg-gradient-to-r from-slate-700 to-slate-800 bg-clip-text animate-pulse">Loading...</span>
+            )}
+          </div>
+          <div className="flex items-center gap-2 mt-1 text-[10px] text-slate-500 font-mono">
+            <Clock className="h-3 w-3" />
+            <span className="tabular-nums">{timeText}</span>
+            <span className="text-slate-600">•</span>
+            <span>{actorText}</span>
+          </div>
+        </div>
+        
+        {hasError && (
+          <div className="flex items-center shrink-0">
+            <Badge className="bg-rose-500/30 text-rose-400 border-rose-500/50 text-[8px] animate-pulse">
+              ERROR
             </Badge>
-          )}
-        </div>
-        <div className="mt-0.5 min-h-[1.25rem]">
-          {startTyping ? (
-            <TypingText text={descText} speed={10} className="text-sm font-bold text-white" />
-          ) : (
-            <span className="text-sm font-bold text-transparent bg-gradient-to-r from-slate-700 to-slate-800 bg-clip-text animate-pulse">Loading...</span>
-          )}
-        </div>
-        <div className="flex items-center gap-2 mt-1 text-[10px] text-slate-500 font-mono">
-          <Clock className="h-3 w-3" />
-          <span className="tabular-nums">{timeText}</span>
-          <span className="text-slate-600">•</span>
-          <span>{actorText}</span>
-        </div>
+          </div>
+        )}
       </div>
-      
-      {hasError && (
-        <div className="flex items-center shrink-0">
-          <Badge className="bg-rose-500/30 text-rose-400 border-rose-500/50 text-[8px] animate-pulse">
-            ERROR
-          </Badge>
+
+      {expanded && (
+        <div className="px-3 pb-3 pt-0 border-t border-slate-800/50 mt-0">
+          <div className="grid grid-cols-2 gap-3 mt-3 p-3 bg-slate-950/50 rounded-lg">
+            <div className="space-y-1">
+              <p className="text-[9px] font-black uppercase tracking-widest text-slate-500">Who</p>
+              <p className="text-xs font-bold text-white flex items-center gap-1">
+                <UserCheck className="h-3 w-3 text-violet-400" />
+                {employeeName}
+              </p>
+            </div>
+            <div className="space-y-1">
+              <p className="text-[9px] font-black uppercase tracking-widest text-slate-500">Where</p>
+              <p className="text-xs font-bold text-white uppercase">{shopText}</p>
+            </div>
+            <div className="space-y-1">
+              <p className="text-[9px] font-black uppercase tracking-widest text-slate-500">IP Address</p>
+              <p className="text-xs font-mono text-white">{ipText}</p>
+            </div>
+            <div className="space-y-1">
+              <p className="text-[9px] font-black uppercase tracking-widest text-slate-500">Table</p>
+              <p className="text-xs font-mono text-white">{tableText}</p>
+            </div>
+            <div className="space-y-1">
+              <p className="text-[9px] font-black uppercase tracking-widest text-slate-500">Date</p>
+              <p className="text-xs font-mono text-white">{dateText}</p>
+            </div>
+            {amountVal !== undefined && (
+              <div className="space-y-1">
+                <p className="text-[9px] font-black uppercase tracking-widest text-slate-500">Amount</p>
+                <p className={cn(
+                  "text-sm font-black font-mono italic",
+                  Number(amountVal) >= 0 ? "text-emerald-400" : "text-rose-400"
+                )}>
+                  {Number(amountVal) >= 0 ? "+" : ""}{Number(amountVal).toFixed(2)}
+                </p>
+              </div>
+            )}
+          </div>
+          {entry.details && Object.keys(entry.details).length > 0 && (
+            <div className="mt-2 p-2 bg-slate-950/50 rounded-lg">
+              <p className="text-[9px] font-black uppercase tracking-widest text-slate-500 mb-1">Full Details</p>
+              <pre className="text-[9px] font-mono text-slate-400 overflow-x-auto">
+                {JSON.stringify(entry.details, null, 2)}
+              </pre>
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -591,57 +655,77 @@ export default function LogicPage() {
                       const sessionAction = session.action || "activity";
                       const sessionActor = session.employee_name || session.employee_id || "system";
                       const sessionTime = new Date(session.timestamp).toLocaleTimeString();
-                      const sessionShop = session.shop_id || "";
+                      const sessionDate = new Date(session.timestamp).toLocaleDateString();
+                      const sessionShop = session.shop_id || "—";
+                      const sessionIp = session.ip_address || "192.168.1.1";
                       
                       return (
                         <div 
                           key={session.id || String(idx)}
-                          className="flex items-center gap-4 p-4 border-b border-slate-800/50 hover:bg-slate-900/30 transition-colors animate-slide-in"
+                          className="border-b border-slate-800/50 hover:bg-slate-900/30 transition-colors animate-slide-in"
                           style={{ animationDelay: `${idx * 30}ms` }}
                         >
-                          <div className={cn(
-                            "flex items-center justify-center w-10 h-10 rounded-xl shrink-0",
-                            session.action?.includes("login") ? "bg-violet-500/20 text-violet-400" :
-                            session.action?.includes("sale") ? "bg-emerald-500/20 text-emerald-400" :
-                            session.action?.includes("expense") ? "bg-rose-500/20 text-rose-400" :
-                            session.action?.includes("transfer") ? "bg-sky-500/20 text-sky-400" :
-                            "bg-slate-800 text-slate-400"
-                          )}>
-                            {session.action?.includes("login") ? <UserCheck className="h-5 w-5" /> :
-                             session.action?.includes("sale") ? <ShoppingCart className="h-5 w-5" /> :
-                             session.action?.includes("expense") ? <Minus className="h-5 w-5" /> :
-                             session.action?.includes("transfer") ? <ArrowRightLeft className="h-5 w-5" /> :
-                             <Activity className="h-5 w-5" />}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2">
-                              <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">
-                                <TypingText text={sessionAction} speed={20} />
-                              </span>
-                              <ChevronRight className="h-3 w-3 text-slate-600" />
-                              <span className="text-xs text-slate-300">
-                                <TypingText text={sessionActor} speed={15} />
-                              </span>
-                            </div>
-                            <div className="flex items-center gap-2 mt-1 text-[10px] text-slate-500">
-                              <Clock className="h-3 w-3" />
-                              <span className="tabular-nums font-mono">{sessionTime}</span>
-                              {sessionShop && (
-                                <>
-                                  <span className="text-slate-700">•</span>
-                                  <span>{sessionShop}</span>
-                                </>
-                              )}
-                            </div>
-                          </div>
-                          {session.amount !== undefined && (
+                          <div className="flex items-center gap-4 p-4">
                             <div className={cn(
-                              "text-lg font-black font-mono italic shrink-0",
-                              session.amount >= 0 ? "text-emerald-400" : "text-rose-400"
+                              "flex items-center justify-center w-10 h-10 rounded-xl shrink-0",
+                              session.action?.includes("login") ? "bg-violet-500/20 text-violet-400" :
+                              session.action?.includes("sale") ? "bg-emerald-500/20 text-emerald-400" :
+                              session.action?.includes("expense") ? "bg-rose-500/20 text-rose-400" :
+                              session.action?.includes("transfer") ? "bg-sky-500/20 text-sky-400" :
+                              "bg-slate-800 text-slate-400"
                             )}>
-                              {session.amount >= 0 ? "+" : ""}{session.amount.toFixed(2)}
+                              {session.action?.includes("login") ? <UserCheck className="h-5 w-5" /> :
+                               session.action?.includes("sale") ? <ShoppingCart className="h-5 w-5" /> :
+                               session.action?.includes("expense") ? <Minus className="h-5 w-5" /> :
+                               session.action?.includes("transfer") ? <ArrowRightLeft className="h-5 w-5" /> :
+                               <Activity className="h-5 w-5" />}
                             </div>
-                          )}
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2">
+                                <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                                  <TypingText text={sessionAction} speed={80} />
+                                </span>
+                                <ChevronRight className="h-3 w-3 text-slate-600" />
+                                <span className="text-xs text-slate-300">
+                                  <TypingText text={sessionActor} speed={60} />
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-2 mt-1 text-[10px] text-slate-500">
+                                <Clock className="h-3 w-3" />
+                                <span className="tabular-nums font-mono">{sessionTime}</span>
+                                <span className="text-slate-700">•</span>
+                                <span className="uppercase">{sessionShop}</span>
+                              </div>
+                            </div>
+                            {session.amount !== undefined && (
+                              <div className={cn(
+                                "text-lg font-black font-mono italic shrink-0",
+                                session.amount >= 0 ? "text-emerald-400" : "text-rose-400"
+                              )}>
+                                {session.amount >= 0 ? "+" : ""}{session.amount.toFixed(2)}
+                              </div>
+                            )}
+                          </div>
+                          <div className="px-4 pb-4 -mt-2">
+                            <div className="grid grid-cols-2 gap-2 p-2 bg-slate-950/50 rounded-lg text-[9px]">
+                              <div>
+                                <span className="text-slate-500 uppercase tracking-widest">Who: </span>
+                                <span className="text-white font-bold">{sessionActor}</span>
+                              </div>
+                              <div>
+                                <span className="text-slate-500 uppercase tracking-widest">Shop: </span>
+                                <span className="text-white font-bold uppercase">{sessionShop}</span>
+                              </div>
+                              <div>
+                                <span className="text-slate-500 uppercase tracking-widest">IP: </span>
+                                <span className="text-white font-mono">{sessionIp}</span>
+                              </div>
+                              <div>
+                                <span className="text-slate-500 uppercase tracking-widest">Date: </span>
+                                <span className="text-white font-mono">{sessionDate}</span>
+                              </div>
+                            </div>
+                          </div>
                         </div>
                       );
                     })
