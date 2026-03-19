@@ -2305,9 +2305,6 @@ export async function getMonthlyReportData(
     const expenseLedger = (ledger || []).filter((l: any) => String(l?.type || "").toLowerCase() === "expense");
     const prevSalesPeriod = prevPeriodSalesRes?.data || [];
     const prevLedgerPeriod = prevPeriodLedgerRes?.data || [];
-
-    // Only count real expenses in strategic reporting; exclude assets, adjustments, transfers, etc.
-    const expenseLedger = (ledger || []).filter((l: any) => String(l?.type || "").toLowerCase() === "expense");
     const prevExpenseLedgerPeriod = (prevLedgerPeriod || []).filter((l: any) => String(l?.type || "").toLowerCase() === "expense");
 
     const revenue = sales.reduce((sum: number, s: any) => sum + Number(s.total_with_tax || 0), 0);
@@ -2686,6 +2683,9 @@ export async function getQuarterlyReportData(
     const shop = shopRes.data;
     const settings = settingsRes.data;
     const prevSalesClients = new Set((prevSalesRes.data || []).map((s: any) => String(s.client_name || "").toLowerCase()).filter(Boolean));
+
+    // Only count real expenses in strategic reporting; exclude assets, adjustments, transfers, etc.
+    const expenseLedger = (ledger || []).filter((l: any) => String(l?.type || "").toLowerCase() === "expense");
 
     const revenue = sales.reduce((sum: number, s: any) => sum + Number(s.total_with_tax || 0), 0);
     const revenuePreTax = sales.reduce((sum: number, s: any) => sum + Number(s.total_before_tax || 0), 0);
