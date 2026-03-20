@@ -31,15 +31,15 @@ export async function GET() {
 
 export async function POST(req: Request) {
   try {
-    await requirePrivilegedActor();
+    const actor = await requirePrivilegedActor();
     const body = await req.json().catch(() => ({}));
     
     const amount = Number(body?.amount);
     const reason = String(body?.reason || "");
-    const resolveKind = String(body?.resolveKind || "overhead_payment");
+    const resolveKind = String(body?.resolveKind || "explained");
     const resolveShop = String(body?.resolveShop || "");
     
-    if (!Number.isFinite(amount) || amount === 0) {
+    if (!Number.isFinite(amount)) {
       return NextResponse.json({ error: "Invalid amount" }, { status: 400 });
     }
     if (!reason) {
@@ -49,6 +49,27 @@ export async function POST(req: Request) {
     const timestamp = new Date().toISOString();
     const id = Math.random().toString(36).substring(2, 9);
 
+    // Get current computed balance from ledger
+    const { data: ledgerRows } = await supabaseAdmin
+      .from("operations_ledger")
+      .select("amount");
+    
+    const computedBalance = (ledgerRows || []).reduce((sum: number, r: any) => sum + Number(r.amount || 0), 0);
+    
+    // Get current actual balance
+    const { data: opsState } = await supabaseAdmin
+      .from("operations_state")
+      .select("actual_balance")
+      .eq("id", 1)
+      .maybeSingle();
+    
+    const currentActualBalance = Number(opsState?.actual_balance || 0);
+    
+    // The validated balance = computed balance (what's accounted for) + the drift amount (what was unexplained)
+    // This validates the cash by saying "the drift is real money from [reason]"
+    const newActualBalance = computedBalance + amount;
+
+    // 1. Record the drift resolution explanation
     const driftRecord = {
       id,
       amount,
@@ -56,6 +77,7 @@ export async function POST(req: Request) {
       resolved_kind: resolveKind,
       resolved_shop: resolveShop,
       created_at: timestamp,
+      created_by: actor.type === "staff" ? actor.employeeId : "owner",
     };
 
     const { data: drift, error: driftError } = await supabaseAdmin
@@ -65,50 +87,31 @@ export async function POST(req: Request) {
       .maybeSingle();
 
     if (driftError) {
-      console.log("Drifts table not ready, recording as ledger entry instead");
+      console.error("Drift insert error:", driftError);
     }
 
-    const ledgerKind = resolveKind === "explained" ? "drift_explained" : resolveKind;
-    
-    const overheadKeywords = ["rent", "utilities", "electric", "water", "internet", "salaries", "misc"];
-    let overheadCategory = null;
-    
-    if (ledgerKind === "overhead_payment") {
-      const reasonLower = reason.toLowerCase();
-      for (const kw of overheadKeywords) {
-        if (reasonLower.includes(kw)) {
-          overheadCategory = kw;
-          break;
-        }
-      }
-      if (!overheadCategory && resolveShop) {
-        overheadCategory = resolveShop.includes("kipasa") ? "rent" 
-          : resolveShop.includes("tradecenter") ? "rent"
-          : resolveShop.includes("dub") ? "rent"
-          : "misc";
-      }
-    }
+    // 2. Update actual_balance to validate the cash (NO new ledger entry)
+    // The drift is validated, meaning the cash exists but was unexplained
+    // We update actual_balance to match computed_balance + drift to show it's validated
+    await supabaseAdmin
+      .from("operations_state")
+      .upsert({
+        id: 1,
+        actual_balance: newActualBalance,
+        updated_at: timestamp,
+      });
 
-    const ledgerEntry = {
-      amount: Math.abs(amount),
-      kind: ledgerKind,
-      shop_id: resolveShop || null,
-      overhead_category: overheadCategory,
-      title: `Drift Resolution: ${reason}`,
-      notes: reason,
-      effective_date: timestamp.split("T")[0],
-      metadata: {
-        type: "drift_resolution",
-        original_amount: amount,
+    return NextResponse.json({
+      success: true,
+      drift: drift || driftRecord,
+      validation: {
+        computedBalance,
+        previousActualBalance: currentActualBalance,
+        newActualBalance,
+        validatedAmount: amount,
         reason,
-        resolved_kind: resolveKind,
-        resolved_shop: resolveShop,
-      },
-    };
-
-    await supabaseAdmin.from("operations_ledger").insert(ledgerEntry);
-
-    return NextResponse.json({ success: true, drift: drift || driftRecord });
+      }
+    });
   } catch (e: any) {
     const msg = e?.message || String(e);
     const status = msg === "Unauthorized" ? 401 : 500;

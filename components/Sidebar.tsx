@@ -52,6 +52,7 @@ const navItems = [
     { name: 'Financials', href: '/finance', icon: BarChart3 },
     { name: 'Reports', href: '/reports', icon: BarChart3 },
     { name: 'Operations', href: '/operations', icon: Wallet },
+    { name: 'Cash Handshake', href: '/handshake', icon: ArrowRightLeft },
     { name: 'Invest', href: '/invest', icon: HandCoins },
     { name: 'Logic', href: '/logic', icon: Cpu },
     { name: 'EOD Reports', href: '/admin/eod', icon: FileText },
