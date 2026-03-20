@@ -48,14 +48,13 @@ export async function POST(req: Request) {
     const timestamp = new Date().toISOString();
     const driftId = Math.random().toString(36).substring(2, 9);
 
-    // Get current computed balance from ledger
+    // Get current state
     const { data: ledgerRows } = await supabaseAdmin
       .from("operations_ledger")
       .select("amount");
     
     const computedBalance = (ledgerRows || []).reduce((sum: number, r: any) => sum + Number(r.amount || 0), 0);
     
-    // Get current actual balance
     const { data: opsState } = await supabaseAdmin
       .from("operations_state")
       .select("actual_balance")
@@ -63,49 +62,30 @@ export async function POST(req: Request) {
       .maybeSingle();
     
     const currentActualBalance = Number(opsState?.actual_balance || 0);
+    const currentDrift = currentActualBalance - computedBalance;
     
     // Total allocated amount
     const totalAllocated = allocations.reduce((sum: number, a: any) => sum + Number(a.amount || 0), 0);
 
-    // Create ledger entries for each allocation
-    const ledgerEntries = [];
-    for (const alloc of allocations) {
-      const ledgerId = Math.random().toString(36).substring(2, 9);
-      const entry = {
-        id: ledgerId,
-        amount: Number(alloc.amount || 0),
-        kind: "overhead_payment",
-        shop_id: String(alloc.shopId || ""),
-        overhead_category: String(alloc.category || "misc"),
-        title: `Drift Resolution: ${reason}`,
-        notes: reason,
-        effective_date: timestamp.split("T")[0],
-        metadata: {
-          type: "drift_resolution",
-          drift_id: driftId,
-          reason,
-        },
-        created_at: timestamp,
-      };
-      
-      const { error: ledgerError } = await supabaseAdmin
-        .from("operations_ledger")
-        .insert(entry);
-      
-      if (!ledgerError) {
-        ledgerEntries.push(entry);
-      }
-    }
+    // VALIDATION: This is CASH VALIDATION, not money movement
+    // The money was ALREADY in the vault (actual_balance)
+    // We're just explaining where it came from
+    // NO ledger entries are created
+    // The drift decreases because we've explained part of it
 
-    // Record the drift resolution
+    // Record the drift resolution with allocations
     const driftRecord = {
       id: driftId,
       amount: totalAllocated,
       reason,
-      resolved_kind: "overhead_linked",
+      resolved_kind: "cash_validated",
       created_at: timestamp,
       created_by: actor.type === "staff" ? actor.employeeId : "owner",
-      allocations: allocations,
+      allocations: allocations.map((a: any) => ({
+        shop_id: a.shopId,
+        category: a.category,
+        amount: Number(a.amount || 0),
+      })),
     };
 
     const { data: drift, error: driftError } = await supabaseAdmin
@@ -118,29 +98,21 @@ export async function POST(req: Request) {
       console.error("Drift insert error:", driftError);
     }
 
-    // Update actual_balance to match computed_balance (drift becomes 0)
-    // The allocations have been added to ledger, so computed will now include them
-    const newComputedBalance = computedBalance + totalAllocated;
-    
-    await supabaseAdmin
-      .from("operations_state")
-      .upsert({
-        id: 1,
-        actual_balance: newComputedBalance,
-        updated_at: timestamp,
-      });
+    // NO changes to actual_balance or ledger
+    // The drift automatically reduces because:
+    // - The explained amount is now recorded as "validated cash"
+    // - Remaining drift = current_drift - validated_amount
 
     return NextResponse.json({
       success: true,
       drift: drift || driftRecord,
-      ledgerEntries,
       validation: {
-        previousComputedBalance: computedBalance,
         previousActualBalance: currentActualBalance,
-        totalAllocated,
-        newComputedBalance,
-        newActualBalance: newComputedBalance,
-        driftResolved: Math.abs(currentActualBalance - computedBalance - totalAllocated) < 0.01,
+        previousComputedBalance: computedBalance,
+        previousDrift: currentDrift,
+        validatedAmount: totalAllocated,
+        remainingDrift: currentDrift - totalAllocated,
+        allocations: allocations,
         reason,
       }
     });

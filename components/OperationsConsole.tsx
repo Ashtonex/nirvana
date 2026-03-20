@@ -108,7 +108,18 @@ export function OperationsConsole({
     allocations: [{ shopId: "", category: "rent", amount: "" }],
   });
 
+  const [vaultForm, setVaultForm] = useState({
+    newBalance: "",
+    reason: "",
+  });
+
+  const [showVaultModal, setShowVaultModal] = useState(false);
+  
   const currentDrift = state.delta;
+  
+  // Calculate total validated drift
+  const totalValidated = drifts.reduce((sum, d) => sum + Number(d.amount || 0), 0);
+  const remainingDrift = currentDrift - totalValidated;
   
   const addAllocation = () => {
     setDriftForm(f => ({
@@ -132,6 +143,40 @@ export function OperationsConsole({
   };
 
   const totalAllocated = driftForm.allocations.reduce((sum, a) => sum + Number(a.amount || 0), 0);
+
+  const adjustVault = async () => {
+    const newBalance = Number(vaultForm.newBalance);
+    if (!Number.isFinite(newBalance) || newBalance < 0) {
+      alert("Enter a valid balance");
+      return;
+    }
+    if (!vaultForm.reason) {
+      alert("Reason required for vault adjustment");
+      return;
+    }
+    setBusy(true);
+    try {
+      const res = await fetch("/api/operations/vault", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          newBalance,
+          reason: vaultForm.reason,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed");
+      setVaultForm({ newBalance: "", reason: "" });
+      setShowVaultModal(false);
+      await fetchState();
+      alert(`Vault adjusted! Change: $${data.vault?.change?.toFixed(2)}`);
+    } catch (e: any) {
+      alert(e.message || "Failed to adjust vault");
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const addEntry = async () => {
     const amt = Number(entry.amount);
@@ -221,9 +266,17 @@ export function OperationsConsole({
     <div className="space-y-6">
       {/* Top Stats */}
       <div className="grid gap-4 md:grid-cols-4">
-        <Card className="bg-slate-950/60 border-slate-800">
+        <Card className="bg-slate-950/60 border-slate-800 relative">
           <CardHeader className="pb-2">
-            <CardDescription className="text-[10px] font-black uppercase tracking-widest text-slate-500">Operations</CardDescription>
+            <CardDescription className="text-[10px] font-black uppercase tracking-widest text-slate-500 flex items-center justify-between">
+              <span>Operations</span>
+              <button onClick={() => {
+                setVaultForm({ newBalance: String(state.actualBalance || 0), reason: "" });
+                setShowVaultModal(true);
+              }} className="text-slate-600 hover:text-white">
+                <Pencil className="h-3 w-3" />
+              </button>
+            </CardDescription>
             <CardTitle className="text-2xl font-black italic text-emerald-300">${Number(state.actualBalance || 0).toLocaleString()}</CardTitle>
           </CardHeader>
           <CardContent className="text-[10px] font-bold text-slate-500 uppercase">Cash Vault</CardContent>
@@ -242,15 +295,18 @@ export function OperationsConsole({
           </CardHeader>
           <CardContent className="text-[10px] font-bold text-slate-500 uppercase">Ops + Invest</CardContent>
         </Card>
-        <Card className={cn("border-2", Math.abs(state.delta || 0) < 0.01 ? "bg-emerald-950/20 border-emerald-800/30" : "bg-amber-950/20 border-amber-800/50")}>
+        <Card className={cn("border-2", Math.abs(remainingDrift) < 0.01 ? "bg-emerald-950/20 border-emerald-800/30" : "bg-amber-950/20 border-amber-800/50")}>
           <CardHeader className="pb-2">
-            <CardDescription className="text-[10px] font-black uppercase tracking-widest text-slate-500">Drift</CardDescription>
-            <CardTitle className={cn("text-2xl font-black italic", Math.abs(state.delta || 0) < 0.01 ? "text-emerald-400" : "text-amber-400")}>
-              {state.delta.toFixed(2)}
+            <CardDescription className="text-[10px] font-black uppercase tracking-widest text-slate-500">
+              Drift
+              {totalValidated > 0 && <span className="text-emerald-500 ml-1">(Validated: ${totalValidated.toFixed(2)})</span>}
+            </CardDescription>
+            <CardTitle className={cn("text-2xl font-black italic", Math.abs(remainingDrift) < 0.01 ? "text-emerald-400" : "text-amber-400")}>
+              {remainingDrift.toFixed(2)}
             </CardTitle>
           </CardHeader>
-          <CardContent className={cn("text-[10px] font-bold uppercase", Math.abs(state.delta || 0) < 0.01 ? "text-emerald-500" : "text-amber-500")}>
-            {Math.abs(state.delta || 0) < 0.01 ? "Balanced" : "Needs Resolution"}
+          <CardContent className={cn("text-[10px] font-bold uppercase", Math.abs(remainingDrift) < 0.01 ? "text-emerald-500" : "text-amber-500")}>
+            {Math.abs(remainingDrift) < 0.01 ? "Balanced" : "Needs Resolution"}
           </CardContent>
         </Card>
       </div>
@@ -464,6 +520,58 @@ export function OperationsConsole({
                   <div className="text-lg font-black font-mono italic text-amber-400">${d.amount.toFixed(2)}</div>
                 </div>
               ))}
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Vault Adjustment Modal */}
+      {showVaultModal && (
+        <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4">
+          <Card className="bg-slate-950 border-slate-800 w-full max-w-md">
+            <CardHeader>
+              <CardTitle className="text-lg font-black uppercase italic text-emerald-400 flex items-center gap-2">
+                <Pencil className="h-5 w-5" /> Edit Master Vault
+              </CardTitle>
+              <CardDescription className="text-[10px]">
+                Changing the vault balance will create a drift record. Provide an explanation.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <label className="text-[10px] font-black uppercase text-slate-500">Current Balance</label>
+                <div className="text-xl font-black font-mono italic text-slate-400">${Number(state.actualBalance || 0).toLocaleString()}</div>
+              </div>
+              <div className="space-y-2">
+                <label className="text-[10px] font-black uppercase text-slate-500">New Balance</label>
+                <Input
+                  value={vaultForm.newBalance}
+                  onChange={(e) => setVaultForm(f => ({ ...f, newBalance: e.target.value }))}
+                  className="bg-slate-900 border-slate-800 font-mono"
+                  placeholder="0.00"
+                  inputMode="decimal"
+                />
+                {Number(vaultForm.newBalance) !== Number(state.actualBalance) && (
+                  <div className={cn("text-[10px] font-bold", Number(vaultForm.newBalance) > Number(state.actualBalance) ? "text-emerald-400" : "text-rose-400")}>
+                    Change: {Number(vaultForm.newBalance) > Number(state.actualBalance) ? "+" : ""}${((Number(vaultForm.newBalance) || 0) - (Number(state.actualBalance) || 0)).toFixed(2)}
+                  </div>
+                )}
+              </div>
+              <div className="space-y-2">
+                <label className="text-[10px] font-black uppercase text-slate-500">Explanation</label>
+                <Input
+                  value={vaultForm.reason}
+                  onChange={(e) => setVaultForm(f => ({ ...f, reason: e.target.value }))}
+                  className="bg-slate-900 border-slate-800"
+                  placeholder="e.g. Cash count revealed $50 more, Physical verification"
+                />
+              </div>
+              <div className="flex gap-2 pt-2">
+                <Button variant="outline" onClick={() => setShowVaultModal(false)} className="flex-1">Cancel</Button>
+                <Button disabled={busy} onClick={adjustVault} className="flex-1 bg-emerald-600 hover:bg-emerald-500 font-black uppercase">
+                  {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : "Confirm Adjustment"}
+                </Button>
+              </div>
             </CardContent>
           </Card>
         </div>
