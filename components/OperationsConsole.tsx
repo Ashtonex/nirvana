@@ -146,6 +146,34 @@ export function OperationsConsole({
     }));
   }, [staffLogs, shops]);
 
+  const allEmployees = useMemo(() => {
+    const employeeMap = new Map<string, { name: string; shopId: string; lastLogin: string | null; isOnline: boolean }>();
+    const now = new Date();
+    
+    staffLogs.forEach(log => {
+      if (log.employee_id) {
+        const logTime = new Date(log.created_at).getTime();
+        const isRecent = Boolean(log.created_at && (now.getTime() - logTime) < 15 * 60 * 1000);
+        const existing = employeeMap.get(log.employee_id);
+        const isLoginAction = log.action === "login" || log.action === "shift_start";
+        
+        if (!existing) {
+          employeeMap.set(log.employee_id, {
+            name: log.employee_name || log.employee_id,
+            shopId: log.shop_id,
+            lastLogin: isLoginAction ? log.created_at : null,
+            isOnline: isRecent && isLoginAction,
+          });
+        } else if (log.action === "logout" && isRecent) {
+          employeeMap.set(log.employee_id, { ...existing, isOnline: false });
+        } else if (isLoginAction && isRecent) {
+          employeeMap.set(log.employee_id, { ...existing, isOnline: true, lastLogin: log.created_at });
+        }
+      }
+    });
+    return Array.from(employeeMap.values());
+  }, [staffLogs]);
+
   const fetchData = useCallback(async () => {
     try {
       const [ledgerRes, handshakeRes, stateRes, auditRes, staffRes] = await Promise.all([
@@ -374,22 +402,35 @@ export function OperationsConsole({
           <CardContent className="space-y-3">
             <div className="space-y-2">
               <div className="text-[10px] font-black uppercase text-slate-500 flex items-center gap-2">
-                <Users className="h-3 w-3" /> Active Shops ({activeShops.length})
+                <Users className="h-3 w-3" /> Staff Status ({allEmployees.filter(e => e.isOnline).length} online)
               </div>
               <div className="flex flex-wrap gap-2">
-                {activeShops.length === 0 ? (
-                  <span className="text-xs text-slate-600 italic">No active logins</span>
-                ) : activeShops.map(shop => (
-                  <div key={shop.id} className="flex items-center gap-2 px-3 py-1 bg-emerald-950/30 border border-emerald-800/30 rounded-full">
-                    <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
-                    <span className="text-xs font-black text-emerald-300">{shop.name}</span>
-                    <span className="text-[10px] text-slate-500">{shop.staff}</span>
+                {allEmployees.length === 0 ? (
+                  <span className="text-xs text-slate-600 italic">No staff data</span>
+                ) : allEmployees.map((emp, idx) => (
+                  <div key={idx} className={cn(
+                    "flex items-center gap-2 px-3 py-1 border rounded-full transition-all",
+                    emp.isOnline 
+                      ? "bg-emerald-950/30 border-emerald-800/30" 
+                      : "bg-rose-950/20 border-rose-900/30"
+                  )}>
+                    <div className={cn(
+                      "w-2 h-2 rounded-full",
+                      emp.isOnline ? "bg-emerald-500 animate-pulse" : "bg-rose-600"
+                    )} />
+                    <span className={cn(
+                      "text-xs font-black",
+                      emp.isOnline ? "text-emerald-300" : "text-rose-400"
+                    )}>
+                      {emp.name}
+                    </span>
+                    <span className="text-[10px] text-slate-500">@ {emp.shopId}</span>
                   </div>
                 ))}
               </div>
             </div>
             <div className="space-y-1 max-h-24 overflow-y-auto">
-              <div className="text-[10px] font-black uppercase text-slate-500">Recent</div>
+              <div className="text-[10px] font-black uppercase text-slate-500">Recent Activity</div>
               {staffLogs.slice(0, 5).map(log => (
                 <div key={log.id} className="flex items-center justify-between text-[10px] py-1 border-b border-slate-800/50">
                   <div className="flex items-center gap-2">
@@ -441,38 +482,10 @@ export function OperationsConsole({
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            <div className="flex items-center gap-4">
-              <div className="text-center">
-                <div className={cn("text-3xl font-black italic", auditStats.failed > 0 ? "text-rose-300" : "text-emerald-300")}>
-                  {auditStats.failed > 0 ? "!" : "OK"}
-                </div>
-                <div className="text-[10px] text-slate-500">Status</div>
-              </div>
-              <div className="flex-1 space-y-1">
-                <div className="flex justify-between text-xs">
-                  <span className="text-emerald-500">Passed</span>
-                  <span className="text-emerald-400 font-mono">{auditStats.passed}</span>
-                </div>
-                <div className="flex justify-between text-xs">
-                  <span className={auditStats.failed > 0 ? "text-rose-500" : "text-slate-500"}>Failed</span>
-                  <span className={auditStats.failed > 0 ? "text-rose-400 font-mono" : "text-slate-600 font-mono"}>{auditStats.failed}</span>
-                </div>
-              </div>
-            </div>
-            {Object.keys(auditStats.varianceByShop).length > 0 && (
-              <div className="pt-2 border-t border-slate-800">
-                <div className="text-[10px] font-black uppercase text-slate-500 mb-2">Variance by Shop</div>
-                {Object.entries(auditStats.varianceByShop).map(([shop, variance]) => (
-                  <div key={shop} className="flex justify-between text-xs py-1">
-                    <span className="text-rose-400">{shop}</span>
-                    <span className="text-rose-300 font-mono">${variance.toFixed(2)}</span>
-                  </div>
-                ))}
-              </div>
-            )}
-            {auditStats.total === 0 && (
-              <div className="text-xs text-slate-600 italic text-center py-4">No audits run yet</div>
-            )}
+            <AuditMonitorCard 
+              auditStats={auditStats} 
+              ledger={ledger}
+            />
           </CardContent>
         </Card>
 
@@ -863,26 +876,39 @@ function NirvanaLogoCard({ masterVault, investTotal, handshakes, auditPassed, au
 }) {
   const allGood = auditFailed === 0 && handshakes.every(h => h.status !== "pending");
   const [rotation, setRotation] = useState(0);
+  const [tilt, setTilt] = useState(0);
   
   useEffect(() => {
     const interval = setInterval(() => {
-      setRotation(prev => (prev + 1) % 360);
+      setRotation(prev => (prev + 2) % 360);
+      setTilt(prev => Math.sin(prev * Math.PI / 180) * 15);
     }, 50);
     return () => clearInterval(interval);
   }, []);
 
   return (
     <Card className={cn(
-      "bg-gradient-to-br border-2",
+      "bg-gradient-to-br border-2 overflow-hidden",
       allGood ? "from-violet-950/60 to-slate-950 border-violet-500/50" : "from-amber-950/60 to-slate-950 border-amber-500/50"
     )}>
       <CardContent className="flex flex-col items-center justify-center py-6">
-        <div 
-          className="w-20 h-20 mb-4 flex items-center justify-center transition-all duration-1000"
-          style={{ transform: `rotate(${rotation}deg)` }}
-        >
-          <div className="w-full h-full bg-gradient-to-br from-violet-500 to-purple-700 rounded-2xl flex items-center justify-center shadow-2xl shadow-violet-500/30">
-            <span className="text-3xl font-black italic text-white tracking-tighter">N</span>
+        <div className="perspective-500">
+          <div 
+            className="w-20 h-20 mb-4 flex items-center justify-center transition-transform"
+            style={{ 
+              transform: `rotateY(${rotation}deg) rotateX(${tilt}deg)`,
+              transformStyle: "preserve-3d"
+            }}
+          >
+            <div className="absolute w-full h-full bg-gradient-to-br from-violet-500 to-purple-700 rounded-2xl flex items-center justify-center shadow-2xl shadow-violet-500/30 backface-hidden">
+              <span className="text-3xl font-black italic text-white tracking-tighter">N</span>
+            </div>
+            <div 
+              className="absolute w-full h-full bg-gradient-to-br from-purple-700 to-violet-500 rounded-2xl flex items-center justify-center shadow-2xl shadow-violet-500/30"
+              style={{ transform: "rotateY(180deg)" }}
+            >
+              <span className="text-3xl font-black italic text-white tracking-tighter">N</span>
+            </div>
           </div>
         </div>
         <div className="text-center">
@@ -992,4 +1018,131 @@ function detectOverheadCategory(title: string): string {
   if (t.includes("utilities") || t.includes("electric") || t.includes("water")) return "utilities";
   if (t.includes("salar") || t.includes("wage")) return "salaries";
   return "misc";
+}
+
+function AuditMonitorCard({ auditStats, ledger }: { 
+  auditStats: { total: number; passed: number; failed: number; varianceByShop: Record<string, number> }; 
+  ledger: any[];
+}) {
+  const [auditLine, setAuditLine] = useState("");
+  const [auditPhase, setAuditPhase] = useState(0);
+  const [highExpenses, setHighExpenses] = useState<any[]>([]);
+  const [isRunning, setIsRunning] = useState(true);
+  
+  const auditLines = useMemo(() => {
+    const lines: string[] = [];
+    lines.push("[AUDIT] initializing scan...");
+    lines.push("[AUDIT] checking shop compliance...");
+    lines.push("[AUDIT] scanning ledger entries...");
+    
+    const recentExpenses = ledger.filter(l => l.amount < 0 && l.kind?.includes("expense"));
+    const flaggedExpenses = recentExpenses.filter(l => Math.abs(l.amount) > 20);
+    
+    if (flaggedExpenses.length > 0) {
+      lines.push(`[!] FLAGGED: ${flaggedExpenses.length} expense(s) over $20`);
+      flaggedExpenses.slice(0, 3).forEach((exp, i) => {
+        lines.push(`    ${i + 1}. $${Math.abs(exp.amount).toFixed(2)} - ${exp.title || 'expense'}`);
+        lines.push(`       Shop: ${exp.shop_id || 'N/A'}`);
+      });
+    }
+    
+    lines.push(`[AUDIT] total checks: ${auditStats.total}`);
+    lines.push(`[AUDIT] passed: ${auditStats.passed}`);
+    lines.push(`[AUDIT] failed: ${auditStats.failed}`);
+    
+    if (auditStats.failed > 0) {
+      lines.push("[!] VARIANCE DETECTED:");
+      Object.entries(auditStats.varianceByShop).forEach(([shop, variance]) => {
+        lines.push(`    ${shop}: $${(variance as number).toFixed(2)}`);
+      });
+    }
+    
+    lines.push("[AUDIT] next scan in 5s...");
+    lines.push("ready.");
+    return lines;
+  }, [auditStats, ledger]);
+
+  useEffect(() => {
+    if (!isRunning) return;
+    
+    const fullText = auditLines.join("\n");
+    let charIndex = 0;
+    
+    const interval = setInterval(() => {
+      if (charIndex < fullText.length) {
+        setAuditLine(fullText.substring(0, charIndex + 1));
+        charIndex++;
+      } else {
+        clearInterval(interval);
+        setTimeout(() => {
+          setAuditPhase(p => p + 1);
+        }, 2000);
+      }
+    }, 60);
+    
+    return () => clearInterval(interval);
+  }, [auditPhase, isRunning, auditLines]);
+
+  useEffect(() => {
+    if (!isRunning) return;
+    const highExp = ledger.filter(l => l.amount < 0 && l.kind?.includes("expense") && Math.abs(l.amount) > 20);
+    setHighExpenses(highExp.slice(0, 5));
+  }, [ledger, isRunning]);
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <div className={cn(
+            "w-2 h-2 rounded-full",
+            isRunning ? "bg-emerald-500 animate-pulse" : "bg-slate-500"
+          )} />
+          <span className="text-[10px] font-black uppercase text-slate-500">
+            {isRunning ? "Live" : "Paused"}
+          </span>
+        </div>
+        <div className="text-[10px] text-slate-500 font-mono">
+          cycle {auditPhase + 1}
+        </div>
+      </div>
+      
+      <div className="bg-slate-950/80 border border-slate-800/50 rounded-lg p-3 h-40 overflow-hidden">
+        <pre className="text-[10px] font-mono text-emerald-400/90 whitespace-pre-wrap leading-relaxed overflow-y-auto h-full">
+          {auditLine}
+          <span className="animate-pulse">▋</span>
+        </pre>
+      </div>
+      
+      <div className="flex gap-2">
+        <Button 
+          size="sm" 
+          variant="outline" 
+          onClick={() => setIsRunning(!isRunning)}
+          className="flex-1 text-[10px] font-black uppercase h-7"
+        >
+          {isRunning ? "Pause" : "Resume"}
+        </Button>
+        <Button 
+          size="sm" 
+          variant="outline" 
+          onClick={() => { setAuditPhase(p => p + 1); }}
+          className="flex-1 text-[10px] font-black uppercase h-7"
+        >
+          Force Scan
+        </Button>
+      </div>
+      
+      {highExpenses.length > 0 && (
+        <div className="pt-2 border-t border-slate-800">
+          <div className="text-[10px] font-black uppercase text-rose-500 mb-2">High Expenses ({">"}$20)</div>
+          {highExpenses.map((exp, i) => (
+            <div key={i} className="flex justify-between text-[10px] py-1 text-rose-400">
+              <span>{exp.title || 'expense'}</span>
+              <span className="font-mono">${Math.abs(exp.amount).toFixed(2)}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
 }

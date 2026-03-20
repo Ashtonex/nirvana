@@ -1217,6 +1217,14 @@ Generated via NIRVANA POS`;
                         <ShoppingCart className="h-4 w-4" /> Quick Sale
                     </Button>
 
+                    <Button
+                        onClick={() => window.location.reload()}
+                        className="bg-slate-700 hover:bg-slate-600 text-[10px] font-black uppercase italic h-10 px-3 flex items-center gap-2"
+                        title="Refresh page"
+                    >
+                        <RefreshCcw className="h-4 w-4" /> Refresh
+                    </Button>
+
                     {db?.settings?.taxMode ? (
                         <Badge className="bg-emerald-500/10 text-emerald-300 border-emerald-500/20 text-[9px] font-black uppercase">
                             Tax: {String(db.settings.taxMode).replace(/_/g, " ")} @ {Number(db.settings.taxRate || 0) * 100}%
