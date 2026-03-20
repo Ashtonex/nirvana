@@ -34,20 +34,19 @@ export async function POST(req: Request) {
     const actor = await requirePrivilegedActor();
     const body = await req.json().catch(() => ({}));
     
-    const amount = Number(body?.amount);
     const reason = String(body?.reason || "");
-    const resolveKind = String(body?.resolveKind || "explained");
-    const resolveShop = String(body?.resolveShop || "");
+    const allocations = body?.allocations || []; // Array of { shopId, category, amount }
     
-    if (!Number.isFinite(amount)) {
-      return NextResponse.json({ error: "Invalid amount" }, { status: 400 });
-    }
     if (!reason) {
       return NextResponse.json({ error: "Reason required" }, { status: 400 });
     }
+    
+    if (!Array.isArray(allocations) || allocations.length === 0) {
+      return NextResponse.json({ error: "At least one allocation required" }, { status: 400 });
+    }
 
     const timestamp = new Date().toISOString();
-    const id = Math.random().toString(36).substring(2, 9);
+    const driftId = Math.random().toString(36).substring(2, 9);
 
     // Get current computed balance from ledger
     const { data: ledgerRows } = await supabaseAdmin
@@ -65,19 +64,48 @@ export async function POST(req: Request) {
     
     const currentActualBalance = Number(opsState?.actual_balance || 0);
     
-    // The validated balance = computed balance (what's accounted for) + the drift amount (what was unexplained)
-    // This validates the cash by saying "the drift is real money from [reason]"
-    const newActualBalance = computedBalance + amount;
+    // Total allocated amount
+    const totalAllocated = allocations.reduce((sum: number, a: any) => sum + Number(a.amount || 0), 0);
 
-    // 1. Record the drift resolution explanation
+    // Create ledger entries for each allocation
+    const ledgerEntries = [];
+    for (const alloc of allocations) {
+      const ledgerId = Math.random().toString(36).substring(2, 9);
+      const entry = {
+        id: ledgerId,
+        amount: Number(alloc.amount || 0),
+        kind: "overhead_payment",
+        shop_id: String(alloc.shopId || ""),
+        overhead_category: String(alloc.category || "misc"),
+        title: `Drift Resolution: ${reason}`,
+        notes: reason,
+        effective_date: timestamp.split("T")[0],
+        metadata: {
+          type: "drift_resolution",
+          drift_id: driftId,
+          reason,
+        },
+        created_at: timestamp,
+      };
+      
+      const { error: ledgerError } = await supabaseAdmin
+        .from("operations_ledger")
+        .insert(entry);
+      
+      if (!ledgerError) {
+        ledgerEntries.push(entry);
+      }
+    }
+
+    // Record the drift resolution
     const driftRecord = {
-      id,
-      amount,
+      id: driftId,
+      amount: totalAllocated,
       reason,
-      resolved_kind: resolveKind,
-      resolved_shop: resolveShop,
+      resolved_kind: "overhead_linked",
       created_at: timestamp,
       created_by: actor.type === "staff" ? actor.employeeId : "owner",
+      allocations: allocations,
     };
 
     const { data: drift, error: driftError } = await supabaseAdmin
@@ -90,25 +118,29 @@ export async function POST(req: Request) {
       console.error("Drift insert error:", driftError);
     }
 
-    // 2. Update actual_balance to validate the cash (NO new ledger entry)
-    // The drift is validated, meaning the cash exists but was unexplained
-    // We update actual_balance to match computed_balance + drift to show it's validated
+    // Update actual_balance to match computed_balance (drift becomes 0)
+    // The allocations have been added to ledger, so computed will now include them
+    const newComputedBalance = computedBalance + totalAllocated;
+    
     await supabaseAdmin
       .from("operations_state")
       .upsert({
         id: 1,
-        actual_balance: newActualBalance,
+        actual_balance: newComputedBalance,
         updated_at: timestamp,
       });
 
     return NextResponse.json({
       success: true,
       drift: drift || driftRecord,
+      ledgerEntries,
       validation: {
-        computedBalance,
+        previousComputedBalance: computedBalance,
         previousActualBalance: currentActualBalance,
-        newActualBalance,
-        validatedAmount: amount,
+        totalAllocated,
+        newComputedBalance,
+        newActualBalance: newComputedBalance,
+        driftResolved: Math.abs(currentActualBalance - computedBalance - totalAllocated) < 0.01,
         reason,
       }
     });

@@ -104,11 +104,34 @@ export function OperationsConsole({
   });
 
   const [driftForm, setDriftForm] = useState({
-    amount: "",
     reason: "",
-    resolveKind: "explained",
-    resolveShop: "",
+    allocations: [{ shopId: "", category: "rent", amount: "" }],
   });
+
+  const currentDrift = state.delta;
+  
+  const addAllocation = () => {
+    setDriftForm(f => ({
+      ...f,
+      allocations: [...f.allocations, { shopId: "", category: "rent", amount: "" }]
+    }));
+  };
+
+  const removeAllocation = (index: number) => {
+    setDriftForm(f => ({
+      ...f,
+      allocations: f.allocations.filter((_, i) => i !== index)
+    }));
+  };
+
+  const updateAllocation = (index: number, field: string, value: string) => {
+    setDriftForm(f => ({
+      ...f,
+      allocations: f.allocations.map((a, i) => i === index ? { ...a, [field]: value } : a)
+    }));
+  };
+
+  const totalAllocated = driftForm.allocations.reduce((sum, a) => sum + Number(a.amount || 0), 0);
 
   const addEntry = async () => {
     const amt = Number(entry.amount);
@@ -141,13 +164,13 @@ export function OperationsConsole({
   };
 
   const resolveDrift = async () => {
-    const amt = Number(driftForm.amount);
-    if (!Number.isFinite(amt) || amt === 0) {
-      alert("Amount required");
-      return;
-    }
     if (!driftForm.reason) {
       alert("Reason required");
+      return;
+    }
+    const validAllocs = driftForm.allocations.filter(a => a.shopId && Number(a.amount) > 0);
+    if (validAllocs.length === 0) {
+      alert("At least one allocation with shop and amount required");
       return;
     }
     setBusy(true);
@@ -157,15 +180,21 @@ export function OperationsConsole({
         headers: { "Content-Type": "application/json" },
         credentials: "include",
         body: JSON.stringify({
-          amount: amt,
           reason: driftForm.reason,
-          resolveKind: driftForm.resolveKind,
-          resolveShop: driftForm.resolveShop,
+          allocations: validAllocs.map(a => ({
+            shopId: a.shopId,
+            category: a.category,
+            amount: Number(a.amount)
+          })),
         }),
       });
-      if (!res.ok) throw new Error("Failed");
-      setDriftForm({ amount: "", reason: "", resolveKind: "explained", resolveShop: "" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed");
+      setDriftForm({ reason: "", allocations: [{ shopId: "", category: "rent", amount: "" }] });
       await fetchState();
+      alert(`Drift resolved! $${data.validation?.totalAllocated?.toFixed(2) || 0} linked to overhead allocations.`);
+    } catch (e: any) {
+      alert(e.message || "Failed to resolve drift");
     } finally {
       setBusy(false);
     }
@@ -349,40 +378,72 @@ export function OperationsConsole({
           <Card className="bg-amber-950/20 border-amber-800/50">
             <CardHeader>
               <CardTitle className="text-lg font-black uppercase italic text-amber-400 flex items-center gap-2">
-                <AlertTriangle className="h-5 w-5" /> Cash Validation
+                <AlertTriangle className="h-5 w-5" /> Link Drift to Overhead
               </CardTitle>
               <CardDescription className="text-[10px]">
-                Validate unexplained cash (drift) by explaining where it came from. This updates actual_balance to match the system.
+                Current Drift: <span className="text-amber-400 font-bold">${Math.abs(currentDrift).toFixed(2)}</span> {currentDrift < 0 ? "(Shortage)" : "(Surplus)"}. Link to shop overhead allocations to track in reconciliation.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black uppercase text-slate-500">Drift Amount</label>
-                  <Input value={driftForm.amount} onChange={(e) => setDriftForm(s => ({ ...s, amount: e.target.value }))} className="bg-slate-900 border-amber-500/30 font-mono" placeholder="0.00" inputMode="decimal" />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black uppercase text-slate-500">Category</label>
-                  <select value={driftForm.resolveKind} onChange={(e) => setDriftForm(s => ({ ...s, resolveKind: e.target.value }))} className="w-full bg-slate-900 border border-slate-800 text-white px-3 py-2 rounded-md">
-                    <option value="explained">Explained (Validated)</option>
-                    <option value="overhead_payment">Overhead Payment</option>
-                    <option value="eod_deposit">EOD Deposit</option>
-                  </select>
-                </div>
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black uppercase text-slate-500">Shop</label>
-                  <select value={driftForm.resolveShop} onChange={(e) => setDriftForm(s => ({ ...s, resolveShop: e.target.value }))} className="w-full bg-slate-900 border border-slate-800 text-white px-3 py-2 rounded-md">
-                    <option value="">N/A</option>
-                    {shops.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-                  </select>
-                </div>
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black uppercase text-slate-500">Explanation</label>
-                  <Input value={driftForm.reason} onChange={(e) => setDriftForm(s => ({ ...s, reason: e.target.value }))} className="bg-slate-900 border-slate-800" placeholder="e.g. Rent from Dub Dub ($100), actual cash on hand ($37)" />
-                </div>
+              <div className="space-y-2">
+                <label className="text-[10px] font-black uppercase text-slate-500">Explanation</label>
+                <Input 
+                  value={driftForm.reason} 
+                  onChange={(e) => setDriftForm(s => ({ ...s, reason: e.target.value }))} 
+                  className="bg-slate-900 border-slate-800" 
+                  placeholder="e.g. Rent payments collected, utilities paid" 
+                />
               </div>
+              
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <label className="text-[10px] font-black uppercase text-slate-500">Overhead Allocations</label>
+                  <Button size="sm" variant="outline" onClick={addAllocation} className="h-7 text-[10px]">+ Add Line</Button>
+                </div>
+                
+                {driftForm.allocations.map((alloc, idx) => (
+                  <div key={idx} className="flex items-center gap-2">
+                    <select 
+                      value={alloc.shopId} 
+                      onChange={(e) => updateAllocation(idx, "shopId", e.target.value)}
+                      className="flex-1 bg-slate-900 border border-slate-800 text-white px-3 py-2 rounded-md text-sm"
+                    >
+                      <option value="">Select Shop</option>
+                      {shops.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                    </select>
+                    <select 
+                      value={alloc.category} 
+                      onChange={(e) => updateAllocation(idx, "category", e.target.value)}
+                      className="w-32 bg-slate-900 border border-slate-800 text-white px-3 py-2 rounded-md text-sm"
+                    >
+                      <option value="rent">Rent</option>
+                      <option value="utilities">Utilities</option>
+                      <option value="salaries">Salaries</option>
+                      <option value="misc">Misc</option>
+                    </select>
+                    <Input 
+                      value={alloc.amount} 
+                      onChange={(e) => updateAllocation(idx, "amount", e.target.value)}
+                      className="w-28 bg-slate-900 border-slate-800 font-mono" 
+                      placeholder="0.00"
+                      inputMode="decimal"
+                    />
+                    {driftForm.allocations.length > 1 && (
+                      <Button size="sm" variant="ghost" onClick={() => removeAllocation(idx)} className="h-8 w-8 p-0 text-slate-500 hover:text-rose-400">×</Button>
+                    )}
+                  </div>
+                ))}
+              </div>
+              
+              <div className="flex items-center justify-between pt-2 border-t border-slate-800">
+                <span className="text-[10px] font-black uppercase text-slate-500">Total Allocated</span>
+                <span className={cn("text-lg font-black font-mono italic", totalAllocated === Math.abs(currentDrift) ? "text-emerald-400" : "text-amber-400")}>
+                  ${totalAllocated.toFixed(2)}
+                </span>
+              </div>
+              
               <Button disabled={busy} onClick={resolveDrift} className="w-full bg-amber-600 hover:bg-amber-500 font-black uppercase">
-                <CheckCircle2 className="h-4 w-4 mr-2" /> Validate Cash
+                <CheckCircle2 className="h-4 w-4 mr-2" /> Link to Overhead & Resolve Drift
               </Button>
             </CardContent>
           </Card>
@@ -397,7 +458,7 @@ export function OperationsConsole({
               ) : drifts.map(d => (
                 <div key={d.id} className="flex items-center justify-between p-3 bg-slate-900/40 rounded-lg border border-slate-800">
                   <div>
-                    <div className="text-[10px] font-black uppercase text-slate-400">{d.resolved_kind} {d.resolved_shop ? `• ${d.resolved_shop}` : ""}</div>
+                    <div className="text-[10px] font-black uppercase text-slate-400">{d.resolved_kind}</div>
                     <div className="text-sm font-bold text-white">{d.reason}</div>
                   </div>
                   <div className="text-lg font-black font-mono italic text-amber-400">${d.amount.toFixed(2)}</div>

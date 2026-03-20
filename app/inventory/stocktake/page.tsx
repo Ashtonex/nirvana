@@ -7,7 +7,6 @@ import {
     CardContent,
     CardHeader,
     CardTitle,
-    CardDescription,
     Button,
     Badge,
     Input
@@ -19,7 +18,10 @@ import {
     CheckCircle2,
     Search,
     Store,
-    ArrowRight
+    ArrowRight,
+    FileText,
+    Loader2,
+    Printer
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -31,6 +33,8 @@ export default function StocktakePage() {
     const [loading, setLoading] = useState(false);
     const [searchTerm, setSearchTerm] = useState("");
     const [executor, setExecutor] = useState<string>("");
+    const [savingItem, setSavingItem] = useState<string | null>(null);
+    const [pendingChanges, setPendingChanges] = useState<Set<string>>(new Set());
     const router = useRouter();
 
     useEffect(() => {
@@ -64,15 +68,46 @@ export default function StocktakePage() {
     const shopItems = db.inventory.filter((item: any) =>
         item.allocations.some((a: any) => a.shopId === selectedShop)
     ).filter((item: any) =>
+        !searchTerm ||
         item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        item.category.toLowerCase().includes(searchTerm.toLowerCase())
+        item.category.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        item.id.toLowerCase().includes(searchTerm.toLowerCase())
     );
 
     const handleCountChange = (itemId: string, val: string) => {
         setCounts(prev => ({ ...prev, [itemId]: parseInt(val) || 0 }));
+        setPendingChanges(prev => new Set(prev).add(itemId));
     };
 
-    const handleSave = async () => {
+    const saveSingleItem = async (itemId: string) => {
+        if (!selectedShop) return;
+        setSavingItem(itemId);
+        try {
+            const item = shopItems.find((i: any) => i.id === itemId);
+            const alloc = item?.allocations.find((a: any) => a.shopId === selectedShop);
+            const systemQty = alloc?.quantity || 0;
+            const physicalQty = counts[itemId] !== undefined ? counts[itemId] : systemQty;
+            
+            await recordStocktake({
+                shopId: selectedShop,
+                items: [{ itemId, physicalQuantity: physicalQty }]
+            });
+            
+            setPendingChanges(prev => {
+                const next = new Set(prev);
+                next.delete(itemId);
+                return next;
+            });
+            
+            router.refresh();
+        } catch (e) {
+            console.error(e);
+        } finally {
+            setSavingItem(null);
+        }
+    };
+
+    const saveAllItems = async () => {
         if (!selectedShop) return;
         setLoading(true);
         try {
@@ -88,6 +123,7 @@ export default function StocktakePage() {
                 items: itemsToSync
             });
 
+            setPendingChanges(new Set());
             alert("Inventory Synchronized Successfully.");
             router.refresh();
         } catch (e) {
@@ -96,6 +132,66 @@ export default function StocktakePage() {
             setLoading(false);
         }
     };
+
+    const generatePDF = async () => {
+        const shop = shops.find((s: any) => s.id === selectedShop);
+        const shopName = shop?.name || selectedShop;
+        
+        const content = shopItems.map((item: any) => {
+            const alloc = item.allocations.find((a: any) => a.shopId === selectedShop);
+            const qty = counts[item.id] !== undefined ? counts[item.id] : (alloc?.quantity || 0);
+            return `${item.name} | ${item.category} | Qty: ${qty}`;
+        }).join('\n');
+
+        const text = `STOCKTAKE AUDIT - ${shopName.toUpperCase()}
+Date: ${new Date().toLocaleDateString()}
+Executor: ${executor}
+========================================
+
+${content}
+
+========================================
+Total Items: ${shopItems.length}`;
+
+        const blob = new Blob([text], { type: 'text/plain' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `Stocktake_${shopName}_${new Date().toISOString().split('T')[0]}.txt`;
+        a.click();
+        URL.revokeObjectURL(url);
+    };
+
+    const generateFullInventoryPDF = async () => {
+        setLoading(true);
+        try {
+            const allItems = db.inventory.map((item: any) => {
+                const allocations = item.allocations.map((a: any) => `${a.shopName}: ${a.quantity}`).join(', ');
+                return `${item.name} | ${item.category} | ${allocations || 'No stock'}`;
+            }).join('\n');
+
+            const text = `NIRVANA FULL INVENTORY REPORT
+Generated: ${new Date().toLocaleString()}
+========================================
+
+${allItems}
+
+========================================
+Total Products: ${db.inventory.length}`;
+
+            const blob = new Blob([text], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `FullInventory_${new Date().toISOString().split('T')[0]}.txt`;
+            a.click();
+            URL.revokeObjectURL(url);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const hasPendingChanges = pendingChanges.size > 0;
 
     return (
         <div className="space-y-8 pb-32 pt-8">
@@ -107,13 +203,25 @@ export default function StocktakePage() {
                     <p className="text-slate-400 font-medium tracking-tight uppercase text-xs">Physical inventory reconciliation & shrinkage control.</p>
                 </div>
 
-                <div className="flex gap-4">
+                <div className="flex flex-wrap gap-2">
+                    <Button 
+                        onClick={generateFullInventoryPDF}
+                        disabled={loading}
+                        className="bg-slate-700 hover:bg-slate-600 text-white font-black uppercase text-xs"
+                    >
+                        <Printer className="h-4 w-4 mr-2" />
+                        Full DB PDF
+                    </Button>
                     <select
                         className="bg-slate-900 border-2 border-slate-800 text-white rounded-lg px-4 py-2 font-black uppercase text-xs"
                         value={selectedShop}
-                        onChange={(e) => setSelectedShop(e.target.value)}
+                        onChange={(e) => {
+                            setSelectedShop(e.target.value);
+                            setCounts({});
+                            setPendingChanges(new Set());
+                        }}
                     >
-                        <option value="">Select Shop for Audit</option>
+                        <option value="">Select Shop</option>
                         {shops.map((s: any) => <option key={s.id} value={s.id}>{s.name}</option>)}
                     </select>
                 </div>
@@ -121,14 +229,29 @@ export default function StocktakePage() {
 
             {selectedShop ? (
                 <div className="space-y-6">
-                    <div className="flex items-center gap-4 bg-slate-950/50 p-4 border border-slate-800 rounded-xl">
-                        <Search className="h-5 w-5 text-slate-500" />
-                        <Input
-                            placeholder="Filter by Name or Category..."
-                            className="bg-transparent border-none placeholder:text-slate-600 font-bold text-slate-200"
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                        />
+                    <div className="flex items-center gap-4">
+                        <div className="flex-1 flex items-center gap-4 bg-slate-950/50 p-4 border border-slate-800 rounded-xl">
+                            <Search className="h-5 w-5 text-slate-500" />
+                            <Input
+                                placeholder="Search by Name, Category, or SKU..."
+                                className="bg-transparent border-none placeholder:text-slate-600 font-bold text-slate-200"
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                            />
+                        </div>
+                        <Button 
+                            onClick={generatePDF}
+                            disabled={loading}
+                            className="bg-violet-700 hover:bg-violet-600 text-white font-black uppercase text-xs"
+                        >
+                            <FileText className="h-4 w-4 mr-2" />
+                            Export List
+                        </Button>
+                        {hasPendingChanges && (
+                            <Badge className="bg-amber-500/20 text-amber-400 border-amber-500/30">
+                                {pendingChanges.size} unsaved
+                            </Badge>
+                        )}
                     </div>
 
                     <div className="grid grid-cols-1 gap-4">
@@ -137,21 +260,26 @@ export default function StocktakePage() {
                             const systemQty = alloc?.quantity || 0;
                             const physicalQty = counts[item.id] !== undefined ? counts[item.id] : systemQty;
                             const diff = physicalQty - systemQty;
+                            const isPending = pendingChanges.has(item.id);
 
                             return (
-                                <Card key={item.id} className="bg-slate-900/40 border-slate-800 hover:border-slate-700 transition-all overflow-hidden group">
+                                <Card key={item.id} className={cn(
+                                    "bg-slate-900/40 border-slate-800 transition-all overflow-hidden",
+                                    isPending && "border-amber-500/50"
+                                )}>
                                     <CardContent className="p-0 flex items-stretch">
                                         <div className="p-6 flex-1 space-y-1">
                                             <div className="flex items-center gap-2 mb-1">
                                                 <Badge className="bg-slate-950 text-slate-500 text-[8px] font-black uppercase">{item.category}</Badge>
                                                 {diff < 0 && <Badge className="bg-rose-500/10 text-rose-500 border-rose-500/10 text-[8px] font-black uppercase tracking-widest"><AlertTriangle className="h-2 w-2 mr-1" /> Shrinkage</Badge>}
                                                 {diff > 0 && <Badge className="bg-sky-500/10 text-sky-500 border-sky-500/10 text-[8px] font-black uppercase tracking-widest"><CheckCircle2 className="h-2 w-2 mr-1" /> Surplus</Badge>}
+                                                {isPending && <Badge className="bg-amber-500/10 text-amber-500 border-amber-500/10 text-[8px] font-black uppercase tracking-widest">Changed</Badge>}
                                             </div>
                                             <h3 className="text-lg font-black text-white uppercase italic tracking-tight">{item.name}</h3>
                                             <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">SKU: {item.id.toUpperCase()}</p>
                                         </div>
 
-                                        <div className="bg-slate-950/50 border-l border-slate-800 p-6 flex items-center gap-8">
+                                        <div className="bg-slate-950/50 border-l border-slate-800 p-6 flex items-center gap-6">
                                             <div className="text-right">
                                                 <p className="text-[10px] font-black text-slate-500 uppercase">System</p>
                                                 <p className="text-2xl font-black text-slate-300 italic font-mono">{systemQty}</p>
@@ -163,7 +291,10 @@ export default function StocktakePage() {
                                                 <p className="text-[10px] font-black text-sky-400 uppercase">Physical Count</p>
                                                 <Input
                                                     type="number"
-                                                    className="w-24 bg-slate-900 border-slate-700 text-white font-black text-lg h-10 text-center"
+                                                    className={cn(
+                                                        "w-24 bg-slate-900 border-slate-700 text-white font-black text-lg h-10 text-center",
+                                                        isPending && "border-amber-500/50"
+                                                    )}
                                                     value={physicalQty}
                                                     onChange={(e) => handleCountChange(item.id, e.target.value)}
                                                 />
@@ -171,10 +302,26 @@ export default function StocktakePage() {
 
                                             <div className="w-20 text-center">
                                                 <p className="text-[10px] font-black text-slate-500 uppercase">Delta</p>
-                                                <p className={`text-xl font-black italic font-mono ${diff === 0 ? 'text-slate-600' : diff < 0 ? 'text-rose-500' : 'text-sky-500'}`}>
+                                                <p className={cn("text-xl font-black italic font-mono", diff === 0 ? 'text-slate-600' : diff < 0 ? 'text-rose-500' : 'text-sky-500')}>
                                                     {diff > 0 ? '+' : ''}{diff}
                                                 </p>
                                             </div>
+
+                                            <Button 
+                                                size="sm"
+                                                onClick={() => saveSingleItem(item.id)}
+                                                disabled={savingItem === item.id || !isPending}
+                                                className={cn(
+                                                    "h-10 px-4 font-black uppercase text-xs",
+                                                    isPending ? "bg-emerald-600 hover:bg-emerald-500" : "bg-slate-800"
+                                                )}
+                                            >
+                                                {savingItem === item.id ? (
+                                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                                ) : (
+                                                    <Save className="h-4 w-4" />
+                                                )}
+                                            </Button>
                                         </div>
                                     </CardContent>
                                 </Card>
@@ -184,11 +331,18 @@ export default function StocktakePage() {
 
                     <div className="flex justify-end pt-4">
                         <Button
-                            className="bg-sky-600 hover:bg-sky-500 text-white font-black uppercase px-8 py-6 rounded-xl shadow-xl shadow-sky-900/20 group"
-                            onClick={handleSave}
+                            className="bg-sky-600 hover:bg-sky-500 text-white font-black uppercase px-8 py-6 rounded-xl shadow-xl shadow-sky-900/20"
+                            onClick={saveAllItems}
                             disabled={loading}
                         >
-                            {loading ? "Reconciling..." : <>Sync Physical State <Save className="ml-2 h-5 w-5 group-hover:scale-110 transition-transform" /></>}
+                            {loading ? (
+                                <>
+                                    <Loader2 className="h-5 w-5 mr-2 animate-spin" />
+                                    Reconciling...
+                                </>
+                            ) : (
+                                <>Sync All ({shopItems.length} items) <Save className="ml-2 h-5 w-5" /></>
+                            )}
                         </Button>
                     </div>
                 </div>
@@ -205,4 +359,6 @@ export default function StocktakePage() {
     );
 }
 
-
+function cn(...classes: (string | boolean | undefined | null)[]): string {
+    return classes.filter(Boolean).join(' ');
+}
