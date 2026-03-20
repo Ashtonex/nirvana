@@ -1578,11 +1578,12 @@ export async function transferInventory(itemId: string, fromShopId: string, toSh
     revalidatePath("/transfers");
 }
 
-export async function postDrawerToOperations(input: { shopId: string; amount: number; notes?: string }) {
+export async function postDrawerToOperations(input: { shopId: string; amount: number; notes?: string; kind?: string }) {
     const actor = await requireManagerOrOwner();
     const shopId = String(input?.shopId || "").trim();
     const amount = Number(input?.amount);
     const notes = input?.notes ? String(input.notes) : "";
+    const kind = input?.kind || "eod_deposit";
 
     if (!shopId) throw new Error("Missing shopId");
     if (!Number.isFinite(amount) || amount <= 0) throw new Error("Invalid amount");
@@ -1602,13 +1603,13 @@ export async function postDrawerToOperations(input: { shopId: string; amount: nu
         category: "Operations Transfer",
         amount,
         date: timestamp,
-        description: `Posted to Operations (Master Vault)${notes ? ` | ${notes}` : ""}`,
+        description: `Posted to Operations (${kind === "overhead_contribution" ? "Overhead" : "EOD"})${notes ? ` | ${notes}` : ""}`,
         employee_id: actor.id
     }]);
 
     await createOperationsLedgerEntry({
         amount,
-        kind: "drawer_post",
+        kind,
         shopId,
         title: `Drawer → Operations (${shopId})`,
         notes: notes || null,

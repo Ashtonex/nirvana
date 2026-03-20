@@ -232,6 +232,7 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
     const [isOpsPostModalOpen, setIsOpsPostModalOpen] = useState(false);
     const [opsPostAmount, setOpsPostAmount] = useState("");
     const [opsPostNotes, setOpsPostNotes] = useState("");
+    const [opsPostKind, setOpsPostKind] = useState<"eod_deposit" | "overhead_contribution">("eod_deposit");
 
     // Receipt context & Modal state
     const [activeReceipt, setActiveReceipt] = useState<any | null>(null);
@@ -419,10 +420,11 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
 
         startTransition(async () => {
             try {
-                await postDrawerToOperations({ shopId, amount: val, notes: opsPostNotes });
+                await postDrawerToOperations({ shopId, amount: val, notes: opsPostNotes, kind: opsPostKind });
                 setIsOpsPostModalOpen(false);
                 setOpsPostAmount("");
                 setOpsPostNotes("");
+                setOpsPostKind("eod_deposit");
                 alert("Posted to Operations successfully.");
             } catch (e: any) {
                 alert(e?.message || "Failed to post to Operations.");
@@ -2300,6 +2302,23 @@ Generated via NIRVANA POS`;
                                 onChange={(e) => setOpsPostAmount(e.target.value)}
                             />
                         </div>
+                    </div>
+
+                    <div>
+                        <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Deposit Type</label>
+                        <select
+                            value={opsPostKind}
+                            onChange={(e) => setOpsPostKind(e.target.value as "eod_deposit" | "overhead_contribution")}
+                            className="w-full bg-slate-950 border border-emerald-500/30 text-white px-3 py-2 rounded-md mt-1 font-bold"
+                        >
+                            <option value="eod_deposit">EOD Deposit (General Sales)</option>
+                            <option value="overhead_contribution">Overhead Contribution (Shop's Overhead Target)</option>
+                        </select>
+                        <p className="text-[10px] text-slate-500 mt-1">
+                            {opsPostKind === "eod_deposit" 
+                                ? "General sales deposit - adds to Master Vault"
+                                : "Allocates toward shop's monthly overhead target"}
+                        </p>
                     </div>
 
                     <div>
