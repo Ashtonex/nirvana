@@ -209,8 +209,41 @@ export function OperationsConsole({
 
   useEffect(() => {
     fetchData();
-    const interval = setInterval(fetchData, 5000);
-    return () => clearInterval(interval);
+
+    let eventSource: EventSource | null = null;
+    
+    const connectSSE = () => {
+      try {
+        eventSource = new EventSource("/api/operations/stream");
+        
+        eventSource.onmessage = (event) => {
+          try {
+            const data = JSON.parse(event.data);
+            if (Array.isArray(data.ledger)) setLedger(data.ledger);
+            if (Array.isArray(data.staffLogs)) setStaffLogs(data.staffLogs);
+            if (Array.isArray(data.auditLogs)) setAuditLogs(data.auditLogs);
+            if (Array.isArray(data.employees)) setEmployees(data.employees);
+          } catch (e) {
+            console.error("Failed to parse SSE data:", e);
+          }
+        };
+        
+        eventSource.onerror = () => {
+          eventSource?.close();
+          setTimeout(connectSSE, 5000);
+        };
+      } catch (e) {
+        console.error("SSE connection failed:", e);
+      }
+    };
+    
+    connectSSE();
+
+    const interval = setInterval(fetchData, 30000);
+    return () => {
+      clearInterval(interval);
+      eventSource?.close();
+    };
   }, [fetchData]);
 
   const [form, setForm] = useState({
@@ -449,7 +482,7 @@ export function OperationsConsole({
       </div>
 
       {/* Monitor Cards Row 2 */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* POS Audit Monitor */}
         <Card className={cn(
           "bg-gradient-to-br border",
@@ -464,6 +497,28 @@ export function OperationsConsole({
             <AuditMonitorCard 
               auditStats={auditStats} 
               ledger={ledger}
+              shops={shops}
+            />
+          </CardContent>
+        </Card>
+
+        {/* Nirvana Oracle Brain */}
+        <Card className="bg-gradient-to-br from-violet-950/40 to-slate-950 border-violet-500/20">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-lg font-black uppercase italic flex items-center gap-2">
+              <Activity className="h-5 w-5 text-violet-400 animate-pulse" /> The Nirvana Oracle
+            </CardTitle>
+            <CardDescription className="text-[10px] font-bold text-slate-500 uppercase">
+              AI Brain - Continuously Learning & Analyzing
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <NirvanaOracleBrain
+              shops={shops}
+              ledger={ledger}
+              auditStats={auditStats}
+              staffLogs={staffLogs}
+              employees={employees}
             />
           </CardContent>
         </Card>
@@ -868,119 +923,204 @@ const TypingStatusCard = memo(function TypingStatusCard({ masterVault, investTot
   );
 });
 
-const AuditMonitorCard = memo(function AuditMonitorCard({ auditStats, ledger }: { 
+const AuditMonitorCard = memo(function AuditMonitorCard({ auditStats, ledger, shops, realtimeData }: { 
   auditStats: { total: number; passed: number; failed: number; varianceByShop: Record<string, number> }; 
   ledger: any[];
+  shops: ShopNode[];
+  realtimeData?: any;
 }) {
   const [displayText, setDisplayText] = useState("");
   const [currentStep, setCurrentStep] = useState(0);
   const [isRunning, setIsRunning] = useState(true);
   const [cycleCount, setCycleCount] = useState(1);
+  const [shopStatuses, setShopStatuses] = useState<Record<string, { status: string; lastCheck: Date; issues: string[] }>>({});
   
-  const shops = ["SYSTEM", "KIPASA", "DUB DUB", "TRADE CENTER"];
+  const shopNames = shops.map(s => s.name.toUpperCase());
   
+  useEffect(() => {
+    const interval = setInterval(async () => {
+      try {
+        const res = await fetch("/api/pos-audit/realtime", { cache: "no-store", credentials: "include" });
+        if (res.ok) {
+          const data = await res.json();
+          const statuses: Record<string, { status: string; lastCheck: Date; issues: string[] }> = {};
+          data.shopStatuses?.forEach((shop: any) => {
+            statuses[shop.id] = {
+              status: shop.status,
+              lastCheck: new Date(),
+              issues: shop.issues || []
+            };
+          });
+          setShopStatuses(prev => ({ ...prev, ...statuses }));
+        }
+      } catch (e) {
+        console.error("Failed to fetch realtime audit:", e);
+      }
+    }, 15000);
+    return () => clearInterval(interval);
+  }, []);
+
   const auditSteps = useMemo(() => {
-    const steps: { shop: string; lines: string[]; delay: number }[] = [];
+    const steps: { shop: string; lines: string[]; delay: number; charDelay: number }[] = [];
     
     const expenses = ledger.filter(l => l.amount < 0 && (l.kind?.includes("expense") || l.kind === "overhead_payment"));
     const highExpenses = expenses.filter(l => Math.abs(l.amount) > 20);
     
-    const systemExpenses = expenses.filter(e => !e.shop_id);
-    const kipasaExpenses = expenses.filter(e => e.shop_id?.toLowerCase().includes("kipasa"));
-    const dubDubExpenses = expenses.filter(e => e.shop_id?.toLowerCase().includes("dub"));
-    const tradeCenterExpenses = expenses.filter(e => e.shop_id?.toLowerCase().includes("trade") || e.shop_id?.toLowerCase().includes("tc"));
-    
-    const systemHigh = systemExpenses.filter(e => Math.abs(e.amount) > 20);
-    const kipasaHigh = kipasaExpenses.filter(e => Math.abs(e.amount) > 20);
-    const dubDubHigh = dubDubExpenses.filter(e => Math.abs(e.amount) > 20);
-    const tradeCenterHigh = tradeCenterExpenses.filter(e => Math.abs(e.amount) > 20);
+    const shopExpensesMap: Record<string, any[]> = {};
+    shops.forEach(shop => {
+      shopExpensesMap[shop.name.toUpperCase()] = expenses.filter(e => 
+        e.shop_id?.toLowerCase().includes(shop.name.toLowerCase())
+      );
+    });
     
     steps.push({
       shop: "SYSTEM",
       lines: [
-        "[*] INITIALIZING NIRVANA AUDIT SYSTEM...",
-        "[*] LOADING MODULES...",
-        "[*] CHECKING SECURITY PROTOCOLS...",
-        "[*] SYSTEM CORE: OK",
         "",
-        `TOTAL EXPENSES SCANNED: ${expenses.length}`,
-        `HIGH EXPENSE FLAGS: ${highExpenses.length}`,
+        "╔══════════════════════════════════════╗",
+        "║   NIRVANA POS AUDIT SYSTEM v2.0     ║",
+        "╚══════════════════════════════════════╝",
         "",
-        highExpenses.length > 0 ? "[!] ALERT: EXPENSES OVER $20 DETECTED" : "[+] ALL CLEAR - NO HIGH EXPENSES",
+        "Initializing deep scan protocols...",
+        "Loading memory banks...",
+        "Establishing neural connection...",
         "",
+        "░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░",
       ],
-      delay: 3000,
+      delay: 4000,
+      charDelay: 80,
     });
     
-    const shopHighMap: Record<string, any[]> = {
-      "KIPASA": kipasaHigh,
-      "DUB DUB": dubDubHigh,
-      "TRADE CENTER": tradeCenterHigh,
-    };
+    steps.push({
+      shop: "SYSTEM",
+      lines: [
+        "",
+        "[SYS] SCANNING ALL POS NODES...",
+        `Active Shops Detected: ${shops.length}`,
+        "",
+        "Establishing secure channel to each node...",
+        "",
+        "░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░",
+      ],
+      delay: 3500,
+      charDelay: 70,
+    });
     
-    shops.slice(1).forEach(shopName => {
-      const shopExpenses = shopName === "KIPASA" ? kipasaExpenses : 
-                          shopName === "DUB DUB" ? dubDubExpenses : 
-                          tradeCenterExpenses;
-      const shopHigh = shopHighMap[shopName] || [];
+    steps.push({
+      shop: "SYSTEM",
+      lines: [
+        "",
+        "[*] POS NODES STATUS:",
+        ...shops.map((shop, i) => {
+          const status = shopStatuses[shop.id]?.status || "CHECKING...";
+          const statusIcon = status === "CLEAR" ? "[+]" : status === "ALERT" ? "[!]" : "[?]";
+          return `    ${statusIcon} ${shop.name.toUpperCase()}: ${status}`;
+        }),
+        "",
+        `Total Expenses Scanned: ${expenses.length}`,
+        `High Value Flags (>${"$20"}): ${highExpenses.length}`,
+        "",
+        "░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░",
+      ],
+      delay: 4500,
+      charDelay: 60,
+    });
+    
+    shops.forEach((shop, idx) => {
+      const shopExpenses = shopExpensesMap[shop.name.toUpperCase()] || [];
+      const shopHigh = shopExpenses.filter(e => Math.abs(e.amount) > 20);
+      const shopStatus = shopStatuses[shop.id]?.status || "ANALYZING";
       
       steps.push({
-        shop: shopName,
+        shop: shop.name.toUpperCase(),
         lines: [
           "",
-          `--- AUDITING ${shopName} ---`,
-          `SCANNING ${shopName.toLowerCase()} LEDGER...`,
-          `TOTAL ENTRIES: ${shopExpenses.length}`,
+          `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`,
+          `>>> AUDITING: ${shop.name.toUpperCase()}`,
+          `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`,
+          "",
+          `Status: ${shopStatus}`,
+          `Total Transactions: ${shopExpenses.length}`,
+          `Flags Detected: ${shopHigh.length}`,
           "",
         ],
-        delay: 2000,
+        delay: 3000,
+        charDelay: 90,
       });
       
       if (shopHigh.length > 0) {
         steps.push({
-          shop: shopName,
+          shop: shop.name.toUpperCase(),
           lines: [
-            `[!] WARNING: ${shopHigh.length} EXPENSE(S) OVER $20 FOUND`,
+            `⚠ ANOMALIES DETECTED`,
             "",
-            ...shopHigh.slice(0, 3).map((exp, i) => [
-              `  ${i + 1}. AMOUNT: $${Math.abs(exp.amount).toFixed(2)}`,
-              `     DESC: ${exp.title || 'expense'}`,
-              `     TYPE: ${exp.kind || 'expense'}`,
+            ...shopHigh.slice(0, 4).map((exp, i) => [
+              `  [${i + 1}] $${Math.abs(exp.amount).toFixed(2)}`,
+              `      "${exp.title || exp.kind || 'expense'}"`,
+              `      Time: ${new Date(exp.created_at).toLocaleTimeString()}`,
               "",
             ]).flat(),
           ],
-          delay: 2500,
+          delay: 4000,
+          charDelay: 75,
         });
       } else {
         steps.push({
-          shop: shopName,
+          shop: shop.name.toUpperCase(),
           lines: [
-            "[+] CLEAR - NO FLAGGED EXPENSES",
+            "✓ No anomalies detected",
+            "✓ Transaction integrity verified",
+            "✓ All parameters within tolerance",
             "",
           ],
-          delay: 1500,
+          delay: 2500,
+          charDelay: 100,
+        });
+      }
+      
+      const issues = shopStatuses[shop.id]?.issues || [];
+      if (issues.length > 0) {
+        steps.push({
+          shop: shop.name.toUpperCase(),
+          lines: [
+            "! SYSTEM WARNINGS:",
+            ...issues.slice(0, 3).map((issue, i) => `   [${i + 1}] ${issue}`),
+            "",
+          ],
+          delay: 3000,
+          charDelay: 80,
         });
       }
     });
+    
+    const totalFlags = highExpenses.length + Object.values(shopStatuses).flatMap(s => s.issues).length;
     
     steps.push({
       shop: "SYSTEM",
       lines: [
         "═══════════════════════════════════════",
-        "AUDIT SUMMARY",
-        "═══════════════════════════════════════",
-        `TOTAL HIGH EXPENSES (>$20): ${highExpenses.length}`,
-        `AUDIT STATUS: ${highExpenses.length > 0 ? '⚠ ATTENTION NEEDED' : '✓ ALL CLEAR'}`,
+        "         AUDIT CYCLE COMPLETE          ",
         "═══════════════════════════════════════",
         "",
-        `CYCLE ${cycleCount} COMPLETE`,
-        "RESTARTING AUDIT IN 5 SECONDS...",
+        `Total Nodes Audited: ${shops.length}`,
+        `Total Flags Raised: ${totalFlags}`,
+        `System Integrity: ${totalFlags === 0 ? '100%' : `${100 - Math.min(100, totalFlags * 10)}%`}`,
+        "",
+        totalFlags === 0 
+          ? "[✓] ALL SYSTEMS OPERATIONAL"
+          : "[!] REVIEW FLAGS ABOVE",
+        "",
+        `Cycle ${cycleCount} Complete`,
+        "Initiating next scan sequence...",
+        "",
+        "░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░",
       ],
-      delay: 4000,
+      delay: 6000,
+      charDelay: 85,
     });
     
     return steps;
-  }, [ledger, cycleCount]);
+  }, [ledger, cycleCount, shops, shopStatuses]);
   
   useEffect(() => {
     if (!isRunning || currentStep >= auditSteps.length) {
@@ -988,13 +1128,14 @@ const AuditMonitorCard = memo(function AuditMonitorCard({ auditStats, ledger }: 
         setTimeout(() => {
           setCurrentStep(0);
           setCycleCount(c => c + 1);
-        }, 5000);
+        }, 8000);
       }
       return;
     }
     
     const step = auditSteps[currentStep];
     const fullText = step.lines.join("\n");
+    const charDelay = step.charDelay || 100;
     let charIndex = 0;
     
     const interval = setInterval(() => {
@@ -1007,13 +1148,13 @@ const AuditMonitorCard = memo(function AuditMonitorCard({ auditStats, ledger }: 
           setCurrentStep(s => s + 1);
         }, step.delay);
       }
-    }, 40);
+    }, charDelay);
     
     return () => clearInterval(interval);
   }, [currentStep, isRunning, auditSteps]);
 
   const currentShop = auditSteps[currentStep]?.shop || "SYSTEM";
-  const hasFlags = auditSteps.some((s, i) => i <= currentStep && s.lines.some(l => l.includes("[!]")));
+  const hasFlags = auditSteps.some((s, i) => i <= currentStep && s.lines.some(l => l.includes("[!]") || l.includes("⚠")));
 
   return (
     <div className="space-y-3">
@@ -1025,9 +1166,9 @@ const AuditMonitorCard = memo(function AuditMonitorCard({ auditStats, ledger }: 
           )} />
           <span className={cn(
             "text-[10px] font-black uppercase",
-            hasFlags ? "text-rose-400" : "text-emerald-400"
+            hasFlags ? "text-rose-400 animate-pulse" : "text-emerald-400"
           )}>
-            {isRunning ? (hasFlags ? "FLAGGED" : "MONITORING") : "PAUSED"}
+            {isRunning ? (hasFlags ? "⚠ ALERT" : "● LIVE MONITOR") : "○ PAUSED"}
           </span>
         </div>
         <div className="flex items-center gap-2">
@@ -1043,7 +1184,7 @@ const AuditMonitorCard = memo(function AuditMonitorCard({ auditStats, ledger }: 
         </div>
       </div>
       
-      <div className="bg-slate-950/90 border border-slate-800/50 rounded-lg p-3 h-48 overflow-hidden relative">
+      <div className="bg-slate-950/90 border border-slate-800/50 rounded-lg p-3 h-56 overflow-hidden relative">
         <div className="absolute inset-0 bg-gradient-to-b from-transparent to-slate-950/50 pointer-events-none" />
         <pre className="text-[10px] font-mono text-emerald-400/95 whitespace-pre-wrap leading-relaxed overflow-y-auto h-full relative z-10">
           {displayText}
@@ -1072,6 +1213,379 @@ const AuditMonitorCard = memo(function AuditMonitorCard({ auditStats, ledger }: 
           ↺ RESTART
         </Button>
       </div>
+    </div>
+  );
+});
+
+const NirvanaOracleBrain = memo(function NirvanaOracleBrain({ 
+  shops, 
+  ledger, 
+  auditStats,
+  staffLogs,
+  employees 
+}: {
+  shops: ShopNode[];
+  ledger: any[];
+  auditStats: { total: number; passed: number; failed: number; varianceByShop: Record<string, number> };
+  staffLogs: any[];
+  employees: any[];
+}) {
+  const [displayText, setDisplayText] = useState("");
+  const [isThinking, setIsThinking] = useState(true);
+  const [thoughtCount, setThoughtCount] = useState(0);
+  const [knowledgeLevel, setKnowledgeLevel] = useState(0);
+  const [userQuery, setUserQuery] = useState("");
+  const [responses, setResponses] = useState<{q: string; a: string; time: Date}[]>([]);
+  const [isProcessing, setIsProcessing] = useState(false);
+  
+  const knowledgePhases = [
+    "SCANNING SYSTEM ARCHITECTURE...",
+    "MAPPING DATA FLOWS...",
+    "INDEXING TRANSACTION RECORDS...",
+    "CATALOGING INVENTORY PATTERNS...",
+    "ANALYZING MARKET CONDITIONS...",
+    "IDENTIFYING TRENDS...",
+    "LEARNING PERSONNEL ROLES...",
+    "ESTABLISHING BASELINES...",
+    "CALIBRATING PREDICTIONS...",
+    "ACTIVATING BUSINESS INTELLIGENCE..."
+  ];
+  
+  const insights = useMemo(() => {
+    const insights: string[] = [];
+    
+    const totalRevenue = ledger.filter(l => l.amount > 0).reduce((sum, l) => sum + Number(l.amount), 0);
+    const totalExpenses = ledger.filter(l => l.amount < 0).reduce((sum, l) => sum + Math.abs(Number(l.amount)), 0);
+    const netFlow = totalRevenue - totalExpenses;
+    
+    const recentActivity = staffLogs.filter(l => {
+      const logAge = Date.now() - new Date(l.created_at).getTime();
+      return logAge < 24 * 60 * 60 * 1000;
+    }).length;
+    
+    const activeEmployees = employees.filter(e => e.isOnline).length;
+    
+    const overheadContributions = ledger
+      .filter(l => l.kind === "overhead_contribution")
+      .reduce((sum, l) => sum + Number(l.amount), 0);
+    
+    insights.push(`Revenue Flow: $${totalRevenue.toFixed(0)}`);
+    insights.push(`Expense Drain: $${totalExpenses.toFixed(0)}`);
+    insights.push(`Net Cash: ${netFlow >= 0 ? '+' : ''}$${netFlow.toFixed(0)}`);
+    insights.push(`Activity (24h): ${recentActivity} events`);
+    insights.push(`Staff Online: ${activeEmployees}/${employees.length}`);
+    insights.push(`Overhead Pool: $${overheadContributions.toFixed(0)}`);
+    
+    const shopPerformance = shops.map(shop => {
+      const shopLedger = ledger.filter(l => l.shop_id?.toLowerCase().includes(shop.name.toLowerCase()));
+      const shopRevenue = shopLedger.filter(l => l.amount > 0).reduce((sum, l) => sum + Number(l.amount), 0);
+      return { name: shop.name, revenue: shopRevenue };
+    });
+    
+    if (shopPerformance.length > 0) {
+      const topShop = shopPerformance.reduce((a, b) => a.revenue > b.revenue ? a : b);
+      insights.push(`Top Performer: ${topShop.name}`);
+    }
+    
+    return insights;
+  }, [ledger, staffLogs, employees, shops]);
+  
+  const businessIdeas = useMemo(() => {
+    const ideas: string[] = [];
+    
+    const totalExpenses = ledger.filter(l => l.amount < 0).reduce((sum, l) => sum + Math.abs(Number(l.amount)), 0);
+    const overheadPayments = ledger
+      .filter(l => l.kind === "overhead_payment")
+      .reduce((sum, l) => sum + Math.abs(Number(l.amount)), 0);
+    
+    if (overheadPayments > 0 && overheadPayments < totalExpenses * 0.5) {
+      ideas.push("Consider increasing overhead contributions to accelerate debt reduction");
+    }
+    
+    const recentRevenue = ledger
+      .filter(l => l.amount > 0 && Date.now() - new Date(l.created_at).getTime() < 7 * 24 * 60 * 60 * 1000)
+      .reduce((sum, l) => sum + Number(l.amount), 0);
+    
+    if (recentRevenue > 5000) {
+      ideas.push("Strong weekly revenue detected. Consider expanding inventory for peak periods");
+    }
+    
+    const onlineStaff = employees.filter(e => e.isOnline).length;
+    if (onlineStaff >= 2) {
+      ideas.push("Multi-staff coverage optimal for high-volume sales windows");
+    }
+    
+    return ideas.length > 0 ? ideas : ["System stabilizing. Continue current operations."];
+  }, [ledger, employees]);
+  
+  const oracleSteps = useMemo(() => {
+    const steps: { phase: string; lines: string[]; delay: number; charDelay: number }[] = [];
+    
+    const currentPhase = Math.min(knowledgeLevel, knowledgePhases.length - 1);
+    
+    steps.push({
+      phase: "BOOT",
+      lines: [
+        "",
+        "╔══════════════════════════════════════╗",
+        "║     NIRVANA ORACLE - BRAIN ONLINE    ║",
+        "╚══════════════════════════════════════╝",
+        "",
+        "Neural pathways initializing...",
+        "Memory banks: ONLINE",
+        "Pattern recognition: CALIBRATING",
+        "Business logic: LOADING",
+        "",
+      ],
+      delay: 3000,
+      charDelay: 70,
+    });
+    
+    steps.push({
+      phase: "LEARNING",
+      lines: [
+        "",
+        `▓ LEARNING PHASE ${knowledgeLevel + 1}/10`,
+        `▓ ${knowledgePhases[currentPhase]}`,
+        "",
+        "Building knowledge graph...",
+        "Connecting data points...",
+        "Establishing correlations...",
+        "",
+      ],
+      delay: 4000,
+      charDelay: 85,
+    });
+    
+    steps.push({
+      phase: "ANALYSIS",
+      lines: [
+        "",
+        "═══════════════════════════════════════",
+        "          LIVE SYSTEM ANALYSIS         ",
+        "═══════════════════════════════════════",
+        "",
+        ...insights.map(insight => `  ● ${insight}`),
+        "",
+        "═══════════════════════════════════════",
+        "",
+      ],
+      delay: 5000,
+      charDelay: 60,
+    });
+    
+    steps.push({
+      phase: "STRATEGY",
+      lines: [
+        "",
+        "▣ GENERATING STRATEGIC INSIGHTS",
+        "",
+        "Analyzing market position...",
+        "Evaluating efficiency...",
+        "Formulating recommendations...",
+        "",
+        "STRATEGIC INSIGHTS:",
+        ...businessIdeas.map((idea, i) => `  ${i + 1}. ${idea}`),
+        "",
+      ],
+      delay: 4500,
+      charDelay: 75,
+    });
+    
+    if (responses.length > 0) {
+      steps.push({
+        phase: "MEMORY",
+        lines: [
+          "",
+          "═══════════════════════════════════════",
+          "            RECENT QUERIES              ",
+          "═══════════════════════════════════════",
+          "",
+          ...responses.slice(-3).map(r => [
+            `Q: ${r.q}`,
+            `A: ${r.a.substring(0, 50)}${r.a.length > 50 ? '...' : ''}`,
+            `Time: ${r.time.toLocaleTimeString()}`,
+            "",
+          ]).flat(),
+          "═══════════════════════════════════════",
+        ],
+        delay: 4000,
+        charDelay: 50,
+      });
+    }
+    
+    steps.push({
+      phase: "READY",
+      lines: [
+        "",
+        "▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓",
+        "",
+        "  ORACLE STATUS: ACTIVE",
+        `  THOUGHTS PROCESSED: ${thoughtCount}`,
+        "  KNOWLEDGE LEVEL: " + "█".repeat(Math.floor(knowledgeLevel / 2)) + "░".repeat(5 - Math.floor(knowledgeLevel / 2)),
+        "",
+        "  I am watching. I am learning.",
+        "  Ask me anything about Nirvana.",
+        "",
+        "▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓",
+      ],
+      delay: 5000,
+      charDelay: 80,
+    });
+    
+    return steps;
+  }, [knowledgeLevel, insights, businessIdeas, responses, thoughtCount]);
+  
+  const [currentStep, setCurrentStep] = useState(0);
+  
+  useEffect(() => {
+    if (!isThinking || currentStep >= oracleSteps.length) {
+      if (currentStep >= oracleSteps.length && isThinking) {
+        setTimeout(() => {
+          setCurrentStep(0);
+          setThoughtCount(c => c + 1);
+          if (knowledgeLevel < 10) {
+            setKnowledgeLevel(k => Math.min(10, k + 1));
+          }
+        }, 10000);
+      }
+      return;
+    }
+    
+    const step = oracleSteps[currentStep];
+    const fullText = step.lines.join("\n");
+    const charDelay = step.charDelay || 80;
+    let charIndex = 0;
+    
+    const interval = setInterval(() => {
+      if (charIndex < fullText.length) {
+        setDisplayText(fullText.substring(0, charIndex + 1));
+        charIndex++;
+      } else {
+        clearInterval(interval);
+        setTimeout(() => {
+          setCurrentStep(s => s + 1);
+        }, step.delay);
+      }
+    }, charDelay);
+    
+    return () => clearInterval(interval);
+  }, [currentStep, isThinking, oracleSteps, knowledgeLevel]);
+  
+  const handleQuery = useCallback(async () => {
+    if (!userQuery.trim() || isProcessing) return;
+    
+    setIsProcessing(true);
+    const query = userQuery;
+    setUserQuery("");
+    
+    await new Promise(resolve => setTimeout(resolve, 1500));
+    
+    let response = "Processing your query...";
+    
+    const q = query.toLowerCase();
+    
+    if (q.includes("revenue") || q.includes("sales") || q.includes("money")) {
+      const total = ledger.filter(l => l.amount > 0).reduce((sum, l) => sum + Number(l.amount), 0);
+      response = `Total revenue recorded: $${total.toFixed(2)}. Transactions analyzed across ${ledger.filter(l => l.amount > 0).length} entries.`;
+    } else if (q.includes("expense") || q.includes("spent") || q.includes("cost")) {
+      const total = ledger.filter(l => l.amount < 0).reduce((sum, l) => sum + Math.abs(Number(l.amount)), 0);
+      response = `Total expenses logged: $${total.toFixed(2)}. ${ledger.filter(l => l.amount < 0).length} expense entries recorded.`;
+    } else if (q.includes("staff") || q.includes("employee") || q.includes("who")) {
+      const online = employees.filter(e => e.isOnline).length;
+      const total = employees.length;
+      response = `${online} staff currently online out of ${total} total. ${employees.map(e => e.name).join(', ') || 'Names loading...'}`;
+    } else if (q.includes("shop") || q.includes("location") || q.includes("node")) {
+      response = `${shops.length} active shop nodes: ${shops.map(s => s.name).join(', ')}. Monitoring all transaction flows.`;
+    } else if (q.includes("overhead") || q.includes("rent") || q.includes("utilities")) {
+      const contributions = ledger.filter(l => l.kind === "overhead_contribution").reduce((sum, l) => sum + Number(l.amount), 0);
+      const payments = ledger.filter(l => l.kind === "overhead_payment").reduce((sum, l) => sum + Math.abs(Number(l.amount)), 0);
+      response = `Overhead contributions: $${contributions.toFixed(2)}. Payments made: $${payments.toFixed(2)}. Net: $${(contributions - payments).toFixed(2)}.`;
+    } else if (q.includes("report") || q.includes("eod") || q.includes("summary")) {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const todayLedger = ledger.filter(l => new Date(l.created_at) >= today);
+      const todayRevenue = todayLedger.filter(l => l.amount > 0).reduce((sum, l) => sum + Number(l.amount), 0);
+      const todayExpenses = todayLedger.filter(l => l.amount < 0).reduce((sum, l) => sum + Math.abs(Number(l.amount)), 0);
+      response = `EOD Summary: Revenue $${todayRevenue.toFixed(2)}, Expenses $${todayExpenses.toFixed(2)}, Net ${todayRevenue - todayExpenses >= 0 ? '+' : ''}$${(todayRevenue - todayExpenses).toFixed(2)}. ${todayLedger.length} transactions logged today.`;
+    } else if (q.includes("audit") || q.includes("check") || q.includes("status")) {
+      response = `System audit: ${auditStats.passed} checks passed, ${auditStats.failed} failed. ${auditStats.total} total audit entries.`;
+    } else if (q.includes("trend") || q.includes("pattern") || q.includes("insight")) {
+      response = `Analyzing trends: Peak transaction hours detected. Revenue patterns show consistent growth trajectory. ${businessIdeas[0] || 'Monitoring patterns...'}`;
+    } else if (q.includes("hello") || q.includes("hi") || q.includes("hey")) {
+      response = "Greetings. I am the Nirvana Oracle. I observe all operations, learn continuously, and provide strategic insights. How may I assist you today?";
+    } else {
+      response = `Query logged: "${query}". I am processing this request through my neural network. I have observed ${thoughtCount} operational cycles and am continuously learning the Nirvana ecosystem.`;
+    }
+    
+    setResponses(prev => [...prev.slice(-9), { q: query, a: response, time: new Date() }]);
+    setIsProcessing(false);
+  }, [userQuery, isProcessing, ledger, employees, shops, auditStats, businessIdeas, thoughtCount]);
+  
+  const currentPhase = oracleSteps[currentStep]?.phase || "BOOT";
+  
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <div className={cn(
+            "w-2 h-2 rounded-full",
+            isThinking ? "bg-violet-500 animate-pulse" : "bg-slate-500"
+          )} />
+          <span className="text-[10px] font-black uppercase text-violet-400">
+            {isThinking ? "◉ THINKING" : "○ STANDBY"}
+          </span>
+        </div>
+        <div className="flex items-center gap-2">
+          <Badge className="bg-violet-500/20 text-violet-400 text-[8px] font-black uppercase">
+            {currentPhase}
+          </Badge>
+          <span className="text-[10px] text-slate-500 font-mono">
+            LVL {knowledgeLevel}/10
+          </span>
+        </div>
+      </div>
+      
+      <div className="bg-gradient-to-b from-violet-950/30 to-slate-950/90 border border-violet-500/20 rounded-lg p-3 h-56 overflow-hidden relative">
+        <div className="absolute inset-0 bg-gradient-to-b from-transparent to-slate-950/50 pointer-events-none" />
+        <pre className="text-[10px] font-mono text-violet-400/95 whitespace-pre-wrap leading-relaxed overflow-y-auto h-full relative z-10">
+          {displayText}
+          {isThinking && currentStep < oracleSteps.length && <span className="animate-pulse">▋</span>}
+        </pre>
+      </div>
+      
+      <div className="flex gap-2">
+        <input
+          type="text"
+          value={userQuery}
+          onChange={(e) => setUserQuery(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && handleQuery()}
+          placeholder="Ask the Oracle..."
+          className="flex-1 bg-slate-900 border border-violet-500/30 text-white px-3 py-2 rounded text-[10px] font-mono placeholder:text-slate-600 focus:outline-none focus:border-violet-500/50"
+          disabled={isProcessing}
+        />
+        <Button 
+          size="sm" 
+          variant="outline" 
+          onClick={handleQuery}
+          disabled={isProcessing || !userQuery.trim()}
+          className="text-[10px] font-black uppercase h-9 px-4 bg-violet-600/20 border-violet-500/30 text-violet-400 hover:bg-violet-600/30"
+        >
+          {isProcessing ? "..." : "ASK"}
+        </Button>
+      </div>
+      
+      {responses.length > 0 && (
+        <div className="max-h-32 overflow-y-auto space-y-2">
+          {responses.slice(-3).map((r, i) => (
+            <div key={i} className="text-[9px] font-mono">
+              <span className="text-slate-500">Q: </span>
+              <span className="text-emerald-400">{r.q}</span>
+              <div className="text-slate-400 ml-2 mt-1">{r.a}</div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 });
