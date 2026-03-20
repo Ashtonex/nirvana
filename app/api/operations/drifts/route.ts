@@ -33,14 +33,15 @@ export async function POST(req: Request) {
   try {
     const actor = await requirePrivilegedActor();
     const body = await req.json().catch(() => ({}));
-    
+
     const reason = String(body?.reason || "");
-    const allocations = body?.allocations || []; // Array of { shopId, category, amount }
-    
+    const allocations = body?.allocations || [];
+    const committed = Boolean(body?.committed); // true = money moved to vault, false = money was already in vault
+
     if (!reason) {
       return NextResponse.json({ error: "Reason required" }, { status: 400 });
     }
-    
+
     if (!Array.isArray(allocations) || allocations.length === 0) {
       return NextResponse.json({ error: "At least one allocation required" }, { status: 400 });
     }
@@ -52,33 +53,27 @@ export async function POST(req: Request) {
     const { data: ledgerRows } = await supabaseAdmin
       .from("operations_ledger")
       .select("amount");
-    
+
     const computedBalance = (ledgerRows || []).reduce((sum: number, r: any) => sum + Number(r.amount || 0), 0);
-    
+
     const { data: opsState } = await supabaseAdmin
       .from("operations_state")
       .select("actual_balance")
       .eq("id", 1)
       .maybeSingle();
-    
+
     const currentActualBalance = Number(opsState?.actual_balance || 0);
     const currentDrift = currentActualBalance - computedBalance;
-    
+
     // Total allocated amount
     const totalAllocated = allocations.reduce((sum: number, a: any) => sum + Number(a.amount || 0), 0);
 
-    // VALIDATION: This is CASH VALIDATION, not money movement
-    // The money was ALREADY in the vault (actual_balance)
-    // We're just explaining where it came from
-    // NO ledger entries are created
-    // The drift decreases because we've explained part of it
-
-    // Record the drift resolution with allocations
+    // Record the drift resolution
     const driftRecord = {
       id: driftId,
       amount: totalAllocated,
       reason,
-      resolved_kind: "cash_validated",
+      resolved_kind: committed ? "cash_committed" : "cash_validated",
       created_at: timestamp,
       created_by: actor.type === "staff" ? actor.employeeId : "owner",
       allocations: allocations.map((a: any) => ({
@@ -98,21 +93,43 @@ export async function POST(req: Request) {
       console.error("Drift insert error:", driftError);
     }
 
-    // NO changes to actual_balance or ledger
-    // The drift automatically reduces because:
-    // - The explained amount is now recorded as "validated cash"
-    // - Remaining drift = current_drift - validated_amount
+    // If COMMITTED: money is being moved from drift pool to tracked vault
+    // Create ledger entries to account for this money
+    // computed_balance increases, drift decreases
+    // actual_balance stays the same (money was already counted)
+    if (committed) {
+      for (const alloc of allocations) {
+        await supabaseAdmin.from("operations_ledger").insert({
+          amount: Number(alloc.amount || 0),
+          kind: "overhead_payment",
+          shop_id: String(alloc.shopId || ""),
+          overhead_category: String(alloc.category || "misc"),
+          title: `Drift Commit: ${reason}`,
+          notes: reason,
+          effective_date: timestamp.split("T")[0],
+          metadata: {
+            type: "drift_commit",
+            drift_id: driftId,
+            reason,
+          },
+          created_at: timestamp,
+        });
+      }
+    }
+    // If NOT committed: money was already in vault, just explaining it
+    // No ledger entries, no balance changes
+    // Drift just gets "validated" (marked as explained)
 
     return NextResponse.json({
       success: true,
       drift: drift || driftRecord,
       validation: {
+        committed,
         previousActualBalance: currentActualBalance,
         previousComputedBalance: computedBalance,
         previousDrift: currentDrift,
         validatedAmount: totalAllocated,
         remainingDrift: currentDrift - totalAllocated,
-        allocations: allocations,
         reason,
       }
     });

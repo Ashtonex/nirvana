@@ -106,6 +106,7 @@ export function OperationsConsole({
   const [driftForm, setDriftForm] = useState({
     reason: "",
     allocations: [{ shopId: "", category: "rent", amount: "" }],
+    committed: false,
   });
 
   const [vaultForm, setVaultForm] = useState({
@@ -226,6 +227,7 @@ export function OperationsConsole({
         credentials: "include",
         body: JSON.stringify({
           reason: driftForm.reason,
+          committed: driftForm.committed,
           allocations: validAllocs.map(a => ({
             shopId: a.shopId,
             category: a.category,
@@ -235,9 +237,12 @@ export function OperationsConsole({
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed");
-      setDriftForm({ reason: "", allocations: [{ shopId: "", category: "rent", amount: "" }] });
+      setDriftForm({ reason: "", allocations: [{ shopId: "", category: "rent", amount: "" }], committed: false });
       await fetchState();
-      alert(`Drift resolved! $${data.validation?.totalAllocated?.toFixed(2) || 0} linked to overhead allocations.`);
+      const msg = driftForm.committed
+        ? `Drift committed! $${data.validation?.validatedAmount?.toFixed(2) || 0} moved from drift to tracked.`
+        : `Drift validated! $${data.validation?.validatedAmount?.toFixed(2) || 0} explained.`;
+      alert(msg);
     } catch (e: any) {
       alert(e.message || "Failed to resolve drift");
     } finally {
@@ -339,32 +344,82 @@ export function OperationsConsole({
       {/* Overview Tab */}
       {activeTab === "overview" && (
         <div className="space-y-4">
-          <Card className="bg-slate-950/60 border-slate-800">
+          <Card className="bg-gradient-to-br from-slate-900 to-slate-950 border-slate-800">
             <CardHeader>
               <CardTitle className="text-lg font-black uppercase italic">Post to Operations</CardTitle>
+              <CardDescription className="text-[10px]">
+                Post EOD deposits, overhead payments, or capital injections. Does NOT cause drift.
+              </CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
-              <div className="grid grid-cols-1 md:grid-cols-6 gap-3">
-                <Input value={entry.amount} onChange={(e) => setEntry(s => ({ ...s, amount: e.target.value }))} className="bg-slate-900 border-slate-800 font-mono" placeholder="Amount" inputMode="decimal" />
-                <select value={entry.kind} onChange={(e) => setEntry(s => ({ ...s, kind: e.target.value }))} className="bg-slate-900 border border-slate-800 text-white px-3 py-2 rounded-md">
-                  <option value="eod_deposit">EOD Deposit</option>
-                  <option value="overhead_payment">Overhead</option>
-                  <option value="capital_injection">Injection</option>
-                  <option value="adjustment">Adjustment</option>
-                </select>
-                <select value={entry.shopId} onChange={(e) => setEntry(s => ({ ...s, shopId: e.target.value }))} className="bg-slate-900 border border-slate-800 text-white px-3 py-2 rounded-md">
-                  <option value="">Any Shop</option>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-3">
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black uppercase text-slate-500">Amount</label>
+                  <Input value={entry.amount} onChange={(e) => setEntry(s => ({ ...s, amount: e.target.value }))} className="bg-slate-900 border-slate-800 font-mono" placeholder="0.00" inputMode="decimal" />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black uppercase text-slate-500">Type</label>
+                  <select value={entry.kind} onChange={(e) => setEntry(s => ({ ...s, kind: e.target.value }))} className="bg-slate-900 border border-slate-800 text-white px-3 py-2 rounded-md w-full">
+                    <option value="eod_deposit">EOD Deposit</option>
+                    <option value="overhead_payment">Overhead Payment</option>
+                    <option value="capital_injection">Capital Injection</option>
+                    <option value="adjustment">Adjustment</option>
+                  </select>
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black uppercase text-slate-500">Shop</label>
+                  <select value={entry.shopId} onChange={(e) => setEntry(s => ({ ...s, shopId: e.target.value }))} className="bg-slate-900 border border-slate-800 text-white px-3 py-2 rounded-md w-full">
+                    <option value="">Any Shop</option>
+                    {shops.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                  </select>
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black uppercase text-slate-500">Category</label>
+                  <select value={entry.overheadCategory} onChange={(e) => setEntry(s => ({ ...s, overheadCategory: e.target.value }))} className="bg-slate-900 border border-slate-800 text-white px-3 py-2 rounded-md w-full">
+                    <option value="">None</option>
+                    <option value="rent">Rent</option>
+                    <option value="utilities">Utilities</option>
+                    <option value="salaries">Salaries</option>
+                    <option value="misc">Misc</option>
+                  </select>
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black uppercase text-slate-500">Title</label>
+                  <Input value={entry.title} onChange={(e) => setEntry(s => ({ ...s, title: e.target.value }))} className="bg-slate-900 border-slate-800" placeholder="Description" />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black uppercase text-slate-500">&nbsp;</label>
+                  <Button disabled={busy} onClick={addEntry} className="w-full bg-emerald-600 hover:bg-emerald-500 font-black uppercase">Post</Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-amber-950/20 border-amber-800/30">
+            <CardHeader>
+              <CardTitle className="text-lg font-black uppercase italic text-amber-400">Validate Overhead</CardTitle>
+              <CardDescription className="text-[10px]">
+                Track overhead expenses that weren't auto-tracked. Posts to Shop Overhead Reconciliation.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3">
+                <Input value={entry.amount} onChange={(e) => setEntry(s => ({ ...s, amount: e.target.value }))} className="bg-slate-900 border-amber-500/30 font-mono" placeholder="Amount" inputMode="decimal" />
+                <select value={entry.shopId} onChange={(e) => setEntry(s => ({ ...s, shopId: e.target.value }))} className="bg-slate-900 border-amber-500/30 text-white px-3 py-2 rounded-md">
+                  <option value="">Select Shop</option>
                   {shops.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
                 </select>
-                <select value={entry.overheadCategory} onChange={(e) => setEntry(s => ({ ...s, overheadCategory: e.target.value }))} className="bg-slate-900 border border-slate-800 text-white px-3 py-2 rounded-md">
-                  <option value="">No Category</option>
+                <select value={entry.overheadCategory} onChange={(e) => setEntry(s => ({ ...s, overheadCategory: e.target.value }))} className="bg-slate-900 border-amber-500/30 text-white px-3 py-2 rounded-md">
                   <option value="rent">Rent</option>
                   <option value="utilities">Utilities</option>
                   <option value="salaries">Salaries</option>
                   <option value="misc">Misc</option>
                 </select>
-                <Input value={entry.title} onChange={(e) => setEntry(s => ({ ...s, title: e.target.value }))} className="bg-slate-900 border-slate-800" placeholder="Title" />
-                <Button disabled={busy} onClick={addEntry} className="font-black uppercase">Post</Button>
+                <Input value={entry.title} onChange={(e) => setEntry(s => ({ ...s, title: e.target.value }))} className="bg-slate-900 border-amber-500/30" placeholder="Description" />
+                <Button disabled={busy} onClick={() => {
+                  setEntry(e => ({ ...e, kind: "overhead_payment" }));
+                  addEntry();
+                }} className="bg-amber-600 hover:bg-amber-500 font-black uppercase">Validate</Button>
               </div>
             </CardContent>
           </Card>
@@ -497,9 +552,29 @@ export function OperationsConsole({
                   ${totalAllocated.toFixed(2)}
                 </span>
               </div>
+
+              <div className="flex items-center gap-4 p-3 bg-slate-900/50 rounded-lg">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={driftForm.committed}
+                    onChange={(e) => setDriftForm(f => ({ ...f, committed: e.target.checked }))}
+                    className="w-4 h-4"
+                  />
+                  <div>
+                    <span className="text-xs font-black uppercase text-slate-300">Commit to Vault</span>
+                    <p className="text-[10px] text-slate-500">
+                      {driftForm.committed
+                        ? "Money will be moved from drift to tracked overhead"
+                        : "Money was already in vault - just validating explanation"
+                      }
+                    </p>
+                  </div>
+                </label>
+              </div>
               
               <Button disabled={busy} onClick={resolveDrift} className="w-full bg-amber-600 hover:bg-amber-500 font-black uppercase">
-                <CheckCircle2 className="h-4 w-4 mr-2" /> Link to Overhead & Resolve Drift
+                <CheckCircle2 className="h-4 w-4 mr-2" /> {driftForm.committed ? "Commit & Validate" : "Validate Drift"}
               </Button>
             </CardContent>
           </Card>
