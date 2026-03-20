@@ -535,6 +535,10 @@ export function OperationsConsole({
                     {isExpense ? (
                       <>
                         <option value="overhead_payment">Overhead Payment</option>
+                        <option value="stock_orders">Stock Orders</option>
+                        <option value="transport">Transport</option>
+                        <option value="peer_payout">Peer Payout</option>
+                        <option value="other_expense">Other Expense</option>
                         <option value="rent">Rent</option>
                         <option value="utilities">Utilities</option>
                         <option value="salaries">Salaries</option>
@@ -621,6 +625,10 @@ export function OperationsConsole({
                           >
                             <option value="overhead_contribution">Contribution</option>
                             <option value="overhead_payment">Payment</option>
+                            <option value="stock_orders">Stock Orders</option>
+                            <option value="transport">Transport</option>
+                            <option value="peer_payout">Peer Payout</option>
+                            <option value="other_expense">Other Expense</option>
                             <option value="eod_deposit">EOD Deposit</option>
                             <option value="drawer_post">Drawer Post</option>
                           </select>
@@ -711,7 +719,6 @@ export function OperationsConsole({
               </CardContent>
             </Card>
           )}
-        </div>
     </div>
   );
 }

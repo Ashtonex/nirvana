@@ -234,6 +234,16 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
     const [opsPostNotes, setOpsPostNotes] = useState("");
     const [opsPostKind, setOpsPostKind] = useState<"eod_deposit" | "overhead_contribution">("overhead_contribution");
 
+    // Auto-detect overhead keywords in notes
+    useEffect(() => {
+        const notes = opsPostNotes.toLowerCase();
+        const overheadKeywords = ["rent", "utilities", "salary", "salaries", "wages", "electric", "water", "internet", "overhead"];
+        const hasOverheadKeyword = overheadKeywords.some(kw => notes.includes(kw));
+        if (hasOverheadKeyword && opsPostKind === "eod_deposit") {
+            setOpsPostKind("overhead_contribution");
+        }
+    }, [opsPostNotes, opsPostKind]);
+
     // Receipt context & Modal state
     const [activeReceipt, setActiveReceipt] = useState<any | null>(null);
     const [isSuccessModalOpen, setIsSuccessModalOpen] = useState(false);
