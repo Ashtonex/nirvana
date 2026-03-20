@@ -590,45 +590,77 @@ export function OperationsConsole({
             </CardContent>
           </Card>
 
-          {/* Recent Transactions */}
+          {/* Shop Overhead Reconciliation */}
           <Card className="bg-slate-950/60 border-slate-800">
             <CardHeader>
               <CardTitle className="text-lg font-black uppercase italic flex items-center gap-2">
-                <History className="h-5 w-5" /> Recent Transactions ({ledger.length})
+                <TrendingUp className="h-5 w-5 text-emerald-400" /> Shop Overhead Reconciliation
               </CardTitle>
+              <CardDescription className="text-[10px]">
+                Contributions IN vs Expenses OUT per shop
+              </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-2 max-h-[50vh] overflow-y-auto">
-              {ledger.length === 0 ? (
-                <div className="text-center py-12 text-slate-600 italic">No transactions yet</div>
-              ) : ledger.map(entry => {
-                const isIncome = Number(entry.amount) >= 0;
+            <CardContent className="space-y-3">
+              {(() => {
+                const byShop: Record<string, { contributed: number; paid: number }> = {};
+                shops.forEach(s => {
+                  byShop[s.id] = { contributed: 0, paid: 0 };
+                });
+                ledger.forEach(entry => {
+                  if (entry.shop_id) {
+                    if (entry.kind === "overhead_contribution" || entry.amount > 0) {
+                      byShop[entry.shop_id] = byShop[entry.shop_id] || { contributed: 0, paid: 0 };
+                      byShop[entry.shop_id].contributed += Math.abs(Number(entry.amount || 0));
+                    } else {
+                      byShop[entry.shop_id] = byShop[entry.shop_id] || { contributed: 0, paid: 0 };
+                      byShop[entry.shop_id].paid += Math.abs(Number(entry.amount || 0));
+                    }
+                  }
+                });
+                
+                const shopData = shops.map(s => ({
+                  id: s.id,
+                  name: s.name,
+                  contributed: byShop[s.id]?.contributed || 0,
+                  paid: byShop[s.id]?.paid || 0,
+                  net: (byShop[s.id]?.contributed || 0) - (byShop[s.id]?.paid || 0),
+                })).filter(s => s.contributed > 0 || s.paid > 0);
+                
+                if (shopData.length === 0) {
+                  return <div className="text-center py-8 text-slate-600 italic text-xs">No shop contributions yet</div>;
+                }
+                
                 return (
-                  <div key={entry.id} className="flex items-center justify-between p-4 bg-slate-900/40 rounded-lg border border-slate-800 hover:border-slate-700 transition-colors">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-1">
-                        <Badge className={cn("text-[8px] font-black uppercase", isIncome ? "bg-emerald-500/20 text-emerald-400" : "bg-rose-500/20 text-rose-400")}>
-                          {entry.kind}
-                        </Badge>
-                        {entry.shop_id && (
-                          <Badge className="bg-slate-700/50 text-slate-400 text-[8px] font-black uppercase">
-                            {entry.shop_id}
-                          </Badge>
-                        )}
+                  <div className="space-y-2">
+                    {shopData.map(shop => (
+                      <div key={shop.id} className="p-4 bg-slate-900/40 rounded-lg border border-slate-800">
+                        <div className="flex items-center justify-between mb-3">
+                          <div className="flex items-center gap-2">
+                            <div className="w-3 h-3 rounded-full bg-emerald-500" />
+                            <span className="text-sm font-black text-white uppercase">{shop.name}</span>
+                          </div>
+                          <span className={cn(
+                            "text-lg font-black font-mono italic",
+                            shop.net >= 0 ? "text-emerald-400" : "text-rose-400"
+                          )}>
+                            {shop.net >= 0 ? "+" : ""}${shop.net.toFixed(2)}
+                          </span>
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="flex justify-between text-xs">
+                            <span className="text-emerald-500">Contributed</span>
+                            <span className="font-mono text-emerald-400">${shop.contributed.toFixed(2)}</span>
+                          </div>
+                          <div className="flex justify-between text-xs">
+                            <span className="text-rose-500">Paid Out</span>
+                            <span className="font-mono text-rose-400">${shop.paid.toFixed(2)}</span>
+                          </div>
+                        </div>
                       </div>
-                      <div className="text-sm font-bold text-white">{entry.title || entry.notes || "—"}</div>
-                      <div className="text-[10px] text-slate-600">{new Date(entry.created_at).toLocaleString()}</div>
-                    </div>
-                    <div className="flex items-center gap-4">
-                      <div className={cn("text-xl font-black font-mono italic", isIncome ? "text-emerald-400" : "text-rose-400")}>
-                        {isIncome ? "+" : ""}{Number(entry.amount).toFixed(2)}
-                      </div>
-                      <Button size="sm" variant="ghost" onClick={() => deleteEntry(entry.id)} className="h-8 w-8 p-0 text-slate-600 hover:text-rose-400">
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
+                    ))}
                   </div>
                 );
-              })}
+              })()}
             </CardContent>
           </Card>
         </div>
