@@ -1,6 +1,19 @@
 -- Operations and Invest Schema for Nirvana POS
 -- Run this in your Supabase SQL Editor
 
+-- Drift Resolutions Table
+CREATE TABLE IF NOT EXISTS operations_drifts (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  amount NUMERIC(12,2) NOT NULL,
+  reason TEXT NOT NULL,
+  resolved_kind TEXT,
+  resolved_shop TEXT,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+ALTER TABLE operations_drifts ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow all operations on operations_drifts" ON operations_drifts FOR ALL USING (true) WITH CHECK (true);
+
 -- Operations Ledger Table
 CREATE TABLE IF NOT EXISTS operations_ledger (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,

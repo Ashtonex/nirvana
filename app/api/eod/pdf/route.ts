@@ -160,12 +160,13 @@ export async function GET(req: Request) {
       const wUntil = wUntilObj.toISOString();
 
       const monthStart = new Date(todayDate.getUTCFullYear(), todayDate.getUTCMonth(), 1).toISOString();
-      const [wSalesRes, wLedgerRes, shopRes, settingsRes, mtdSalesRes] = await Promise.all([
+      const [wSalesRes, wLedgerRes, shopRes, settingsRes, mtdSalesRes, opsLedgerRes] = await Promise.all([
         supabaseAdmin.from("sales").select("id, total_with_tax, total_before_tax, tax, discount_applied, quantity, item_id, item_name, date, payment_method, employee_id").eq("shop_id", shopId).gte("date", wWeekStart).lte("date", wUntil).then((r: any) => r, () => ({ data: [] as any[] })),
         supabaseAdmin.from("ledger_entries").select("*").eq("shop_id", shopId).gte("date", wWeekStart).lte("date", wUntil).then((r: any) => r, () => ({ data: [] as any[] })),
         supabaseAdmin.from("shops").select("*").eq("id", shopId).single().then((r: any) => r, () => ({ data: null })),
         supabaseAdmin.from("oracle_settings").select("*").single().then((r: any) => r, () => ({ data: null })),
         supabaseAdmin.from("sales").select("total_with_tax").eq("shop_id", shopId).gte("date", monthStart).lte("date", wUntil).limit(3000).then((r: any) => r, () => ({ data: [] as any[] })),
+        supabaseAdmin.from("operations_ledger").select("amount, kind, shop_id, overhead_category, title, effective_date").gte("effective_date", wWeekStart.split('T')[0]).lte("effective_date", wUntil.split('T')[0]).in("kind", ["overhead_payment", "eod_deposit", "drift_explained"]).then((r: any) => r, () => ({ data: [] as any[] })),
       ]);
 
       const wSalesBase = wSalesRes.data || [];
@@ -173,6 +174,7 @@ export async function GET(req: Request) {
       const wLedger = wLedgerRes.data || [];
       const shop = shopRes.data;
       const settings = settingsRes.data;
+      const opsLedger = opsLedgerRes.data || [];
 
       // Resolve missing sales metadata (landed_cost, category)
       const wItemIds = Array.from(new Set(wSalesBase.map((s: any) => s.item_id).filter(Boolean)));
@@ -403,6 +405,21 @@ export async function GET(req: Request) {
     const mtdProgress = monthlyOverhead > 0 ? (mtdRevenue / monthlyOverhead) * 100 : 0;
 
       const wNet = wSalesTotalWithTax - wPosExpenses;
+      
+      // Operations Overhead by Category and Shop
+      const opsOverheadByCategory: Record<string, Record<string, number>> = {};
+      const opsOverheadTotal: Record<string, number> = {};
+      opsLedger.forEach((l: any) => {
+        const cat = String(l.overhead_category || "misc");
+        const sid = String(l.shop_id || "operations");
+        if (!opsOverheadByCategory[cat]) opsOverheadByCategory[cat] = {};
+        opsOverheadByCategory[cat][sid] = (opsOverheadByCategory[cat][sid] || 0) + Number(l.amount || 0);
+        opsOverheadTotal[cat] = (opsOverheadTotal[cat] || 0) + Number(l.amount || 0);
+      });
+      const opsOverheadSummary = Object.entries(opsOverheadTotal)
+        .map(([category, amount]) => ({ category, amount, byShop: opsOverheadByCategory[category] || {} }))
+        .sort((a, b) => b.amount - a.amount);
+      
       weeklyData = {
         sales: wSales,
         ledger: wLedger,
@@ -415,6 +432,7 @@ export async function GET(req: Request) {
         posExpenses: wPosExpenses
       },
       overhead: { monthly: monthlyOverhead, weekly: weeklyOverhead, fixed: fixedObligations, operational: operationalCosts, rent, salaries, utilities, misc, posExpenses: wPosExpenses },
+      opsOverhead: { byCategory: opsOverheadSummary, totals: opsOverheadTotal, entries: opsLedger },
       audit: auditResults,
       settings: settings || {},
       staffScoreboard,
@@ -748,6 +766,28 @@ export async function GET(req: Request) {
           const overCov = weeklyData.overheadCovered || 0;
           pDrawText(`Overhead Coverage:`, { x: width / 2 + 10, y: metY, size: 9, font });
           pDrawText(`${overCov.toFixed(1)}%`, { x: width / 2 + 105, y: metY, size: 10, font: fontBold, color: overCov >= 100 ? COLORS.highlight : COLORS.warning });
+
+          // Operations Overhead by Category
+          const opsOverhead = weeklyData.opsOverhead || { byCategory: [], totals: {} };
+          if (Object.keys(opsOverhead.totals || {}).length > 0) {
+            let opsY = metY - 130;
+            pDrawText(`OVERHEAD BY CATEGORY (Operations):`, { x: width / 2 + 10, y: opsY, size: 8, font: fontBold, color: COLORS.oracle });
+            opsY -= 15;
+            (opsOverhead.byCategory || []).slice(0, 4).forEach((cat: any) => {
+              const catName = String(cat.category || "misc").toUpperCase();
+              const catAmt = Number(cat.amount || 0);
+              pDrawText(`${catName}:`, { x: width / 2 + 15, y: opsY, size: 7, font });
+              pDrawText(`$${catAmt.toFixed(0)}`, { x: width / 2 + 100, y: opsY, size: 7, font: fontBold });
+              opsY -= 10;
+              // Show by shop
+              const byShop = cat.byShop || {};
+              Object.entries(byShop).forEach(([shop, amt]: [string, any]) => {
+                if (opsY < metY - 180) return;
+                pDrawText(`  ${shop}: $${Number(amt || 0).toFixed(0)}`, { x: width / 2 + 20, y: opsY, size: 6, font, color: rgb(0.5, 0.5, 0.5) });
+                opsY -= 8;
+              });
+            });
+          }
 
           const mtdRev = weeklyData.mtd?.revenue || 0;
           const mtdProg = weeklyData.mtd?.progress || 0;
