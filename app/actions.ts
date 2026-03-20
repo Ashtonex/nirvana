@@ -1165,6 +1165,8 @@ export async function recordPosExpense(
     // IMPORTANT: EOD deposits (from Post to Ops) should NOT affect drift - only overhead balances may cause drift
     if (options?.toOperations || isOverheadExpense) {
         const opsKind = isOverheadExpense ? "overhead_payment" : "eod_deposit";
+        
+        // Insert to ledger
         await supabaseAdmin.from('operations_ledger').insert({
             amount: amount,
             kind: opsKind,
@@ -1174,6 +1176,26 @@ export async function recordPosExpense(
             employee_id: employeeId,
             effective_date: new Date().toISOString().split('T')[0],
         });
+        
+        // ALSO update the actual balance in operations_state
+        // This ensures posting from POS doesn't create fake drift
+        if (!isOverheadExpense) {
+            // EOD deposit - update actual balance
+            const { data: currentState } = await supabaseAdmin
+                .from('operations_state')
+                .select('actual_balance')
+                .eq('id', 1)
+                .maybeSingle();
+            
+            const newBalance = Number(currentState?.actual_balance || 0) + amount;
+            await supabaseAdmin
+                .from('operations_state')
+                .upsert({ 
+                    id: 1, 
+                    actual_balance: newBalance, 
+                    updated_at: new Date().toISOString() 
+                });
+        }
     }
 
     // Log to audit trail with full details
