@@ -232,7 +232,7 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
     const [isOpsPostModalOpen, setIsOpsPostModalOpen] = useState(false);
     const [opsPostAmount, setOpsPostAmount] = useState("");
     const [opsPostNotes, setOpsPostNotes] = useState("");
-    const [opsPostKind, setOpsPostKind] = useState<"eod_deposit" | "overhead_contribution">("eod_deposit");
+    const [opsPostKind, setOpsPostKind] = useState<"eod_deposit" | "overhead_contribution">("overhead_contribution");
 
     // Receipt context & Modal state
     const [activeReceipt, setActiveReceipt] = useState<any | null>(null);

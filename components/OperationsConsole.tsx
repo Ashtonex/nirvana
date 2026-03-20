@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo, useRef, memo } from "react";
 import { Badge, Button, Card, CardContent, CardDescription, CardHeader, CardTitle, Input } from "@/components/ui";
-import { Coins, Loader2, Trash2, ArrowRightLeft, DollarSign, History, TrendingUp, TrendingDown, Warehouse, Upload, Download, Plus, Minus, Activity, Users, Shield, Handshake, LogOut, Wifi, WifiOff } from "lucide-react";
+import { Coins, Loader2, Trash2, ArrowRightLeft, DollarSign, History, TrendingUp, TrendingDown, Warehouse, Upload, Download, Plus, Minus, Activity, Users, Shield, Handshake, LogOut, Wifi, WifiOff, Edit, X } from "lucide-react";
 import { cn } from "@/components/ui";
 
 function detectOverheadCategory(title: string): string {
@@ -84,12 +84,10 @@ export function OperationsConsole({
   initialLedger: any[];
 }) {
   const [ledger, setLedger] = useState<LedgerEntry[]>(initialLedger);
-  const [handshakes, setHandshakes] = useState<HandshakeEntry[]>([]);
   const [auditLogs, setAuditLogs] = useState<AuditEntry[]>([]);
   const [staffLogs, setStaffLogs] = useState<StaffLog[]>([]);
   const [employees, setEmployees] = useState<any[]>([]);
   const [busy, setBusy] = useState(false);
-  const [activeSection, setActiveSection] = useState<"overview" | "handshake">("overview");
 
   const [opsState, setOpsState] = useState<OpsState>(initialState);
 
@@ -115,14 +113,6 @@ export function OperationsConsole({
     Object.values(summary).forEach(s => { s.net = s.contributed - s.paid; });
     return Object.values(summary).filter(s => s.contributed > 0 || s.paid > 0);
   }, [ledger, shops]);
-
-  const handshakeStats = useMemo(() => {
-    const total = handshakes.length;
-    const pending = handshakes.filter(h => h.status === "pending").length;
-    const completed = handshakes.filter(h => h.status !== "pending").length;
-    const totalValue = handshakes.reduce((sum, h) => sum + Number(h.amount || 0), 0);
-    return { total, pending, completed, totalValue };
-  }, [handshakes]);
 
   const auditStats = useMemo(() => {
     const total = auditLogs.length;
@@ -196,9 +186,8 @@ export function OperationsConsole({
 
   const fetchData = useCallback(async () => {
     try {
-      const [ledgerRes, handshakeRes, stateRes, auditRes, staffRes, empRes] = await Promise.all([
+      const [ledgerRes, stateRes, auditRes, staffRes, empRes] = await Promise.all([
         fetch("/api/operations/ledger?limit=100", { cache: "no-store", credentials: "include" }),
-        fetch("/api/operations/handshakes", { cache: "no-store", credentials: "include" }),
         fetch("/api/operations/state", { cache: "no-store", credentials: "include" }),
         fetch("/api/pos-audit/logs?limit=20", { cache: "no-store", credentials: "include" }).then(r => r.ok ? r.json() : { logs: [] }).catch(() => ({ logs: [] })),
         fetch("/api/staff/logs?limit=50", { cache: "no-store", credentials: "include" }).then(r => r.ok ? r.json() : { logs: [] }).catch(() => ({ logs: [] })),
@@ -206,11 +195,9 @@ export function OperationsConsole({
       ]);
       
       const ledgerData = await ledgerRes.json().catch(() => ({ rows: [] }));
-      const handshakeData = await handshakeRes.json().catch(() => ({ handshakes: [] }));
       const stateData = await stateRes.json().catch(() => ({}));
       
       if (Array.isArray(ledgerData?.rows)) setLedger(ledgerData.rows);
-      if (Array.isArray(handshakeData?.handshakes)) setHandshakes(handshakeData.handshakes);
       if (stateData?.computedBalance != null) setOpsState(stateData);
       if (Array.isArray(auditRes?.logs)) setAuditLogs(auditRes.logs);
       if (Array.isArray(staffRes?.logs)) setStaffLogs(staffRes.logs);
@@ -291,53 +278,23 @@ export function OperationsConsole({
     }
   };
 
-  const [handshakeForm, setHandshakeForm] = useState({
-    fromShop: "",
-    toShop: "",
-    amount: "",
-    associate: "",
-    initiatedBy: "",
-  });
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editKind, setEditKind] = useState("");
 
-  const initiateHandshake = async () => {
-    const amt = Number(handshakeForm.amount);
-    if (!Number.isFinite(amt) || amt <= 0) {
-      alert("Enter a valid amount");
-      return;
-    }
-    if (!handshakeForm.fromShop || !handshakeForm.toShop) {
-      alert("Select both shops");
-      return;
-    }
+  const updateEntryKind = async (id: string, newKind: string) => {
     setBusy(true);
     try {
-      const res = await fetch("/api/operations/handshake", {
-        method: "POST",
+      const res = await fetch(`/api/operations/ledger/${id}`, {
+        method: "PUT",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify(handshakeForm),
+        body: JSON.stringify({ kind: newKind }),
       });
       if (!res.ok) throw new Error("Failed");
-      setHandshakeForm({ fromShop: "", toShop: "", amount: "", associate: "", initiatedBy: "" });
+      setEditingId(null);
       await fetchData();
     } catch (e) {
-      alert("Failed to initiate handshake");
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const acknowledgeHandshake = async (id: string) => {
-    setBusy(true);
-    try {
-      const res = await fetch(`/api/operations/handshake/${id}/acknowledge`, {
-        method: "POST",
-        credentials: "include",
-      });
-      if (!res.ok) throw new Error("Failed");
-      await fetchData();
-    } catch (e) {
-      alert("Failed to acknowledge");
+      alert("Failed to update");
     } finally {
       setBusy(false);
     }
@@ -477,15 +434,15 @@ export function OperationsConsole({
           combinedTotal={combinedTotal}
           ledgerCount={ledger.length}
           activeShops={activeShops.length}
-          handshakePending={handshakeStats.pending}
           auditFailed={auditStats.failed}
+          handshakePending={0}
         />
 
         {/* Nirvana Logo */}
         <NirvanaLogoCard 
           masterVault={masterVault} 
           investTotal={investTotal} 
-          handshakes={handshakes}
+          handshakes={[]}
           auditPassed={auditStats.passed}
           auditFailed={auditStats.failed}
         />
@@ -510,72 +467,21 @@ export function OperationsConsole({
             />
           </CardContent>
         </Card>
-
-        {/* Handshake Tracker */}
-        <Card className="bg-gradient-to-br from-amber-950/60 to-slate-950 border-amber-800/40">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-lg font-black uppercase italic flex items-center gap-2">
-              <Handshake className="h-5 w-5 text-amber-400" /> Handshake Tracker
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="grid grid-cols-3 gap-4 text-center">
-              <div>
-                <div className="text-3xl font-black italic text-amber-300">{handshakeStats.total}</div>
-                <div className="text-[10px] text-slate-500">Created</div>
-              </div>
-              <div>
-                <div className={cn("text-3xl font-black italic", handshakeStats.pending > 0 ? "text-amber-300" : "text-emerald-300")}>
-                  {handshakeStats.pending}
-                </div>
-                <div className="text-[10px] text-slate-500">Pending</div>
-              </div>
-              <div>
-                <div className="text-3xl font-black italic text-emerald-300">{handshakeStats.completed}</div>
-                <div className="text-[10px] text-slate-500">Signed</div>
-              </div>
-            </div>
-            <div className="pt-2 border-t border-slate-800 text-center">
-              <div className="text-xs text-slate-500">Total Value</div>
-              <div className="text-xl font-black font-mono italic text-amber-300">${handshakeStats.totalValue.toLocaleString()}</div>
-            </div>
-          </CardContent>
-        </Card>
       </div>
 
-      {/* Section Tabs */}
-      <div className="flex gap-2 border-b border-slate-800">
-        <button
-          onClick={() => setActiveSection("overview")}
-          className={cn(
-            "flex items-center gap-2 px-4 py-3 text-xs font-black uppercase tracking-widest border-b-2 transition-all",
-            activeSection === "overview" ? "border-emerald-500 text-emerald-400" : "border-transparent text-slate-500 hover:text-slate-300"
-          )}
+      {/* Link to Handshake Page */}
+      <div className="flex justify-center">
+        <a 
+          href="/handshake" 
+          className="flex items-center gap-2 px-6 py-3 bg-amber-600/20 border border-amber-600/30 rounded-lg text-amber-400 font-black uppercase text-xs hover:bg-amber-600/30 transition-colors"
         >
-          <DollarSign className="h-4 w-4" /> Operations
-        </button>
-        <button
-          onClick={() => setActiveSection("handshake")}
-          className={cn(
-            "flex items-center gap-2 px-4 py-3 text-xs font-black uppercase tracking-widest border-b-2 transition-all",
-            activeSection === "handshake" ? "border-amber-500 text-amber-400" : "border-transparent text-slate-500 hover:text-slate-300"
-          )}
-        >
-          <ArrowRightLeft className="h-4 w-4" /> Handshake
-          {handshakeStats.pending > 0 && (
-            <Badge className="ml-1 bg-amber-500/20 text-amber-400 text-[8px]">
-              {handshakeStats.pending}
-            </Badge>
-          )}
-        </button>
+          <Handshake className="h-4 w-4" /> Manage Cash Handshakes
+        </a>
       </div>
 
-      {/* OPERATIONS SECTION */}
-      {activeSection === "overview" && (
-        <div className="space-y-6">
-          {/* Add Entry Form */}
-          <Card className={cn(
-            "border-2 transition-colors",
+      {/* Add Entry Form */}
+      <Card className={cn(
+        "border-2 transition-colors",
             isExpense ? "bg-rose-950/20 border-rose-800/30" : "bg-slate-950/60 border-slate-800"
           )}>
             <CardHeader>
@@ -702,13 +608,27 @@ export function OperationsConsole({
                 <div className="text-center py-12 text-slate-600 italic">No transactions yet</div>
               ) : ledger.map(entry => {
                 const isIncome = Number(entry.amount) >= 0;
+                const isOverhead = entry.kind === "overhead_contribution" || entry.kind === "overhead_payment";
                 return (
                   <div key={entry.id} className="flex items-center justify-between p-4 bg-slate-900/40 rounded-lg border border-slate-800 hover:border-slate-700 transition-colors">
                     <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-1">
-                        <Badge className={cn("text-[8px] font-black uppercase", isIncome ? "bg-emerald-500/20 text-emerald-400" : "bg-rose-500/20 text-rose-400")}>
-                          {entry.kind}
-                        </Badge>
+                      <div className="flex items-center gap-2 mb-1 flex-wrap">
+                        {editingId === entry.id ? (
+                          <select
+                            value={editKind}
+                            onChange={(e) => setEditKind(e.target.value)}
+                            className="bg-slate-800 border border-slate-600 text-white px-2 py-1 rounded text-[8px]"
+                          >
+                            <option value="overhead_contribution">Contribution</option>
+                            <option value="overhead_payment">Payment</option>
+                            <option value="eod_deposit">EOD Deposit</option>
+                            <option value="drawer_post">Drawer Post</option>
+                          </select>
+                        ) : (
+                          <Badge className={cn("text-[8px] font-black uppercase", isIncome ? "bg-emerald-500/20 text-emerald-400" : "bg-rose-500/20 text-rose-400")}>
+                            {entry.kind}
+                          </Badge>
+                        )}
                         {entry.shop_id && (
                           <Badge className="bg-slate-700/50 text-slate-400 text-[8px] font-black uppercase">
                             {entry.shop_id}
@@ -723,10 +643,25 @@ export function OperationsConsole({
                       <div className="text-sm font-bold text-white">{entry.title || entry.notes || "—"}</div>
                       <div className="text-[10px] text-slate-600">{new Date(entry.created_at).toLocaleString()}</div>
                     </div>
-                    <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-2">
                       <div className={cn("text-xl font-black font-mono italic", isIncome ? "text-emerald-400" : "text-rose-400")}>
                         {isIncome ? "+" : ""}{Number(entry.amount).toFixed(2)}
                       </div>
+                      {isOverhead && editingId !== entry.id && (
+                        <Button size="sm" variant="ghost" onClick={() => { setEditingId(entry.id); setEditKind(entry.kind); }} className="h-8 w-8 p-0 text-slate-600 hover:text-amber-400">
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                      )}
+                      {editingId === entry.id && (
+                        <div className="flex gap-1">
+                          <Button size="sm" onClick={() => updateEntryKind(entry.id, editKind)} className="h-8 px-2 text-[8px] bg-emerald-600 hover:bg-emerald-500">
+                            Save
+                          </Button>
+                          <Button size="sm" variant="ghost" onClick={() => setEditingId(null)} className="h-8 w-8 p-0">
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      )}
                       <Button size="sm" variant="ghost" onClick={() => deleteEntry(entry.id)} className="h-8 w-8 p-0 text-slate-600 hover:text-rose-400">
                         <Trash2 className="h-4 w-4" />
                       </Button>
@@ -777,114 +712,6 @@ export function OperationsConsole({
             </Card>
           )}
         </div>
-      )}
-
-      {/* HANDSHAKE SECTION */}
-      {activeSection === "handshake" && (
-        <div className="space-y-6">
-          <Card className="bg-gradient-to-br from-amber-950/30 to-slate-950 border-amber-800/30">
-            <CardHeader>
-              <CardTitle className="text-lg font-black uppercase italic text-amber-400 flex items-center gap-2">
-                <ArrowRightLeft className="h-5 w-5" /> Initiate Cash Transfer
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                <select
-                  value={handshakeForm.fromShop}
-                  onChange={(e) => setHandshakeForm(f => ({ ...f, fromShop: e.target.value }))}
-                  className="bg-slate-900 border border-slate-800 text-white px-3 py-2 rounded-md"
-                >
-                  <option value="">From Shop</option>
-                  {shops.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-                </select>
-                <select
-                  value={handshakeForm.toShop}
-                  onChange={(e) => setHandshakeForm(f => ({ ...f, toShop: e.target.value }))}
-                  className="bg-slate-900 border border-slate-800 text-white px-3 py-2 rounded-md"
-                >
-                  <option value="">To Shop</option>
-                  {shops.filter(s => s.id !== handshakeForm.fromShop).map(s => (
-                    <option key={s.id} value={s.id}>{s.name}</option>
-                  ))}
-                </select>
-                <Input
-                  value={handshakeForm.amount}
-                  onChange={(e) => setHandshakeForm(f => ({ ...f, amount: e.target.value }))}
-                  className="bg-slate-900 border-slate-800 font-mono"
-                  placeholder="Amount"
-                  inputMode="decimal"
-                />
-                <Input
-                  value={handshakeForm.associate}
-                  onChange={(e) => setHandshakeForm(f => ({ ...f, associate: e.target.value }))}
-                  className="bg-slate-900 border border-slate-800"
-                  placeholder="Courier / Associate"
-                />
-                <Input
-                  value={handshakeForm.initiatedBy}
-                  onChange={(e) => setHandshakeForm(f => ({ ...f, initiatedBy: e.target.value }))}
-                  className="bg-slate-900 border border-slate-800"
-                  placeholder="Initiated By"
-                />
-                <Button disabled={busy} onClick={initiateHandshake} className="bg-amber-600 hover:bg-amber-500 font-black uppercase">
-                  Initiate
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-amber-950/20 border-amber-800/30">
-            <CardHeader>
-              <CardTitle className="text-lg font-black uppercase italic text-amber-400">
-                Pending Acknowledgments ({handshakeStats.pending})
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              {handshakeStats.pending === 0 ? (
-                <div className="text-center py-8 text-slate-600 italic text-xs">No pending handshakes</div>
-              ) : handshakes.filter(h => h.status === "pending").map(h => (
-                <div key={h.id} className="flex items-center justify-between p-4 bg-slate-900/40 rounded-lg border border-amber-800/30">
-                  <div>
-                    <div className="flex items-center gap-2 text-[10px] font-black uppercase text-slate-400">
-                      {h.from_shop} <ArrowRightLeft className="h-3 w-3" /> {h.to_shop}
-                    </div>
-                    <div className="text-sm font-bold text-white">{h.associate || "Unnamed"}</div>
-                    <div className="text-[10px] text-slate-500">By {h.initiated_by}</div>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <div className="text-xl font-black font-mono italic text-amber-400">${h.amount.toFixed(2)}</div>
-                    <Button size="sm" onClick={() => acknowledgeHandshake(h.id)} className="bg-emerald-600 hover:bg-emerald-500 font-black uppercase">
-                      Acknowledge
-                    </Button>
-                  </div>
-                </div>
-              ))}
-            </CardContent>
-          </Card>
-
-          <Card className="bg-slate-950/60 border-slate-800">
-            <CardHeader>
-              <CardTitle className="text-lg font-black uppercase italic">Handshake History ({handshakeStats.completed})</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2 max-h-[40vh] overflow-y-auto">
-              {handshakeStats.completed === 0 ? (
-                <div className="text-center py-8 text-slate-600 italic text-xs">No completed handshakes</div>
-              ) : handshakes.filter(h => h.status !== "pending").map(h => (
-                <div key={h.id} className="flex items-center justify-between p-3 bg-slate-900/40 rounded-lg border border-slate-800">
-                  <div>
-                    <div className="flex items-center gap-2 text-[10px] font-black uppercase text-emerald-400">
-                      {h.from_shop} <ArrowRightLeft className="h-3 w-3" /> {h.to_shop}
-                    </div>
-                    <div className="text-sm font-bold text-white">{h.associate || "Unnamed"}</div>
-                  </div>
-                  <div className="text-lg font-black font-mono italic text-emerald-400">${h.amount.toFixed(2)}</div>
-                </div>
-              ))}
-            </CardContent>
-          </Card>
-        </div>
-      )}
     </div>
   );
 }
@@ -962,7 +789,7 @@ const TypingStatusCard = memo(function TypingStatusCard({ masterVault, investTot
   combinedTotal: number;
   ledgerCount: number;
   activeShops: number;
-  handshakePending: number;
+  handshakePending?: number;
   auditFailed: number;
 }) {
   const [displayText, setDisplayText] = useState("");
@@ -983,16 +810,16 @@ const TypingStatusCard = memo(function TypingStatusCard({ masterVault, investTot
     if (activeShops > 0) {
       lines.push(`${activeShops} shop${activeShops > 1 ? "s" : ""} active`);
     }
-    if (handshakePending > 0) {
-      lines.push(`! ${handshakePending} handshake${handshakePending > 1 ? "s" : ""} pending`);
+    if ((handshakePending ?? 0) > 0) {
+      lines.push(`! ${handshakePending} handshake${(handshakePending ?? 0) > 1 ? "s" : ""} pending`);
     }
     if (auditFailed > 0) {
       lines.push(`! pos audit variance detected`);
     }
     lines.push("");
-    if (handshakePending === 0 && auditFailed === 0 && activeShops > 0) {
+    if ((handshakePending ?? 0) === 0 && auditFailed === 0 && activeShops > 0) {
       lines.push("all systems nominal...");
-    } else if (handshakePending > 0 || auditFailed > 0) {
+    } else if ((handshakePending ?? 0) > 0 || auditFailed > 0) {
       lines.push("review pending items.");
     } else {
       lines.push("no active operations.");
