@@ -926,7 +926,9 @@ const NirvanaLogoCard = memo(function NirvanaLogoCard({ masterVault, investTotal
               <img 
                 src="/logo.png" 
                 alt="Nirvana" 
-                className="w-full h-full object-contain drop-shadow-[0_0_15px_rgba(139,92,246,0.5)]"
+                className="w-full h-full object-contain"
+                style={{ filter: 'drop-shadow(0 0 15px rgba(139,92,246,0.5))', backgroundColor: 'transparent' }}
+                onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
               />
             </div>
           </div>
