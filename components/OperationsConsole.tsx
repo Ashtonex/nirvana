@@ -87,6 +87,7 @@ export function OperationsConsole({
   const [handshakes, setHandshakes] = useState<HandshakeEntry[]>([]);
   const [auditLogs, setAuditLogs] = useState<AuditEntry[]>([]);
   const [staffLogs, setStaffLogs] = useState<StaffLog[]>([]);
+  const [employees, setEmployees] = useState<any[]>([]);
   const [busy, setBusy] = useState(false);
   const [activeSection, setActiveSection] = useState<"overview" | "handshake">("overview");
 
@@ -155,41 +156,53 @@ export function OperationsConsole({
   }, [staffLogs, shops]);
 
   const allEmployees = useMemo(() => {
-    const employeeMap = new Map<string, { name: string; shopId: string; lastLogin: string | null; isOnline: boolean }>();
     const now = new Date();
+    const recentThreshold = 15 * 60 * 1000;
+    
+    const employeeStatus = new Map<string, { lastLogin: string | null; isOnline: boolean; shopId: string }>();
     
     staffLogs.forEach(log => {
       if (log.employee_id) {
         const logTime = new Date(log.created_at).getTime();
-        const isRecent = Boolean(log.created_at && (now.getTime() - logTime) < 15 * 60 * 1000);
-        const existing = employeeMap.get(log.employee_id);
+        const isRecent = (now.getTime() - logTime) < recentThreshold;
         const isLoginAction = log.action === "login" || log.action === "shift_start";
         
-        if (!existing) {
-          employeeMap.set(log.employee_id, {
-            name: log.employee_name || log.employee_id,
+        if (isLoginAction && isRecent) {
+          employeeStatus.set(log.employee_id, {
+            lastLogin: log.created_at,
+            isOnline: true,
             shopId: log.shop_id,
-            lastLogin: isLoginAction ? log.created_at : null,
-            isOnline: isRecent && isLoginAction,
           });
         } else if (log.action === "logout" && isRecent) {
-          employeeMap.set(log.employee_id, { ...existing, isOnline: false });
-        } else if (isLoginAction && isRecent) {
-          employeeMap.set(log.employee_id, { ...existing, isOnline: true, lastLogin: log.created_at });
+          const existing = employeeStatus.get(log.employee_id);
+          if (existing) {
+            existing.isOnline = false;
+          }
         }
       }
     });
-    return Array.from(employeeMap.values());
-  }, [staffLogs]);
+    
+    return employees.map(emp => {
+      const status = employeeStatus.get(emp.id);
+      return {
+        id: emp.id,
+        name: emp.name || emp.id,
+        shopId: status?.shopId || emp.shop_id || "",
+        lastLogin: status?.lastLogin || null,
+        isOnline: status?.isOnline || false,
+      };
+    });
+  }, [employees, staffLogs]);
 
   const fetchData = useCallback(async () => {
     try {
-      const [ledgerRes, handshakeRes, stateRes, auditRes, staffRes] = await Promise.all([
+      const [ledgerRes, handshakeRes, stateRes, auditRes, staffRes, empRes] = await Promise.all([
         fetch("/api/operations/ledger?limit=100", { cache: "no-store", credentials: "include" }),
         fetch("/api/operations/handshakes", { cache: "no-store", credentials: "include" }),
         fetch("/api/operations/state", { cache: "no-store", credentials: "include" }),
         fetch("/api/pos-audit/logs?limit=20", { cache: "no-store", credentials: "include" }).then(r => r.ok ? r.json() : { logs: [] }).catch(() => ({ logs: [] })),
         fetch("/api/staff/logs?limit=50", { cache: "no-store", credentials: "include" }).then(r => r.ok ? r.json() : { logs: [] }).catch(() => ({ logs: [] })),
+        fetch("/api/employees", { cache: "no-store", credentials: "include" }).then(r => r.ok ? r.json() : { employees: [] }).catch(() => ({ employees: [] })),
       ]);
       
       const ledgerData = await ledgerRes.json().catch(() => ({ rows: [] }));
@@ -201,6 +214,7 @@ export function OperationsConsole({
       if (stateData?.computedBalance != null) setOpsState(stateData);
       if (Array.isArray(auditRes?.logs)) setAuditLogs(auditRes.logs);
       if (Array.isArray(staffRes?.logs)) setStaffLogs(staffRes.logs);
+      if (Array.isArray(empRes?.employees)) setEmployees(empRes.employees);
     } catch (e) {
       console.error("Failed to fetch data:", e);
     }
@@ -902,20 +916,18 @@ const NirvanaLogoCard = memo(function NirvanaLogoCard({ masterVault, investTotal
       <CardContent className="flex flex-col items-center justify-center py-6">
         <div className="perspective-500">
           <div 
-            className="w-20 h-20 mb-4 flex items-center justify-center transition-transform"
+            className="w-20 h-20 mb-4 transition-transform relative"
             style={{ 
               transform: `rotateY(${rotation}deg) rotateX(${tilt}deg)`,
               transformStyle: "preserve-3d"
             }}
           >
-            <div className="absolute w-full h-full bg-gradient-to-br from-violet-500 to-purple-700 rounded-2xl flex items-center justify-center shadow-2xl shadow-violet-500/30 backface-hidden">
-              <span className="text-3xl font-black italic text-white tracking-tighter">N</span>
-            </div>
-            <div 
-              className="absolute w-full h-full bg-gradient-to-br from-purple-700 to-violet-500 rounded-2xl flex items-center justify-center shadow-2xl shadow-violet-500/30"
-              style={{ transform: "rotateY(180deg)" }}
-            >
-              <span className="text-3xl font-black italic text-white tracking-tighter">N</span>
+            <div className="absolute inset-0 backface-hidden">
+              <img 
+                src="/logo.png" 
+                alt="Nirvana" 
+                className="w-full h-full object-contain drop-shadow-[0_0_15px_rgba(139,92,246,0.5)]"
+              />
             </div>
           </div>
         </div>
@@ -1024,70 +1036,148 @@ const AuditMonitorCard = memo(function AuditMonitorCard({ auditStats, ledger }: 
   auditStats: { total: number; passed: number; failed: number; varianceByShop: Record<string, number> }; 
   ledger: any[];
 }) {
-  const [auditLine, setAuditLine] = useState("");
-  const [auditPhase, setAuditPhase] = useState(0);
-  const [highExpenses, setHighExpenses] = useState<any[]>([]);
+  const [displayText, setDisplayText] = useState("");
+  const [currentStep, setCurrentStep] = useState(0);
   const [isRunning, setIsRunning] = useState(true);
+  const [cycleCount, setCycleCount] = useState(1);
   
-  const auditLines = useMemo(() => {
-    const lines: string[] = [];
-    lines.push("[AUDIT] initializing scan...");
-    lines.push("[AUDIT] checking shop compliance...");
-    lines.push("[AUDIT] scanning ledger entries...");
+  const shops = ["SYSTEM", "KIPASA", "DUB DUB", "TRADE CENTER"];
+  
+  const auditSteps = useMemo(() => {
+    const steps: { shop: string; lines: string[]; delay: number }[] = [];
     
-    const recentExpenses = ledger.filter(l => l.amount < 0 && l.kind?.includes("expense"));
-    const flaggedExpenses = recentExpenses.filter(l => Math.abs(l.amount) > 20);
+    const expenses = ledger.filter(l => l.amount < 0 && (l.kind?.includes("expense") || l.kind === "overhead_payment"));
+    const highExpenses = expenses.filter(l => Math.abs(l.amount) > 20);
     
-    if (flaggedExpenses.length > 0) {
-      lines.push(`[!] FLAGGED: ${flaggedExpenses.length} expense(s) over $20`);
-      flaggedExpenses.slice(0, 3).forEach((exp, i) => {
-        lines.push(`    ${i + 1}. $${Math.abs(exp.amount).toFixed(2)} - ${exp.title || 'expense'}`);
-        lines.push(`       Shop: ${exp.shop_id || 'N/A'}`);
+    const systemExpenses = expenses.filter(e => !e.shop_id);
+    const kipasaExpenses = expenses.filter(e => e.shop_id?.toLowerCase().includes("kipasa"));
+    const dubDubExpenses = expenses.filter(e => e.shop_id?.toLowerCase().includes("dub"));
+    const tradeCenterExpenses = expenses.filter(e => e.shop_id?.toLowerCase().includes("trade") || e.shop_id?.toLowerCase().includes("tc"));
+    
+    const systemHigh = systemExpenses.filter(e => Math.abs(e.amount) > 20);
+    const kipasaHigh = kipasaExpenses.filter(e => Math.abs(e.amount) > 20);
+    const dubDubHigh = dubDubExpenses.filter(e => Math.abs(e.amount) > 20);
+    const tradeCenterHigh = tradeCenterExpenses.filter(e => Math.abs(e.amount) > 20);
+    
+    steps.push({
+      shop: "SYSTEM",
+      lines: [
+        "[*] INITIALIZING NIRVANA AUDIT SYSTEM...",
+        "[*] LOADING MODULES...",
+        "[*] CHECKING SECURITY PROTOCOLS...",
+        "[*] SYSTEM CORE: OK",
+        "",
+        `TOTAL EXPENSES SCANNED: ${expenses.length}`,
+        `HIGH EXPENSE FLAGS: ${highExpenses.length}`,
+        "",
+        highExpenses.length > 0 ? "[!] ALERT: EXPENSES OVER $20 DETECTED" : "[+] ALL CLEAR - NO HIGH EXPENSES",
+        "",
+      ],
+      delay: 3000,
+    });
+    
+    const shopHighMap: Record<string, any[]> = {
+      "KIPASA": kipasaHigh,
+      "DUB DUB": dubDubHigh,
+      "TRADE CENTER": tradeCenterHigh,
+    };
+    
+    shops.slice(1).forEach(shopName => {
+      const shopExpenses = shopName === "KIPASA" ? kipasaExpenses : 
+                          shopName === "DUB DUB" ? dubDubExpenses : 
+                          tradeCenterExpenses;
+      const shopHigh = shopHighMap[shopName] || [];
+      
+      steps.push({
+        shop: shopName,
+        lines: [
+          "",
+          `--- AUDITING ${shopName} ---`,
+          `SCANNING ${shopName.toLowerCase()} LEDGER...`,
+          `TOTAL ENTRIES: ${shopExpenses.length}`,
+          "",
+        ],
+        delay: 2000,
       });
-    }
+      
+      if (shopHigh.length > 0) {
+        steps.push({
+          shop: shopName,
+          lines: [
+            `[!] WARNING: ${shopHigh.length} EXPENSE(S) OVER $20 FOUND`,
+            "",
+            ...shopHigh.slice(0, 3).map((exp, i) => [
+              `  ${i + 1}. AMOUNT: $${Math.abs(exp.amount).toFixed(2)}`,
+              `     DESC: ${exp.title || 'expense'}`,
+              `     TYPE: ${exp.kind || 'expense'}`,
+              "",
+            ]).flat(),
+          ],
+          delay: 2500,
+        });
+      } else {
+        steps.push({
+          shop: shopName,
+          lines: [
+            "[+] CLEAR - NO FLAGGED EXPENSES",
+            "",
+          ],
+          delay: 1500,
+        });
+      }
+    });
     
-    lines.push(`[AUDIT] total checks: ${auditStats.total}`);
-    lines.push(`[AUDIT] passed: ${auditStats.passed}`);
-    lines.push(`[AUDIT] failed: ${auditStats.failed}`);
+    steps.push({
+      shop: "SYSTEM",
+      lines: [
+        "═══════════════════════════════════════",
+        "AUDIT SUMMARY",
+        "═══════════════════════════════════════",
+        `TOTAL HIGH EXPENSES (>$20): ${highExpenses.length}`,
+        `AUDIT STATUS: ${highExpenses.length > 0 ? '⚠ ATTENTION NEEDED' : '✓ ALL CLEAR'}`,
+        "═══════════════════════════════════════",
+        "",
+        `CYCLE ${cycleCount} COMPLETE`,
+        "RESTARTING AUDIT IN 5 SECONDS...",
+      ],
+      delay: 4000,
+    });
     
-    if (auditStats.failed > 0) {
-      lines.push("[!] VARIANCE DETECTED:");
-      Object.entries(auditStats.varianceByShop).forEach(([shop, variance]) => {
-        lines.push(`    ${shop}: $${(variance as number).toFixed(2)}`);
-      });
-    }
-    
-    lines.push("[AUDIT] next scan in 5s...");
-    lines.push("ready.");
-    return lines;
-  }, [auditStats, ledger]);
-
+    return steps;
+  }, [ledger, cycleCount]);
+  
   useEffect(() => {
-    if (!isRunning) return;
+    if (!isRunning || currentStep >= auditSteps.length) {
+      if (currentStep >= auditSteps.length && isRunning) {
+        setTimeout(() => {
+          setCurrentStep(0);
+          setCycleCount(c => c + 1);
+        }, 5000);
+      }
+      return;
+    }
     
-    const fullText = auditLines.join("\n");
+    const step = auditSteps[currentStep];
+    const fullText = step.lines.join("\n");
     let charIndex = 0;
     
     const interval = setInterval(() => {
       if (charIndex < fullText.length) {
-        setAuditLine(fullText.substring(0, charIndex + 1));
+        setDisplayText(fullText.substring(0, charIndex + 1));
         charIndex++;
       } else {
         clearInterval(interval);
         setTimeout(() => {
-          setAuditPhase(p => p + 1);
-        }, 2000);
+          setCurrentStep(s => s + 1);
+        }, step.delay);
       }
-    }, 60);
+    }, 40);
     
     return () => clearInterval(interval);
-  }, [auditPhase, isRunning, auditLines]);
+  }, [currentStep, isRunning, auditSteps]);
 
-  useEffect(() => {
-    if (!isRunning) return;
-    const highExp = ledger.filter(l => l.amount < 0 && l.kind?.includes("expense") && Math.abs(l.amount) > 20);
-    setHighExpenses(highExp.slice(0, 5));
-  }, [ledger, isRunning]);
+  const currentShop = auditSteps[currentStep]?.shop || "SYSTEM";
+  const hasFlags = auditSteps.some((s, i) => i <= currentStep && s.lines.some(l => l.includes("[!]")));
 
   return (
     <div className="space-y-3">
@@ -1097,19 +1187,31 @@ const AuditMonitorCard = memo(function AuditMonitorCard({ auditStats, ledger }: 
             "w-2 h-2 rounded-full",
             isRunning ? "bg-emerald-500 animate-pulse" : "bg-slate-500"
           )} />
-          <span className="text-[10px] font-black uppercase text-slate-500">
-            {isRunning ? "Live" : "Paused"}
+          <span className={cn(
+            "text-[10px] font-black uppercase",
+            hasFlags ? "text-rose-400" : "text-emerald-400"
+          )}>
+            {isRunning ? (hasFlags ? "FLAGGED" : "MONITORING") : "PAUSED"}
           </span>
         </div>
-        <div className="text-[10px] text-slate-500 font-mono">
-          cycle {auditPhase + 1}
+        <div className="flex items-center gap-2">
+          <Badge className={cn(
+            "text-[8px] font-black uppercase",
+            currentShop === "SYSTEM" ? "bg-violet-500/20 text-violet-400" : "bg-sky-500/20 text-sky-400"
+          )}>
+            {currentShop}
+          </Badge>
+          <span className="text-[10px] text-slate-500 font-mono">
+            CYCLE {cycleCount}
+          </span>
         </div>
       </div>
       
-      <div className="bg-slate-950/80 border border-slate-800/50 rounded-lg p-3 h-40 overflow-hidden">
-        <pre className="text-[10px] font-mono text-emerald-400/90 whitespace-pre-wrap leading-relaxed overflow-y-auto h-full">
-          {auditLine}
-          <span className="animate-pulse">▋</span>
+      <div className="bg-slate-950/90 border border-slate-800/50 rounded-lg p-3 h-48 overflow-hidden relative">
+        <div className="absolute inset-0 bg-gradient-to-b from-transparent to-slate-950/50 pointer-events-none" />
+        <pre className="text-[10px] font-mono text-emerald-400/95 whitespace-pre-wrap leading-relaxed overflow-y-auto h-full relative z-10">
+          {displayText}
+          {isRunning && currentStep < auditSteps.length && <span className="animate-pulse">▋</span>}
         </pre>
       </div>
       
@@ -1118,31 +1220,22 @@ const AuditMonitorCard = memo(function AuditMonitorCard({ auditStats, ledger }: 
           size="sm" 
           variant="outline" 
           onClick={() => setIsRunning(!isRunning)}
-          className="flex-1 text-[10px] font-black uppercase h-7"
+          className={cn(
+            "flex-1 text-[10px] font-black uppercase h-7",
+            isRunning ? "border-rose-500/50 text-rose-400" : "border-emerald-500/50 text-emerald-400"
+          )}
         >
-          {isRunning ? "Pause" : "Resume"}
+          {isRunning ? "⏸ PAUSE" : "▶ RESUME"}
         </Button>
         <Button 
           size="sm" 
           variant="outline" 
-          onClick={() => { setAuditPhase(p => p + 1); }}
-          className="flex-1 text-[10px] font-black uppercase h-7"
+          onClick={() => { setCurrentStep(0); setCycleCount(1); }}
+          className="flex-1 text-[10px] font-black uppercase h-7 border-slate-700 text-slate-400"
         >
-          Force Scan
+          ↺ RESTART
         </Button>
       </div>
-      
-      {highExpenses.length > 0 && (
-        <div className="pt-2 border-t border-slate-800">
-          <div className="text-[10px] font-black uppercase text-rose-500 mb-2">High Expenses ({">"}$20)</div>
-          {highExpenses.map((exp, i) => (
-            <div key={i} className="flex justify-between text-[10px] py-1 text-rose-400">
-              <span>{exp.title || 'expense'}</span>
-              <span className="font-mono">${Math.abs(exp.amount).toFixed(2)}</span>
-            </div>
-          ))}
-        </div>
-      )}
     </div>
   );
 });
