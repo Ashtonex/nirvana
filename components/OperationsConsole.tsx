@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { Badge, Button, Card, CardContent, CardDescription, CardHeader, CardTitle, Input } from "@/components/ui";
-import { Coins, Loader2, Pencil, Trash2, ArrowRightLeft, DollarSign, History, TrendingUp, TrendingDown, Warehouse, Upload, Download, Plus, Minus, Activity, Users, Shield, Handshake, LogOut, Wifi, WifiOff } from "lucide-react";
+import { Coins, Loader2, Trash2, ArrowRightLeft, DollarSign, History, TrendingUp, TrendingDown, Warehouse, Upload, Download, Plus, Minus, Activity, Users, Shield, Handshake, LogOut, Wifi, WifiOff } from "lucide-react";
 import { cn } from "@/components/ui";
 
 type ShopNode = {
@@ -20,7 +20,6 @@ type LedgerEntry = {
   title?: string;
   notes?: string;
   created_at: string;
-  metadata?: any;
 };
 
 type OpsState = {
@@ -74,19 +73,15 @@ export function OperationsConsole({
   const [busy, setBusy] = useState(false);
   const [activeSection, setActiveSection] = useState<"overview" | "handshake">("overview");
 
-  // State from API
   const [opsState, setOpsState] = useState<OpsState>(initialState);
 
-  // Master Vault = sum of all ledger entries
   const masterVault = useMemo(() => {
     return ledger.reduce((sum, entry) => sum + Number(entry.amount || 0), 0);
   }, [ledger]);
 
-  // Invest total from state
   const investTotal = opsState?.invest?.available || 0;
   const combinedTotal = masterVault + investTotal;
 
-  // Handshake stats
   const handshakeStats = useMemo(() => {
     const total = handshakes.length;
     const pending = handshakes.filter(h => h.status === "pending").length;
@@ -95,16 +90,19 @@ export function OperationsConsole({
     return { total, pending, completed, totalValue };
   }, [handshakes]);
 
-  // POS Audit stats
   const auditStats = useMemo(() => {
     const total = auditLogs.length;
     const passed = auditLogs.filter(a => a.status === "passed").length;
     const failed = auditLogs.filter(a => a.status === "failed").length;
-    const totalVariance = auditLogs.reduce((sum, a) => sum + Math.abs(Number(a.variance || 0)), 0);
-    return { total, passed, failed, totalVariance };
+    const varianceByShop: Record<string, number> = {};
+    auditLogs.forEach(a => {
+      if (a.status === "failed") {
+        varianceByShop[a.shop_id] = (varianceByShop[a.shop_id] || 0) + Math.abs(Number(a.variance || 0));
+      }
+    });
+    return { total, passed, failed, varianceByShop };
   }, [auditLogs]);
 
-  // Active shops (from staff logs)
   const activeShops = useMemo(() => {
     const shopMap = new Map<string, { lastLogin: string; staff: string }>();
     staffLogs.forEach(log => {
@@ -153,14 +151,12 @@ export function OperationsConsole({
     return () => clearInterval(interval);
   }, [fetchData]);
 
-  // Form state
   const [form, setForm] = useState({
     amount: "",
     type: "income",
     category: "eod_deposit",
     shopId: "",
     title: "",
-    notes: "",
   });
 
   const isExpense = form.type === "expense";
@@ -190,12 +186,11 @@ export function OperationsConsole({
           shopId: form.shopId || null,
           overheadCategory: form.category === "overhead_contribution" ? detectOverheadCategory(form.title) : null,
           title: form.title,
-          notes: form.notes || null,
         }),
       });
       
       if (!res.ok) throw new Error("Failed");
-      setForm({ amount: "", type: "income", category: "eod_deposit", shopId: "", title: "", notes: "" });
+      setForm({ amount: "", type: "income", category: "eod_deposit", shopId: "", title: "" });
       await fetchData();
     } catch (e) {
       alert("Failed to add entry");
@@ -221,14 +216,12 @@ export function OperationsConsole({
     }
   };
 
-  // Handshake functions
   const [handshakeForm, setHandshakeForm] = useState({
     fromShop: "",
     toShop: "",
     amount: "",
     associate: "",
     initiatedBy: "",
-    notes: "",
   });
 
   const initiateHandshake = async () => {
@@ -250,7 +243,7 @@ export function OperationsConsole({
         body: JSON.stringify(handshakeForm),
       });
       if (!res.ok) throw new Error("Failed");
-      setHandshakeForm({ fromShop: "", toShop: "", amount: "", associate: "", initiatedBy: "", notes: "" });
+      setHandshakeForm({ fromShop: "", toShop: "", amount: "", associate: "", initiatedBy: "" });
       await fetchData();
     } catch (e) {
       alert("Failed to initiate handshake");
@@ -278,8 +271,7 @@ export function OperationsConsole({
   return (
     <div className="space-y-6">
       {/* Top Cards Row */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-        {/* Master Vault */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card className="bg-gradient-to-br from-emerald-950/60 to-slate-950 border-emerald-800/40">
           <CardHeader className="pb-2">
             <CardDescription className="text-[10px] font-black uppercase tracking-widest text-emerald-500/70 flex items-center gap-1">
@@ -287,14 +279,13 @@ export function OperationsConsole({
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-black italic text-emerald-300 font-mono">
+            <div className="text-4xl font-black italic text-emerald-300 font-mono">
               ${masterVault.toLocaleString()}
             </div>
             <p className="text-[10px] text-slate-500 mt-1">Total cash in business</p>
           </CardContent>
         </Card>
 
-        {/* Invest */}
         <Card className="bg-gradient-to-br from-sky-950/60 to-slate-950 border-sky-800/40">
           <CardHeader className="pb-2">
             <CardDescription className="text-[10px] font-black uppercase tracking-widest text-sky-500/70 flex items-center gap-1">
@@ -302,14 +293,13 @@ export function OperationsConsole({
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-black italic text-sky-300 font-mono">
+            <div className="text-4xl font-black italic text-sky-300 font-mono">
               ${investTotal.toLocaleString()}
             </div>
-            <p className="text-[10px] text-slate-500 mt-1">Perfume growth fund</p>
+            <p className="text-[10px] text-slate-500 mt-1">Perfume deposits total</p>
           </CardContent>
         </Card>
 
-        {/* Combined */}
         <Card className="bg-gradient-to-br from-violet-950/60 to-slate-950 border-violet-800/40">
           <CardHeader className="pb-2">
             <CardDescription className="text-[10px] font-black uppercase tracking-widest text-violet-500/70 flex items-center gap-1">
@@ -317,72 +307,24 @@ export function OperationsConsole({
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-black italic text-violet-300 font-mono">
+            <div className="text-4xl font-black italic text-violet-300 font-mono">
               ${combinedTotal.toLocaleString()}
             </div>
             <p className="text-[10px] text-slate-500 mt-1">Vault + Invest</p>
           </CardContent>
         </Card>
-
-        {/* Handshake Stats */}
-        <Card className="bg-gradient-to-br from-amber-950/60 to-slate-950 border-amber-800/40">
-          <CardHeader className="pb-2">
-            <CardDescription className="text-[10px] font-black uppercase tracking-widest text-amber-500/70 flex items-center gap-1">
-              <Handshake className="h-3 w-3" /> Handshakes
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center gap-2">
-              <span className="text-2xl font-black italic text-amber-300">{handshakeStats.total}</span>
-              <div className="text-[10px]">
-                <div className="text-emerald-400">{handshakeStats.completed} signed</div>
-                <div className={handshakeStats.pending > 0 ? "text-amber-400" : "text-slate-600"}>
-                  {handshakeStats.pending} pending
-                </div>
-              </div>
-            </div>
-            <p className="text-[10px] text-slate-500 mt-1">Total: ${handshakeStats.totalValue.toLocaleString()}</p>
-          </CardContent>
-        </Card>
-
-        {/* POS Audit Stats */}
-        <Card className={cn(
-          "bg-gradient-to-br to-slate-950 border",
-          auditStats.failed > 0 ? "from-rose-950/60 border-rose-800/40" : "from-slate-900/60 border-slate-800/40"
-        )}>
-          <CardHeader className="pb-2">
-            <CardDescription className="text-[10px] font-black uppercase tracking-widest text-slate-500/70 flex items-center gap-1">
-              <Shield className="h-3 w-3" /> POS Audit
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center gap-2">
-              <span className={cn("text-2xl font-black italic", auditStats.failed > 0 ? "text-rose-300" : "text-emerald-300")}>
-                {auditStats.failed > 0 ? "!" : "OK"}
-              </span>
-              <div className="text-[10px]">
-                <div className="text-emerald-400">{auditStats.passed} passed</div>
-                <div className={auditStats.failed > 0 ? "text-rose-400" : "text-slate-600"}>
-                  {auditStats.failed} failed
-                </div>
-              </div>
-            </div>
-            <p className="text-[10px] text-slate-500 mt-1">Variance: ${auditStats.totalVariance.toFixed(2)}</p>
-          </CardContent>
-        </Card>
       </div>
 
-      {/* Log Card & Nirvana Logo Row */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        {/* Log Card - Active Shops */}
-        <Card className="lg:col-span-2 bg-gradient-to-br from-slate-900/80 to-slate-950 border-slate-800/50">
+      {/* Monitor Cards Row */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {/* Live Activity Log */}
+        <Card className="bg-gradient-to-br from-slate-900/80 to-slate-950 border-slate-800/50">
           <CardHeader className="pb-2">
             <CardTitle className="text-lg font-black uppercase italic flex items-center gap-2">
-              <Activity className="h-5 w-5 text-emerald-400" /> Live Activity Log
+              <Activity className="h-5 w-5 text-emerald-400" /> Live Log
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            {/* Active Shops */}
             <div className="space-y-2">
               <div className="text-[10px] font-black uppercase text-slate-500 flex items-center gap-2">
                 <Users className="h-3 w-3" /> Active Shops ({activeShops.length})
@@ -399,20 +341,16 @@ export function OperationsConsole({
                 ))}
               </div>
             </div>
-
-            {/* Recent Staff Activity */}
-            <div className="space-y-1 max-h-32 overflow-y-auto">
-              <div className="text-[10px] font-black uppercase text-slate-500">Recent Activity</div>
-              {staffLogs.slice(0, 8).map(log => (
+            <div className="space-y-1 max-h-24 overflow-y-auto">
+              <div className="text-[10px] font-black uppercase text-slate-500">Recent</div>
+              {staffLogs.slice(0, 5).map(log => (
                 <div key={log.id} className="flex items-center justify-between text-[10px] py-1 border-b border-slate-800/50">
                   <div className="flex items-center gap-2">
                     <LogOut className="h-3 w-3 text-slate-600" />
                     <span className="text-slate-400">{log.employee_name || log.employee_id}</span>
                     <span className="text-slate-600">@ {log.shop_id}</span>
                   </div>
-                  <span className="text-slate-600">
-                    {new Date(log.created_at).toLocaleTimeString()}
-                  </span>
+                  <span className="text-slate-600">{new Date(log.created_at).toLocaleTimeString()}</span>
                 </div>
               ))}
               {staffLogs.length === 0 && (
@@ -422,7 +360,18 @@ export function OperationsConsole({
           </CardContent>
         </Card>
 
-        {/* Nirvana Logo Rotating Card */}
+        {/* Typing Status */}
+        <TypingStatusCard 
+          masterVault={masterVault}
+          investTotal={investTotal}
+          combinedTotal={combinedTotal}
+          ledgerCount={ledger.length}
+          activeShops={activeShops.length}
+          handshakePending={handshakeStats.pending}
+          auditFailed={auditStats.failed}
+        />
+
+        {/* Nirvana Logo */}
         <NirvanaLogoCard 
           masterVault={masterVault} 
           investTotal={investTotal} 
@@ -432,16 +381,85 @@ export function OperationsConsole({
         />
       </div>
 
-      {/* Typing Status Card */}
-      <TypingStatusCard 
-        masterVault={masterVault}
-        investTotal={investTotal}
-        combinedTotal={combinedTotal}
-        ledgerCount={ledger.length}
-        activeShops={activeShops.length}
-        handshakePending={handshakeStats.pending}
-        auditFailed={auditStats.failed}
-      />
+      {/* Monitor Cards Row 2 */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* POS Audit Monitor */}
+        <Card className={cn(
+          "bg-gradient-to-br border",
+          auditStats.failed > 0 ? "from-rose-950/60 to-slate-950 border-rose-800/40" : "from-slate-900/60 to-slate-950 border-slate-800/40"
+        )}>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-lg font-black uppercase italic flex items-center gap-2">
+              <Shield className="h-5 w-5 text-sky-400" /> POS Audit Monitor
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="flex items-center gap-4">
+              <div className="text-center">
+                <div className={cn("text-3xl font-black italic", auditStats.failed > 0 ? "text-rose-300" : "text-emerald-300")}>
+                  {auditStats.failed > 0 ? "!" : "OK"}
+                </div>
+                <div className="text-[10px] text-slate-500">Status</div>
+              </div>
+              <div className="flex-1 space-y-1">
+                <div className="flex justify-between text-xs">
+                  <span className="text-emerald-500">Passed</span>
+                  <span className="text-emerald-400 font-mono">{auditStats.passed}</span>
+                </div>
+                <div className="flex justify-between text-xs">
+                  <span className={auditStats.failed > 0 ? "text-rose-500" : "text-slate-500"}>Failed</span>
+                  <span className={auditStats.failed > 0 ? "text-rose-400 font-mono" : "text-slate-600 font-mono"}>{auditStats.failed}</span>
+                </div>
+              </div>
+            </div>
+            {Object.keys(auditStats.varianceByShop).length > 0 && (
+              <div className="pt-2 border-t border-slate-800">
+                <div className="text-[10px] font-black uppercase text-slate-500 mb-2">Variance by Shop</div>
+                {Object.entries(auditStats.varianceByShop).map(([shop, variance]) => (
+                  <div key={shop} className="flex justify-between text-xs py-1">
+                    <span className="text-rose-400">{shop}</span>
+                    <span className="text-rose-300 font-mono">${variance.toFixed(2)}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+            {auditStats.total === 0 && (
+              <div className="text-xs text-slate-600 italic text-center py-4">No audits run yet</div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Handshake Tracker */}
+        <Card className="bg-gradient-to-br from-amber-950/60 to-slate-950 border-amber-800/40">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-lg font-black uppercase italic flex items-center gap-2">
+              <Handshake className="h-5 w-5 text-amber-400" /> Handshake Tracker
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="grid grid-cols-3 gap-4 text-center">
+              <div>
+                <div className="text-3xl font-black italic text-amber-300">{handshakeStats.total}</div>
+                <div className="text-[10px] text-slate-500">Created</div>
+              </div>
+              <div>
+                <div className={cn("text-3xl font-black italic", handshakeStats.pending > 0 ? "text-amber-300" : "text-emerald-300")}>
+                  {handshakeStats.pending}
+                </div>
+                <div className="text-[10px] text-slate-500">Pending</div>
+              </div>
+              <div>
+                <div className="text-3xl font-black italic text-emerald-300">{handshakeStats.completed}</div>
+                <div className="text-[10px] text-slate-500">Signed</div>
+              </div>
+            </div>
+            <div className="pt-2 border-t border-slate-800 text-center">
+              <div className="text-xs text-slate-500">Total Value</div>
+              <div className="text-xl font-black font-mono italic text-amber-300">${handshakeStats.totalValue.toLocaleString()}</div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
 
       {/* Section Tabs */}
       <div className="flex gap-2 border-b border-slate-800">
@@ -470,7 +488,7 @@ export function OperationsConsole({
         </button>
       </div>
 
-      {/* OVERVIEW SECTION */}
+      {/* OPERATIONS SECTION */}
       {activeSection === "overview" && (
         <div className="space-y-6">
           {/* Add Entry Form */}
@@ -505,7 +523,7 @@ export function OperationsConsole({
                 </Button>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3">
                 <div className="space-y-1">
                   <label className="text-[10px] font-black uppercase text-slate-500">Amount</label>
                   <Input
@@ -558,7 +576,7 @@ export function OperationsConsole({
                   </select>
                 </div>
 
-                <div className="space-y-1">
+                <div className="space-y-1 lg:col-span-2">
                   <label className="text-[10px] font-black uppercase text-slate-500">Description</label>
                   <Input
                     value={form.title}
@@ -590,77 +608,50 @@ export function OperationsConsole({
             </CardContent>
           </Card>
 
-          {/* Shop Overhead Reconciliation */}
+          {/* Recent Transactions */}
           <Card className="bg-slate-950/60 border-slate-800">
             <CardHeader>
               <CardTitle className="text-lg font-black uppercase italic flex items-center gap-2">
-                <TrendingUp className="h-5 w-5 text-emerald-400" /> Shop Overhead Reconciliation
+                <History className="h-5 w-5" /> Recent Transactions
               </CardTitle>
-              <CardDescription className="text-[10px]">
-                Contributions IN vs Expenses OUT per shop
-              </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-3">
-              {(() => {
-                const byShop: Record<string, { contributed: number; paid: number }> = {};
-                shops.forEach(s => {
-                  byShop[s.id] = { contributed: 0, paid: 0 };
-                });
-                ledger.forEach(entry => {
-                  if (entry.shop_id) {
-                    if (entry.kind === "overhead_contribution" || entry.amount > 0) {
-                      byShop[entry.shop_id] = byShop[entry.shop_id] || { contributed: 0, paid: 0 };
-                      byShop[entry.shop_id].contributed += Math.abs(Number(entry.amount || 0));
-                    } else {
-                      byShop[entry.shop_id] = byShop[entry.shop_id] || { contributed: 0, paid: 0 };
-                      byShop[entry.shop_id].paid += Math.abs(Number(entry.amount || 0));
-                    }
-                  }
-                });
-                
-                const shopData = shops.map(s => ({
-                  id: s.id,
-                  name: s.name,
-                  contributed: byShop[s.id]?.contributed || 0,
-                  paid: byShop[s.id]?.paid || 0,
-                  net: (byShop[s.id]?.contributed || 0) - (byShop[s.id]?.paid || 0),
-                })).filter(s => s.contributed > 0 || s.paid > 0);
-                
-                if (shopData.length === 0) {
-                  return <div className="text-center py-8 text-slate-600 italic text-xs">No shop contributions yet</div>;
-                }
-                
+            <CardContent className="space-y-2 max-h-[50vh] overflow-y-auto">
+              {ledger.length === 0 ? (
+                <div className="text-center py-12 text-slate-600 italic">No transactions yet</div>
+              ) : ledger.map(entry => {
+                const isIncome = Number(entry.amount) >= 0;
                 return (
-                  <div className="space-y-2">
-                    {shopData.map(shop => (
-                      <div key={shop.id} className="p-4 bg-slate-900/40 rounded-lg border border-slate-800">
-                        <div className="flex items-center justify-between mb-3">
-                          <div className="flex items-center gap-2">
-                            <div className="w-3 h-3 rounded-full bg-emerald-500" />
-                            <span className="text-sm font-black text-white uppercase">{shop.name}</span>
-                          </div>
-                          <span className={cn(
-                            "text-lg font-black font-mono italic",
-                            shop.net >= 0 ? "text-emerald-400" : "text-rose-400"
-                          )}>
-                            {shop.net >= 0 ? "+" : ""}${shop.net.toFixed(2)}
-                          </span>
-                        </div>
-                        <div className="grid grid-cols-2 gap-4">
-                          <div className="flex justify-between text-xs">
-                            <span className="text-emerald-500">Contributed</span>
-                            <span className="font-mono text-emerald-400">${shop.contributed.toFixed(2)}</span>
-                          </div>
-                          <div className="flex justify-between text-xs">
-                            <span className="text-rose-500">Paid Out</span>
-                            <span className="font-mono text-rose-400">${shop.paid.toFixed(2)}</span>
-                          </div>
-                        </div>
+                  <div key={entry.id} className="flex items-center justify-between p-4 bg-slate-900/40 rounded-lg border border-slate-800 hover:border-slate-700 transition-colors">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        <Badge className={cn("text-[8px] font-black uppercase", isIncome ? "bg-emerald-500/20 text-emerald-400" : "bg-rose-500/20 text-rose-400")}>
+                          {entry.kind}
+                        </Badge>
+                        {entry.shop_id && (
+                          <Badge className="bg-slate-700/50 text-slate-400 text-[8px] font-black uppercase">
+                            {entry.shop_id}
+                          </Badge>
+                        )}
+                        {entry.overhead_category && (
+                          <Badge className="bg-amber-500/20 text-amber-400 text-[8px] font-black uppercase">
+                            {entry.overhead_category}
+                          </Badge>
+                        )}
                       </div>
-                    ))}
+                      <div className="text-sm font-bold text-white">{entry.title || entry.notes || "—"}</div>
+                      <div className="text-[10px] text-slate-600">{new Date(entry.created_at).toLocaleString()}</div>
+                    </div>
+                    <div className="flex items-center gap-4">
+                      <div className={cn("text-xl font-black font-mono italic", isIncome ? "text-emerald-400" : "text-rose-400")}>
+                        {isIncome ? "+" : ""}{Number(entry.amount).toFixed(2)}
+                      </div>
+                      <Button size="sm" variant="ghost" onClick={() => deleteEntry(entry.id)} className="h-8 w-8 p-0 text-slate-600 hover:text-rose-400">
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </div>
                 );
-              })()}
+              })}
             </CardContent>
           </Card>
         </div>
@@ -669,7 +660,6 @@ export function OperationsConsole({
       {/* HANDSHAKE SECTION */}
       {activeSection === "handshake" && (
         <div className="space-y-6">
-          {/* Initiate Handshake */}
           <Card className="bg-gradient-to-br from-amber-950/30 to-slate-950 border-amber-800/30">
             <CardHeader>
               <CardTitle className="text-lg font-black uppercase italic text-amber-400 flex items-center gap-2">
@@ -707,7 +697,7 @@ export function OperationsConsole({
                   value={handshakeForm.associate}
                   onChange={(e) => setHandshakeForm(f => ({ ...f, associate: e.target.value }))}
                   className="bg-slate-900 border border-slate-800"
-                  placeholder="Courier"
+                  placeholder="Courier / Associate"
                 />
                 <Input
                   value={handshakeForm.initiatedBy}
@@ -722,11 +712,10 @@ export function OperationsConsole({
             </CardContent>
           </Card>
 
-          {/* Pending Handshakes */}
           <Card className="bg-amber-950/20 border-amber-800/30">
             <CardHeader>
               <CardTitle className="text-lg font-black uppercase italic text-amber-400">
-                Pending ({handshakeStats.pending})
+                Pending Acknowledgments ({handshakeStats.pending})
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-2">
@@ -752,10 +741,9 @@ export function OperationsConsole({
             </CardContent>
           </Card>
 
-          {/* Handshake History */}
           <Card className="bg-slate-950/60 border-slate-800">
             <CardHeader>
-              <CardTitle className="text-lg font-black uppercase italic">History ({handshakeStats.completed})</CardTitle>
+              <CardTitle className="text-lg font-black uppercase italic">Handshake History ({handshakeStats.completed})</CardTitle>
             </CardHeader>
             <CardContent className="space-y-2 max-h-[40vh] overflow-y-auto">
               {handshakeStats.completed === 0 ? (
@@ -779,13 +767,12 @@ export function OperationsConsole({
   );
 }
 
-// Nirvana Logo Rotating Card
 function NirvanaLogoCard({ masterVault, investTotal, handshakes, auditPassed, auditFailed }: {
   masterVault: number;
   investTotal: number;
   handshakes: any[];
-  auditPassed: number;
   auditFailed: number;
+  auditPassed: number;
 }) {
   const allGood = auditFailed === 0 && handshakes.every(h => h.status !== "pending");
   const [rotation, setRotation] = useState(0);
@@ -802,47 +789,38 @@ function NirvanaLogoCard({ masterVault, investTotal, handshakes, auditPassed, au
       "bg-gradient-to-br border-2",
       allGood ? "from-violet-950/60 to-slate-950 border-violet-500/50" : "from-amber-950/60 to-slate-950 border-amber-500/50"
     )}>
-      <CardContent className="flex flex-col items-center justify-center py-8">
+      <CardContent className="flex flex-col items-center justify-center py-6">
         <div 
-          className={cn(
-            "w-24 h-24 mb-4 flex items-center justify-center transition-all duration-1000",
-            allGood ? "" : "animate-pulse"
-          )}
+          className="w-20 h-20 mb-4 flex items-center justify-center transition-all duration-1000"
           style={{ transform: `rotate(${rotation}deg)` }}
         >
           <div className="w-full h-full bg-gradient-to-br from-violet-500 to-purple-700 rounded-2xl flex items-center justify-center shadow-2xl shadow-violet-500/30">
-            <span className="text-4xl font-black italic text-white tracking-tighter">N</span>
+            <span className="text-3xl font-black italic text-white tracking-tighter">N</span>
           </div>
         </div>
         <div className="text-center">
-          <div className={cn(
-            "text-2xl font-black italic uppercase",
-            allGood ? "text-violet-300" : "text-amber-300"
-          )}>
+          <div className={cn("text-xl font-black italic uppercase", allGood ? "text-violet-300" : "text-amber-300")}>
             {allGood ? "Nirvana" : "Attention"}
           </div>
           <div className="text-[10px] text-slate-500 mt-1">
             {allGood ? "All systems operational" : "Action required"}
           </div>
         </div>
-        <div className="flex gap-4 mt-4 text-[10px]">
-          <div className="flex items-center gap-1">
-            {allGood ? (
-              <Wifi className="h-3 w-3 text-emerald-400" />
-            ) : (
-              <WifiOff className="h-3 w-3 text-amber-400" />
-            )}
-            <span className={allGood ? "text-emerald-400" : "text-amber-400"}>
-              {allGood ? "Connected" : "Issues"}
-            </span>
-          </div>
+        <div className="flex items-center gap-2 mt-3 text-[10px]">
+          {allGood ? (
+            <Wifi className="h-3 w-3 text-emerald-400" />
+          ) : (
+            <WifiOff className="h-3 w-3 text-amber-400" />
+          )}
+          <span className={allGood ? "text-emerald-400" : "text-amber-400"}>
+            {allGood ? "Connected" : "Issues"}
+          </span>
         </div>
       </CardContent>
     </Card>
   );
 }
 
-// Slow Typing Status Card
 function TypingStatusCard({ masterVault, investTotal, combinedTotal, ledgerCount, activeShops, handshakePending, auditFailed }: {
   masterVault: number;
   investTotal: number;
@@ -855,48 +833,39 @@ function TypingStatusCard({ masterVault, investTotal, combinedTotal, ledgerCount
   const [displayText, setDisplayText] = useState("");
   const [isTyping, setIsTyping] = useState(true);
   const charIndex = useRef(0);
-  const linesRef = useRef(0);
 
   const fullText = useMemo(() => {
     const lines: string[] = [];
-    lines.push("nirvana operations dashboard initializing...");
+    lines.push("initializing nirvana dashboard...");
     lines.push(".");
     lines.push(".");
     lines.push(".");
     lines.push("");
-    lines.push(`master vault status: $${masterVault.toLocaleString()}`);
-    lines.push(`invest fund status: $${investTotal.toLocaleString()}`);
-    lines.push(`combined total: $${combinedTotal.toLocaleString()}`);
+    lines.push(`vault status: $${masterVault.toLocaleString()}`);
+    lines.push(`invest status: $${investTotal.toLocaleString()}`);
+    lines.push(`combined: $${combinedTotal.toLocaleString()}`);
     lines.push("");
-    
     if (activeShops > 0) {
-      lines.push(`${activeShops} shop${activeShops > 1 ? "s" : ""} currently active`);
+      lines.push(`${activeShops} shop${activeShops > 1 ? "s" : ""} active`);
     }
-    
     if (handshakePending > 0) {
-      lines.push(`! ${handshakePending} handshake${handshakePending > 1 ? "s" : ""} awaiting acknowledgment`);
+      lines.push(`! ${handshakePending} handshake${handshakePending > 1 ? "s" : ""} pending`);
     }
-    
     if (auditFailed > 0) {
       lines.push(`! pos audit variance detected`);
     }
-    
     lines.push("");
-    
     if (handshakePending === 0 && auditFailed === 0 && activeShops > 0) {
       lines.push("all systems nominal...");
-      lines.push("no immediate action required.");
     } else if (handshakePending > 0 || auditFailed > 0) {
-      lines.push("review pending items in respective tabs.");
+      lines.push("review pending items.");
     } else {
-      lines.push("no active operations detected.");
+      lines.push("no active operations.");
     }
-    
     lines.push("");
-    lines.push(`total transactions logged: ${ledgerCount}`);
+    lines.push(`transactions logged: ${ledgerCount}`);
     lines.push("");
-    lines.push("dashboard ready.");
-    
+    lines.push("ready.");
     return lines.join("\n");
   }, [masterVault, investTotal, combinedTotal, ledgerCount, activeShops, handshakePending, auditFailed]);
 
@@ -930,7 +899,6 @@ function TypingStatusCard({ masterVault, investTotal, combinedTotal, ledgerCount
   );
 }
 
-// Helper
 function detectOverheadCategory(title: string): string {
   const t = title.toLowerCase();
   if (t.includes("rent")) return "rent";
