@@ -437,6 +437,7 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
         } else {
             setCart([...cart, { item, quantity: qtyToAdd, price }]);
         }
+        setSearchTerm("");
     };
 
     const removeFromCart = (id: string) => {
@@ -1151,10 +1152,14 @@ Generated via NIRVANA POS`;
         }
     };
 
-    const filteredInventory = inventoryState.filter((item: any) =>
-        item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        item.category.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    const filteredInventory = inventoryState.filter((item: any) => {
+        const matchesSearch = item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            item.category.toLowerCase().includes(searchTerm.toLowerCase());
+        const allocation = item.allocations?.find((a: any) => a.shopId === shopId);
+        const qtyAtShop = allocation ? allocation.quantity : 0;
+        const hasStock = qtyAtShop > 0 || item.id.startsWith('adhoc');
+        return matchesSearch && hasStock;
+    });
 
     return (
         <div className="grid gap-4 md:gap-6 md:grid-cols-12 grid-cols-1">

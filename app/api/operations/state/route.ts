@@ -60,6 +60,19 @@ export async function GET() {
       totalInvestWithdrawn += withdrawn;
     });
 
+    const { data: opsLedgerRows } = await supabaseAdmin
+      .from("operations_ledger")
+      .select("amount, kind, shop_id");
+
+    const opsSavingsByShop: Record<string, number> = {};
+    (opsLedgerRows || []).forEach((r: any) => {
+      if (r.shop_id && (r.kind === "eod_deposit" || r.kind === "savings_contribution")) {
+        const shop = r.shop_id;
+        if (!opsSavingsByShop[shop]) opsSavingsByShop[shop] = 0;
+        opsSavingsByShop[shop] += Number(r.amount || 0);
+      }
+    });
+
     const totalInvestAvailable = totalInvest - totalInvestWithdrawn;
     const combinedTotal = (opsState?.actual_balance || 0) + totalInvestAvailable;
 
@@ -107,6 +120,9 @@ export async function GET() {
         withdrawn: totalInvestWithdrawn,
         available: totalInvestAvailable,
         byShop: investByShop
+      },
+      savings: {
+        byShop: opsSavingsByShop
       },
       combinedTotal,
       overheadTracking: {
