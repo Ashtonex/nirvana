@@ -1,9 +1,17 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef, memo } from "react";
 import { Badge, Button, Card, CardContent, CardDescription, CardHeader, CardTitle, Input } from "@/components/ui";
 import { Coins, Loader2, Trash2, ArrowRightLeft, DollarSign, History, TrendingUp, TrendingDown, Warehouse, Upload, Download, Plus, Minus, Activity, Users, Shield, Handshake, LogOut, Wifi, WifiOff } from "lucide-react";
 import { cn } from "@/components/ui";
+
+function detectOverheadCategory(title: string): string {
+  const t = title.toLowerCase();
+  if (t.includes("rent")) return "rent";
+  if (t.includes("utilities") || t.includes("electric") || t.includes("water")) return "utilities";
+  if (t.includes("salar") || t.includes("wage")) return "salaries";
+  return "misc";
+}
 
 type ShopNode = {
   id: string;
@@ -867,7 +875,7 @@ export function OperationsConsole({
   );
 }
 
-function NirvanaLogoCard({ masterVault, investTotal, handshakes, auditPassed, auditFailed }: {
+const NirvanaLogoCard = memo(function NirvanaLogoCard({ masterVault, investTotal, handshakes, auditPassed, auditFailed }: {
   masterVault: number;
   investTotal: number;
   handshakes: any[];
@@ -932,9 +940,9 @@ function NirvanaLogoCard({ masterVault, investTotal, handshakes, auditPassed, au
       </CardContent>
     </Card>
   );
-}
+});
 
-function TypingStatusCard({ masterVault, investTotal, combinedTotal, ledgerCount, activeShops, handshakePending, auditFailed }: {
+const TypingStatusCard = memo(function TypingStatusCard({ masterVault, investTotal, combinedTotal, ledgerCount, activeShops, handshakePending, auditFailed }: {
   masterVault: number;
   investTotal: number;
   combinedTotal: number;
@@ -1010,17 +1018,9 @@ function TypingStatusCard({ masterVault, investTotal, combinedTotal, ledgerCount
       </CardContent>
     </Card>
   );
-}
+});
 
-function detectOverheadCategory(title: string): string {
-  const t = title.toLowerCase();
-  if (t.includes("rent")) return "rent";
-  if (t.includes("utilities") || t.includes("electric") || t.includes("water")) return "utilities";
-  if (t.includes("salar") || t.includes("wage")) return "salaries";
-  return "misc";
-}
-
-function AuditMonitorCard({ auditStats, ledger }: { 
+const AuditMonitorCard = memo(function AuditMonitorCard({ auditStats, ledger }: { 
   auditStats: { total: number; passed: number; failed: number; varianceByShop: Record<string, number> }; 
   ledger: any[];
 }) {
@@ -1145,4 +1145,4 @@ function AuditMonitorCard({ auditStats, ledger }: {
       )}
     </div>
   );
-}
+});
