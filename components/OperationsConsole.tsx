@@ -339,6 +339,28 @@ export function OperationsConsole({
         </Card>
       </div>
 
+      {/* Shop Savings Cards Row */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {shops.map((shop) => {
+          const shopInvest = opsState?.invest?.byShop?.[shop.id]?.available || 0;
+          return (
+            <Card key={shop.id} className="bg-gradient-to-br from-cyan-950/40 to-slate-950 border-cyan-800/30">
+              <CardHeader className="pb-2">
+                <CardDescription className="text-[10px] font-black uppercase tracking-widest text-cyan-500/70">
+                  {shop.name} Savings
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="text-3xl font-black italic text-cyan-300 font-mono">
+                  ${shopInvest.toLocaleString()}
+                </div>
+                <p className="text-[10px] text-slate-500 mt-1">Total deposited</p>
+              </CardContent>
+            </Card>
+          );
+        })}
+      </div>
+
       {/* Monitor Cards Row */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {/* Live Activity Log */}
