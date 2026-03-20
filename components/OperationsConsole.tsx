@@ -40,6 +40,14 @@ type HandshakeEntry = {
   acknowledged_at?: string;
 };
 
+type OverheadSummary = {
+  shopId: string;
+  shopName: string;
+  contributed: number;
+  paid: number;
+  net: number;
+};
+
 type AuditEntry = {
   id: string;
   shop_id: string;
@@ -81,6 +89,22 @@ export function OperationsConsole({
 
   const investTotal = opsState?.invest?.available || 0;
   const combinedTotal = masterVault + investTotal;
+
+  const overheadSummary: OverheadSummary[] = useMemo(() => {
+    const summary: Record<string, OverheadSummary> = {};
+    shops.forEach(shop => {
+      summary[shop.id] = { shopId: shop.id, shopName: shop.name, contributed: 0, paid: 0, net: 0 };
+    });
+    ledger.forEach(entry => {
+      if (entry.kind === "overhead_contribution" && entry.shop_id) {
+        summary[entry.shop_id] = { ...summary[entry.shop_id], contributed: (summary[entry.shop_id]?.contributed || 0) + Number(entry.amount || 0) };
+      } else if (entry.kind === "overhead_payment" && entry.shop_id) {
+        summary[entry.shop_id] = { ...summary[entry.shop_id], paid: (summary[entry.shop_id]?.paid || 0) + Math.abs(Number(entry.amount || 0)) };
+      }
+    });
+    Object.values(summary).forEach(s => { s.net = s.contributed - s.paid; });
+    return Object.values(summary).filter(s => s.contributed > 0 || s.paid > 0);
+  }, [ledger, shops]);
 
   const handshakeStats = useMemo(() => {
     const total = handshakes.length;
@@ -654,6 +678,46 @@ export function OperationsConsole({
               })}
             </CardContent>
           </Card>
+
+          {/* Overhead Tracker */}
+          {overheadSummary.length > 0 && (
+            <Card className="bg-gradient-to-br from-amber-950/40 to-slate-950 border-amber-800/30">
+              <CardHeader>
+                <CardTitle className="text-lg font-black uppercase italic flex items-center gap-2">
+                  <TrendingUp className="h-5 w-5 text-emerald-400" /> Shop Overhead Tracker
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {overheadSummary.map(shop => (
+                    <div key={shop.shopId} className="p-4 bg-slate-900/40 rounded-lg border border-slate-800">
+                      <div className="text-sm font-black uppercase text-white mb-3">{shop.shopName}</div>
+                      <div className="space-y-2">
+                        <div className="flex justify-between text-xs">
+                          <span className="text-emerald-500 flex items-center gap-1">
+                            <TrendingUp className="h-3 w-3" /> Contributed
+                          </span>
+                          <span className="font-mono text-emerald-400">${shop.contributed.toFixed(2)}</span>
+                        </div>
+                        <div className="flex justify-between text-xs">
+                          <span className="text-rose-500 flex items-center gap-1">
+                            <TrendingDown className="h-3 w-3" /> Paid
+                          </span>
+                          <span className="font-mono text-rose-400">${shop.paid.toFixed(2)}</span>
+                        </div>
+                        <div className="flex justify-between text-xs border-t border-slate-700 pt-2">
+                          <span className="text-slate-400">Net</span>
+                          <span className={cn("font-mono font-black", shop.net >= 0 ? "text-emerald-400" : "text-rose-400")}>
+                            {shop.net >= 0 ? "+" : ""}${shop.net.toFixed(2)}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </div>
       )}
 
