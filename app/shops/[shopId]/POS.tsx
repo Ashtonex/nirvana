@@ -676,6 +676,14 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
                         employeeId: selectedEmployeeId || "system"
                     });
 
+                    if (res.error) {
+                        alert(`Lay-by failed: ${res.error}`);
+                        return;
+                    }
+
+                    const laybyId = res.id!;
+                    const laybyDate = res.date!;
+
                     // Lay-by reserves stock immediately; reflect it locally so staff can keep selling without refresh.
                     for (const entry of cart) {
                         applyLocalStockDecrement(entry.item.id, entry.quantity);
@@ -684,7 +692,7 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
                     // Push new lay-by into local list so it appears in the Lay-by modal immediately
                     setLaybyList((prev: LaybyQuote[]) => [
                         {
-                            id: res.id,
+                            id: laybyId,
                             shopId,
                             clientName,
                             clientPhone,
@@ -700,7 +708,7 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
                             totalWithTax,
                             paidAmount: deposit,
                             status: 'layby',
-                            date: res.date,
+                            date: laybyDate,
                             expiryDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
                             employeeId: selectedEmployeeId || "system",
                         },
@@ -708,9 +716,9 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
                     ]);
 
                     currentReceiptData = {
-                        orderId: `LAY-${res.id}`,
-                        receiptNo: `#LAY-${res.id}`,
-                        transactionId: res.id,
+                        orderId: `LAY-${laybyId}`,
+                        receiptNo: `#LAY-${laybyId}`,
+                        transactionId: laybyId,
                         shopName: shop?.name || "NIRVANA STORE",
                         cashier,
                         clientName,

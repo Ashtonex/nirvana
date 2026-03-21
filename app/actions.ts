@@ -1922,12 +1922,10 @@ export async function recordLayby(layby: {
         const id = Math.random().toString(36).substring(2, 9);
         const date = new Date().toISOString();
 
-        // Validate items
         if (!layby.items || layby.items.length === 0) {
-            throw new Error("Lay-by requires at least one item");
+            return { error: "Lay-by requires at least one item" };
         }
 
-        // Pre-check stock before writing anything so we don't create partial lay-bys.
         for (const item of layby.items) {
             if (!item.itemId || String(item.itemId).startsWith('service_') || String(item.itemId).startsWith('adhoc')) continue;
             const qty = Math.max(1, Number(item.quantity || 0));
@@ -1940,17 +1938,16 @@ export async function recordLayby(layby: {
 
             if (allocErr) {
                 console.error('[recordLayby] Stock check failed:', allocErr);
-                throw new Error(`Stock check failed: ${allocErr.message}`);
+                return { error: `Stock check failed: ${allocErr.message}` };
             }
 
             if (!alloc || Number(alloc.quantity || 0) < qty) {
-                throw new Error(`Insufficient stock for lay-by: ${item.itemName || item.itemId}`);
+                return { error: `Insufficient stock for lay-by: ${item.itemName || item.itemId}` };
             }
         }
 
         console.log('[recordLayby] Stock check passed, creating quotation...');
 
-        // 1. Create the Lay-by record in quotations table
         const base: any = {
             id,
             shop_id: layby.shopId,
@@ -1966,7 +1963,6 @@ export async function recordLayby(layby: {
             status: 'layby'
         };
 
-        // Insert with column fallback (in case paid_amount/client_phone not in schema yet)
         const working: any = { ...base };
         let inserted = false;
         for (let attempt = 0; attempt < 6; attempt++) {
@@ -1987,19 +1983,17 @@ export async function recordLayby(layby: {
                 continue;
             }
             console.error('[recordLayby] Quotation insert failed:', res.error);
-            throw new Error(res.error.message);
+            return { error: res.error.message };
         }
-        if (!inserted) throw new Error('Failed to create lay-by record');
+        if (!inserted) return { error: 'Failed to create lay-by record' };
 
         console.log('[recordLayby] Decrementing inventory...');
 
-        // 2. Reserve Inventory (Reduce stock immediately)
         for (const item of layby.items) {
             if (!item.itemId || String(item.itemId).startsWith('service_') || String(item.itemId).startsWith('adhoc')) continue;
 
             const qty = Math.max(1, Number(item.quantity || 0));
 
-            // Use atomic DB functions to match sale behavior and avoid race conditions.
             const decAlloc = await supabaseAdmin.rpc('decrement_allocation', {
                 item_id: item.itemId,
                 shop_id: layby.shopId,
@@ -2007,7 +2001,7 @@ export async function recordLayby(layby: {
             });
             if (decAlloc.error) {
                 console.error('[recordLayby] decrement_allocation RPC failed:', decAlloc.error);
-                throw new Error(`Failed to reserve stock: ${decAlloc.error.message}`);
+                return { error: `Failed to reserve stock: ${decAlloc.error.message}` };
             }
 
             const decInv = await supabaseAdmin.rpc('decrement_inventory', {
@@ -2016,13 +2010,12 @@ export async function recordLayby(layby: {
             });
             if (decInv.error) {
                 console.error('[recordLayby] decrement_inventory RPC failed:', decInv.error);
-                throw new Error(`Failed to update inventory: ${decInv.error.message}`);
+                return { error: `Failed to update inventory: ${decInv.error.message}` };
             }
         }
 
         console.log('[recordLayby] Recording ledger entry...');
 
-        // 3. Record the deposit in the ledger (Cash inflow)
         const ledgerRes = await supabaseAdmin.from('ledger_entries').insert({
             id: Math.random().toString(36).substring(2, 9),
             shop_id: layby.shopId,
@@ -2034,14 +2027,14 @@ export async function recordLayby(layby: {
         });
         if (ledgerRes.error) {
             console.error('[recordLayby] Ledger insert failed:', ledgerRes.error);
-            throw new Error(`Failed to record deposit: ${ledgerRes.error.message}`);
+            return { error: `Failed to record deposit: ${ledgerRes.error.message}` };
         }
 
         console.log('[recordLayby] Success! ID:', id);
         return { id, date };
     } catch (e: any) {
         console.error('[recordLayby] CRITICAL ERROR:', e?.message || e);
-        throw e;
+        return { error: e?.message || 'Unknown error' };
     }
 }
 
