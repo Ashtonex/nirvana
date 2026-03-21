@@ -176,7 +176,7 @@ async function sendOperationsReport(daysBack: number = 7) {
       </div>
       <div style="background:#1e293b;padding:16px 14px;border-radius:10px;text-align:center;border:1px solid #334155;">
         <p style="margin:0;font-size:9px;color:#94a3b8;letter-spacing:1px;">OVERHEAD PAID</p>
-        <p style="margin:6px 0 0;font-size:22px;font-weight:900;color:#f59e0b;">$${overheadPayments.reduce((s,n) => s+Math.abs(Number(n?.amount||0)), 0).toFixed(2)}</p>
+        <p style="margin:6px 0 0;font-size:22px;font-weight:900;color:#f59e0b;">$${overheadPayments.reduce((s: number, n: any) => s+Math.abs(Number(n?.amount||0)), 0).toFixed(2)}</p>
         <p style="margin:4px 0 0;font-size:10px;color:#64748b;">${overheadPayments.length} payments</p>
       </div>
     </div>
@@ -273,7 +273,7 @@ async function sendOperationsReport(daysBack: number = 7) {
     ${overheadPayments.length > 0 ? `
     <div style="background:#78350f;border-radius:10px;overflow:hidden;margin-bottom:20px;border-left:4px solid #f59e0b;">
       <div style="background:#92400e;padding:12px 20px;">
-        <strong style="font-size:12px;color:#fef3c7;letter-spacing:1px;">OVERHEAD PAYMENTS (${overheadPayments.length} entries | $${overheadPayments.reduce((s,n) => s+Math.abs(Number(n?.amount||0)), 0).toFixed(2)} total)</strong>
+        <strong style="font-size:12px;color:#fef3c7;letter-spacing:1px;">OVERHEAD PAYMENTS (${overheadPayments.length} entries | $${overheadPayments.reduce((s: number, n: any) => s+Math.abs(Number(n?.amount||0)), 0).toFixed(2)} total)</strong>
       </div>
       <table style="width:100%;border-collapse:collapse;font-size:11px;">
         <thead>
