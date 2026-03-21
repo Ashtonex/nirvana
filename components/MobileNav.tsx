@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { Home, Package, Menu, MessageSquare, ArrowRightLeft } from 'lucide-react';
+import { Home, Package, Menu, MessageSquare, ArrowRightLeft, Settings, LayoutDashboard } from 'lucide-react';
 
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -13,41 +13,43 @@ function cn(...inputs: ClassValue[]) {
     return twMerge(clsx(inputs));
 }
 
-const ALLOWED_EMAIL = "flectere@dev.com";
-
 export function MobileNav() {
     const pathname = usePathname();
     const { staff } = useStaff();
-    const [canShow, setCanShow] = useState(false);
+    const [isOwnerOrAdmin, setIsOwnerOrAdmin] = useState(false);
+    const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        // Don't show for staff (and avoid firing owner auth checks).
-        if (staff) {
-            setCanShow(false);
-            return;
-        }
-        fetch("/api/auth/me", { cache: "no-store", credentials: "include" })
-            .then(res => res.json())
-            .then(data => {
-                if (data?.user?.email === ALLOWED_EMAIL) {
-                    setCanShow(true);
+        async function checkAuth() {
+            try {
+                const res = await fetch("/api/staff/me", { cache: "no-store", credentials: "include" });
+                if (res.ok) {
+                    const data = await res.json();
+                    const role = String(data?.staff?.role || "").toLowerCase();
+                    if (role === "owner" || role === "admin") {
+                        setIsOwnerOrAdmin(true);
+                    }
                 }
-            })
-            .catch(() => {});
-    }, [staff]);
+            } catch (e) {
+                console.error("[MobileNav] Auth check error:", e);
+            } finally {
+                setLoading(false);
+            }
+        }
+        checkAuth();
+    }, []);
 
-    // Don't show for staff
+    // Don't show for staff (shop staff), only for owner/admin
+    if (loading) return null;
     if (staff) return null;
-
-    // Only show for specific allowed user
-    if (!canShow) return null;
+    if (!isOwnerOrAdmin) return null;
 
     const tabs = [
         { name: 'Home', href: '/', icon: Home },
+        { name: 'Dashboard', href: '/', icon: LayoutDashboard },
         { name: 'Inventory', href: '/inventory', icon: Package },
         { name: 'Chat', href: '/chat', icon: MessageSquare },
-        { name: 'Transfers', href: '/transfers', icon: ArrowRightLeft },
-        { name: 'Menu', href: '/mobile-menu', icon: Menu },
+        { name: 'More', href: '/mobile-menu', icon: Menu },
     ];
 
     return (
@@ -62,7 +64,7 @@ export function MobileNav() {
                             className={cn(
                                 "flex flex-col items-center justify-center space-y-1 transition-colors",
                                 isActive
-                                    ? "text-primary"
+                                    ? "text-emerald-400"
                                     : "text-slate-500 hover:text-slate-300"
                             )}
                         >
