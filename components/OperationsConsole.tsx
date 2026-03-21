@@ -335,7 +335,7 @@ export function OperationsConsole({
   };
 
   const handleGenerateReport = async () => {
-    if (!confirm("Generate and email an operations report for the last 7 days?")) return;
+    if (!confirm("Download operations report for the last 7 days?")) return;
     setIsGeneratingReport(true);
     try {
       const res = await fetch("/api/operations/report", {
@@ -344,9 +344,16 @@ export function OperationsConsole({
         credentials: "include",
         body: JSON.stringify({ daysBack: 7 }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed");
-      alert("Operations report sent successfully!");
+      if (!res.ok) throw new Error("Failed to generate report");
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `ops-report-${new Date().toISOString().split("T")[0]}.html`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
     } catch (e: any) {
       alert("Failed to generate report: " + (e?.message || "Unknown error"));
     } finally {
@@ -401,27 +408,6 @@ export function OperationsConsole({
         </Card>
       </div>
 
-      {/* Generate Report Button */}
-      <div className="flex justify-center">
-        <Button
-          disabled={isGeneratingReport}
-          onClick={handleGenerateReport}
-          className="font-black uppercase px-8 bg-amber-600 hover:bg-amber-500 text-white"
-        >
-          {isGeneratingReport ? (
-            <>
-              <Loader2 className="h-4 w-4 animate-spin mr-2" />
-              Generating...
-            </>
-          ) : (
-            <>
-              <Download className="h-4 w-4 mr-2" />
-              Generate Operations Report
-            </>
-          )}
-        </Button>
-      </div>
-
       {/* Shop Savings Cards Row */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {shops.map((shop) => {
@@ -442,6 +428,67 @@ export function OperationsConsole({
             </Card>
           );
         })}
+      </div>
+
+      {/* Overhead Tracker */}
+      {overheadSummary.length > 0 && (
+        <Card className="bg-gradient-to-br from-amber-950/40 to-slate-950 border-amber-800/30">
+          <CardHeader>
+            <CardTitle className="text-lg font-black uppercase italic flex items-center gap-2">
+              <TrendingUp className="h-5 w-5 text-emerald-400" /> Shop Overhead Tracker
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {overheadSummary.map(shop => (
+                <div key={shop.shopId} className="p-4 bg-slate-900/40 rounded-lg border border-slate-800">
+                  <div className="text-sm font-black uppercase text-white mb-3">{shop.shopName}</div>
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-xs">
+                      <span className="text-emerald-500 flex items-center gap-1">
+                        <TrendingUp className="h-3 w-3" /> Contributed
+                      </span>
+                      <span className="font-mono text-emerald-400">${shop.contributed.toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between text-xs">
+                      <span className="text-rose-500 flex items-center gap-1">
+                        <TrendingDown className="h-3 w-3" /> Paid
+                      </span>
+                      <span className="font-mono text-rose-400">${shop.paid.toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between text-xs border-t border-slate-700 pt-2">
+                      <span className="text-slate-400">Net</span>
+                      <span className={cn("font-mono font-black", shop.net >= 0 ? "text-emerald-400" : "text-rose-400")}>
+                        {shop.net >= 0 ? "+" : ""}${shop.net.toFixed(2)}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Generate Report Button */}
+      <div className="flex justify-center">
+        <Button
+          disabled={isGeneratingReport}
+          onClick={handleGenerateReport}
+          className="font-black uppercase px-8 bg-amber-600 hover:bg-amber-500 text-white"
+        >
+          {isGeneratingReport ? (
+            <>
+              <Loader2 className="h-4 w-4 animate-spin mr-2" />
+              Generating...
+            </>
+          ) : (
+            <>
+              <Download className="h-4 w-4 mr-2" />
+              Generate Operations Report
+            </>
+          )}
+        </Button>
       </div>
 
       {/* Monitor Cards Row */}
@@ -777,45 +824,6 @@ export function OperationsConsole({
             </CardContent>
           </Card>
 
-          {/* Overhead Tracker */}
-          {overheadSummary.length > 0 && (
-            <Card className="bg-gradient-to-br from-amber-950/40 to-slate-950 border-amber-800/30">
-              <CardHeader>
-                <CardTitle className="text-lg font-black uppercase italic flex items-center gap-2">
-                  <TrendingUp className="h-5 w-5 text-emerald-400" /> Shop Overhead Tracker
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  {overheadSummary.map(shop => (
-                    <div key={shop.shopId} className="p-4 bg-slate-900/40 rounded-lg border border-slate-800">
-                      <div className="text-sm font-black uppercase text-white mb-3">{shop.shopName}</div>
-                      <div className="space-y-2">
-                        <div className="flex justify-between text-xs">
-                          <span className="text-emerald-500 flex items-center gap-1">
-                            <TrendingUp className="h-3 w-3" /> Contributed
-                          </span>
-                          <span className="font-mono text-emerald-400">${shop.contributed.toFixed(2)}</span>
-                        </div>
-                        <div className="flex justify-between text-xs">
-                          <span className="text-rose-500 flex items-center gap-1">
-                            <TrendingDown className="h-3 w-3" /> Paid
-                          </span>
-                          <span className="font-mono text-rose-400">${shop.paid.toFixed(2)}</span>
-                        </div>
-                        <div className="flex justify-between text-xs border-t border-slate-700 pt-2">
-                          <span className="text-slate-400">Net</span>
-                          <span className={cn("font-mono font-black", shop.net >= 0 ? "text-emerald-400" : "text-rose-400")}>
-                            {shop.net >= 0 ? "+" : ""}${shop.net.toFixed(2)}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          )}
     </div>
   );
 }
