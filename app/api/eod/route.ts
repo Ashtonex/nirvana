@@ -164,6 +164,267 @@ async function sendWeeklyReport(shopId: string, staffName: string) {
   }
 }
 
+// Enhanced Weekly Report with Operations & Cost Analysis
+async function sendEnhancedWeeklyReport() {
+  const since = startOfWeekUTC();
+  const lastWeekStart = new Date(since);
+  lastWeekStart.setDate(lastWeekStart.getDate() - 7);
+
+  // Get all shops
+  const { data: shops } = await supabaseAdmin.from('shops').select('id, name, expenses');
+  const shopList = shops || [];
+
+  // Get this week's sales (ALL shops)
+  const { data: thisWeekSales } = await supabaseAdmin
+    .from('sales')
+    .select('shop_id, total_with_tax, date')
+    .gte('date', since);
+
+  // Get last week's sales for comparison
+  const { data: lastWeekSales } = await supabaseAdmin
+    .from('sales')
+    .select('shop_id, total_with_tax, date')
+    .gte('date', lastWeekStart.toISOString())
+    .lt('date', since);
+
+  // Get operations ledger (ALL shops for the week)
+  const { data: opsLedger } = await supabaseAdmin
+    .from('operations_ledger')
+    .select('amount, kind, title, shop_id, created_at')
+    .gte('created_at', since);
+
+  // Get invest deposits (ALL shops)
+  const { data: investDeposits } = await supabaseAdmin
+    .from('invest_deposits')
+    .select('amount, withdrawn, shop_id, created_at')
+    .gte('created_at', since);
+
+  // Calculate totals
+  const thisWeekRevenue = (thisWeekSales || []).reduce((sum: number, s: any) => sum + Number(s.total_with_tax || 0), 0);
+  const lastWeekRevenue = (lastWeekSales || []).reduce((sum: number, s: any) => sum + Number(s.total_with_tax || 0), 0);
+  const revenueGrowth = lastWeekRevenue > 0 ? ((thisWeekRevenue - lastWeekRevenue) / lastWeekRevenue) * 100 : 0;
+
+  // Operations summary
+  const opsRows = opsLedger || [];
+  const deposits = opsRows.filter((r: any) => r.kind === 'eod_deposit' || r.kind === 'overhead_contribution');
+  const totalDeposits = deposits.reduce((sum: number, r: any) => sum + Number(r.amount || 0), 0);
+  const expenses = opsRows.filter((r: any) => r.kind?.includes('expense') || r.kind === 'overhead_payment');
+  const totalExpenses = expenses.reduce((sum: number, r: any) => sum + Math.abs(Number(r.amount || 0)), 0);
+
+  // By shop breakdown
+  const byShop: Record<string, { revenue: number; deposits: number; expenses: number }> = {};
+  shopList.forEach((shop: any) => {
+    const shopSales = (thisWeekSales || []).filter((s: any) => s.shop_id === shop.id);
+    const shopRevenue = shopSales.reduce((sum: number, s: any) => sum + Number(s.total_with_tax || 0), 0);
+    const shopDeposits = deposits.filter((d: any) => d.shop_id === shop.id);
+    const shopDepositTotal = shopDeposits.reduce((sum: number, d: any) => sum + Number(d.amount || 0), 0);
+    const shopExpenses = expenses.filter((e: any) => e.shop_id === shop.id);
+    const shopExpenseTotal = shopExpenses.reduce((sum: number, e: any) => sum + Math.abs(Number(e.amount || 0)), 0);
+    byShop[shop.name] = { revenue: shopRevenue, deposits: shopDepositTotal, expenses: shopExpenseTotal };
+  });
+
+  // Invest/Perfume growth
+  const thisWeekInvest = (investDeposits || []).reduce((sum: number, d: any) => sum + Number(d.amount || 0), 0);
+  const { data: lastWeekInvest } = await supabaseAdmin
+    .from('invest_deposits')
+    .select('amount')
+    .gte('created_at', lastWeekStart.toISOString())
+    .lt('created_at', since);
+  const lastWeekInvestTotal = (lastWeekInvest || []).reduce((sum: number, d: any) => sum + Number(d.amount || 0), 0);
+  const investGrowth = lastWeekInvestTotal > 0 ? ((thisWeekInvest - lastWeekInvestTotal) / lastWeekInvestTotal) * 100 : 0;
+
+  // Get monthly overhead target from shop expenses
+  const monthlyOverhead = shopList.reduce((sum: number, shop: any) => {
+    const exp = shop.expenses as Record<string, number> || {};
+    return sum + Object.values(exp).reduce((a: number, b: number) => a + (b || 0), 0);
+  }, 0);
+  const weeklyOverheadTarget = monthlyOverhead / 4.33;
+
+  // Cost Analysis & Suggestions (AI-style deterministic analysis)
+  const suggestions: string[] = [];
+  const highCostCategories: Record<string, number> = {};
+
+  // Analyze expense categories
+  expenses.forEach((e: any) => {
+    const cat = e.title || e.kind || 'Uncategorized';
+    highCostCategories[cat] = (highCostCategories[cat] || 0) + Math.abs(Number(e.amount || 0));
+  });
+
+  // Generate suggestions based on data
+  if (totalExpenses > totalDeposits * 0.3) {
+    suggestions.push(`⚠️ EXPENSES HIGH: Expenses ($${totalExpenses.toFixed(2)}) exceed 30% of deposits. Review overhead allocation.`);
+  }
+
+  if (revenueGrowth < 0) {
+    suggestions.push(`📉 REVENUE DIP: Sales down ${Math.abs(revenueGrowth).toFixed(1)}% vs last week. Consider promotions or inventory check.`);
+  } else if (revenueGrowth > 10) {
+    suggestions.push(`📈 STRONG GROWTH: Revenue up ${revenueGrowth.toFixed(1)}% vs last week. Capitalize on this momentum!`);
+  }
+
+  if (investGrowth > 0) {
+    suggestions.push(`💰 INVESTMENT GROWTH: Perfume/Invest deposits up ${investGrowth.toFixed(1)}% this week.`);
+  }
+
+  // High cost categories
+  const topCosts = Object.entries(highCostCategories)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 3);
+  
+  if (topCosts.length > 0) {
+    suggestions.push(`💸 TOP COSTS THIS WEEK: ${topCosts.map(([k, v]) => `${k} ($${v.toFixed(2)})`).join(', ')}`);
+  }
+
+  // Efficiency suggestions
+  const avgDailyRevenue = thisWeekRevenue / 7;
+  if (avgDailyRevenue < weeklyOverheadTarget) {
+    suggestions.push(`🎯 BREAK-EVEN FOCUS: Average daily revenue ($${avgDailyRevenue.toFixed(2)}) below overhead target ($${weeklyOverheadTarget.toFixed(2)}/day).`);
+  }
+
+  // Shop-specific suggestions
+  Object.entries(byShop).forEach(([shopName, data]) => {
+    if (data.revenue > 0 && data.expenses > data.revenue * 0.5) {
+      suggestions.push(`🏪 ${shopName.toUpperCase()}: High expense ratio (${((data.expenses / data.revenue) * 100).toFixed(0)}% of revenue). Audit overhead.`);
+    }
+  });
+
+  if (suggestions.length === 0) {
+    suggestions.push("✅ OPERATIONS STABLE: All metrics within acceptable ranges. Continue current strategy.");
+  }
+
+  const startDate = new Date(since).toLocaleDateString();
+  const endDate = new Date().toLocaleDateString();
+
+  const recipient = process.env.EOD_REPORT_RECIPIENT || ORACLE_RECIPIENT;
+
+  try {
+    await sendEmail({
+      to: recipient,
+      subject: `[WEEKLY OVERVIEW] All Shops — ${startDate} to ${endDate}`,
+      html: `
+        <div style="font-family:sans-serif;max-width:800px;margin:0 auto;">
+          <h2 style="margin:0 0 12px;">📊 Enhanced Weekly Overview — All Shops Combined</h2>
+          <p style="color:#64748b;margin:0 0 4px;">Week: ${startDate} - ${endDate}</p>
+          <p style="color:#64748b;margin:0 0 16px;">Generated: ${new Date().toLocaleString()}</p>
+
+          <div style="background:linear-gradient(135deg,#1e3a5f,#0f172a);padding:20px;border-radius:12px;margin-bottom:16px;">
+            <h3 style="margin:0 0 16px;color:#fff;">💰 Weekly Performance Summary</h3>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+              <div style="background:rgba(255,255,255,0.1);padding:12px;border-radius:8px;">
+                <p style="margin:0;color:#94a3b8;font-size:12px;">This Week Revenue</p>
+                <p style="margin:4px 0 0;font-size:24px;font-weight:bold;color:#10b981;">$${thisWeekRevenue.toFixed(2)}</p>
+                ${revenueGrowth !== 0 ? `<p style="margin:4px 0 0;font-size:12px;color:${revenueGrowth >= 0 ? '#10b981' : '#ef4444'};">${revenueGrowth >= 0 ? '↑' : '↓'} ${Math.abs(revenueGrowth).toFixed(1)}% vs last week</p>` : ''}
+              </div>
+              <div style="background:rgba(255,255,255,0.1);padding:12px;border-radius:8px;">
+                <p style="margin:0;color:#94a3b8;font-size:12px;">Invest/Perfume Growth</p>
+                <p style="margin:4px 0 0;font-size:24px;font-weight:bold;color:#8b5cf6;">$${thisWeekInvest.toFixed(2)}</p>
+                ${investGrowth !== 0 ? `<p style="margin:4px 0 0;font-size:12px;color:${investGrowth >= 0 ? '#10b981' : '#ef4444'};">${investGrowth >= 0 ? '↑' : '↓'} ${Math.abs(investGrowth).toFixed(1)}% vs last week</p>` : ''}
+              </div>
+              <div style="background:rgba(255,255,255,0.1);padding:12px;border-radius:8px;">
+                <p style="margin:0;color:#94a3b8;font-size:12px;">Operations Deposits</p>
+                <p style="margin:4px 0 0;font-size:24px;font-weight:bold;color:#3b82f6;">$${totalDeposits.toFixed(2)}</p>
+                <p style="margin:4px 0 0;font-size:12px;color:#94a3b8;">${deposits.length} transactions</p>
+              </div>
+              <div style="background:rgba(255,255,255,0.1);padding:12px;border-radius:8px;">
+                <p style="margin:0;color:#94a3b8;font-size:12px;">Total Expenses</p>
+                <p style="margin:4px 0 0;font-size:24px;font-weight:bold;color:#ef4444;">$${totalExpenses.toFixed(2)}</p>
+                <p style="margin:4px 0 0;font-size:12px;color:#94a3b8;">${expenses.length} entries</p>
+              </div>
+            </div>
+          </div>
+
+          <div style="background:#f1f5f9;padding:16px;border-radius:12px;margin-bottom:16px;">
+            <h3 style="margin:0 0 12px;">📍 Performance by Shop</h3>
+            <table style="width:100%;border-collapse:collapse;font-size:12px;">
+              <thead>
+                <tr style="background:#e2e8f0;">
+                  <th style="text-align:left;padding:8px;">Shop</th>
+                  <th style="text-align:right;padding:8px;">Revenue</th>
+                  <th style="text-align:right;padding:8px;">Deposits</th>
+                  <th style="text-align:right;padding:8px;">Expenses</th>
+                  <th style="text-align:right;padding:8px;">Net</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${Object.entries(byShop).map(([name, data]) => `
+                  <tr style="border-bottom:1px solid #e2e8f0;">
+                    <td style="padding:8px;font-weight:600;">${name}</td>
+                    <td style="padding:8px;text-align:right;color:#10b981;">$${data.revenue.toFixed(2)}</td>
+                    <td style="padding:8px;text-align:right;color:#3b82f6;">$${data.deposits.toFixed(2)}</td>
+                    <td style="padding:8px;text-align:right;color:#ef4444;">$${data.expenses.toFixed(2)}</td>
+                    <td style="padding:8px;text-align:right;font-weight:600;color:${(data.deposits - data.expenses) >= 0 ? '#10b981' : '#ef4444'};">$${(data.deposits - data.expenses).toFixed(2)}</td>
+                  </tr>
+                `).join('')}
+                <tr style="background:#f8fafc;font-weight:700;">
+                  <td style="padding:8px;">TOTAL</td>
+                  <td style="padding:8px;text-align:right;color:#10b981;">$${thisWeekRevenue.toFixed(2)}</td>
+                  <td style="padding:8px;text-align:right;color:#3b82f6;">$${totalDeposits.toFixed(2)}</td>
+                  <td style="padding:8px;text-align:right;color:#ef4444;">$${totalExpenses.toFixed(2)}</td>
+                  <td style="padding:8px;text-align:right;color:#10b981;">$${(totalDeposits - totalExpenses).toFixed(2)}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div style="background:#fef3c7;padding:16px;border-radius:12px;border-left:4px solid #f59e0b;margin-bottom:16px;">
+            <h3 style="margin:0 0 12px;color:#92400e;">🔍 Cost Analysis & Efficiency Suggestions</h3>
+            <ul style="margin:0;padding-left:20px;color:#78350f;">
+              ${suggestions.map(s => `<li style="margin:8px 0;font-size:13px;">${s}</li>`).join('')}
+            </ul>
+          </div>
+
+          <div style="background:#f1f5f9;padding:16px;border-radius:12px;margin-bottom:16px;">
+            <h3 style="margin:0 0 12px;">💵 Operations Ledger Summary</h3>
+            <p style="margin:0 0 8px;font-size:12px;color:#64748b;">All cash movements from Operations page this week</p>
+            <table style="width:100%;border-collapse:collapse;font-size:11px;">
+              <thead>
+                <tr>
+                  <th style="text-align:left;border-bottom:1px solid #cbd5e1;padding:6px;">Date</th>
+                  <th style="text-align:left;border-bottom:1px solid #cbd5e1;padding:6px;">Type</th>
+                  <th style="text-align:left;border-bottom:1px solid #cbd5e1;padding:6px;">Description</th>
+                  <th style="text-align:right;border-bottom:1px solid #cbd5e1;padding:6px;">Amount</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${opsRows.slice(0, 20).map((r: any) => `
+                  <tr>
+                    <td style="padding:6px;border-bottom:1px solid #e2e8f0;">${new Date(r.created_at).toLocaleDateString()}</td>
+                    <td style="padding:6px;border-bottom:1px solid #e2e8f0;">
+                      <span style="background:${r.amount >= 0 ? '#dcfce7' : '#fee2e2'};padding:2px 6px;border-radius:4px;font-size:10px;">
+                        ${r.kind || 'unknown'}
+                      </span>
+                    </td>
+                    <td style="padding:6px;border-bottom:1px solid #e2e8f0;">${r.title || '-'}</td>
+                    <td style="padding:6px;border-bottom:1px solid #e2e8f0;text-align:right;color:${r.amount >= 0 ? '#10b981' : '#ef4444'};">
+                      ${r.amount >= 0 ? '+' : ''}$${Number(r.amount || 0).toFixed(2)}
+                    </td>
+                  </tr>
+                `).join('')}
+                ${opsRows.length > 20 ? `<tr><td colspan="4" style="padding:8px;text-align:center;color:#64748b;font-size:11px;">...and ${opsRows.length - 20} more entries</td></tr>` : ''}
+                ${opsRows.length === 0 ? '<tr><td colspan="4" style="padding:12px;text-align:center;color:#64748b;">No operations ledger entries this week</td></tr>' : ''}
+              </tbody>
+            </table>
+          </div>
+
+          <div style="background:#f0fdf4;padding:16px;border-radius:12px;border-left:4px solid #22c55e;">
+            <h3 style="margin:0 0 8px;color:#166534;">💡 Weekly Recommendations</h3>
+            <ol style="margin:0;padding-left:20px;color:#15803d;font-size:13px;">
+              <li style="margin:6px 0;">Review high-cost categories and identify potential savings of 5-10%</li>
+              <li style="margin:6px 0;">Maintain consistent deposit schedule to improve cash flow visibility</li>
+              <li style="margin:6px 0;">Monitor shop-specific expense ratios weekly</li>
+              <li style="margin:6px 0;">Track invest/perfume growth as indicator of customer engagement</li>
+              ${revenueGrowth < 5 ? '<li style="margin:6px 0;">Consider promotional campaigns to boost weekly revenue growth</li>' : ''}
+            </ol>
+          </div>
+        </div>
+      `,
+    });
+    return true;
+  } catch (e: any) {
+    console.error("[ENHANCED WEEKLY] Email send failed:", e?.message || e);
+    return false;
+  }
+}
+
 export async function POST(req: Request) {
   const body = await req.json().catch(() => ({}));
   const shopId = body?.shopId;
@@ -505,11 +766,19 @@ export async function POST(req: Request) {
   const shouldSendWeekly = today === 6;
   
   let weeklyEmailed = false;
+  let enhancedWeeklyEmailed = false;
   if (shouldSendWeekly) {
     try {
+      // Send per-shop weekly report (existing)
       weeklyEmailed = await sendWeeklyReport(shopId, staffName);
     } catch (e: any) {
       console.error("[EOD] Weekly report failed:", e?.message || e);
+    }
+    try {
+      // Send enhanced weekly overview (new - all shops combined)
+      enhancedWeeklyEmailed = await sendEnhancedWeeklyReport();
+    } catch (e: any) {
+      console.error("[EOD] Enhanced weekly report failed:", e?.message || e);
     }
   }
 
@@ -517,6 +786,7 @@ export async function POST(req: Request) {
     success: true,
     emailed,
     weeklyEmailed,
+    enhancedWeeklyEmailed,
     isWeeklyDay: shouldSendWeekly,
     totals: { 
       totalWithTax, 
