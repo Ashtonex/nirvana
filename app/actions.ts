@@ -1152,7 +1152,8 @@ export async function recordPosExpense(
         employee_id: employeeId
     }]);
 
-    // Auto-create Invest deposit for perfume expenses or if manually toggled
+    // Auto-create Invest deposit for perfume expenses (both deduct from drawer AND post to invest)
+    // Perfume purchases are tracked as both an expense AND an investment
     if (isPerfumeExpense || options?.toInvest) {
         await supabaseAdmin.from('invest_deposits').insert({
             shop_id: shopId,
