@@ -1928,6 +1928,9 @@ export async function recordLayby(layby: {
 
         for (const item of layby.items) {
             if (!item.itemId || String(item.itemId).startsWith('service_') || String(item.itemId).startsWith('adhoc')) continue;
+            const itemIdStr = String(item.itemId);
+            const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+            if (!uuidRegex.test(itemIdStr)) continue;
             const qty = Math.max(1, Number(item.quantity || 0));
             const { data: alloc, error: allocErr } = await supabaseAdmin
                 .from('inventory_allocations')
@@ -1991,6 +1994,10 @@ export async function recordLayby(layby: {
 
         for (const item of layby.items) {
             if (!item.itemId || String(item.itemId).startsWith('service_') || String(item.itemId).startsWith('adhoc')) continue;
+
+            const itemIdStr = String(item.itemId);
+            const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+            if (!uuidRegex.test(itemIdStr)) continue;
 
             const qty = Math.max(1, Number(item.quantity || 0));
 
