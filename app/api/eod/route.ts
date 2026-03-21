@@ -499,12 +499,12 @@ async function sendComprehensiveWeeklyReport(closingShopId: string, staffName: s
       <div style="background:#1e293b;padding:14px 10px;border-radius:8px;text-align:center;">
         <p style="margin:0;font-size:9px;color:#94a3b8;letter-spacing:1px;">OPS DEPOSITS</p>
         <p style="margin:6px 0 0;font-size:18px;font-weight:900;color:#3b82f6;">$${kipasaDeposits.toFixed(2)}</p>
-        <p style="margin:4px 0 0;font-size:10px;color:#64748b;">${kipasaOps.filter(r => r.amount >= 0).length} entries</p>
+        <p style="margin:4px 0 0;font-size:10px;color:#64748b;">${kipasaOps.filter((r: any) => r.amount >= 0).length} entries</p>
       </div>
       <div style="background:#1e293b;padding:14px 10px;border-radius:8px;text-align:center;">
         <p style="margin:0;font-size:9px;color:#94a3b8;letter-spacing:1px;">OPS EXPENSES</p>
         <p style="margin:6px 0 0;font-size:18px;font-weight:900;color:#ef4444;">$${kipasaExpensesTotal.toFixed(2)}</p>
-        <p style="margin:4px 0 0;font-size:10px;color:#64748b;">${kipasaOps.filter(r => r.amount < 0).length} entries</p>
+        <p style="margin:4px 0 0;font-size:10px;color:#64748b;">${kipasaOps.filter((r: any) => r.amount < 0).length} entries</p>
       </div>
       <div style="background:#1e293b;padding:14px 10px;border-radius:8px;text-align:center;">
         <p style="margin:0;font-size:9px;color:#94a3b8;letter-spacing:1px;">INVEST/PERFUME</p>
@@ -590,12 +590,12 @@ async function sendComprehensiveWeeklyReport(closingShopId: string, staffName: s
       <div style="background:#1e293b;padding:14px 10px;border-radius:8px;text-align:center;">
         <p style="margin:0;font-size:9px;color:#94a3b8;letter-spacing:1px;">OPS DEPOSITS</p>
         <p style="margin:6px 0 0;font-size:18px;font-weight:900;color:#3b82f6;">$${otherDeposits.toFixed(2)}</p>
-        <p style="margin:4px 0 0;font-size:10px;color:#64748b;">${otherOps.filter(r => r.amount >= 0).length} entries</p>
+        <p style="margin:4px 0 0;font-size:10px;color:#64748b;">${otherOps.filter((r: any) => r.amount >= 0).length} entries</p>
       </div>
       <div style="background:#1e293b;padding:14px 10px;border-radius:8px;text-align:center;">
         <p style="margin:0;font-size:9px;color:#94a3b8;letter-spacing:1px;">OPS EXPENSES</p>
         <p style="margin:6px 0 0;font-size:18px;font-weight:900;color:#ef4444;">$${otherExpensesTotal.toFixed(2)}</p>
-        <p style="margin:4px 0 0;font-size:10px;color:#64748b;">${otherOps.filter(r => r.amount < 0).length} entries</p>
+        <p style="margin:4px 0 0;font-size:10px;color:#64748b;">${otherOps.filter((r: any) => r.amount < 0).length} entries</p>
       </div>
       <div style="background:#1e293b;padding:14px 10px;border-radius:8px;text-align:center;">
         <p style="margin:0;font-size:9px;color:#94a3b8;letter-spacing:1px;">INVEST/PERFUME</p>
@@ -807,7 +807,7 @@ async function sendComprehensiveWeeklyReport(closingShopId: string, staffName: s
     ${overheadFiltered.length > 0 ? `
     <div style="background:#78350f;border-radius:8px;overflow:hidden;margin-bottom:20px;border-left:4px solid #f59e0b;">
       <div style="background:#92400e;padding:10px 20px;">
-        <strong style="font-size:12px;color:#fef3c7;letter-spacing:1px;">OVERHEAD PAYMENTS THIS WEEK — ${overheadFiltered.length} entries | Total: $${overheadFiltered.reduce((s,n) => s+Math.abs(Number(n?.amount||0)), 0).toFixed(2)}</strong>
+        <strong style="font-size:12px;color:#fef3c7;letter-spacing:1px;">OVERHEAD PAYMENTS THIS WEEK — ${overheadFiltered.length} entries | Total: $${overheadFiltered.reduce((s: number, n: any) => s+Math.abs(Number(n?.amount||0)), 0).toFixed(2)}</strong>
       </div>
       <table style="width:100%;border-collapse:collapse;font-size:11px;">
         <tbody>

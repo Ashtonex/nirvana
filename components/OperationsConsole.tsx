@@ -87,6 +87,7 @@ export function OperationsConsole({
   const [auditLogs, setAuditLogs] = useState<AuditEntry[]>([]);
   const [staffLogs, setStaffLogs] = useState<StaffLog[]>([]);
   const [employees, setEmployees] = useState<any[]>([]);
+  const [isGeneratingReport, setIsGeneratingReport] = useState(false);
   const [busy, setBusy] = useState(false);
 
   const [opsState, setOpsState] = useState<OpsState>(initialState);
@@ -333,6 +334,26 @@ export function OperationsConsole({
     }
   };
 
+  const handleGenerateReport = async () => {
+    if (!confirm("Generate and email an operations report for the last 7 days?")) return;
+    setIsGeneratingReport(true);
+    try {
+      const res = await fetch("/api/operations/report", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ daysBack: 7 }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed");
+      alert("Operations report sent successfully!");
+    } catch (e: any) {
+      alert("Failed to generate report: " + (e?.message || "Unknown error"));
+    } finally {
+      setIsGeneratingReport(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Top Cards Row */}
@@ -378,6 +399,27 @@ export function OperationsConsole({
             <p className="text-[10px] text-slate-500 mt-1">Vault + Invest</p>
           </CardContent>
         </Card>
+      </div>
+
+      {/* Generate Report Button */}
+      <div className="flex justify-center">
+        <Button
+          disabled={isGeneratingReport}
+          onClick={handleGenerateReport}
+          className="font-black uppercase px-8 bg-amber-600 hover:bg-amber-500 text-white"
+        >
+          {isGeneratingReport ? (
+            <>
+              <Loader2 className="h-4 w-4 animate-spin mr-2" />
+              Generating...
+            </>
+          ) : (
+            <>
+              <Download className="h-4 w-4 mr-2" />
+              Generate Operations Report
+            </>
+          )}
+        </Button>
       </div>
 
       {/* Shop Savings Cards Row */}
