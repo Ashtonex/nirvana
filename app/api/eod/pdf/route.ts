@@ -465,8 +465,8 @@ export async function GET(req: Request) {
     const totalCashSales = cashSales.reduce((sum: number, s: any) => sum + Number(s.total_with_tax || 0), 0);
     const totalEcocash = sales.filter((s: any) => s.payment_method === 'ecocash').reduce((sum: number, s: any) => sum + Number(s.total_with_tax || 0), 0);
 
-    // Lay-by activity
-    const laybyCash = ledger.filter((l: any) => ['Lay-by Deposit', 'Lay-by installment', 'Lay-by Final Payment'].includes(l.category)).reduce((sum: number, l: any) => sum + Number(l.amount || 0), 0);
+    // Lay-by activity (only completed lay-bys count as today's sales)
+    const laybyCash = ledger.filter((l: any) => l.category === "Lay-by Completed").reduce((sum: number, l: any) => sum + Number(l.amount || 0), 0);
 
     // Cash drawer context
     const openingEntry = ledger

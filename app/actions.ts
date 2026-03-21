@@ -105,8 +105,9 @@ function getLaybyPaidAmountFromLedger(ledgerEntries: any[], laybyId: string): nu
     const needle = `lay-by #${String(laybyId).toLowerCase()}`;
     return (ledgerEntries || [])
         .filter((l: any) => {
-            const category = String(l?.category || '').toLowerCase();
-            if (!category.startsWith('lay-by')) return false;
+            const category = String(l?.category || '');
+            // Count Pending deposits + each Payment installment. DO NOT count 'Lay-by Completed' (it's the remaining balance already paid via Lay-by Payment)
+            if (category !== 'Lay-by Pending' && category !== 'Lay-by Payment') return false;
             const description = String(l?.description || '').toLowerCase();
             return description.includes(needle);
         })
@@ -2027,10 +2028,10 @@ export async function recordLayby(layby: {
             id: Math.random().toString(36).substring(2, 9),
             shop_id: layby.shopId,
             type: 'income',
-            category: 'Lay-by Deposit',
+            category: 'Lay-by Pending',
             amount: layby.deposit,
             date,
-            description: `Deposit for Lay-by #${id} - ${layby.clientName}`
+            description: `Deposit for Lay-by #${id} - ${layby.clientName} (Balance: ${(layby.totalWithTax - layby.deposit).toFixed(2)})`
         });
         if (ledgerRes.error) {
             console.error('[recordLayby] Ledger insert failed:', ledgerRes.error);
@@ -2054,41 +2055,24 @@ export async function updateLaybyPayment(laybyId: string, amount: number, shopId
     if (!layby || layby.status !== 'layby') throw new Error('Lay-by not found');
 
     const date = new Date().toISOString();
-    const tentativePaid = Number(layby.paid_amount || 0) + amount;
-    const tentativeFullyPaid = tentativePaid >= Number(layby.total_with_tax);
 
-    // 1. Record payment in ledger first (this is the source of truth if paid_amount column is missing).
+    // 1. Record each payment as neutral (Lay-by Payment) - not counted in daily sales yet.
+    // Only the final completion will record the remaining balance as income.
     await supabaseAdmin.from('ledger_entries').insert({
         id: Math.random().toString(36).substring(2, 9),
         shop_id: shopId,
         type: 'income',
-        // If paid_amount column is missing, we can't reliably know "final" vs "installment" here.
-        category: layby.paid_amount === undefined || layby.paid_amount === null
-            ? 'Lay-by installment'
-            : (tentativeFullyPaid ? 'Lay-by Final Payment' : 'Lay-by installment'),
+        category: 'Lay-by Payment',
         amount: amount,
         date,
         description: `Payment for Lay-by #${laybyId} - ${layby.client_name}`
     });
 
-    // 2. Compute paid amount (prefer DB column if present, fall back to ledger aggregation).
+    // 2. Compute paid amount
     let newPaidAmount = Number(layby.paid_amount || 0) + amount;
     let isFullyPaid = newPaidAmount >= Number(layby.total_with_tax);
 
-    if (layby.paid_amount === undefined || layby.paid_amount === null) {
-        const { data: lbLedger } = await supabaseAdmin
-            .from('ledger_entries')
-            .select('amount, category, description')
-            .eq('shop_id', shopId)
-            .ilike('category', 'Lay-by%')
-            .ilike('description', `%Lay-by #${laybyId}%`);
-
-        const paidFromLedger = getLaybyPaidAmountFromLedger(lbLedger || [], laybyId);
-        newPaidAmount = paidFromLedger; // already includes this payment
-        isFullyPaid = newPaidAmount >= Number(layby.total_with_tax);
-    }
-
-    // 3. Update the lay-by record (tolerant to missing paid_amount column).
+    // 3. Update the lay-by record
     const updateWorking: any = {
         paid_amount: newPaidAmount,
         status: isFullyPaid ? 'converted' : 'layby'
@@ -2109,9 +2093,24 @@ export async function updateLaybyPayment(laybyId: string, amount: number, shopId
         throw new Error(res.error.message);
     }
 
-    // 4. If fully paid, record as a Sale for reporting
+    // 4. On final completion: record the remaining balance as Lay-by Completed income (today's sales)
     if (isFullyPaid) {
-        // Record each item as a sale, but SKIP inventory reduction because it was reserved at start
+        const totalWithTax = Number(layby.total_with_tax || 0);
+        const depositPaid = Number(layby.paid_amount || 0);
+        const remainingBalance = totalWithTax - depositPaid;
+
+        // Record remaining balance as completed sale income (today's revenue)
+        await supabaseAdmin.from('ledger_entries').insert({
+            id: Math.random().toString(36).substring(2, 9),
+            shop_id: shopId,
+            type: 'income',
+            category: 'Lay-by Completed',
+            amount: remainingBalance,
+            date,
+            description: `Lay-by #${laybyId} completed - ${layby.client_name} (Total: $${totalWithTax.toFixed(2)})`
+        });
+
+        // Record each item as a sale for reporting (SKIP inventory reduction - reserved at lay-by start)
         for (const item of (layby.items as any[])) {
             const saleId = Math.random().toString(36).substring(2, 9);
             await supabaseAdmin.from('sales').insert({
@@ -2127,7 +2126,7 @@ export async function updateLaybyPayment(laybyId: string, amount: number, shopId
                 date,
                 employee_id: employeeId,
                 client_name: layby.client_name,
-                payment_method: 'cash', // Assuming cash for lay-by payments
+                payment_method: 'cash',
                 discount_applied: 0
             });
         }
