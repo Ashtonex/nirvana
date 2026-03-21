@@ -30,12 +30,8 @@ export function BreakEvenChart({ datasets }: BreakEvenChartProps) {
 
     const defaultTab = useMemo(() => {
         if (!availableShops.length) return "global";
-        try {
-            const stored = typeof window !== "undefined" ? window.localStorage.getItem("nirvana.breakEven.activeShop") : null;
-            if (stored && availableShops.includes(stored)) return stored;
-        } catch { /* ignore */ }
-        const firstNonGlobal = availableShops.find((k) => k !== "global");
-        return firstNonGlobal || availableShops[0] || "global";
+        // Always default to "global" for the main chart - users can manually switch to individual shops
+        return "global";
     }, [availableShops]);
 
     const [activeTab, setActiveTab] = useState(defaultTab);
