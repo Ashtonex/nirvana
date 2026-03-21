@@ -239,7 +239,7 @@ export async function computePosAuditReport(input: { shopId: string; dateYYYYMMD
   const totalEcocash = salesRows.filter((s) => String(s?.payment_method || "").toLowerCase() === "ecocash").reduce((sum, s) => sum + toMoney(s?.total_with_tax), 0);
 
   const laybyCash = ledgerRows
-    .filter((l) => l?.category === "Lay-by Completed" && isSameDayISO(l?.date, day))
+    .filter((l) => ['Lay-by Deposit', 'Lay-by Payment', 'Lay-by Completed'].includes(l?.category) && isSameDayISO(l?.date, day))
     .reduce((sum, l) => sum + toMoney(l?.amount), 0);
 
   const posExpenses = ledgerRows

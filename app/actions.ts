@@ -2028,10 +2028,10 @@ export async function recordLayby(layby: {
             id: Math.random().toString(36).substring(2, 9),
             shop_id: layby.shopId,
             type: 'income',
-            category: 'Lay-by Pending',
+            category: 'Lay-by Deposit',
             amount: layby.deposit,
             date,
-            description: `Deposit for Lay-by #${id} - ${layby.clientName} (Balance: ${(layby.totalWithTax - layby.deposit).toFixed(2)})`
+            description: `Deposit for Lay-by #${id} - ${layby.clientName} (Balance: $${(layby.totalWithTax - layby.deposit).toFixed(2)})`
         });
         if (ledgerRes.error) {
             console.error('[recordLayby] Ledger insert failed:', ledgerRes.error);
@@ -2056,8 +2056,7 @@ export async function updateLaybyPayment(laybyId: string, amount: number, shopId
 
     const date = new Date().toISOString();
 
-    // 1. Record each payment as neutral (Lay-by Payment) - not counted in daily sales yet.
-    // Only the final completion will record the remaining balance as income.
+    // 1. Record each payment installment as income (counted in daily sales)
     await supabaseAdmin.from('ledger_entries').insert({
         id: Math.random().toString(36).substring(2, 9),
         shop_id: shopId,

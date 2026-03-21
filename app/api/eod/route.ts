@@ -947,7 +947,9 @@ export async function POST(req: Request) {
     return sum + (t === "income" ? amt : t === "expense" ? -amt : 0);
   }, 0);
 
-  const laybyRows = ledgerRows.filter((l: any) => l.category === "Lay-by Completed");
+  const laybyRows = ledgerRows.filter((l: any) => 
+    ['Lay-by Deposit', 'Lay-by Payment', 'Lay-by Completed'].includes(l.category)
+  );
   const laybyCash = laybyRows.reduce((sum: number, l: any) => sum + Number(l.amount || 0), 0);
 
   // Calculate payment method breakdown
