@@ -39,9 +39,9 @@ export function MobileNav() {
         checkAuth();
     }, []);
 
-    // Don't show for staff (shop staff), only for owner/admin
+    // Don't show for shop staff (those with shop_id), only for owner/admin
     if (loading) return null;
-    if (staff) return null;
+    if (staff?.shop_id) return null;  // Shop staff have shop_id, owners don't
     if (!isOwnerOrAdmin) return null;
 
     const tabs = [
