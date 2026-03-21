@@ -210,7 +210,9 @@ export async function getSalesVsOverheadsData() {
     console.log('[getSalesVsOverheadsData] Total ledger expenses:', ledgerExpenseTotal);
 
     // If we have structured expenses, use them. Otherwise fall back to ledger. Always show something.
-    const globalMonthlyOverhead = shopStructuredTotal > 0 ? shopStructuredTotal + ledgerExpenseTotal : ledgerExpenseTotal;
+    // CAP at $4,900 maximum monthly overhead
+    const rawOverhead = shopStructuredTotal > 0 ? shopStructuredTotal + ledgerExpenseTotal : ledgerExpenseTotal;
+    const globalMonthlyOverhead = Math.min(rawOverhead, 4900);
 
     const datasets: Record<string, any[]> = {
         global: [],
@@ -336,9 +338,9 @@ export async function getRevenueExpenseProfitTrajectoryData() {
         }
     });
 
-    const globalFixedMonthly = Object.values(shopExpensesByKey).reduce((sum: number, val) => sum + val, 0);
-    console.log('[getRevenueExpenseProfitTrajectoryData] Shop expenses:', shopExpensesByKey);
-    console.log('[getRevenueExpenseProfitTrajectoryData] Global fixed:', globalFixedMonthly);
+    const rawGlobalFixed = Object.values(shopExpensesByKey).reduce((sum: number, val) => sum + val, 0);
+    // CAP at $4,900 maximum monthly overhead
+    const globalFixedMonthly = Math.min(rawGlobalFixed, 4900);
     
     const dailyGlobalFixed = daysInMonth > 0 ? globalFixedMonthly / daysInMonth : 0;
 

@@ -2,12 +2,10 @@
 
 import React, { useEffect, useMemo, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui";
-import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from "recharts";
-import { BarChart3, AlertCircle } from "lucide-react";
+import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, BarChart, Bar } from "recharts";
+import { BarChart3, AlertCircle, TrendingUp, TrendingDown, DollarSign } from "lucide-react";
 
 interface RevenueExpenseProfitTrajectoryChartProps {
-  // keys: global + shop ids
   datasets: Record<string, any[]>;
 }
 
@@ -17,29 +15,6 @@ export function RevenueExpenseProfitTrajectoryChart({ datasets }: RevenueExpense
   useEffect(() => {
     setMounted(true);
   }, []);
-
-  const availableShops = useMemo(() => {
-    const keys = Object.keys(datasets || {});
-    const preferredOrder = ["kipasa", "dubdub", "tradecenter", "global"];
-    return keys.sort((a, b) => {
-      const ai = preferredOrder.indexOf(a);
-      const bi = preferredOrder.indexOf(b);
-      if (ai !== -1 || bi !== -1) return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi);
-      return a.localeCompare(b);
-    });
-  }, [datasets]);
-
-  const defaultTab = useMemo(() => {
-    if (!availableShops.length) return "global";
-    // Always default to "global" for the main chart - users can manually switch to individual shops
-    return "global";
-  }, [availableShops]);
-
-  const [activeTab, setActiveTab] = useState(defaultTab);
-
-  useEffect(() => {
-    if (!availableShops.includes(activeTab)) setActiveTab(defaultTab);
-  }, [activeTab, availableShops, defaultTab]);
 
   if (!mounted) {
     return (
@@ -58,7 +33,10 @@ export function RevenueExpenseProfitTrajectoryChart({ datasets }: RevenueExpense
     );
   }
 
-  if (!datasets || Object.keys(datasets).length === 0) {
+  const globalData = datasets?.global || [];
+  const currentMonth = new Date().toLocaleString('default', { month: 'long', year: 'numeric' });
+
+  if (!globalData || globalData.length === 0) {
     return (
       <Card className="col-span-4 border-sky-500/20 bg-slate-900/50">
         <CardHeader>
@@ -75,69 +53,39 @@ export function RevenueExpenseProfitTrajectoryChart({ datasets }: RevenueExpense
     );
   }
 
-  const data = datasets?.[activeTab] || [];
-
-  const onTabChange = (next: string) => {
-    setActiveTab(next);
-    try {
-      window.localStorage.setItem("nirvana.revexp.activeShop", next);
-    } catch { /* ignore */ }
-  };
-
-  const getShopDisplayName = (key: string) => {
-    const nameMap: Record<string, string> = {
-      global: "Global",
-      kipasa: "Kipasa",
-      dubdub: "Dub Dub",
-      tradecenter: "TC",
-    };
-    return nameMap[key] || key;
-  };
+  const lastData = globalData.filter(d => d.revenue !== null).slice(-1)[0];
+  const todayData = globalData.find(d => d.day === new Date().getDate());
+  
+  const totalRevenue = lastData?.revenue || 0;
+  const totalExpenses = lastData?.expenses || 0;
+  const totalProfit = lastData?.profit || 0;
+  const todayRevenue = todayData?.revenue || 0;
+  const todayExpenses = todayData?.variableExpenses || 0;
+  const todayProfit = (todayRevenue || 0) - (todayExpenses || 0);
 
   return (
     <Card className="col-span-full border-emerald-500/20 bg-slate-900/50 backdrop-blur-md">
-      <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-4 sm:space-y-0 pb-6">
+      <CardHeader className="pb-6">
         <div>
           <CardTitle className="flex items-center gap-2 text-xl font-black uppercase italic">
             <BarChart3 className="text-emerald-400" /> Revenue vs Expenses vs Profit (Daily)
           </CardTitle>
           <CardDescription className="text-[10px] font-black uppercase tracking-widest text-slate-500">
-            Month-to-date growth. Expenses include fixed overhead projection plus actual logged expenses by day.
+            {currentMonth} | All Shops Combined | Daily Tracking
           </CardDescription>
         </div>
-        <Tabs value={activeTab} onValueChange={onTabChange} className="bg-slate-950/50 p-1 rounded-xl border border-slate-800">
-          <TabsList className="bg-transparent border-0 h-9">
-            {availableShops.map((shop) => {
-              const colors: Record<string, string> = {
-                global: "data-[state=active]:bg-emerald-700",
-                kipasa: "data-[state=active]:bg-emerald-600",
-                dubdub: "data-[state=active]:bg-sky-600",
-                tradecenter: "data-[state=active]:bg-amber-600",
-              };
-              return (
-                <TabsTrigger
-                  key={shop}
-                  value={shop}
-                  className={`${colors[shop] || "data-[state=active]:bg-emerald-600"} data-[state=active]:text-white uppercase text-[10px] font-black italic tracking-widest px-3`}
-                >
-                  {getShopDisplayName(shop)}
-                </TabsTrigger>
-              );
-            })}
-          </TabsList>
-        </Tabs>
       </CardHeader>
 
       <CardContent>
-        {!data || data.length === 0 ? (
+        {!globalData || globalData.length === 0 ? (
           <div className="w-full h-[380px] mt-2 flex flex-col items-center justify-center rounded-lg border border-dashed border-slate-700 bg-slate-950/50">
             <AlertCircle className="h-12 w-12 text-slate-500 mb-3" />
-            <p className="text-slate-400 font-medium">No data available for {getShopDisplayName(activeTab)}</p>
+            <p className="text-slate-400 font-medium">No data available</p>
           </div>
         ) : (
           <div className="w-full min-h-[380px]">
             <ResponsiveContainer width="100%" height={380}>
-              <LineChart data={data} margin={{ top: 10, right: 30, left: 10, bottom: 10 }}>
+              <LineChart data={globalData} margin={{ top: 10, right: 30, left: 10, bottom: 10 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
                 <XAxis dataKey="day" stroke="#475569" fontSize={10} tickLine={false} axisLine={false} />
                 <YAxis
@@ -172,7 +120,45 @@ export function RevenueExpenseProfitTrajectoryChart({ datasets }: RevenueExpense
           </div>
         )}
       </CardContent>
+
+      <CardContent className="pt-0">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">
+          <div className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/20">
+            <p className="text-[10px] font-black uppercase tracking-widest text-emerald-400 mb-1">Monthly Revenue</p>
+            <p className="text-2xl font-bold text-emerald-400 flex items-center gap-2">
+              <TrendingUp className="h-5 w-5" />
+              ${totalRevenue.toLocaleString()}
+            </p>
+            <p className="text-[9px] text-emerald-400/60 mt-1">Kipasa + Dub Dub + TC</p>
+          </div>
+          
+          <div className="p-4 rounded-2xl bg-orange-500/10 border border-orange-500/20">
+            <p className="text-[10px] font-black uppercase tracking-widest text-orange-400 mb-1">Monthly Expenses</p>
+            <p className="text-2xl font-bold text-orange-400 flex items-center gap-2">
+              <TrendingDown className="h-5 w-5" />
+              ${totalExpenses.toLocaleString()}
+            </p>
+            <p className="text-[9px] text-orange-400/60 mt-1">All POS Expenses</p>
+          </div>
+          
+          <div className="p-4 rounded-2xl bg-sky-500/10 border border-sky-500/20">
+            <p className="text-[10px] font-black uppercase tracking-widest text-sky-400 mb-1">Monthly Profit</p>
+            <p className={`text-2xl font-bold flex items-center gap-2 ${totalProfit >= 0 ? 'text-sky-400' : 'text-rose-400'}`}>
+              <DollarSign className={`h-5 w-5 ${totalProfit >= 0 ? 'text-sky-400' : 'text-rose-400'}`} />
+              {totalProfit >= 0 ? '+' : ''}${totalProfit.toLocaleString()}
+            </p>
+            <p className="text-[9px] text-sky-400/60 mt-1">Revenue - Expenses</p>
+          </div>
+          
+          <div className="p-4 rounded-2xl bg-slate-500/10 border border-slate-500/20">
+            <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Today</p>
+            <p className={`text-2xl font-bold ${todayProfit >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+              {todayProfit >= 0 ? '+' : ''}${todayProfit.toLocaleString()}
+            </p>
+            <p className="text-[9px] text-slate-400/60 mt-1">Today's Net</p>
+          </div>
+        </div>
+      </CardContent>
     </Card>
   );
 }
-
