@@ -1916,101 +1916,133 @@ export async function recordLayby(layby: {
     clientPhone: string;
     employeeId: string;
 }) {
-    const id = Math.random().toString(36).substring(2, 9);
-    const date = new Date().toISOString();
+    console.log('[recordLayby] Starting with:', JSON.stringify({ shopId: layby.shopId, itemCount: layby.items?.length, deposit: layby.deposit }));
 
-    // Validate items
-    if (!layby.items || layby.items.length === 0) {
-        throw new Error("Lay-by requires at least one item");
-    }
+    try {
+        const id = Math.random().toString(36).substring(2, 9);
+        const date = new Date().toISOString();
 
-    // Pre-check stock before writing anything so we don't create partial lay-bys.
-    for (const item of layby.items) {
-        if (!item.itemId || String(item.itemId).startsWith('service_')) continue;
-        const qty = Math.max(1, Number(item.quantity || 0));
-        const { data: alloc } = await supabaseAdmin
-            .from('inventory_allocations')
-            .select('quantity')
-            .eq('item_id', item.itemId)
-            .eq('shop_id', layby.shopId)
-            .maybeSingle();
-
-        if (!alloc || Number(alloc.quantity || 0) < qty) {
-            throw new Error(`Insufficient stock for lay-by: ${item.itemName || item.itemId}`);
-        }
-    }
-
-    // 1. Create the Lay-by record in quotations table
-    const base: any = {
-        id,
-        shop_id: layby.shopId,
-        items: layby.items,
-        total_before_tax: layby.totalBeforeTax,
-        tax: layby.tax,
-        total_with_tax: layby.totalWithTax,
-        paid_amount: layby.deposit,
-        client_name: layby.clientName,
-        client_phone: layby.clientPhone,
-        employee_id: layby.employeeId,
-        date,
-        status: 'layby'
-    };
-
-    // Insert with column fallback (in case paid_amount/client_phone not in schema yet)
-    const working: any = { ...base };
-    let inserted = false;
-    for (let attempt = 0; attempt < 6; attempt++) {
-        const res = await supabaseAdmin.from('quotations').insert(working);
-        if (!res.error) {
-            inserted = true;
-            break;
+        // Validate items
+        if (!layby.items || layby.items.length === 0) {
+            throw new Error("Lay-by requires at least one item");
         }
 
-        const msg = res.error.message || '';
-        const m1 = msg.match(/Could not find the '([^']+)' column/i);
-        const m2 = msg.match(/column "([^"]+)" of relation "quotations" does not exist/i);
-        const missing = (m1 && m1[1]) || (m2 && m2[1]);
-        if (missing && Object.prototype.hasOwnProperty.call(working, missing)) {
-            delete working[missing];
-            continue;
+        // Pre-check stock before writing anything so we don't create partial lay-bys.
+        for (const item of layby.items) {
+            if (!item.itemId || String(item.itemId).startsWith('service_') || String(item.itemId).startsWith('adhoc')) continue;
+            const qty = Math.max(1, Number(item.quantity || 0));
+            const { data: alloc, error: allocErr } = await supabaseAdmin
+                .from('inventory_allocations')
+                .select('quantity')
+                .eq('item_id', item.itemId)
+                .eq('shop_id', layby.shopId)
+                .maybeSingle();
+
+            if (allocErr) {
+                console.error('[recordLayby] Stock check failed:', allocErr);
+                throw new Error(`Stock check failed: ${allocErr.message}`);
+            }
+
+            if (!alloc || Number(alloc.quantity || 0) < qty) {
+                throw new Error(`Insufficient stock for lay-by: ${item.itemName || item.itemId}`);
+            }
         }
-        throw new Error(res.error.message);
-    }
-    if (!inserted) throw new Error('Failed to create lay-by record');
 
-    // 2. Reserve Inventory (Reduce stock immediately)
-    for (const item of layby.items) {
-        if (!item.itemId || item.itemId.startsWith('service_')) continue;
+        console.log('[recordLayby] Stock check passed, creating quotation...');
 
-        const qty = Math.max(1, Number(item.quantity || 0));
-
-        // Use atomic DB functions to match sale behavior and avoid race conditions.
-        const decAlloc = await supabaseAdmin.rpc('decrement_allocation', {
-            item_id: item.itemId,
+        // 1. Create the Lay-by record in quotations table
+        const base: any = {
+            id,
             shop_id: layby.shopId,
-            qty
-        });
-        if (decAlloc.error) throw new Error(decAlloc.error.message);
+            items: layby.items,
+            total_before_tax: layby.totalBeforeTax,
+            tax: layby.tax,
+            total_with_tax: layby.totalWithTax,
+            paid_amount: layby.deposit,
+            client_name: layby.clientName,
+            client_phone: layby.clientPhone,
+            employee_id: layby.employeeId,
+            date,
+            status: 'layby'
+        };
 
-        const decInv = await supabaseAdmin.rpc('decrement_inventory', {
-            item_id: item.itemId,
-            qty
+        // Insert with column fallback (in case paid_amount/client_phone not in schema yet)
+        const working: any = { ...base };
+        let inserted = false;
+        for (let attempt = 0; attempt < 6; attempt++) {
+            const res = await supabaseAdmin.from('quotations').insert(working);
+            if (!res.error) {
+                inserted = true;
+                console.log('[recordLayby] Quotation created successfully:', id);
+                break;
+            }
+
+            const msg = res.error.message || '';
+            const m1 = msg.match(/Could not find the '([^']+)' column/i);
+            const m2 = msg.match(/column "([^"]+)" of relation "quotations" does not exist/i);
+            const missing = (m1 && m1[1]) || (m2 && m2[1]);
+            if (missing && Object.prototype.hasOwnProperty.call(working, missing)) {
+                console.log(`[recordLayby] Dropping missing column: ${missing}, retrying...`);
+                delete working[missing];
+                continue;
+            }
+            console.error('[recordLayby] Quotation insert failed:', res.error);
+            throw new Error(res.error.message);
+        }
+        if (!inserted) throw new Error('Failed to create lay-by record');
+
+        console.log('[recordLayby] Decrementing inventory...');
+
+        // 2. Reserve Inventory (Reduce stock immediately)
+        for (const item of layby.items) {
+            if (!item.itemId || String(item.itemId).startsWith('service_') || String(item.itemId).startsWith('adhoc')) continue;
+
+            const qty = Math.max(1, Number(item.quantity || 0));
+
+            // Use atomic DB functions to match sale behavior and avoid race conditions.
+            const decAlloc = await supabaseAdmin.rpc('decrement_allocation', {
+                item_id: item.itemId,
+                shop_id: layby.shopId,
+                qty
+            });
+            if (decAlloc.error) {
+                console.error('[recordLayby] decrement_allocation RPC failed:', decAlloc.error);
+                throw new Error(`Failed to reserve stock: ${decAlloc.error.message}`);
+            }
+
+            const decInv = await supabaseAdmin.rpc('decrement_inventory', {
+                item_id: item.itemId,
+                qty
+            });
+            if (decInv.error) {
+                console.error('[recordLayby] decrement_inventory RPC failed:', decInv.error);
+                throw new Error(`Failed to update inventory: ${decInv.error.message}`);
+            }
+        }
+
+        console.log('[recordLayby] Recording ledger entry...');
+
+        // 3. Record the deposit in the ledger (Cash inflow)
+        const ledgerRes = await supabaseAdmin.from('ledger_entries').insert({
+            id: Math.random().toString(36).substring(2, 9),
+            shop_id: layby.shopId,
+            type: 'income',
+            category: 'Lay-by Deposit',
+            amount: layby.deposit,
+            date,
+            description: `Deposit for Lay-by #${id} - ${layby.clientName}`
         });
-        if (decInv.error) throw new Error(decInv.error.message);
+        if (ledgerRes.error) {
+            console.error('[recordLayby] Ledger insert failed:', ledgerRes.error);
+            throw new Error(`Failed to record deposit: ${ledgerRes.error.message}`);
+        }
+
+        console.log('[recordLayby] Success! ID:', id);
+        return { id, date };
+    } catch (e: any) {
+        console.error('[recordLayby] CRITICAL ERROR:', e?.message || e);
+        throw e;
     }
-
-    // 3. Record the deposit in the ledger (Cash inflow)
-    await supabaseAdmin.from('ledger_entries').insert({
-        id: Math.random().toString(36).substring(2, 9),
-        shop_id: layby.shopId,
-        type: 'income',
-        category: 'Lay-by Deposit',
-        amount: layby.deposit,
-        date,
-        description: `Deposit for Lay-by #${id} - ${layby.clientName}`
-    });
-
-    return { id, date };
 }
 
 export async function updateLaybyPayment(laybyId: string, amount: number, shopId: string, employeeId: string) {
