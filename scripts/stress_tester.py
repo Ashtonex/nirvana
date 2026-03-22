@@ -105,10 +105,23 @@ def run_simulation(data):
     cash_on_hand = data.get("cash_balance", 1000.0)
     
     # Constants
-    MONTHLY_OVERHEAD = sum(float(item.get("amount", 0)) for item in ledger if item.get("category") == "Overhead" and "-" in str(item.get("amount", "")))
+    def safe_float(v, default=0.0):
+        try:
+            return float(v) if v is not None else default
+        except (ValueError, TypeError):
+            return default
+
+    # 1. Monthly Overhead calculation
+    MONTHLY_OVERHEAD = sum(
+        abs(safe_float(item.get("amount"))) 
+        for item in ledger 
+        if item.get("category") == "Overhead" and safe_float(item.get("amount")) < 0
+    )
     if MONTHLY_OVERHEAD == 0: MONTHLY_OVERHEAD = 1500.0 # Fallback
     
-    AVG_DAILY_REVENUE = sum(float(s.get("total_with_tax", 0)) for s in sales) / 30 if len(sales) > 0 else 200.0
+    # 2. Daily Revenue calculation
+    total_rev = sum(safe_float(s.get("total_with_tax")) for s in sales)
+    AVG_DAILY_REVENUE = total_rev / 30 if len(sales) > 0 else 200.0
     
     simulations = []
     survival_count = 0

@@ -44,7 +44,8 @@ export async function POST(req: Request) {
     const scriptPath = path.join(process.cwd(), "scripts", "stress_tester.py");
     
     const result: any = await new Promise((resolve, reject) => {
-      const python = spawn("python", [scriptPath]);
+      const pythonCmd = process.platform === "win32" ? "python" : "python3";
+      const python = spawn(pythonCmd, [scriptPath]);
       let stdout = "";
       let stderr = "";
 
@@ -55,7 +56,22 @@ export async function POST(req: Request) {
       python.stderr.on("data", (data) => (stderr += data.toString()));
 
       python.on("close", (code) => {
-        if (code !== 0) reject(new Error(stderr || "Python script failed"));
+        if (code !== 0) {
+            if (process.platform === "win32") {
+                const pyRetry = spawn("py", [scriptPath]);
+                let s2 = "", e2 = "";
+                pyRetry.stdin.write(JSON.stringify(payload));
+                pyRetry.stdin.end();
+                pyRetry.stdout.on("data", (d) => (s2 += d.toString()));
+                pyRetry.stderr.on("data", (d) => (e2 += d.toString()));
+                pyRetry.on("close", (c2) => {
+                    if (c2 !== 0) reject(new Error(e2 || "Python retry failed"));
+                    try { resolve(JSON.parse(s2)); } catch { reject(new Error("Failed to parse retry output")); }
+                });
+                return;
+            }
+            reject(new Error(stderr || "Python script failed"));
+        }
         try {
           resolve(JSON.parse(stdout));
         } catch (e) {
@@ -79,7 +95,11 @@ export async function POST(req: Request) {
         });
     }
 
-    return NextResponse.json({ success: false, message: "Simulation failed to generate report" });
+    return NextResponse.json({ 
+        success: false, 
+        message: result.message || "Simulation failed to generate report output",
+        raw: result
+    }, { status: 500 });
   } catch (e: any) {
     console.error("Stress Test API Error:", e);
     return NextResponse.json({ success: false, message: e.message }, { status: 500 });

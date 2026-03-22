@@ -30,8 +30,9 @@ export async function GET() {
     // 3. Execute Python
     const scriptPath = path.join(process.cwd(), "scripts", "system_health.py");
     
-    const result = await new Promise((resolve, reject) => {
-      const python = spawn("python", [scriptPath]);
+    const result: any = await new Promise((resolve, reject) => {
+      const pythonCmd = process.platform === "win32" ? "python" : "python3";
+      const python = spawn(pythonCmd, [scriptPath]);
       let stdout = "";
       let stderr = "";
 
@@ -42,7 +43,22 @@ export async function GET() {
       python.stderr.on("data", (data) => (stderr += data.toString()));
 
       python.on("close", (code) => {
-        if (code !== 0) reject(new Error(stderr || "Python script failed"));
+        if (code !== 0) {
+          if (process.platform === "win32") {
+            const pyRetry = spawn("py", [scriptPath]);
+            let s2 = "", e2 = "";
+            pyRetry.stdin.write(JSON.stringify(payload));
+            pyRetry.stdin.end();
+            pyRetry.stdout.on("data", (d) => (s2 += d.toString()));
+            pyRetry.stderr.on("data", (d) => (e2 += d.toString()));
+            pyRetry.on("close", (c2) => {
+              if (c2 !== 0) reject(new Error(e2 || "Python retry failed"));
+              try { resolve(JSON.parse(s2)); } catch { reject(new Error("Failed to parse retry output")); }
+            });
+            return;
+          }
+          reject(new Error(stderr || "Python script failed"));
+        }
         try {
           resolve(JSON.parse(stdout));
         } catch (e) {

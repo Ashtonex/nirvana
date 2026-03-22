@@ -21,12 +21,21 @@ def analyze_data(input_data):
     ecocash_sales = [s for s in sales if s.get('payment_method') == 'ecocash']
     ecocash_ledger = [l for l in ledger if 'ecocash' in str(l.get('category', '')).lower() or 'ecocash' in str(l.get('description', '')).lower()]
     
+    # Create a lookup map for ledger entries by rounded amount
+    ledger_lookup = {}
+    for l in ecocash_ledger:
+        amt = round(float(l.get('amount', 0)), 2)
+        if amt not in ledger_lookup:
+            ledger_lookup[amt] = []
+        ledger_lookup[amt].append(l)
+
     for sale in ecocash_sales:
         sale_id = f"sale_{sale.get('id')}"
         if sale_id in memory: continue # Already handled or learned
         
-        # Look for matching amount in ledger (approximate time match within 24h)
-        match = next((l for l in ecocash_ledger if abs(float(l.get('amount', 0)) - float(sale.get('total_with_tax', 0))) < 0.01), None)
+        sale_amt = round(float(sale.get('total_with_tax', 0)), 2)
+        match = ledger_lookup.get(sale_amt, [None])[0]
+        
         if not match:
             inquiries.append({
                 "id": sale_id,
