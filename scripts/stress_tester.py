@@ -128,7 +128,8 @@ def run_simulation(data):
     total_drawdown = 0
     insolvency_day = 180
 
-    for i in range(100): # 100 paths for speed
+    total_paths = 100
+    for i in range(total_paths): # 100 paths for speed
         path_cash = cash_on_hand
         path_revenue_mult = 1.0
         path_overhead_mult = 1.0
@@ -158,6 +159,12 @@ def run_simulation(data):
         
         if path_alive: survival_count += 1
         simulations.append(path_cash)
+        
+        # Emit progress every 10 paths
+        if (i + 1) % 10 == 0 or i == total_paths - 1:
+            pct = int(((i + 1) / total_paths) * 100)
+            # Flush so Node can read it immediately
+            print(f"PROGRESS:{pct}:{scenario_type} path {i+1}/{total_paths}", flush=True)
 
     summary = {
         "survival_rate": survival_count,
@@ -186,7 +193,8 @@ if __name__ == "__main__":
         payload = json.loads(input_data)
         report_html = run_simulation(payload)
         
-        # Output result as JSON containing the HTML
+        # Output result as JSON containing the HTML — preceded by a delimiter so Node can distinguish it from progress lines
+        print("__NIRVANA_RESULT__", flush=True)
         print(json.dumps({
             "status": "success",
             "report_html": report_html,

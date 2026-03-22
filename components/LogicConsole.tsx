@@ -410,29 +410,80 @@ export default function LogicPage() {
   
   const auditRef = useRef<HTMLDivElement>(null);
   const [runningSimulation, setRunningSimulation] = useState(false);
+  const [simulationProgress, setSimulationProgress] = useState(0);
+  const [simulationMessage, setSimulationMessage] = useState("");
+  const [simulationElapsed, setSimulationElapsed] = useState(0);
+  const [simulationComplete, setSimulationComplete] = useState(false);
   const [selectedScenario, setSelectedScenario] = useState("Recession");
   const [reports, setReports] = useState<any[]>([]);
 
   const runStressTest = async () => {
     setRunningSimulation(true);
+    setSimulationProgress(0);
+    setSimulationMessage("Initializing...");
+    setSimulationElapsed(0);
+
+    const elapsedInterval = setInterval(() => {
+      setSimulationElapsed(s => s + 1);
+    }, 1000);
+
     try {
-      const res = await fetch("/api/logic/stress-test", {
+      const res = await fetch("/api/logic/stress-test/stream", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ scenario: selectedScenario }),
         credentials: "include"
       });
-      const data = await res.json();
-      if (data.success) {
-        setReports(prev => [data, ...prev]);
-        window.open(data.reportUrl, "_blank");
-      } else {
-        alert("Simulation failed: " + data.message);
+
+      if (!res.ok) {
+        throw new Error(`Server error: ${res.status}`);
       }
-    } catch (e) {
-      alert("Error running simulation");
-    } finally {
+
+      const reader = res.body?.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+
+      if (!reader) throw new Error("No response body");
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() || "";
+
+        for (const line of lines) {
+          if (!line.startsWith("data: ")) continue;
+          try {
+            const data = JSON.parse(line.slice(6));
+            if (data.progress !== undefined) setSimulationProgress(data.progress);
+            if (data.message) setSimulationMessage(data.message);
+            if (data.elapsed !== undefined) setSimulationElapsed(data.elapsed);
+
+            if (data.complete) {
+              if (data.error) {
+                setSimulationMessage(`Error: ${data.error}`);
+                setSimulationProgress(0);
+              } else if (data.reportUrl) {
+                setReports(prev => [{ reportUrl: data.reportUrl, filename: data.filename }, ...prev]);
+                window.open(data.reportUrl, "_blank");
+                setSimulationMessage("Complete!");
+                setSimulationComplete(true);
+              }
+              setRunningSimulation(false);
+            }
+          } catch {
+            // Skip malformed events
+          }
+        }
+      }
+    } catch (e: any) {
+      setSimulationMessage(`Error: ${e.message || "Simulation failed"}`);
+      setSimulationProgress(0);
       setRunningSimulation(false);
+    } finally {
+      clearInterval(elapsedInterval);
     }
   };
 
@@ -479,6 +530,18 @@ export default function LogicPage() {
     const interval = setInterval(fetchAll, 3000);
     return () => clearInterval(interval);
   }, [fetchAll]);
+
+  useEffect(() => {
+    if (simulationComplete) {
+      const t = setTimeout(() => {
+        setSimulationComplete(false);
+        setSimulationProgress(0);
+        setSimulationMessage("");
+        setSimulationElapsed(0);
+      }, 4000);
+      return () => clearTimeout(t);
+    }
+  }, [simulationComplete]);
 
   const totalOpsValue = operations.reduce((sum, op) => sum + Number(op.amount || 0), 0);
   const totalPositive = operations.filter(op => Number(op.amount) >= 0).reduce((sum, op) => sum + Number(op.amount || 0), 0);
@@ -682,9 +745,11 @@ export default function LogicPage() {
                   ].map(scenario => (
                     <button
                       key={scenario.id}
+                      disabled={runningSimulation}
                       onClick={() => setSelectedScenario(scenario.id)}
                       className={cn(
                         "p-4 rounded-xl border-2 text-left transition-all group/btn",
+                        runningSimulation && "opacity-50 cursor-not-allowed",
                         selectedScenario === scenario.id 
                           ? "bg-violet-500/10 border-violet-500 shadow-[0_0_20px_rgba(139,92,246,0.1)]" 
                           : "bg-slate-900/50 border-slate-800 hover:border-slate-700"
@@ -700,27 +765,77 @@ export default function LogicPage() {
                 </div>
 
                 <div className="p-6 rounded-2xl bg-slate-950 border border-slate-800/50 flex flex-col items-center justify-center text-center space-y-4">
-                  <div className="w-16 h-16 rounded-full bg-violet-500/10 flex items-center justify-center">
-                    <Activity className={cn("h-8 w-8 text-violet-500", runningSimulation && "animate-spin")} />
+                  <div className="w-16 h-16 rounded-full bg-violet-500/10 flex items-center justify-center relative">
+                    {simulationComplete ? (
+                      <ShieldCheck className="h-8 w-8 text-emerald-400 animate-pulse" />
+                    ) : (
+                      <Activity className={cn("h-8 w-8 text-violet-500", runningSimulation && "animate-spin")} />
+                    )}
+                    {runningSimulation && (
+                      <span className="absolute -bottom-1 -right-1 bg-violet-600 text-white text-[8px] font-black px-1.5 py-0.5 rounded-full animate-pulse">
+                        LIVE
+                      </span>
+                    )}
+                    {simulationComplete && (
+                      <span className="absolute -bottom-1 -right-1 bg-emerald-600 text-white text-[8px] font-black px-1.5 py-0.5 rounded-full">
+                        DONE
+                      </span>
+                    )}
                   </div>
                   <div>
-                    <h3 className="text-lg font-black uppercase italic text-white">Ready for Neural Simulation</h3>
-                    <p className="text-xs text-slate-500 max-w-sm mx-auto">Running the stress test will execute 1,000 algorithmic paths to predict business survival probability.</p>
+                    <h3 className="text-lg font-black uppercase italic text-white">
+                      {simulationComplete ? "Report Generated!" : runningSimulation ? "Simulation Running" : "Ready for Neural Simulation"}
+                    </h3>
+                    <p className="text-xs text-slate-500 max-w-sm mx-auto">
+                      {simulationComplete
+                        ? `Completed in ${simulationElapsed}s — your report is open in a new tab.`
+                        : runningSimulation
+                        ? simulationMessage || "Processing Monte Carlo paths..."
+                        : "Running the stress test will execute 100 algorithmic paths to predict business survival probability."}
+                    </p>
                   </div>
+
+                  {(runningSimulation || simulationComplete) && (
+                    <div className="w-full max-w-xs space-y-2">
+                      <div className="flex justify-between items-center">
+                        <span className="text-[9px] font-black uppercase text-slate-500">Progress</span>
+                        <span className={cn(
+                          "text-[9px] font-black font-mono",
+                          simulationComplete ? "text-emerald-400" : "text-violet-400"
+                        )}>{simulationProgress}%</span>
+                      </div>
+                      <div className="h-2 w-full bg-slate-800 rounded-full overflow-hidden">
+                        <div
+                          className={cn(
+                            "h-full rounded-full transition-all duration-300 ease-out",
+                            simulationComplete
+                              ? "bg-emerald-500"
+                              : "bg-gradient-to-r from-violet-600 to-indigo-500"
+                          )}
+                          style={{ width: `${simulationProgress}%` }}
+                        />
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-[9px] font-black uppercase text-slate-500">Elapsed</span>
+                        <span className="text-[9px] font-black text-slate-400 font-mono">{simulationElapsed}s</span>
+                      </div>
+                    </div>
+                  )}
+
                   <button
                     disabled={runningSimulation}
                     onClick={runStressTest}
                     className={cn(
                       "w-full max-w-xs h-14 rounded-xl font-black uppercase italic tracking-widest transition-all",
-                      runningSimulation 
-                        ? "bg-slate-800 text-slate-500 cursor-not-allowed" 
+                      runningSimulation
+                        ? "bg-slate-800 text-slate-500 cursor-not-allowed"
                         : "bg-gradient-to-r from-violet-600 to-indigo-600 text-white shadow-xl hover:scale-105 active:scale-95"
                     )}
                   >
                     {runningSimulation ? (
                       <span className="flex items-center justify-center gap-2">
                         <Loader2 className="h-5 w-5 animate-spin" />
-                        PROCESSING PATHS...
+                        PROCESSING...
                       </span>
                     ) : "INITIATE SIMULATION"}
                   </button>
