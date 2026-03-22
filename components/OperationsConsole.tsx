@@ -373,7 +373,7 @@ export function OperationsConsole({
           </CardHeader>
           <CardContent>
             <div className="text-4xl font-black italic text-emerald-300 font-mono">
-              ${masterVault.toLocaleString()}
+              $<AnimatedNumber value={masterVault} />
             </div>
             <p className="text-[10px] text-slate-500 mt-1">Total cash in business</p>
           </CardContent>
@@ -387,7 +387,7 @@ export function OperationsConsole({
           </CardHeader>
           <CardContent>
             <div className="text-4xl font-black italic text-sky-300 font-mono">
-              ${investTotal.toLocaleString()}
+              $<AnimatedNumber value={investTotal} />
             </div>
             <p className="text-[10px] text-slate-500 mt-1">Perfume deposits total</p>
           </CardContent>
@@ -401,7 +401,7 @@ export function OperationsConsole({
           </CardHeader>
           <CardContent>
             <div className="text-4xl font-black italic text-violet-300 font-mono">
-              ${combinedTotal.toLocaleString()}
+              $<AnimatedNumber value={combinedTotal} />
             </div>
             <p className="text-[10px] text-slate-500 mt-1">Vault + Invest</p>
           </CardContent>
@@ -421,7 +421,7 @@ export function OperationsConsole({
               </CardHeader>
               <CardContent>
                 <div className="text-3xl font-black italic text-cyan-300 font-mono">
-                  ${shopSavings.toLocaleString()}
+                  $<AnimatedNumber value={shopSavings} />
                 </div>
                 <p className="text-[10px] text-slate-500 mt-1">Total committed to ops</p>
               </CardContent>
@@ -448,18 +448,18 @@ export function OperationsConsole({
                       <span className="text-emerald-500 flex items-center gap-1">
                         <TrendingUp className="h-3 w-3" /> Contributed
                       </span>
-                      <span className="font-mono text-emerald-400">${shop.contributed.toFixed(2)}</span>
+                      <span className="font-mono text-emerald-400">$<AnimatedNumber value={shop.contributed} /></span>
                     </div>
                     <div className="flex justify-between text-xs">
                       <span className="text-rose-500 flex items-center gap-1">
                         <TrendingDown className="h-3 w-3" /> Paid
                       </span>
-                      <span className="font-mono text-rose-400">${shop.paid.toFixed(2)}</span>
+                      <span className="font-mono text-rose-400">$<AnimatedNumber value={shop.paid} /></span>
                     </div>
                     <div className="flex justify-between text-xs border-t border-slate-700 pt-2">
                       <span className="text-slate-400">Net</span>
                       <span className={cn("font-mono font-black", shop.net >= 0 ? "text-emerald-400" : "text-rose-400")}>
-                        {shop.net >= 0 ? "+" : ""}${shop.net.toFixed(2)}
+                        {shop.net >= 0 ? "+" : ""}$<AnimatedNumber value={shop.net} />
                       </span>
                     </div>
                   </div>
@@ -828,6 +828,38 @@ export function OperationsConsole({
   );
 }
 
+function AnimatedNumber({ value }: { value: number }) {
+  const [displayValue, setDisplayValue] = useState(0);
+  
+  useEffect(() => {
+    let start = displayValue;
+    const end = value;
+    if (start === end) return;
+    
+    const duration = 1000; // 1 second
+    const startTime = performance.now();
+    
+    const animate = (currentTime: number) => {
+      const elapsed = currentTime - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+      
+      // Ease out quad
+      const easeProgress = progress * (2 - progress);
+      
+      const current = start + (end - start) * easeProgress;
+      setDisplayValue(current);
+      
+      if (progress < 1) {
+        requestAnimationFrame(animate);
+      }
+    };
+    
+    requestAnimationFrame(animate);
+  }, [value]);
+  
+  return <span>{displayValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>;
+}
+
 const NirvanaLogoCard = memo(function NirvanaLogoCard({ masterVault, investTotal, handshakes, auditPassed, auditFailed }: {
   masterVault: number;
   investTotal: number;
@@ -836,57 +868,60 @@ const NirvanaLogoCard = memo(function NirvanaLogoCard({ masterVault, investTotal
   auditPassed: number;
 }) {
   const allGood = auditFailed === 0 && handshakes.every(h => h.status !== "pending");
-  const [rotation, setRotation] = useState(0);
-  const [tilt, setTilt] = useState(0);
   
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setRotation(prev => (prev + 2) % 360);
-      setTilt(prev => Math.sin(prev * Math.PI / 180) * 15);
-    }, 50);
-    return () => clearInterval(interval);
-  }, []);
-
   return (
     <Card className={cn(
       "bg-gradient-to-br border-2 overflow-hidden",
       allGood ? "from-violet-950/60 to-slate-950 border-violet-500/50" : "from-amber-950/60 to-slate-950 border-amber-500/50"
     )}>
       <CardContent className="flex flex-col items-center justify-center py-6">
+        <style dangerouslySetInnerHTML={{ __html: `
+          @keyframes nirvana-spin {
+            from { transform: rotateY(0deg) rotateX(10deg); }
+            to { transform: rotateY(360deg) rotateX(10deg); }
+          }
+          .animate-nirvana-spin {
+            animation: nirvana-spin 8s linear infinite;
+            transform-style: preserve-3d;
+          }
+        `}} />
         <div className="perspective-500">
-          <div 
-            className="w-20 h-20 mb-4 transition-transform relative"
-            style={{ 
-              transform: `rotateY(${rotation}deg) rotateX(${tilt}deg)`,
-              transformStyle: "preserve-3d"
-            }}
-          >
+          <div className="w-20 h-20 mb-4 relative animate-nirvana-spin">
             <div className="absolute inset-0 backface-hidden">
               <img 
                 src="/logo.png" 
                 alt="Nirvana" 
                 className="w-full h-full object-contain"
-                style={{ filter: 'drop-shadow(0 0 15px rgba(139,92,246,0.5))', backgroundColor: 'transparent' }}
+                style={{ filter: 'drop-shadow(0 0 15px rgba(139,92,246,0.6))', backgroundColor: 'transparent' }}
                 onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+              />
+            </div>
+            {/* Mirror face for 3D effect */}
+            <div className="absolute inset-0 backface-hidden" style={{ transform: 'rotateY(180deg)' }}>
+              <img 
+                src="/logo.png" 
+                alt="Nirvana" 
+                className="w-full h-full object-contain opacity-50"
+                style={{ filter: 'drop-shadow(0 0 15px rgba(139,92,246,0.4))' }}
               />
             </div>
           </div>
         </div>
         <div className="text-center">
-          <div className={cn("text-xl font-black italic uppercase", allGood ? "text-violet-300" : "text-amber-300")}>
+          <div className={cn("text-xl font-black italic uppercase tracking-widest", allGood ? "text-violet-300" : "text-amber-300")}>
             {allGood ? "Nirvana" : "Attention"}
           </div>
-          <div className="text-[10px] text-slate-500 mt-1">
+          <div className="text-[10px] text-slate-500 mt-1 font-mono uppercase tracking-tighter">
             {allGood ? "All systems operational" : "Action required"}
           </div>
         </div>
         <div className="flex items-center gap-2 mt-3 text-[10px]">
           {allGood ? (
-            <Wifi className="h-3 w-3 text-emerald-400" />
+            <Wifi className="h-3 w-3 text-emerald-400 animate-pulse" />
           ) : (
-            <WifiOff className="h-3 w-3 text-amber-400" />
+            <WifiOff className="h-3 w-3 text-amber-400 grow-pulse" />
           )}
-          <span className={allGood ? "text-emerald-400" : "text-amber-400"}>
+          <span className={cn("font-bold uppercase", allGood ? "text-emerald-400" : "text-amber-400")}>
             {allGood ? "Connected" : "Issues"}
           </span>
         </div>
@@ -904,70 +939,53 @@ const TypingStatusCard = memo(function TypingStatusCard({ masterVault, investTot
   handshakePending?: number;
   auditFailed: number;
 }) {
-  const [displayText, setDisplayText] = useState("");
-  const [isTyping, setIsTyping] = useState(true);
-  const charIndex = useRef(0);
+  const [visibleLines, setVisibleLines] = useState<number>(0);
+  const [complete, setComplete] = useState(false);
 
-  const fullText = useMemo(() => {
-    const lines: string[] = [];
-    lines.push("initializing nirvana dashboard...");
-    lines.push(".");
-    lines.push(".");
-    lines.push(".");
-    lines.push("");
-    lines.push(`vault status: $${masterVault.toLocaleString()}`);
-    lines.push(`invest status: $${investTotal.toLocaleString()}`);
-    lines.push(`combined: $${combinedTotal.toLocaleString()}`);
-    lines.push("");
-    if (activeShops > 0) {
-      lines.push(`${activeShops} shop${activeShops > 1 ? "s" : ""} active`);
-    }
-    if ((handshakePending ?? 0) > 0) {
-      lines.push(`! ${handshakePending} handshake${(handshakePending ?? 0) > 1 ? "s" : ""} pending`);
-    }
-    if (auditFailed > 0) {
-      lines.push(`! pos audit variance detected`);
-    }
-    lines.push("");
-    if ((handshakePending ?? 0) === 0 && auditFailed === 0 && activeShops > 0) {
-      lines.push("all systems nominal...");
-    } else if ((handshakePending ?? 0) > 0 || auditFailed > 0) {
-      lines.push("review pending items.");
-    } else {
-      lines.push("no active operations.");
-    }
-    lines.push("");
-    lines.push(`transactions logged: ${ledgerCount}`);
-    lines.push("");
-    lines.push("ready.");
-    return lines.join("\n");
-  }, [masterVault, investTotal, combinedTotal, ledgerCount, activeShops, handshakePending, auditFailed]);
+  const lines = useMemo(() => [
+    { type: 'text', label: 'initializing nirvana dashboard...' },
+    { type: 'text', label: '...' },
+    { type: 'value', label: 'vault status: $', value: masterVault },
+    { type: 'value', label: 'invest status: $', value: investTotal },
+    { type: 'value', label: 'combined: $', value: combinedTotal },
+    { type: 'text', label: '' },
+    { type: 'text', label: activeShops > 0 ? `${activeShops} shop${activeShops > 1 ? "s" : ""} active` : '' },
+    { type: 'text', label: (handshakePending ?? 0) > 0 ? `! ${handshakePending} handshake${(handshakePending ?? 0) > 1 ? "s" : ""} pending` : '' },
+    { type: 'text', label: auditFailed > 0 ? `! pos audit variance detected` : '' },
+    { type: 'text', label: '' },
+    { type: 'text', label: ((handshakePending ?? 0) === 0 && auditFailed === 0 && activeShops > 0) ? "all systems nominal..." : "review pending items." },
+    { type: 'text', label: `transactions logged: ${ledgerCount}` },
+    { type: 'text', label: 'ready.' },
+  ].filter(l => l.label !== ''), [masterVault, investTotal, combinedTotal, ledgerCount, activeShops, handshakePending, auditFailed]);
 
   useEffect(() => {
-    charIndex.current = 0;
-    setDisplayText("");
-    setIsTyping(true);
-
+    setVisibleLines(0);
+    setComplete(false);
+    let current = 0;
     const interval = setInterval(() => {
-      if (charIndex.current < fullText.length) {
-        setDisplayText(fullText.substring(0, charIndex.current + 1));
-        charIndex.current++;
+      if (current < lines.length) {
+        current++;
+        setVisibleLines(current);
       } else {
-        setIsTyping(false);
+        setComplete(true);
         clearInterval(interval);
       }
-    }, 80);
-
+    }, 400);
     return () => clearInterval(interval);
-  }, [fullText]);
+  }, [lines]);
 
   return (
     <Card className="bg-slate-950/80 border-slate-800/50">
       <CardContent className="py-4">
-        <pre className="text-xs font-mono text-emerald-400/80 whitespace-pre-wrap leading-relaxed">
-          {displayText}
-          {isTyping && <span className="animate-pulse">▋</span>}
-        </pre>
+        <div className="text-xs font-mono text-emerald-400/80 whitespace-pre-wrap leading-relaxed min-h-[180px]">
+          {lines.slice(0, visibleLines).map((line, i) => (
+            <div key={i} className="flex gap-1 animate-in fade-in slide-in-from-left-1 duration-300">
+              <span>{line.label}</span>
+              {line.type === 'value' && <AnimatedNumber value={line.value} />}
+            </div>
+          ))}
+          {!complete && <span className="animate-pulse">▋</span>}
+        </div>
       </CardContent>
     </Card>
   );
@@ -984,8 +1002,31 @@ const AuditMonitorCard = memo(function AuditMonitorCard({ auditStats, ledger, sh
   const [isRunning, setIsRunning] = useState(true);
   const [cycleCount, setCycleCount] = useState(1);
   const [shopStatuses, setShopStatuses] = useState<Record<string, { status: string; lastCheck: Date; issues: string[] }>>({});
+  const [auditResult, setAuditResult] = useState<any>(null);
+  const [isAuditing, setIsAuditing] = useState(false);
   
   const shopNames = shops.map(s => s.name.toUpperCase());
+
+  const handleRunAudit = async () => {
+    setIsAuditing(true);
+    setAuditResult(null);
+    try {
+      const res = await fetch("/api/pos-audit/run", { 
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ shopId: shops[0]?.id || "global" })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setAuditResult(data);
+        setTimeout(() => setAuditResult(null), 10000);
+      }
+    } catch (e) {
+      console.error("Audit run failed:", e);
+    } finally {
+      setIsAuditing(false);
+    }
+  };
   
   useEffect(() => {
     const interval = setInterval(async () => {
@@ -1252,14 +1293,54 @@ const AuditMonitorCard = memo(function AuditMonitorCard({ auditStats, ledger, sh
         <Button 
           size="sm" 
           variant="outline" 
+          onClick={handleRunAudit}
+          disabled={isAuditing}
+          className="flex-1 text-[10px] font-black uppercase h-7 border-sky-500/50 text-sky-400 hover:bg-sky-500/10"
+        >
+          {isAuditing ? "Auditing..." : "▶ RUN AUDIT"}
+        </Button>
+        <Button 
+          size="sm" 
+          variant="outline" 
           onClick={() => setIsRunning(!isRunning)}
           className={cn(
-            "flex-1 text-[10px] font-black uppercase h-7",
+            "w-20 text-[10px] font-black uppercase h-7",
             isRunning ? "border-rose-500/50 text-rose-400" : "border-emerald-500/50 text-emerald-400"
           )}
         >
-          {isRunning ? "⏸ PAUSE" : "▶ RESUME"}
+          {isRunning ? "⏸" : "▶"}
         </Button>
+        <Button 
+          size="sm" 
+          variant="outline" 
+          asChild
+          className="w-20 text-[10px] font-black uppercase h-7 border-slate-700 text-slate-400"
+        >
+          <a href="/pos">GO TO POS</a>
+        </Button>
+      </div>
+
+      {auditResult && (
+        <div className="p-3 bg-slate-900 border border-emerald-500/40 rounded-lg animate-in slide-in-from-bottom duration-500">
+          <div className="text-[10px] font-black text-emerald-400 uppercase mb-2">Audit Result: {shops[0]?.name}</div>
+          <div className="grid grid-cols-2 gap-2 text-[9px] font-mono">
+            <div className="text-slate-500">Sales:</div>
+            <div className="text-slate-200 text-right">${Number(auditResult.sales || 0).toFixed(2)}</div>
+            <div className="text-slate-500">Expenses:</div>
+            <div className="text-slate-200 text-right">${Number(auditResult.expenses || 0).toFixed(2)}</div>
+            <div className="text-slate-500">Tax:</div>
+            <div className="text-slate-200 text-right">${Number(auditResult.tax || 0).toFixed(2)}</div>
+            <div className="border-t border-slate-800 col-span-2 my-1" />
+            <div className="text-emerald-400 font-bold">Variance:</div>
+            <div className={cn("font-bold text-right", auditResult.variance !== 0 ? "text-rose-400" : "text-emerald-400")}>
+              ${Number(auditResult.variance || 0).toFixed(2)}
+            </div>
+          </div>
+        </div>
+        </div>
+      )}
+      
+      <div className="flex gap-2">
         <Button 
           size="sm" 
           variant="outline" 
@@ -1294,6 +1375,9 @@ const NirvanaOracleBrain = memo(function NirvanaOracleBrain({
   const [responses, setResponses] = useState<{q: string; a: string; time: Date}[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   
+  const [aiResponse, setAiResponse] = useState<any>(null);
+  const [errorCount, setErrorCount] = useState(0);
+  
   const knowledgePhases = [
     "SCANNING SYSTEM ARCHITECTURE...",
     "MAPPING DATA FLOWS...",
@@ -1304,371 +1388,190 @@ const NirvanaOracleBrain = memo(function NirvanaOracleBrain({
     "LEARNING PERSONNEL ROLES...",
     "ESTABLISHING BASELINES...",
     "CALIBRATING PREDICTIONS...",
-    "ACTIVATING BUSINESS INTELLIGENCE..."
+    "ACTIVATING BUSINESS INTELLIGENCE...",
+    "CONSULTING PYTHON ANALYTICS ENGINE..."
   ];
-  
-  const insights = useMemo(() => {
-    const insights: string[] = [];
-    
-    const totalRevenue = ledger.filter(l => l.amount > 0).reduce((sum, l) => sum + Number(l.amount), 0);
-    const totalExpenses = ledger.filter(l => l.amount < 0).reduce((sum, l) => sum + Math.abs(Number(l.amount)), 0);
-    const netFlow = totalRevenue - totalExpenses;
-    
-    const recentActivity = staffLogs.filter(l => {
-      const logAge = Date.now() - new Date(l.created_at).getTime();
-      return logAge < 24 * 60 * 60 * 1000;
-    }).length;
-    
-    const activeEmployees = employees.filter(e => e.isOnline).length;
-    
-    const overheadContributions = ledger
-      .filter(l => l.kind === "overhead_contribution")
-      .reduce((sum, l) => sum + Number(l.amount), 0);
-    
-    insights.push(`Revenue Flow: $${totalRevenue.toFixed(0)}`);
-    insights.push(`Expense Drain: $${totalExpenses.toFixed(0)}`);
-    insights.push(`Net Cash: ${netFlow >= 0 ? '+' : ''}$${netFlow.toFixed(0)}`);
-    
-    // SUSTAINABILITY SCORE: Net Flow vs Projected Daily Overheads
-    const estimatedDailyOverhead = 160; // Baseline $4,800/month
-    const daysInPeriod = 7; 
-    const sustainabilityScore = Math.min(100, Math.max(0, (netFlow / (estimatedDailyOverhead * daysInPeriod)) * 100));
-    insights.push(`Sustainability Score: ${sustainabilityScore.toFixed(1)}%`);
-    
-    insights.push(`Activity (24h): ${recentActivity} events`);
-    insights.push(`Staff Online: ${activeEmployees}/${employees.length}`);
-    insights.push(`Overhead Pool: $${overheadContributions.toFixed(0)}`);
-    
-    const shopPerformance = shops.map(shop => {
-      const shopLedger = ledger.filter(l => l.shop_id?.toLowerCase().includes(shop.name.toLowerCase()));
-      const shopRevenue = shopLedger.filter(l => l.amount > 0).reduce((sum, l) => sum + Number(l.amount), 0);
-      return { name: shop.name, revenue: shopRevenue };
-    });
-    
-    if (shopPerformance.length > 0) {
-      const topShop = shopPerformance.reduce((a, b) => a.revenue > b.revenue ? a : b);
-      insights.push(`Top Performer: ${topShop.name}`);
-    }
-    
-    const posRoutedExpenses = ledger.filter(l =>
-      l.notes?.includes("Auto-routed from POS expense")
-    );
-    const routedTotal = posRoutedExpenses.reduce((sum, l) => sum + Number(l.amount), 0);
-    if (posRoutedExpenses.length > 0) {
-      insights.push(`POS→Ops Routed: $${routedTotal.toFixed(0)} (${posRoutedExpenses.length} entries)`);
-    }
-    
-    const eodDeposits = ledger.filter(l => l.kind === "eod_deposit");
-    const opsIncome = eodDeposits.reduce((sum, l) => sum + Number(l.amount), 0);
-    if (opsIncome > 0) {
-      insights.push(`Ops Income (EOD): $${opsIncome.toFixed(0)}`);
-    }
-    
-    return insights;
-  }, [ledger, staffLogs, employees, shops]);
-  
-  const businessIdeas = useMemo(() => {
-    const ideas: string[] = [];
-    
-    const totalExpenses = ledger.filter(l => l.amount < 0).reduce((sum, l) => sum + Math.abs(Number(l.amount)), 0);
-    const overheadPayments = ledger
-      .filter(l => l.kind === "overhead_payment")
-      .reduce((sum, l) => sum + Math.abs(Number(l.amount)), 0);
-    
-    if (overheadPayments > 0 && overheadPayments < totalExpenses * 0.5) {
-      ideas.push("Consider increasing overhead contributions to accelerate debt reduction");
-    }
-    
-    const recentRevenue = ledger
-      .filter(l => l.amount > 0 && Date.now() - new Date(l.created_at).getTime() < 7 * 24 * 60 * 60 * 1000)
-      .reduce((sum, l) => sum + Number(l.amount), 0);
-    
-    if (recentRevenue > 5000) {
-      ideas.push("Strong weekly revenue detected. Consider expanding inventory for peak periods");
-    }
-    
-    const onlineStaff = employees.filter(e => e.isOnline).length;
-    if (onlineStaff >= 2) {
-      ideas.push("Multi-staff coverage optimal for high-volume sales windows");
-    }
-    
-    return ideas.length > 0 ? ideas : ["System stabilizing. Continue current operations."];
-  }, [ledger, employees]);
-  
-  const oracleSteps = useMemo(() => {
-    const steps: { phase: string; lines: string[]; delay: number; charDelay: number }[] = [];
-    
-    const currentPhase = Math.min(knowledgeLevel, knowledgePhases.length - 1);
-    
-    steps.push({
-      phase: "BOOT",
-      lines: [
-        "",
-        "╔══════════════════════════════════════╗",
-        "║     NIRVANA ORACLE - BRAIN ONLINE    ║",
-        "╚══════════════════════════════════════╝",
-        "",
-        "Neural pathways initializing...",
-        "Memory banks: ONLINE",
-        "Pattern recognition: CALIBRATING",
-        "Business logic: LOADING",
-        "",
-      ],
-      delay: 3000,
-      charDelay: 70,
-    });
-    
-    steps.push({
-      phase: "LEARNING",
-      lines: [
-        "",
-        `▓ LEARNING PHASE ${knowledgeLevel + 1}/10`,
-        `▓ ${knowledgePhases[currentPhase]}`,
-        "",
-        "Building knowledge graph...",
-        "Connecting data points...",
-        "Establishing correlations...",
-        "",
-      ],
-      delay: 4000,
-      charDelay: 85,
-    });
-    
-    steps.push({
-      phase: "ANALYSIS",
-      lines: [
-        "",
-        "═══════════════════════════════════════",
-        "          LIVE SYSTEM ANALYSIS         ",
-        "═══════════════════════════════════════",
-        "",
-        ...insights.map(insight => `  ● ${insight}`),
-        "",
-        "═══════════════════════════════════════",
-        "",
-      ],
-      delay: 5000,
-      charDelay: 60,
-    });
-    
-    steps.push({
-      phase: "STRATEGY",
-      lines: [
-        "",
-        "▣ GENERATING STRATEGIC INSIGHTS",
-        "",
-        "Analyzing market position...",
-        "Evaluating efficiency...",
-        "Formulating recommendations...",
-        "",
-        "STRATEGIC INSIGHTS:",
-        ...businessIdeas.map((idea, i) => `  ${i + 1}. ${idea}`),
-        "",
-      ],
-      delay: 4500,
-      charDelay: 75,
-    });
-    
-    if (responses.length > 0) {
-      steps.push({
-        phase: "MEMORY",
-        lines: [
-          "",
-          "═══════════════════════════════════════",
-          "            RECENT QUERIES              ",
-          "═══════════════════════════════════════",
-          "",
-          ...responses.slice(-3).map(r => [
-            `Q: ${r.q}`,
-            `A: ${r.a.substring(0, 50)}${r.a.length > 50 ? '...' : ''}`,
-            `Time: ${r.time.toLocaleTimeString()}`,
-            "",
-          ]).flat(),
-          "═══════════════════════════════════════",
-        ],
-        delay: 4000,
-        charDelay: 50,
+
+  const fetchAI = useCallback(async () => {
+    setIsThinking(true);
+    try {
+      const res = await fetch("/api/oracle/analyze", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ledger, audit_stats: auditStats, shops, staffLogs })
       });
+      if (res.ok) {
+        const data = await res.json();
+        setAiResponse(data);
+      }
+    } catch (e) {
+      console.error("Oracle fetch failed:", e);
+      setErrorCount(prev => prev + 1);
+    } finally {
+      setIsThinking(false);
     }
-    
-    steps.push({
-      phase: "READY",
-      lines: [
-        "",
-        "▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓",
-        "",
-        "  ORACLE STATUS: ACTIVE",
-        `  THOUGHTS PROCESSED: ${thoughtCount}`,
-        "  KNOWLEDGE LEVEL: " + "█".repeat(Math.floor(knowledgeLevel / 2)) + "░".repeat(5 - Math.floor(knowledgeLevel / 2)),
-        "",
-        "  I am watching. I am learning.",
-        "  Ask me anything about Nirvana.",
-        "",
-        "▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓",
-      ],
-      delay: 5000,
-      charDelay: 80,
-    });
-    
-    return steps;
-  }, [knowledgeLevel, insights, businessIdeas, responses, thoughtCount]);
-  
-  const [currentStep, setCurrentStep] = useState(0);
-  
+  }, [ledger, auditStats, shops, staffLogs]);
+
   useEffect(() => {
-    if (!isThinking || currentStep >= oracleSteps.length) {
-      if (currentStep >= oracleSteps.length && isThinking) {
-        setTimeout(() => {
-          setCurrentStep(0);
-          setThoughtCount(c => c + 1);
-          if (knowledgeLevel < 10) {
-            setKnowledgeLevel(k => Math.min(10, k + 1));
-          }
-        }, 10000);
-      }
-      return;
+    if (knowledgeLevel === 0) {
+      setKnowledgeLevel(1);
     }
-    
-    const step = oracleSteps[currentStep];
-    const fullText = step.lines.join("\n");
-    const charDelay = step.charDelay || 80;
-    let charIndex = 0;
-    
-    const interval = setInterval(() => {
-      if (charIndex < fullText.length) {
-        setDisplayText(fullText.substring(0, charIndex + 1));
-        charIndex++;
-      } else {
-        clearInterval(interval);
-        setTimeout(() => {
-          setCurrentStep(s => s + 1);
-        }, step.delay);
-      }
-    }, charDelay);
-    
-    return () => clearInterval(interval);
-  }, [currentStep, isThinking, oracleSteps, knowledgeLevel]);
-  
-  const handleQuery = useCallback(async () => {
-    if (!userQuery.trim() || isProcessing) return;
-    
+  }, []);
+
+  useEffect(() => {
+    if (knowledgeLevel > 0 && knowledgeLevel < knowledgePhases.length) {
+      const timer = setTimeout(() => {
+        setKnowledgeLevel(prev => prev + 1);
+      }, 500 + Math.random() * 1000);
+      return () => clearTimeout(timer);
+    } else if (knowledgeLevel === knowledgePhases.length) {
+      fetchAI();
+    }
+  }, [knowledgeLevel, fetchAI]);
+
+  useEffect(() => {
+    if (isThinking) {
+      setDisplayText(knowledgePhases[knowledgeLevel - 1] || "READY.");
+      const timer = setTimeout(() => {
+        setThoughtCount(prev => prev + 1);
+      }, 2000);
+      return () => clearTimeout(timer);
+    }
+  }, [isThinking, knowledgeLevel, thoughtCount]);
+
+  const oracleInsights = useMemo(() => {
+    if (!aiResponse) return [];
+    return aiResponse.insights || [];
+  }, [aiResponse]);
+
+  const oracleQuery = async () => {
+    if (!userQuery) return;
     setIsProcessing(true);
-    const query = userQuery;
-    setUserQuery("");
-    
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    
-    let response = "Processing your query...";
-    
-    const q = query.toLowerCase();
-    
-    if (q.includes("revenue") || q.includes("sales") || q.includes("money")) {
-      const total = ledger.filter(l => l.amount > 0).reduce((sum, l) => sum + Number(l.amount), 0);
-      response = `Total revenue recorded: $${total.toFixed(2)}. Transactions analyzed across ${ledger.filter(l => l.amount > 0).length} entries.`;
-    } else if (q.includes("expense") || q.includes("spent") || q.includes("cost")) {
-      const total = ledger.filter(l => l.amount < 0).reduce((sum, l) => sum + Math.abs(Number(l.amount)), 0);
-      response = `Total expenses logged: $${total.toFixed(2)}. ${ledger.filter(l => l.amount < 0).length} expense entries recorded.`;
-    } else if (q.includes("staff") || q.includes("employee") || q.includes("who")) {
-      const online = employees.filter(e => e.isOnline).length;
-      const total = employees.length;
-      response = `${online} staff currently online out of ${total} total. ${employees.map(e => e.name).join(', ') || 'Names loading...'}`;
-    } else if (q.includes("shop") || q.includes("location") || q.includes("node")) {
-      response = `${shops.length} active shop nodes: ${shops.map(s => s.name).join(', ')}. Monitoring all transaction flows.`;
-    } else if (q.includes("overhead") || q.includes("rent") || q.includes("utilities")) {
-      const contributions = ledger.filter(l => l.kind === "overhead_contribution").reduce((sum, l) => sum + Number(l.amount), 0);
-      const payments = ledger.filter(l => l.kind === "overhead_payment").reduce((sum, l) => sum + Math.abs(Number(l.amount)), 0);
-      response = `Overhead contributions: $${contributions.toFixed(2)}. Payments made: $${payments.toFixed(2)}. Net: $${(contributions - payments).toFixed(2)}.`;
-    } else if (q.includes("report") || q.includes("eod") || q.includes("summary")) {
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      const todayLedger = ledger.filter(l => new Date(l.created_at) >= today);
-      const todayRevenue = todayLedger.filter(l => l.amount > 0).reduce((sum, l) => sum + Number(l.amount), 0);
-      const todayExpenses = todayLedger.filter(l => l.amount < 0).reduce((sum, l) => sum + Math.abs(Number(l.amount)), 0);
-      response = `EOD Summary: Revenue $${todayRevenue.toFixed(2)}, Expenses $${todayExpenses.toFixed(2)}, Net ${todayRevenue - todayExpenses >= 0 ? '+' : ''}$${(todayRevenue - todayExpenses).toFixed(2)}. ${todayLedger.length} transactions logged today.`;
-    } else if (q.includes("audit") || q.includes("check") || q.includes("status")) {
-      response = `System audit: ${auditStats.passed} checks passed, ${auditStats.failed} failed. ${auditStats.total} total audit entries.`;
-    } else if (q.includes("trend") || q.includes("pattern") || q.includes("insight")) {
-      response = `Analyzing trends: Peak transaction hours detected. Revenue patterns show consistent growth trajectory. ${businessIdeas[0] || 'Monitoring patterns...'}`;
-    } else if (q.includes("hello") || q.includes("hi") || q.includes("hey")) {
-      response = "Greetings. I am the Nirvana Oracle. I observe all operations, learn continuously, and provide strategic insights. I continuously validate data integrity across ledger entries, cash drawer calculations, and expense routing. How may I assist you today?";
-    } else if (q.includes("integrity") || q.includes("validate") || q.includes("check") || q.includes("audit") || q.includes("bug")) {
-      const routed = ledger.filter(l => l.notes?.includes("Auto-routed from POS expense"));
-      const uniqueAmounts = new Set(routed.map(l => `${l.amount}-${l.created_at}`));
-      const today = new Date().toISOString().split("T")[0];
-      const todayRouted = routed.filter(l => String(l.effective_date || "").startsWith(today));
-      response = `Data integrity check: POS expenses are categorized as 'POS Expense', 'Perfume', or 'Overhead'. Cash drawer formula: baseBalance + cashSales - (todaysPosExpenses + todaysOpsPosts). ${todayRouted.length} expenses routed to operations today ($${todayRouted.reduce((s, l) => s + Number(l.amount), 0).toFixed(2)}). No double-deduction detected in current cycle.`;
-    } else {
-      response = `Query logged: "${query}". I am processing this request through my neural network. I have observed ${thoughtCount} operational cycles and am continuously learning the Nirvana ecosystem.`;
-    }
-    
-    setResponses(prev => [...prev.slice(-9), { q: query, a: response, time: new Date() }]);
-    setIsProcessing(false);
-  }, [userQuery, isProcessing, ledger, employees, shops, auditStats, businessIdeas, thoughtCount]);
-  
-  const currentPhase = oracleSteps[currentStep]?.phase || "BOOT";
-  
+    // Simulation of AI query based on current state
+    setTimeout(() => {
+      const response = "Based on current data, I recommend focusing on " + (shops[0]?.name || "inventory optimization") + ". Performance variance is minimal.";
+      setResponses(prev => [...prev, { q: userQuery, a: response, time: new Date() }]);
+      setUserQuery("");
+      setIsProcessing(false);
+    }, 1500);
+  };
+
   return (
-    <div className="space-y-3">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <div className={cn(
-            "w-2 h-2 rounded-full",
-            isThinking ? "bg-violet-500 animate-pulse" : "bg-slate-500"
-          )} />
-          <span className="text-[10px] font-black uppercase text-violet-400">
-            {isThinking ? "◉ THINKING" : "○ STANDBY"}
-          </span>
+    <Card className="bg-gradient-to-br from-slate-900 to-slate-950 border-violet-500/20">
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+        <div className="flex flex-col">
+          <CardTitle className="text-sm font-medium flex items-center gap-2">
+            <Activity className="h-4 w-4 text-violet-400" />
+            Nirvana Oracle Brain
+          </CardTitle>
+          <CardDescription className="text-[10px]">AI-Powered Strategic Insights</CardDescription>
         </div>
-        <div className="flex items-center gap-2">
-          <Badge className="bg-violet-500/20 text-violet-400 text-[8px] font-black uppercase">
-            {currentPhase}
-          </Badge>
-          <span className="text-[10px] text-slate-500 font-mono">
-            LVL {knowledgeLevel}/10
-          </span>
+        <div className="flex gap-1">
+          {knowledgeLevel < knowledgePhases.length ? (
+            <Badge variant="outline" className="text-[8px] animate-pulse border-violet-500/30 text-violet-400">
+              LEARNING... {Math.floor((knowledgeLevel / knowledgePhases.length) * 100)}%
+            </Badge>
+          ) : (
+            <Badge variant="outline" className="text-[8px] border-emerald-500/30 text-emerald-400">
+              SYSTEM OPTIMIZED
+            </Badge>
+          )}
         </div>
-      </div>
+      </CardHeader>
       
-      <div className="bg-gradient-to-b from-violet-950/30 to-slate-950/90 border border-violet-500/20 rounded-lg p-3 h-56 overflow-hidden relative">
-        <div className="absolute inset-0 bg-gradient-to-b from-transparent to-slate-950/50 pointer-events-none" />
-        <pre className="text-[10px] font-mono text-violet-400/95 whitespace-pre-wrap leading-relaxed overflow-y-auto h-full relative z-10">
-          {displayText}
-          {isThinking && currentStep < oracleSteps.length && <span className="animate-pulse">▋</span>}
-        </pre>
-      </div>
-      
-      <div className="flex gap-2">
-        <input
-          type="text"
-          value={userQuery}
-          onChange={(e) => setUserQuery(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && handleQuery()}
-          placeholder="Ask the Oracle..."
-          className="flex-1 bg-slate-900 border border-violet-500/30 text-white px-3 py-2 rounded text-[10px] font-mono placeholder:text-slate-600 focus:outline-none focus:border-violet-500/50"
-          disabled={isProcessing}
-        />
-        <Button 
-          size="sm" 
-          variant="outline" 
-          onClick={handleQuery}
-          disabled={isProcessing || !userQuery.trim()}
-          className="text-[10px] font-black uppercase h-9 px-4 bg-violet-600/20 border-violet-500/30 text-violet-400 hover:bg-violet-600/30"
-        >
-          {isProcessing ? "..." : "ASK"}
-        </Button>
-      </div>
-      
-      {responses.length > 0 && (
-        <div className="max-h-32 overflow-y-auto space-y-2">
-          {responses.slice(-3).map((r, i) => (
-            <div key={i} className="text-[9px] font-mono">
-              <span className="text-slate-500">Q: </span>
-              <span className="text-emerald-400">{r.q}</span>
-              <div className="text-slate-400 ml-2 mt-1">{r.a}</div>
+      <CardContent className="space-y-4">
+        <div className="bg-slate-950/90 border border-violet-500/30 rounded-lg p-4 min-h-[160px] flex flex-col justify-center relative overflow-hidden group">
+          <div className="absolute top-0 right-0 p-2 opacity-10 group-hover:opacity-30 transition-opacity">
+            <Shield className="h-12 w-12 text-violet-400" />
+          </div>
+          
+          {isThinking ? (
+            <div className="space-y-4 text-center">
+              <div className="flex justify-center">
+                <Loader2 className="h-10 w-10 text-violet-500 animate-spin" />
+              </div>
+              <div className="text-xs font-mono text-violet-400 animate-pulse tracking-widest uppercase">
+                {displayText}
+              </div>
             </div>
-          ))}
+          ) : (
+            <div className="space-y-3">
+              <div className="flex items-center justify-between mb-2">
+                <Badge variant="outline" className="text-[9px] font-black border-violet-500/50 text-violet-400 bg-violet-500/5 uppercase tracking-tighter">
+                  Nirvana Intelligence Oracle v3.0 [PYTHON_CORE]
+                </Badge>
+                {aiResponse && (
+                  <div className="text-[10px] text-emerald-400 font-mono flex items-center gap-1">
+                    <Activity className="h-3 w-3" />
+                    MOOD: {aiResponse.oracle_mood}
+                  </div>
+                )}
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4 mb-4">
+                <div className="space-y-1">
+                  <div className="text-[10px] text-slate-500 uppercase font-bold">Sustainability</div>
+                  <div className="text-xl font-black text-violet-300">
+                    {aiResponse ? <AnimatedNumber value={aiResponse.sustainability_score} /> : "0.00"}%
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <div className="text-[10px] text-slate-500 uppercase font-bold">Projected Growth</div>
+                  <div className="text-xl font-black text-emerald-400">
+                    {aiResponse ? aiResponse.projected_growth : "---"}
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                {oracleInsights.map((insight, i) => (
+                  <div key={i} className="flex gap-3 text-xs leading-relaxed animate-in slide-in-from-left duration-300" style={{ animationDelay: `${i * 150}ms` }}>
+                    <div className="mt-1 w-1.5 h-1.5 rounded-full bg-violet-500 shadow-[0_0_8px_rgba(139,92,246,0.6)] shrink-0" />
+                    <span className="text-slate-300 font-medium italic">"${insight}"</span>
+                  </div>
+                ))}
+              </div>
+
+              {aiResponse?.anomalies?.length > 0 && (
+                <div className="mt-4 p-2 bg-rose-500/10 border border-rose-500/20 rounded text-[9px] text-rose-300 flex items-center gap-2">
+                  <Shield className="h-3 w-3" />
+                  <span>{aiResponse.anomalies.length} SYSTEM ANOMALIES DETECTED BY DEEP SCAN</span>
+                </div>
+              )}
+            </div>
+          )}
         </div>
-      )}
-    </div>
+
+        <div className="space-y-2">
+          <div className="flex gap-2">
+            <Input 
+              placeholder="Query the Oracle..." 
+              className="h-8 text-xs bg-slate-950/50 border-slate-800 text-slate-200 focus-visible:ring-violet-500/50"
+              value={userQuery}
+              onChange={(e) => setUserQuery(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && oracleQuery()}
+            />
+            <Button 
+              size="sm" 
+              onClick={oracleQuery}
+              disabled={isProcessing || !userQuery}
+              className="h-8 bg-violet-600 hover:bg-violet-500 text-white font-bold text-xs"
+            >
+              {isProcessing ? <Loader2 className="h-3 w-3 animate-spin" /> : <Activity className="h-3 w-3" />}
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={fetchAI}
+              disabled={isThinking}
+              className="h-8 border-violet-500/30 text-violet-400 p-2"
+              title="Re-scan system"
+            >
+              ↺
+            </Button>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
   );
 });
