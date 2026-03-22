@@ -42,7 +42,7 @@ export default async function FinancePage() {
 
     // Expenses from ledger (Operational costs like lunch, petrol logged at POS)
     const posExpenses = ledger
-        .filter((l: any) => l.category === 'POS Expense' || l.category === 'Operational Expense')
+        .filter((l: any) => ['POS Expense', 'Perfume', 'Overhead', 'Operational Expense'].includes(l.category))
         .reduce((sum: number, l: any) => sum + l.amount, 0);
 
     // Opening balance + sales - expenses

@@ -22,7 +22,7 @@ async function generateEODForDate(shopId: string, dateStr: string) {
     .from('ledger_entries')
     .select('*')
     .eq('shop_id', shopId)
-    .eq('category', 'POS Expense')
+    .in('category', ['POS Expense', 'Perfume', 'Overhead'])
     .gte('date', startOfDay.toISOString())
     .lte('date', endOfDay.toISOString());
 

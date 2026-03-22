@@ -67,7 +67,7 @@ async function sendWeeklyReport(shopId: string, staffName: string) {
     .from("ledger_entries")
     .select("amount, category, description")
     .eq("shop_id", shopId)
-    .eq("category", "POS Expense")
+    .in("category", ["POS Expense", "Perfume", "Overhead"])
     .gte("date", since);
   
   const totalExpenses = (expenses || []).reduce((sum: number, e: any) => sum + Number(e.amount || 0), 0);
@@ -248,7 +248,7 @@ async function sendComprehensiveWeeklyReport(closingShopId: string, staffName: s
     .from('ledger_entries')
     .select('amount, category, description, date')
     .eq('shop_id', closingShopId)
-    .eq('category', 'POS Expense')
+    .in('category', ['POS Expense', 'Perfume', 'Overhead'])
     .gte('date', `${today}T00:00:00`);
 
   // Get lay-by data for the week
@@ -961,7 +961,7 @@ export async function POST(req: Request) {
 
   const ledgerRows = ledgerEntries || [];
 
-  const posExpenseRows = ledgerRows.filter((l: any) => l.category === "POS Expense");
+  const posExpenseRows = ledgerRows.filter((l: any) => ["POS Expense", "Perfume", "Overhead"].includes(l.category));
   const totalExpenses = posExpenseRows.reduce((sum: number, e: any) => sum + Number(e.amount || 0), 0);
 
   const openingRows = ledgerRows

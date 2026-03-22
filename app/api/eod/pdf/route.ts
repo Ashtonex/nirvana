@@ -205,7 +205,7 @@ export async function GET(req: Request) {
       const wSalesTotalDiscount = wSales.reduce((sum: number, s: any) => sum + Number(s.discount_applied || 0), 0);
       const wSalesTotalCOGS = wSales.reduce((sum: number, s: any) => sum + (Number(s.landed_cost || 0) * Number(s.quantity || 0)), 0);
 
-      const wPosExpenses = wLedger.filter((l: any) => l.category === 'POS Expense').reduce((sum: number, l: any) => sum + Number(l.amount || 0), 0);
+      const wPosExpenses = wLedger.filter((l: any) => ["POS Expense", "Perfume", "Overhead"].includes(l.category)).reduce((sum: number, l: any) => sum + Number(l.amount || 0), 0);
 
       // Grouped Overheads
       const shopEx: any = shop?.expenses || {};
@@ -239,8 +239,8 @@ export async function GET(req: Request) {
         const t = String(l?.type || "").toLowerCase();
         if (t === "expense") return true;
         if (t === "income") return false;
-        // Fallback heuristics: POS Expense is always an expense.
-        return String(l?.category || "") === "POS Expense";
+        // Fallback heuristics: POS Expense, Perfume, Overhead are always expenses.
+        return ["POS Expense", "Perfume", "Overhead"].includes(String(l?.category || ""));
       };
       const wLedgerExpenses = wLedger.filter(isExpenseEntry);
       const wLedgerExpenseTotal = wLedgerExpenses.reduce((sum: number, l: any) => sum + Number(l.amount || 0), 0);
@@ -459,7 +459,7 @@ export async function GET(req: Request) {
     const totalBeforeTax = sales.reduce((sum: number, s: any) => sum + Number(s.total_before_tax || 0), 0);
     const totalTax = sales.reduce((sum: number, s: any) => sum + Number(s.tax || 0), 0);
     const totalDiscount = sales.reduce((sum: number, s: any) => sum + Number(s.discount_applied || 0), 0);
-    const totalPosExpenses = ledger.filter((l: any) => l.category === 'POS Expense').reduce((sum: number, l: any) => sum + Number(l.amount || 0), 0);
+    const totalPosExpenses = ledger.filter((l: any) => ["POS Expense", "Perfume", "Overhead"].includes(l.category)).reduce((sum: number, l: any) => sum + Number(l.amount || 0), 0);
 
     const cashSales = sales.filter((s: any) => s.payment_method === 'cash');
     const totalCashSales = cashSales.reduce((sum: number, s: any) => sum + Number(s.total_with_tax || 0), 0);
@@ -485,7 +485,7 @@ export async function GET(req: Request) {
     const closingCashEstimate = openingCash + totalCashSales + laybyCash - totalPosExpenses + adjustmentNet;
 
     const posExpenses = ledger
-      .filter((l: any) => l.category === 'POS Expense')
+      .filter((l: any) => ["POS Expense", "Perfume", "Overhead"].includes(l.category))
       .sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
     // 2. STOCK INTELLIGENCE
