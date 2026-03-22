@@ -981,7 +981,7 @@ const TypingStatusCard = memo(function TypingStatusCard({ masterVault, investTot
           {lines.slice(0, visibleLines).map((line, i) => (
             <div key={i} className="flex gap-1 animate-in fade-in slide-in-from-left-1 duration-300">
               <span>{line.label}</span>
-              {line.type === 'value' && <AnimatedNumber value={line.value} />}
+              {line.type === 'value' && <AnimatedNumber value={line.value ?? 0} />}
             </div>
           ))}
           {!complete && <span className="animate-pulse">▋</span>}
@@ -1313,10 +1313,10 @@ const AuditMonitorCard = memo(function AuditMonitorCard({ auditStats, ledger, sh
         <Button 
           size="sm" 
           variant="outline" 
-          asChild
+          onClick={() => window.location.href = "/pos"}
           className="w-20 text-[10px] font-black uppercase h-7 border-slate-700 text-slate-400"
         >
-          <a href="/pos">GO TO POS</a>
+          GO TO POS
         </Button>
       </div>
 
@@ -1336,7 +1336,6 @@ const AuditMonitorCard = memo(function AuditMonitorCard({ auditStats, ledger, sh
               ${Number(auditResult.variance || 0).toFixed(2)}
             </div>
           </div>
-        </div>
         </div>
       )}
       
@@ -1524,7 +1523,7 @@ const NirvanaOracleBrain = memo(function NirvanaOracleBrain({
               </div>
 
               <div className="space-y-2">
-                {oracleInsights.map((insight, i) => (
+                {oracleInsights.map((insight: string, i: number) => (
                   <div key={i} className="flex gap-3 text-xs leading-relaxed animate-in slide-in-from-left duration-300" style={{ animationDelay: `${i * 150}ms` }}>
                     <div className="mt-1 w-1.5 h-1.5 rounded-full bg-violet-500 shadow-[0_0_8px_rgba(139,92,246,0.6)] shrink-0" />
                     <span className="text-slate-300 font-medium italic">"${insight}"</span>
