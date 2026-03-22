@@ -13,6 +13,35 @@ function detectOverheadCategory(title: string): string {
   return "misc";
 }
 
+function AnimatedNumber({ value, prefix = "", suffix = "" }: { value: number; prefix?: string; suffix?: string }) {
+  const [display, setDisplay] = useState(0);
+  const prevRef = useRef(0);
+  
+  useEffect(() => {
+    const start = prevRef.current;
+    const end = value;
+    const duration = 1000;
+    const startTime = performance.now();
+    
+    const animate = (currentTime: number) => {
+      const elapsed = currentTime - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+      const eased = 1 - Math.pow(1 - progress, 3);
+      const current = start + (end - start) * eased;
+      setDisplay(current);
+      
+      if (progress < 1) {
+        requestAnimationFrame(animate);
+      }
+    };
+    
+    requestAnimationFrame(animate);
+    prevRef.current = value;
+  }, [value]);
+  
+  return <span>{prefix}{display.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}{suffix}</span>;
+}
+
 type ShopNode = {
   id: string;
   name: string;
@@ -420,9 +449,9 @@ export function OperationsConsole({
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="text-3xl font-black italic text-cyan-300 font-mono">
-                  $<AnimatedNumber value={shopSavings} />
-                </div>
+                      <div className="text-2xl font-black italic tracking-tighter text-white">
+                        $<AnimatedNumber value={shopSavings} />
+                      </div>
                 <p className="text-[10px] text-slate-500 mt-1">Total committed to ops</p>
               </CardContent>
             </Card>
@@ -1376,6 +1405,17 @@ const NirvanaOracleBrain = memo(function NirvanaOracleBrain({
   const [teachingMode, setTeachingMode] = useState(false);
   const [activeInquiry, setActiveInquiry] = useState<any>(null);
   const [answer, setAnswer] = useState("");
+  const [systemHealth, setSystemHealth] = useState<any>(null);
+
+  const fetchHealth = useCallback(async () => {
+    try {
+      const res = await fetch("/api/system/health", { credentials: "include" });
+      const data = await res.json();
+      setSystemHealth(data);
+    } catch (e) {
+      console.error("Health fetch failed");
+    }
+  }, []);
 
   const knowledgePhases = [
     "SCANNING SYSTEM ARCHITECTURE...",
@@ -1428,8 +1468,9 @@ const NirvanaOracleBrain = memo(function NirvanaOracleBrain({
       return () => clearTimeout(timer);
     } else if (knowledgeLevel === knowledgePhases.length) {
       fetchAI();
+      fetchHealth();
     }
-  }, [knowledgeLevel, fetchAI]);
+  }, [knowledgeLevel, fetchAI, fetchHealth]);
 
   const oracleQuery = async () => {
     if (!userQuery) return;
@@ -1455,7 +1496,18 @@ const NirvanaOracleBrain = memo(function NirvanaOracleBrain({
             <Activity className="h-4 w-4 text-violet-400" />
             Nirvana Intelligence Oracle
           </CardTitle>
-          <CardDescription className="text-[10px]">Continuous System Scrutiny & Deep Scan</CardDescription>
+          <CardDescription className="text-[10px] flex items-center gap-2">
+             Continuous System Scrutiny & Deep Scan
+             {systemHealth && (
+               <div className={cn(
+                 "flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[8px] font-black uppercase",
+                 systemHealth.status === "HEALTHY" ? "bg-emerald-500/10 text-emerald-400" : "bg-rose-500/10 text-rose-400 animate-pulse"
+               )}>
+                 <Shield className="h-2 w-2" />
+                 {systemHealth.status}
+               </div>
+             )}
+          </CardDescription>
         </div>
         <div className="flex gap-1">
           {isThinking ? (

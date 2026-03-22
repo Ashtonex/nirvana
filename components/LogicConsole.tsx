@@ -22,7 +22,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/components/ui";
 
-type Tab = "operations" | "audit" | "sessions";
+type Tab = "operations" | "audit" | "sessions" | "forecast" ;
 
 type OperationEntry = {
   id: string;
@@ -409,6 +409,32 @@ export default function LogicPage() {
   const [newAuditIds, setNewAuditIds] = useState<Set<string>>(new Set());
   
   const auditRef = useRef<HTMLDivElement>(null);
+  const [runningSimulation, setRunningSimulation] = useState(false);
+  const [selectedScenario, setSelectedScenario] = useState("Recession");
+  const [reports, setReports] = useState<any[]>([]);
+
+  const runStressTest = async () => {
+    setRunningSimulation(true);
+    try {
+      const res = await fetch("/api/logic/stress-test", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ scenario: selectedScenario }),
+        credentials: "include"
+      });
+      const data = await res.json();
+      if (data.success) {
+        setReports(prev => [data, ...prev]);
+        window.open(data.reportUrl, "_blank");
+      } else {
+        alert("Simulation failed: " + data.message);
+      }
+    } catch (e) {
+      alert("Error running simulation");
+    } finally {
+      setRunningSimulation(false);
+    }
+  };
 
   const fetchAll = useCallback(async () => {
     try {
@@ -486,6 +512,7 @@ export default function LogicPage() {
             { id: "operations" as Tab, label: "Operations", icon: <Coins className="h-4 w-4" />, color: "emerald" },
             { id: "audit" as Tab, label: "Audit", icon: auditErrors > 0 ? <ShieldAlert className="h-4 w-4" /> : <ShieldCheck className="h-4 w-4" />, color: auditErrors > 0 ? "rose" : "emerald" },
             { id: "sessions" as Tab, label: "Sessions", icon: <Clock className="h-4 w-4" />, color: "sky" },
+            { id: "forecast" as Tab, label: "Forecast", icon: <TrendingUp className="h-4 w-4" />, color: "violet" },
           ].map((t) => (
             <button
               key={t.id}
@@ -495,6 +522,7 @@ export default function LogicPage() {
                 tab === t.id
                   ? t.color === "emerald" ? "border-emerald-500 text-emerald-400" :
                     t.color === "rose" ? "border-rose-500 text-rose-400" :
+                    t.color === "violet" ? "border-violet-500 text-violet-400" :
                     "border-sky-500 text-sky-400"
                   : "border-transparent text-slate-500 hover:text-slate-300"
               )}
@@ -633,6 +661,124 @@ export default function LogicPage() {
           </div>
         )}
 
+        {tab === "forecast" && (
+          <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+            <Card className="bg-slate-950/60 border-slate-800 overflow-hidden relative group">
+              <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-violet-600 via-emerald-600 to-rose-600 opacity-50" />
+              <CardHeader>
+                <CardTitle className="flex items-center gap-3 text-2xl font-black uppercase italic text-white">
+                  <TrendingUp className="h-6 w-6 text-violet-400" /> Monte Carlo Stress Engine
+                </CardTitle>
+                <CardDescription className="text-[10px] font-black text-slate-500 uppercase tracking-widest">
+                  Simulate business pathways based on current liquidity and inventory metadata.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-8">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {[
+                    { id: "Recession", label: "Economic Downturn", icon: <TrendingDown className="text-rose-400" />, desc: "High inflation, 40-60% revenue drop." },
+                    { id: "Liquidation", label: "Inventory Purge", icon: <ShoppingCart className="text-emerald-400" />, desc: "Aggressive discounts to boost cash." },
+                    { id: "Hypergrowth", label: "Aggressive Scale", icon: <Zap className="text-violet-400" />, desc: "3x revenue surge with overhead spikes." }
+                  ].map(scenario => (
+                    <button
+                      key={scenario.id}
+                      onClick={() => setSelectedScenario(scenario.id)}
+                      className={cn(
+                        "p-4 rounded-xl border-2 text-left transition-all group/btn",
+                        selectedScenario === scenario.id 
+                          ? "bg-violet-500/10 border-violet-500 shadow-[0_0_20px_rgba(139,92,246,0.1)]" 
+                          : "bg-slate-900/50 border-slate-800 hover:border-slate-700"
+                      )}
+                    >
+                      <div className="flex items-center gap-3 mb-2">
+                        {scenario.icon}
+                        <span className="font-black uppercase italic text-sm">{scenario.label}</span>
+                      </div>
+                      <p className="text-[10px] text-slate-500 font-medium group-hover/btn:text-slate-400">{scenario.desc}</p>
+                    </button>
+                  ))}
+                </div>
+
+                <div className="p-6 rounded-2xl bg-slate-950 border border-slate-800/50 flex flex-col items-center justify-center text-center space-y-4">
+                  <div className="w-16 h-16 rounded-full bg-violet-500/10 flex items-center justify-center">
+                    <Activity className={cn("h-8 w-8 text-violet-500", runningSimulation && "animate-spin")} />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-black uppercase italic text-white">Ready for Neural Simulation</h3>
+                    <p className="text-xs text-slate-500 max-w-sm mx-auto">Running the stress test will execute 1,000 algorithmic paths to predict business survival probability.</p>
+                  </div>
+                  <button
+                    disabled={runningSimulation}
+                    onClick={runStressTest}
+                    className={cn(
+                      "w-full max-w-xs h-14 rounded-xl font-black uppercase italic tracking-widest transition-all",
+                      runningSimulation 
+                        ? "bg-slate-800 text-slate-500 cursor-not-allowed" 
+                        : "bg-gradient-to-r from-violet-600 to-indigo-600 text-white shadow-xl hover:scale-105 active:scale-95"
+                    )}
+                  >
+                    {runningSimulation ? (
+                      <span className="flex items-center justify-center gap-2">
+                        <Loader2 className="h-5 w-5 animate-spin" />
+                        PROCESSING PATHS...
+                      </span>
+                    ) : "INITIATE SIMULATION"}
+                  </button>
+                </div>
+
+                {reports.length > 0 && (
+                  <div className="space-y-4 pt-4 border-t border-slate-800">
+                    <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Recent Forecasts</h3>
+                    <div className="grid gap-2">
+                      {reports.map((report, idx) => (
+                        <a 
+                          key={idx} 
+                          href={report.reportUrl} 
+                          target="_blank"
+                          className="flex items-center justify-between p-3 rounded-lg bg-slate-900 border border-slate-800 hover:bg-slate-800 transition-colors group/report"
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className="p-2 rounded bg-slate-800 text-slate-500 group-hover/report:text-violet-400">
+                              <ShoppingCart className="h-4 w-4" />
+                            </div>
+                            <div>
+                              <p className="text-xs font-bold text-slate-200">{report.filename}</p>
+                              <p className="text-[9px] text-slate-500 uppercase">{new Date().toLocaleTimeString()}</p>
+                            </div>
+                          </div>
+                          <ChevronRight className="h-4 w-4 text-slate-600" />
+                        </a>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <Card className="bg-emerald-950/20 border-emerald-500/20 p-6">
+                <div className="flex items-center gap-3 mb-4">
+                  <Activity className="h-5 w-5 text-emerald-400" />
+                  <h3 className="font-black uppercase italic text-emerald-400">Market Velocity Data</h3>
+                </div>
+                <p className="text-xs text-slate-400 mb-4">Current AI processing reveals a stable sales velocity of 5.2 units/day globally.</p>
+                <div className="h-2 w-full bg-slate-900 rounded-full overflow-hidden">
+                  <div className="h-full bg-emerald-500 w-[65%]" />
+                </div>
+              </Card>
+              <Card className="bg-rose-950/20 border-rose-500/20 p-6">
+                <div className="flex items-center gap-3 mb-4">
+                   <ShieldAlert className="h-5 w-5 text-rose-400" />
+                   <h3 className="font-black uppercase italic text-rose-400">Risk Mitigation</h3>
+                </div>
+                <p className="text-xs text-slate-400 mb-4">Oracle recommends maintaining at least 15% cash liquidity for overhead surges.</p>
+                <div className="h-2 w-full bg-slate-900 rounded-full overflow-hidden">
+                  <div className="h-full bg-rose-500 w-[15%]" />
+                </div>
+              </Card>
+            </div>
+          </div>
+        )}
         {tab === "sessions" && (
           <div className="space-y-4">
             <Card className="bg-slate-950/60 border-slate-800 overflow-hidden">
@@ -702,7 +848,7 @@ export default function LogicPage() {
                                 "text-lg font-black font-mono italic shrink-0",
                                 session.amount >= 0 ? "text-emerald-400" : "text-rose-400"
                               )}>
-                                {session.amount >= 0 ? "+" : ""}{session.amount.toFixed(2)}
+                                {session.amount >= 0 ? "+" : ""}<AnimatedNumber value={session.amount} />
                               </div>
                             )}
                           </div>
