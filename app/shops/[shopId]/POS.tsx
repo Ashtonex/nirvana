@@ -340,6 +340,7 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
 
     const todaysOpsPosts = ledger.filter((l: any) =>
         l.category === 'Operations Transfer' &&
+        !['POS Expense', 'Perfume', 'Overhead'].includes(l.category) &&
         l.shopId === shopId &&
         String(l.date).startsWith(todayStr)
     ).reduce((sum: number, l: any) => sum + Number(l.amount || 0), 0);
