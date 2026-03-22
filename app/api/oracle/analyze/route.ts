@@ -12,15 +12,15 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Oracle brain script not found" }, { status: 500 });
     }
 
-    return new Promise((resolve) => {
+    return new Promise<NextResponse>((resolve) => {
       const pythonCmd = process.platform === "win32" ? "python" : "python3";
       const child = spawn(pythonCmd, [scriptPath]);
       
       let stdout = "";
       let stderr = "";
       
-      child.stdout.on("data", (data) => { stdout += data.toString(); });
-      child.stderr.on("data", (data) => { stderr += data.toString(); });
+      child.stdout.on("data", (chunk) => { stdout += chunk.toString(); });
+      child.stderr.on("data", (chunk) => { stderr += chunk.toString(); });
       
       child.on("close", (code) => {
         if (code !== 0) {
