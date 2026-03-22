@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { requirePrivilegedActor } from "@/lib/apiAuth";
 import { supabaseAdmin } from "@/lib/supabase";
+import { runOracleValidation } from "@/lib/oracleValidation";
 
 export const dynamic = "force-dynamic";
 
@@ -40,7 +41,11 @@ export async function GET() {
     const calculateShopInvestDeposits = (shopId: string) => {
         return (investDeposits || [])
             .filter((d: any) => d.shop_id === shopId)
-            .reduce((acc: number, d: any) => acc + Number(d.amount || 0), 0);
+            .reduce((acc: number, d: any) => {
+                const deposited = Number(d.amount || 0);
+                const withdrawn = Number(d.withdrawn_amount || 0);
+                return acc + Math.max(0, deposited - withdrawn);
+            }, 0);
     };
 
     return NextResponse.json({
@@ -78,7 +83,8 @@ export async function GET() {
       }),
       deadCapital: 0,
       zombieCount: 0,
-      recentEmails: []
+      recentEmails: [],
+      dataIntegrity: await runOracleValidation().catch(() => null)
     });
   } catch (e: any) {
     console.error("Oracle pulse error:", e);

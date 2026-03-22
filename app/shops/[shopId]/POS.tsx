@@ -304,7 +304,7 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
     // Calculate Cash Drawer Math
     const ledger = db.ledger || [];
     const todayStr = new Date().toISOString().split('T')[0];
-    const CASH_OUT_CATEGORIES = new Set(["POS Expense", "Operations Transfer"]);
+    const CASH_OUT_CATEGORIES = new Set(["POS Expense", "Operations Transfer", "Perfume", "Overhead"]);
 
     // 1. Did we open today?
     const todaysOpening = ledger.find((l: any) => l.category === 'Cash Drawer Opening' && l.shopId === shopId && String(l.date).startsWith(todayStr));

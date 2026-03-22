@@ -35,6 +35,12 @@ interface OraclePulseProps {
         deadCapital: number;
         zombieCount: number;
         recentEmails: any[];
+        dataIntegrity?: {
+            status: string;
+            timestamp: string;
+            checks: { name: string; passed: boolean; details?: string }[];
+            issues: { severity: string; code: string; message: string; hint?: string }[];
+        } | null;
     };
 }
 
@@ -56,6 +62,7 @@ export function OraclePulse({ data }: OraclePulseProps) {
         deadCapital: typeof data.deadCapital === 'number' ? data.deadCapital : 0,
         zombieCount: typeof data.zombieCount === 'number' ? data.zombieCount : 0,
         recentEmails: Array.isArray(data.recentEmails) ? data.recentEmails : [],
+        dataIntegrity: data.dataIntegrity || null,
     };
 
     return (
@@ -70,6 +77,50 @@ export function OraclePulse({ data }: OraclePulseProps) {
                         <div className="flex items-center gap-1.5 text-[10px] font-bold text-emerald-500 uppercase">
                             <ShieldCheck className="h-3 w-3" /> System Balanced
                         </div>
+                    </CardContent>
+                </Card>
+
+                <Card className={cn(
+                    "border",
+                    safeData.dataIntegrity?.status === "ok"
+                        ? "bg-emerald-950/20 border-emerald-500/30"
+                        : safeData.dataIntegrity?.status === "issues_found"
+                        ? "bg-rose-950/20 border-rose-500/30"
+                        : "bg-slate-900/50 border-slate-800"
+                )}>
+                    <CardHeader className="pb-2">
+                        <CardDescription className="text-[10px] font-black uppercase tracking-widest text-slate-500">Data Integrity</CardDescription>
+                        <CardTitle className={cn(
+                            "text-xl font-black italic",
+                            safeData.dataIntegrity?.status === "ok" ? "text-emerald-400" :
+                            safeData.dataIntegrity?.status === "issues_found" ? "text-rose-400" : "text-slate-400"
+                        )}>
+                            {safeData.dataIntegrity?.status === "ok" ? "Validated" :
+                             safeData.dataIntegrity?.status === "issues_found" ? `${safeData.dataIntegrity.issues.filter((i: any) => i.severity === "error").length} Errors` :
+                             "Running..."}
+                        </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-1">
+                        {safeData.dataIntegrity?.checks?.map((check: any, idx: number) => (
+                            <div key={idx} className="flex items-center gap-1">
+                                {check.passed ? (
+                                    <ShieldCheck className="h-2.5 w-2.5 text-emerald-500" />
+                                ) : (
+                                    <AlertTriangle className="h-2.5 w-2.5 text-rose-500" />
+                                )}
+                                <span className="text-[9px] font-bold uppercase text-slate-400">{check.name}</span>
+                            </div>
+                        ))}
+                        {(() => {
+                            const warnings = safeData.dataIntegrity?.issues?.filter((i: any) => i.severity === "warning").length ?? 0;
+                            if (warnings === 0) return null;
+                            return (
+                                <div className="flex items-center gap-1 mt-1">
+                                    <AlertTriangle className="h-2.5 w-2.5 text-amber-500" />
+                                    <span className="text-[9px] font-bold text-amber-500">{warnings} warnings</span>
+                                </div>
+                            );
+                        })()}
                     </CardContent>
                 </Card>
 

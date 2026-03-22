@@ -20,8 +20,8 @@ export default async function FinancePage() {
     const { ledger, sales, globalExpenses, shops } = await getFinancials();
 
     // --- STRATEGIC VIEW (Inventory-Based) ---
-    const revenue = sales.reduce((sum: number, s: any) => sum + s.totalBeforeTax, 0);
-    const cogs = ledger.filter((l: any) => l.category === 'Inventory Acquisition').reduce((sum: number, l: any) => sum + l.amount, 0);
+    const revenue = sales.reduce((sum: number, s: any) => sum + Number(s.total_before_tax || 0), 0);
+    const cogs = ledger.filter((l: any) => l.category === 'Inventory Acquisition').reduce((sum: number, l: any) => sum + Number(l.amount || 0), 0);
     const operatingExpenses =
         Object.values(globalExpenses as Record<string, number>).reduce((a: number, b: number) => a + Number(b), 0) +
         shops.reduce(
@@ -38,17 +38,17 @@ export default async function FinancePage() {
 
     // --- OPERATIONAL VIEW (POS-Based) ---
     // Revenue from final sales only
-    const posRevenue = sales.reduce((sum: number, s: any) => sum + s.total_with_tax, 0);
+    const posRevenue = sales.reduce((sum: number, s: any) => sum + Number(s.total_with_tax || 0), 0);
 
-    // Expenses from ledger (Operational costs like lunch, petrol logged at POS)
+    // Expenses from ledger (POS expenses are Perfume, Overhead, or POS Expense)
     const posExpenses = ledger
-        .filter((l: any) => ['POS Expense', 'Perfume', 'Overhead', 'Operational Expense'].includes(l.category))
-        .reduce((sum: number, l: any) => sum + l.amount, 0);
+        .filter((l: any) => ['POS Expense', 'Perfume', 'Overhead'].includes(l.category))
+        .reduce((sum: number, l: any) => sum + Number(l.amount || 0), 0);
 
     // Opening balance + sales - expenses
     const posCashOpening = ledger
         .filter((l: any) => l.category === 'Cash Drawer Opening')
-        .reduce((sum: number, l: any) => sum + l.amount, 0);
+        .reduce((sum: number, l: any) => sum + Number(l.amount || 0), 0);
 
     const posNetIncome = posRevenue - posExpenses;
     const posAvailableCash = posCashOpening + posRevenue - posExpenses;

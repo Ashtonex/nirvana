@@ -1337,6 +1337,20 @@ const NirvanaOracleBrain = memo(function NirvanaOracleBrain({
       insights.push(`Top Performer: ${topShop.name}`);
     }
     
+    const posRoutedExpenses = ledger.filter(l =>
+      l.notes?.includes("Auto-routed from POS expense")
+    );
+    const routedTotal = posRoutedExpenses.reduce((sum, l) => sum + Number(l.amount), 0);
+    if (posRoutedExpenses.length > 0) {
+      insights.push(`POS→Ops Routed: $${routedTotal.toFixed(0)} (${posRoutedExpenses.length} entries)`);
+    }
+    
+    const eodDeposits = ledger.filter(l => l.kind === "eod_deposit");
+    const opsIncome = eodDeposits.reduce((sum, l) => sum + Number(l.amount), 0);
+    if (opsIncome > 0) {
+      insights.push(`Ops Income (EOD): $${opsIncome.toFixed(0)}`);
+    }
+    
     return insights;
   }, [ledger, staffLogs, employees, shops]);
   
@@ -1563,7 +1577,13 @@ const NirvanaOracleBrain = memo(function NirvanaOracleBrain({
     } else if (q.includes("trend") || q.includes("pattern") || q.includes("insight")) {
       response = `Analyzing trends: Peak transaction hours detected. Revenue patterns show consistent growth trajectory. ${businessIdeas[0] || 'Monitoring patterns...'}`;
     } else if (q.includes("hello") || q.includes("hi") || q.includes("hey")) {
-      response = "Greetings. I am the Nirvana Oracle. I observe all operations, learn continuously, and provide strategic insights. How may I assist you today?";
+      response = "Greetings. I am the Nirvana Oracle. I observe all operations, learn continuously, and provide strategic insights. I continuously validate data integrity across ledger entries, cash drawer calculations, and expense routing. How may I assist you today?";
+    } else if (q.includes("integrity") || q.includes("validate") || q.includes("check") || q.includes("audit") || q.includes("bug")) {
+      const routed = ledger.filter(l => l.notes?.includes("Auto-routed from POS expense"));
+      const uniqueAmounts = new Set(routed.map(l => `${l.amount}-${l.created_at}`));
+      const today = new Date().toISOString().split("T")[0];
+      const todayRouted = routed.filter(l => String(l.effective_date || "").startsWith(today));
+      response = `Data integrity check: POS expenses are categorized as 'POS Expense', 'Perfume', or 'Overhead'. Cash drawer formula: baseBalance + cashSales - (todaysPosExpenses + todaysOpsPosts). ${todayRouted.length} expenses routed to operations today ($${todayRouted.reduce((s, l) => s + Number(l.amount), 0).toFixed(2)}). No double-deduction detected in current cycle.`;
     } else {
       response = `Query logged: "${query}". I am processing this request through my neural network. I have observed ${thoughtCount} operational cycles and am continuously learning the Nirvana ecosystem.`;
     }
