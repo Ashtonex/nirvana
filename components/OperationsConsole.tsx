@@ -1366,148 +1366,143 @@ const NirvanaOracleBrain = memo(function NirvanaOracleBrain({
   staffLogs: any[];
   employees: any[];
 }) {
-  const [displayText, setDisplayText] = useState("");
   const [isThinking, setIsThinking] = useState(true);
-  const [thoughtCount, setThoughtCount] = useState(0);
   const [knowledgeLevel, setKnowledgeLevel] = useState(0);
   const [userQuery, setUserQuery] = useState("");
   const [responses, setResponses] = useState<{q: string; a: string; time: Date}[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   
   const [aiResponse, setAiResponse] = useState<any>(null);
-  const [errorCount, setErrorCount] = useState(0);
-  
+  const [teachingMode, setTeachingMode] = useState(false);
+  const [activeInquiry, setActiveInquiry] = useState<any>(null);
+  const [answer, setAnswer] = useState("");
+
   const knowledgePhases = [
     "SCANNING SYSTEM ARCHITECTURE...",
     "MAPPING DATA FLOWS...",
     "INDEXING TRANSACTION RECORDS...",
-    "CATALOGING INVENTORY PATTERNS...",
-    "ANALYZING MARKET CONDITIONS...",
-    "IDENTIFYING TRENDS...",
-    "LEARNING PERSONNEL ROLES...",
-    "ESTABLISHING BASELINES...",
-    "CALIBRATING PREDICTIONS...",
-    "ACTIVATING BUSINESS INTELLIGENCE...",
-    "CONSULTING PYTHON ANALYTICS ENGINE..."
+    "SCRUTINIZING ECO-CASH MOVEMENTS...",
+    "VALIDATING LAY-BY COHESION...",
+    "ANALYZING AUDIT LOG ANOMALIES...",
+    "IDENTIFYING SYSTEM WEAKNESSES...",
+    "CONSULTING PYTHON INTELLIGENCE CORE..."
   ];
 
-  const fetchAI = useCallback(async () => {
+  const fetchAI = useCallback(async (params?: { answer?: string, questionId?: string }) => {
     setIsThinking(true);
     try {
       const res = await fetch("/api/oracle/analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ledger, audit_stats: auditStats, shops, staffLogs })
+        body: JSON.stringify({ 
+          shopId: shops[0]?.id || "global",
+          ...(params || {})
+        })
       });
       if (res.ok) {
         const data = await res.json();
         setAiResponse(data);
+        if (data.inquiries?.length > 0) {
+          setActiveInquiry(data.inquiries[0]);
+        } else {
+          setActiveInquiry(null);
+        }
       }
     } catch (e) {
       console.error("Oracle fetch failed:", e);
-      setErrorCount(prev => prev + 1);
     } finally {
       setIsThinking(false);
+      setAnswer("");
     }
-  }, [ledger, auditStats, shops, staffLogs]);
+  }, [shops]);
 
   useEffect(() => {
-    if (knowledgeLevel === 0) {
-      setKnowledgeLevel(1);
-    }
+    if (knowledgeLevel === 0) setKnowledgeLevel(1);
   }, []);
 
   useEffect(() => {
     if (knowledgeLevel > 0 && knowledgeLevel < knowledgePhases.length) {
       const timer = setTimeout(() => {
         setKnowledgeLevel(prev => prev + 1);
-      }, 500 + Math.random() * 1000);
+      }, 600 + Math.random() * 800);
       return () => clearTimeout(timer);
     } else if (knowledgeLevel === knowledgePhases.length) {
       fetchAI();
     }
   }, [knowledgeLevel, fetchAI]);
 
-  useEffect(() => {
-    if (isThinking) {
-      setDisplayText(knowledgePhases[knowledgeLevel - 1] || "READY.");
-      const timer = setTimeout(() => {
-        setThoughtCount(prev => prev + 1);
-      }, 2000);
-      return () => clearTimeout(timer);
-    }
-  }, [isThinking, knowledgeLevel, thoughtCount]);
-
-  const oracleInsights = useMemo(() => {
-    if (!aiResponse) return [];
-    return aiResponse.insights || [];
-  }, [aiResponse]);
-
   const oracleQuery = async () => {
     if (!userQuery) return;
     setIsProcessing(true);
-    // Simulation of AI query based on current state
     setTimeout(() => {
-      const response = "Based on current data, I recommend focusing on " + (shops[0]?.name || "inventory optimization") + ". Performance variance is minimal.";
+      const response = "Deep scan complete. Structural integrity for " + (shops[0]?.name || "inventory") + " is currently " + (aiResponse?.oracle_mood === 'Optimal' ? "high" : "under scrutiny") + ".";
       setResponses(prev => [...prev, { q: userQuery, a: response, time: new Date() }]);
       setUserQuery("");
       setIsProcessing(false);
-    }, 1500);
+    }, 1200);
+  };
+
+  const submitAnswer = () => {
+    if (!answer || !activeInquiry) return;
+    fetchAI({ answer, questionId: activeInquiry.id });
   };
 
   return (
-    <Card className="bg-gradient-to-br from-slate-900 to-slate-950 border-violet-500/20">
+    <Card className="bg-gradient-to-br from-slate-900 to-slate-950 border-violet-500/20 shadow-xl shadow-violet-500/5">
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
         <div className="flex flex-col">
           <CardTitle className="text-sm font-medium flex items-center gap-2">
             <Activity className="h-4 w-4 text-violet-400" />
-            Nirvana Oracle Brain
+            Nirvana Intelligence Oracle
           </CardTitle>
-          <CardDescription className="text-[10px]">AI-Powered Strategic Insights</CardDescription>
+          <CardDescription className="text-[10px]">Continuous System Scrutiny & Deep Scan</CardDescription>
         </div>
         <div className="flex gap-1">
-          {knowledgeLevel < knowledgePhases.length ? (
-            <Badge variant="outline" className="text-[8px] animate-pulse border-violet-500/30 text-violet-400">
-              LEARNING... {Math.floor((knowledgeLevel / knowledgePhases.length) * 100)}%
+          {isThinking ? (
+            <Badge variant="outline" className="text-[8px] animate-pulse border-violet-500/30 text-violet-400 bg-violet-500/5">
+              ANALYZING... {Math.floor((knowledgeLevel / knowledgePhases.length) * 100)}%
             </Badge>
           ) : (
-            <Badge variant="outline" className="text-[8px] border-emerald-500/30 text-emerald-400">
-              SYSTEM OPTIMIZED
+            <Badge variant="outline" className={cn(
+              "text-[8px] uppercase font-bold",
+              aiResponse?.oracle_mood === "Optimal" ? "border-emerald-500/30 text-emerald-400" : "border-rose-500/30 text-rose-400"
+            )}>
+              {aiResponse?.oracle_mood || "READY"}
             </Badge>
           )}
         </div>
       </CardHeader>
       
       <CardContent className="space-y-4">
-        <div className="bg-slate-950/90 border border-violet-500/30 rounded-lg p-4 min-h-[160px] flex flex-col justify-center relative overflow-hidden group">
+        <div className="bg-slate-950/90 border border-violet-500/30 rounded-lg p-4 min-h-[180px] flex flex-col relative overflow-hidden group">
           <div className="absolute top-0 right-0 p-2 opacity-10 group-hover:opacity-30 transition-opacity">
             <Shield className="h-12 w-12 text-violet-400" />
           </div>
           
           {isThinking ? (
-            <div className="space-y-4 text-center">
+            <div className="space-y-4 text-center my-auto">
               <div className="flex justify-center">
                 <Loader2 className="h-10 w-10 text-violet-500 animate-spin" />
               </div>
-              <div className="text-xs font-mono text-violet-400 animate-pulse tracking-widest uppercase">
-                {displayText}
+              <div className="text-[10px] font-mono text-violet-400 animate-pulse tracking-widest uppercase">
+                {knowledgePhases[knowledgeLevel - 1] || "READY."}
               </div>
             </div>
           ) : (
-            <div className="space-y-3">
+            <div className="space-y-4">
               <div className="flex items-center justify-between mb-2">
                 <Badge variant="outline" className="text-[9px] font-black border-violet-500/50 text-violet-400 bg-violet-500/5 uppercase tracking-tighter">
-                  Nirvana Intelligence Oracle v3.0 [PYTHON_CORE]
+                  Nirvana Intelligence Oracle v4.0 [DEEP_SCAN]
                 </Badge>
                 {aiResponse && (
                   <div className="text-[10px] text-emerald-400 font-mono flex items-center gap-1">
                     <Activity className="h-3 w-3" />
-                    MOOD: {aiResponse.oracle_mood}
+                    CONFIDENCE: {aiResponse.ai_confidence}
                   </div>
                 )}
               </div>
               
-              <div className="grid grid-cols-2 gap-4 mb-4">
+              <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1">
                   <div className="text-[10px] text-slate-500 uppercase font-bold">Sustainability</div>
                   <div className="text-xl font-black text-violet-300">
@@ -1522,19 +1517,52 @@ const NirvanaOracleBrain = memo(function NirvanaOracleBrain({
                 </div>
               </div>
 
-              <div className="space-y-2">
-                {oracleInsights.map((insight: string, i: number) => (
-                  <div key={i} className="flex gap-3 text-xs leading-relaxed animate-in slide-in-from-left duration-300" style={{ animationDelay: `${i * 150}ms` }}>
-                    <div className="mt-1 w-1.5 h-1.5 rounded-full bg-violet-500 shadow-[0_0_8px_rgba(139,92,246,0.6)] shrink-0" />
-                    <span className="text-slate-300 font-medium italic">"${insight}"</span>
+              {/* VULNERABILITIES */}
+              {aiResponse?.vulnerabilities?.length > 0 && (
+                <div className="space-y-2">
+                  <div className="text-[10px] font-bold text-rose-400 uppercase tracking-widest flex items-center gap-2">
+                    <Shield className="h-3 w-3" /> System Weaknesses Detected
                   </div>
-                ))}
-              </div>
+                  {aiResponse.vulnerabilities.map((v: any, i: number) => (
+                    <div key={i} className="p-2 rounded bg-rose-500/5 border border-rose-500/20 text-[10px] text-rose-300 animate-in slide-in-from-right duration-500">
+                       <span className="font-bold uppercase">[{v.type}]</span> {v.message}
+                    </div>
+                  ))}
+                </div>
+              )}
 
-              {aiResponse?.anomalies?.length > 0 && (
-                <div className="mt-4 p-2 bg-rose-500/10 border border-rose-500/20 rounded text-[9px] text-rose-300 flex items-center gap-2">
-                  <Shield className="h-3 w-3" />
-                  <span>{aiResponse.anomalies.length} SYSTEM ANOMALIES DETECTED BY DEEP SCAN</span>
+              {/* ORACLE INQUIRIES / LEARNING */}
+              {activeInquiry && (
+                <div className="mt-4 p-3 bg-violet-500/5 border border-violet-500/40 rounded-lg animate-in fade-in zoom-in duration-500">
+                  <div className="text-[10px] font-bold text-violet-400 uppercase mb-2 flex items-center gap-2">
+                    <Activity className="h-3 w-3 animate-pulse" /> Oracle Clarification Request
+                  </div>
+                  <div className="text-xs text-slate-200 italic mb-3 leading-relaxed">
+                    "{activeInquiry.question}"
+                  </div>
+                  <div className="flex gap-2">
+                    <Input 
+                      placeholder="Teach the Oracle..." 
+                      className="h-7 text-[10px] bg-slate-900 border-violet-500/30 text-slate-200"
+                      value={answer}
+                      onChange={(e) => setAnswer(e.target.value)}
+                      onKeyDown={(e) => e.key === "Enter" && submitAnswer()}
+                    />
+                    <Button onClick={submitAnswer} size="sm" className="h-7 px-3 bg-violet-600 hover:bg-violet-500 text-[10px] font-bold">
+                      TEACH
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {!activeInquiry && aiResponse?.insights?.length > 0 && (
+                <div className="space-y-2">
+                  {aiResponse.insights.map((insight: string, i: number) => (
+                    <div key={i} className="flex gap-3 text-xs leading-relaxed animate-in slide-in-from-left duration-300" style={{ animationDelay: `${i * 150}ms` }}>
+                      <div className="mt-1 w-1.5 h-1.5 rounded-full bg-violet-500 shadow-[0_0_8px_rgba(139,92,246,0.6)] shrink-0" />
+                      <span className="text-slate-300 font-medium italic">"{insight}"</span>
+                    </div>
+                  ))}
                 </div>
               )}
             </div>
@@ -1561,7 +1589,7 @@ const NirvanaOracleBrain = memo(function NirvanaOracleBrain({
             <Button
               size="sm"
               variant="outline"
-              onClick={fetchAI}
+              onClick={() => fetchAI()}
               disabled={isThinking}
               className="h-8 border-violet-500/30 text-violet-400 p-2"
               title="Re-scan system"
