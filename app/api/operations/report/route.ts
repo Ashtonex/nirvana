@@ -2,11 +2,126 @@ import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { supabaseAdmin } from "@/lib/supabase";
 
+import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
+
 function startOfDaysBackUTC(daysBack: number) {
   const d = new Date();
   d.setUTCDate(d.getUTCDate() - Math.max(0, Number(daysBack || 7)));
   d.setUTCHours(0, 0, 0, 0);
   return d.toISOString();
+}
+
+function winAnsiSafe(text: any) {
+  const normalized = String(text ?? "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .normalize("NFKD");
+  let out = "";
+  for (const ch of normalized) {
+    const cp = ch.codePointAt(0) ?? 0;
+    if (cp >= 0x20 && cp <= 0x7e) { out += ch; continue; }
+    if (ch === "’" || ch === "‘") { out += "'"; continue; }
+    if (ch === "“" || ch === "”") { out += "\""; continue; }
+    if (ch === "–" || ch === "—") { out += "-"; continue; }
+    if (ch === "•") { out += "-"; continue; }
+    if (ch === "…") { out += "..."; continue; }
+    if (cp >= 0xa0 && cp <= 0xff) { out += ch; }
+  }
+  return out;
+}
+
+const COLORS = {
+  header: rgb(0.1, 0.1, 0.4),
+  primary: rgb(0.1, 0.4, 0.7),
+  profit: rgb(0.1, 0.5, 0.2),
+  expense: rgb(0.8, 0.1, 0.1),
+  neutral: rgb(0.4, 0.4, 0.4),
+};
+
+async function generateOperationsPDF(daysBack: number, data: {
+  ledger: any[];
+  investDeposits: any[];
+  sales: any[];
+  shops: any[];
+}) {
+  const pdf = await PDFDocument.create();
+  const pageSize: [number, number] = [595.28, 841.89];
+  let page = pdf.addPage(pageSize);
+  const { width, height } = page.getSize();
+  const font = await pdf.embedFont(StandardFonts.Helvetica);
+  const fontBold = await pdf.embedFont(StandardFonts.HelveticaBold);
+
+  const margin = 50;
+  let y = height - margin;
+
+  const drawText = (text: string, size = 10, bold = false, color = rgb(0, 0, 0), x = margin) => {
+    page.drawText(winAnsiSafe(text), { x, y, size, font: bold ? fontBold : font, color });
+    y -= (size + 6);
+  };
+
+  const drawLine = (color = rgb(0.8, 0.8, 0.8), thickness = 1) => {
+    page.drawLine({
+      start: { x: margin, y },
+      end: { x: width - margin, y },
+      thickness,
+      color
+    });
+    y -= 15;
+  };
+
+  const ensureSpace = (minY = 100) => {
+    if (y < minY) {
+      page = pdf.addPage(pageSize);
+      y = height - margin;
+    }
+  };
+
+  // Header
+  drawText("NIRVANA OPERATIONS REPORT", 20, true, COLORS.header);
+  drawText(`Period: Last ${daysBack} Days | Generated: ${new Date().toLocaleString()}`, 10, false, COLORS.neutral);
+  y -= 20;
+  drawLine(COLORS.header, 2);
+
+  // 1. FINANCIAL SUMMARY
+  const totalIncome = data.ledger.filter(l => l.amount > 0).reduce((s, l) => s + Number(l.amount), 0);
+  const totalExpense = data.ledger.filter(l => l.amount < 0).reduce((s, l) => s + Math.abs(Number(l.amount)), 0);
+  const totalInvest = data.investDeposits.reduce((s, d) => s + Number(d.amount), 0);
+  
+  drawText("1. EXECUTIVE SUMMARY", 14, true, COLORS.primary);
+  drawText(`Total Operations Income: $${totalIncome.toFixed(2)}`, 11, true, COLORS.profit);
+  drawText(`Total Operations Expenses: -$${totalExpense.toFixed(2)}`, 11, true, COLORS.expense);
+  drawText(`Net Operations Position: $${(totalIncome - totalExpense).toFixed(2)}`, 11, true, (totalIncome - totalExpense) >= 0 ? COLORS.profit : COLORS.expense);
+  y -= 10;
+  drawText(`Total Investment Capital: $${totalInvest.toFixed(2)}`, 11, true, COLORS.primary);
+  y -= 20;
+
+  // 2. INVESTMENT DETAIL
+  ensureSpace(200);
+  drawText("2. INVESTMENT & ASSET GROWTH", 14, true, COLORS.primary);
+  if (data.investDeposits.length === 0) {
+    drawText("No investment deposits recorded in this period.", 10, false, COLORS.neutral);
+  } else {
+    data.investDeposits.forEach(d => {
+      ensureSpace(40);
+      drawText(`${new Date(d.created_at).toLocaleDateString()} | ${d.deposited_by || 'Unknown'} | $${Number(d.amount).toFixed(2)}`, 10);
+    });
+  }
+  y -= 20;
+
+  // 3. LEDGER HIGHLIGHTS
+  ensureSpace(300);
+  drawText("3. KEY OPERATIONS MOVEMENTS", 14, true, COLORS.primary);
+  const topOps = data.ledger.sort((a, b) => Math.abs(b.amount) - Math.abs(a.amount)).slice(0, 15);
+  topOps.forEach(l => {
+    ensureSpace(40);
+    const color = l.amount < 0 ? COLORS.expense : COLORS.profit;
+    drawText(`${new Date(l.created_at).toLocaleDateString()} | ${l.title || l.kind} | ${l.amount < 0 ? '-' : '+'}$${Math.abs(l.amount).toFixed(2)}`, 9, false, color);
+  });
+
+  y -= 20;
+  drawText("--- END OF REPORT ---", 10, true, COLORS.neutral, width/2 - 50);
+
+  return await pdf.save();
 }
 
 export async function POST(req: Request) {
@@ -59,6 +174,22 @@ export async function POST(req: Request) {
 
     const startDateDisplay = new Date(since).toLocaleDateString();
     const endDateDisplay = new Date().toLocaleDateString();
+
+    if (body.format === 'pdf') {
+      const pdfBytes = await generateOperationsPDF(daysBack, {
+        ledger: opsRows,
+        investDeposits: investRows,
+        sales: salesRows,
+        shops: shopList
+      });
+      return new Response(pdfBytes as any, {
+        headers: {
+          "Content-Type": "application/pdf",
+          "Content-Disposition": `attachment; filename="Nirvana_Operations_Report_${new Date().toISOString().split('T')[0]}.pdf"`
+        }
+      });
+    }
+
     const filename = `ops-report-${new Date().toISOString().split('T')[0]}.html`;
 
     const opsDeposits = opsRows.filter((r: any) => r.amount >= 0);

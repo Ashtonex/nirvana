@@ -1079,6 +1079,12 @@ const AuditMonitorCard = memo(function AuditMonitorCard({ auditStats, ledger, sh
     shops.forEach((shop, idx) => {
       const shopExpenses = shopExpensesMap[shop.name.toUpperCase()] || [];
       const shopHigh = shopExpenses.filter(e => Math.abs(e.amount) > 20);
+      
+      // SURGE DETECTION: Are today's expenses higher than average?
+      const totalShopExp = shopExpenses.reduce((s, e) => s + Math.abs(e.amount), 0);
+      if (totalShopExp > 200) {
+        shopHigh.unshift({ amount: -totalShopExp, title: "TOTAL EXPENSE SURGE", created_at: new Date().toISOString() } as any);
+      }
       const shopStatus = shopStatuses[shop.id]?.status || "ANALYZING";
       
       steps.push({
@@ -1322,6 +1328,13 @@ const NirvanaOracleBrain = memo(function NirvanaOracleBrain({
     insights.push(`Revenue Flow: $${totalRevenue.toFixed(0)}`);
     insights.push(`Expense Drain: $${totalExpenses.toFixed(0)}`);
     insights.push(`Net Cash: ${netFlow >= 0 ? '+' : ''}$${netFlow.toFixed(0)}`);
+    
+    // SUSTAINABILITY SCORE: Net Flow vs Projected Daily Overheads
+    const estimatedDailyOverhead = 160; // Baseline $4,800/month
+    const daysInPeriod = 7; 
+    const sustainabilityScore = Math.min(100, Math.max(0, (netFlow / (estimatedDailyOverhead * daysInPeriod)) * 100));
+    insights.push(`Sustainability Score: ${sustainabilityScore.toFixed(1)}%`);
+    
     insights.push(`Activity (24h): ${recentActivity} events`);
     insights.push(`Staff Online: ${activeEmployees}/${employees.length}`);
     insights.push(`Overhead Pool: $${overheadContributions.toFixed(0)}`);

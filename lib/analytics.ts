@@ -141,9 +141,20 @@ export async function getReorderSuggestions(): Promise<ReorderSuggestion[]> {
 
 export async function getPremiumStockValue() {
     const { data: inventory } = await supabaseAdmin.from('inventory_items').select('landed_cost, quantity');
-    const totalCost = (inventory || []).reduce((sum: number, item: any) => sum + (item.landed_cost * item.quantity), 0);
-    // Calculate value at 1.65x Premium Multiplier
+    const totalCost = (inventory || []).reduce((sum: number, item: any) => sum + (Number(item.landed_cost || 0) * Number(item.quantity || 0)), 0);
     return totalCost * 1.65;
+}
+
+export async function getBreakEvenStockValue() {
+    const { data: inventory } = await supabaseAdmin.from('inventory_items').select('landed_cost, quantity');
+    const totalCost = (inventory || []).reduce((sum: number, item: any) => sum + (Number(item.landed_cost || 0) * Number(item.quantity || 0)), 0);
+    return totalCost * 1.35;
+}
+
+export async function getLeanStockValue() {
+    const { data: inventory } = await supabaseAdmin.from('inventory_items').select('landed_cost, quantity');
+    const totalCost = (inventory || []).reduce((sum: number, item: any) => sum + (Number(item.landed_cost || 0) * Number(item.quantity || 0)), 0);
+    return totalCost * 1.25;
 }
 
 // Helper to normalize shop identifiers to match chart expectations

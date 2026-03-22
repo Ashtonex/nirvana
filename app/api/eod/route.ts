@@ -426,12 +426,35 @@ async function sendComprehensiveWeeklyReport(closingShopId: string, staffName: s
       📋 SECTION 1 — End of Day Report: ${closingShopName}
     </h2>
 
-    <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:16px;">
-      <div style="background:#1e293b;padding:14px 12px;border-radius:8px;text-align:center;border-top:3px solid #10b981;">
-        <p style="margin:0;font-size:10px;color:#94a3b8;letter-spacing:1px;">TODAY'S SALES</p>
-        <p style="margin:6px 0 0;font-size:22px;font-weight:900;color:#10b981;">$${todayTotal.toFixed(2)}</p>
-        <p style="margin:4px 0 0;font-size:10px;color:#64748b;">${todaySales.length} transactions</p>
-      </div>
+        <table style="width:100%;border-collapse:separate;border-spacing:8px 0;margin-bottom:16px;">
+      <tr>
+        <td style="width:20%;background:#1e293b;padding:14px 12px;border-radius:8px;text-align:center;border-top:3px solid #10b981;">
+          <p style="margin:0;font-size:10px;color:#94a3b8;letter-spacing:1px;">TODAY'S SALES</p>
+          <p style="margin:6px 0 0;font-size:20px;font-weight:900;color:#10b981;">${todayTotal.toFixed(2)}</p>
+          <p style="margin:4px 0 0;font-size:9px;color:#64748b;">${todaySales.length} txns</p>
+        </td>
+        <td style="width:20%;background:#1e293b;padding:14px 12px;border-radius:8px;text-align:center;border-top:3px solid #3b82f6;">
+          <p style="margin:0;font-size:10px;color:#94a3b8;letter-spacing:1px;">CASH SALES</p>
+          <p style="margin:6px 0 0;font-size:20px;font-weight:900;color:#fff;">${todayCashTotal.toFixed(2)}</p>
+          <p style="margin:4px 0 0;font-size:9px;color:#64748b;">${todayCashSales.length} sales</p>
+        </td>
+        <td style="width:20%;background:#1e293b;padding:14px 12px;border-radius:8px;text-align:center;border-top:3px solid #8b5cf6;">
+          <p style="margin:0;font-size:10px;color:#94a3b8;letter-spacing:1px;">ECOCASH</p>
+          <p style="margin:6px 0 0;font-size:20px;font-weight:900;color:#c4b5fd;">${todayEcocashTotal.toFixed(2)}</p>
+          <p style="margin:4px 0 0;font-size:9px;color:#64748b;">${todayEcocashSales.length} sales</p>
+        </td>
+        <td style="width:20%;background:#1e293b;padding:14px 12px;border-radius:8px;text-align:center;border-top:3px solid #ef4444;">
+          <p style="margin:0;font-size:10px;color:#94a3b8;letter-spacing:1px;">TODAY'S EXPENSES</p>
+          <p style="margin:6px 0 0;font-size:20px;font-weight:900;color:#ef4444;">${todayExpensesTotal.toFixed(2)}</p>
+          <p style="margin:4px 0 0;font-size:9px;color:#64748b;">${todayExpenseRows.length} entries</p>
+        </td>
+        <td style="width:20%;background:#1e293b;padding:14px 12px;border-radius:8px;text-align:center;border-top:3px solid ${todayNet >= 0 ? '#10b981' : '#ef4444'};">
+          <p style="margin:0;font-size:10px;color:#94a3b8;letter-spacing:1px;">TODAY'S NET</p>
+          <p style="margin:6px 0 0;font-size:20px;font-weight:900;color:${todayNet >= 0 ? '#10b981' : '#ef4444'};">${todayNet >= 0 ? '+' : ''}${todayNet.toFixed(2)}</p>
+          <p style="margin:4px 0 0;font-size:9px;color:#64748b;">Cash position</p>
+        </td>
+      </tr>
+    </table>
       <div style="background:#1e293b;padding:14px 12px;border-radius:8px;text-align:center;border-top:3px solid #3b82f6;">
         <p style="margin:0;font-size:10px;color:#94a3b8;letter-spacing:1px;">CASH SALES</p>
         <p style="margin:6px 0 0;font-size:22px;font-weight:900;color:#fff;">$${todayCashTotal.toFixed(2)}</p>
@@ -485,7 +508,35 @@ async function sendComprehensiveWeeklyReport(closingShopId: string, staffName: s
       🏪 SECTION 2 — Kipasa Weekly Report
     </h2>
 
-    <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin-bottom:16px;">
+        <table style="width:100%;border-collapse:separate;border-spacing:8px 0;margin-bottom:16px;">
+      <tr>
+        <td style="width:16.6%;background:linear-gradient(135deg,#064e3b,#065f46);padding:14px 10px;border-radius:8px;text-align:center;">
+          <p style="margin:0;font-size:9px;color:#6ee7b7;letter-spacing:1px;">WEEKLY REVENUE</p>
+          <p style="margin:6px 0 0;font-size:18px;font-weight:900;color:#fff;">${kipasaTotal.toFixed(2)}</p>
+          <p style="margin:4px 0 0;font-size:9px;color:${kipasaGrowth >= 0 ? '#86efac' : '#fca5a5'};${kipasaGrowth >= 0 ? '↑' : '↓'} ${Math.abs(kipasaGrowth).toFixed(1)}%</p>
+        </td>
+        <td style="width:16.6%;background:#1e293b;padding:14px 10px;border-radius:8px;text-align:center;">
+          <p style="margin:0;font-size:9px;color:#94a3b8;letter-spacing:1px;">TODAY SALES</p>
+          <p style="margin:6px 0 0;font-size:16px;font-weight:900;color:#fff;">${kipasaTodaySales.reduce((sum: number, sale: any) => sum + Number(sale?.total_with_tax || 0), 0).toFixed(2)}</p>
+        </td>
+        <td style="width:16.6%;background:#1e293b;padding:14px 10px;border-radius:8px;text-align:center;">
+          <p style="margin:0;font-size:9px;color:#94a3b8;letter-spacing:1px;">OPS DEPOSITS</p>
+          <p style="margin:6px 0 0;font-size:16px;font-weight:900;color:#3b82f6;">${kipasaDeposits.toFixed(2)}</p>
+        </td>
+        <td style="width:16.6%;background:#1e293b;padding:14px 10px;border-radius:8px;text-align:center;">
+          <p style="margin:0;font-size:9px;color:#94a3b8;letter-spacing:1px;">OPS EXPENSES</p>
+          <p style="margin:6px 0 0;font-size:16px;font-weight:900;color:#ef4444;">${kipasaExpensesTotal.toFixed(2)}</p>
+        </td>
+        <td style="width:16.6%;background:#1e293b;padding:14px 10px;border-radius:8px;text-align:center;">
+          <p style="margin:0;font-size:9px;color:#94a3b8;letter-spacing:1px;">INVEST/PERFUME</p>
+          <p style="margin:6px 0 0;font-size:16px;font-weight:900;color:#c4b5fd;">${kipasaInvestTotal.toFixed(2)}</p>
+        </td>
+        <td style="width:16.6%;background:#1e293b;padding:14px 10px;border-radius:8px;text-align:center;">
+          <p style="margin:0;font-size:9px;color:#94a3b8;letter-spacing:1px;">LAY-BY</p>
+          <p style="margin:6px 0 0;font-size:16px;font-weight:900;color:#fbbf24;">${kipasaLaybyTotal.toFixed(2)}</p>
+        </td>
+      </tr>
+    </table>
       <div style="background:linear-gradient(135deg,#064e3b,#065f46);padding:14px 10px;border-radius:8px;text-align:center;">
         <p style="margin:0;font-size:9px;color:#6ee7b7;letter-spacing:1px;">WEEKLY REVENUE</p>
         <p style="margin:6px 0 0;font-size:20px;font-weight:900;color:#fff;">$${kipasaTotal.toFixed(2)}</p>
@@ -576,7 +627,35 @@ async function sendComprehensiveWeeklyReport(closingShopId: string, staffName: s
       🏢 SECTION 3 — Dub Dub & Trade Center Weekly Report
     </h2>
 
-    <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin-bottom:16px;">
+        <table style="width:100%;border-collapse:separate;border-spacing:8px 0;margin-bottom:16px;">
+      <tr>
+        <td style="width:16.6%;background:linear-gradient(135deg,#1e3a5f,#1e40af);padding:14px 10px;border-radius:8px;text-align:center;">
+          <p style="margin:0;font-size:9px;color:#93c5fd;letter-spacing:1px;">WEEKLY REVENUE</p>
+          <p style="margin:6px 0 0;font-size:18px;font-weight:900;color:#fff;">${otherTotal.toFixed(2)}</p>
+          <p style="margin:4px 0 0;font-size:9px;color:${otherGrowth >= 0 ? '#86efac' : '#fca5a5'};${otherGrowth >= 0 ? '↑' : '↓'} ${Math.abs(otherGrowth).toFixed(1)}%</p>
+        </td>
+        <td style="width:16.6%;background:#1e293b;padding:14px 10px;border-radius:8px;text-align:center;">
+          <p style="margin:0;font-size:9px;color:#94a3b8;letter-spacing:1px;">TODAY SALES</p>
+          <p style="margin:6px 0 0;font-size:16px;font-weight:900;color:#fff;">${otherTodaySales.reduce((sum: number, sale: any) => sum + Number(sale?.total_with_tax || 0), 0).toFixed(2)}</p>
+        </td>
+        <td style="width:16.6%;background:#1e293b;padding:14px 10px;border-radius:8px;text-align:center;">
+          <p style="margin:0;font-size:9px;color:#94a3b8;letter-spacing:1px;">OPS DEPOSITS</p>
+          <p style="margin:6px 0 0;font-size:16px;font-weight:900;color:#3b82f6;">${otherDeposits.toFixed(2)}</p>
+        </td>
+        <td style="width:16.6%;background:#1e293b;padding:14px 10px;border-radius:8px;text-align:center;">
+          <p style="margin:0;font-size:9px;color:#94a3b8;letter-spacing:1px;">OPS EXPENSES</p>
+          <p style="margin:6px 0 0;font-size:16px;font-weight:900;color:#ef4444;">${otherExpensesTotal.toFixed(2)}</p>
+        </td>
+        <td style="width:16.6%;background:#1e293b;padding:14px 10px;border-radius:8px;text-align:center;">
+          <p style="margin:0;font-size:9px;color:#94a3b8;letter-spacing:1px;">INVEST/PERFUME</p>
+          <p style="margin:6px 0 0;font-size:16px;font-weight:900;color:#c4b5fd;">${otherInvestTotal.toFixed(2)}</p>
+        </td>
+        <td style="width:16.6%;background:#1e293b;padding:14px 10px;border-radius:8px;text-align:center;">
+          <p style="margin:0;font-size:9px;color:#94a3b8;letter-spacing:1px;">LAY-BY</p>
+          <p style="margin:6px 0 0;font-size:16px;font-weight:900;color:#fbbf24;">${otherLaybyTotal.toFixed(2)}</p>
+        </td>
+      </tr>
+    </table>
       <div style="background:linear-gradient(135deg,#1e3a5f,#1e40af);padding:14px 10px;border-radius:8px;text-align:center;">
         <p style="margin:0;font-size:9px;color:#93c5fd;letter-spacing:1px;">WEEKLY REVENUE</p>
         <p style="margin:6px 0 0;font-size:20px;font-weight:900;color:#fff;">$${otherTotal.toFixed(2)}</p>
@@ -669,12 +748,31 @@ async function sendComprehensiveWeeklyReport(closingShopId: string, staffName: s
     </h2>
 
     <!-- Top-level KPI row -->
-    <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:20px;">
-      <div style="background:linear-gradient(135deg,#064e3b,#065f46);padding:18px 14px;border-radius:8px;text-align:center;">
-        <p style="margin:0;font-size:9px;color:#6ee7b7;letter-spacing:1px;">TOTAL REVENUE</p>
-        <p style="margin:6px 0 0;font-size:26px;font-weight:900;color:#fff;">$${globalTotal.toFixed(2)}</p>
-        <p style="margin:4px 0 0;font-size:10px;color:${globalGrowth >= 0 ? '#86efac' : '#fca5a5'};">${globalGrowth >= 0 ? '↑' : '↓'} ${Math.abs(globalGrowth).toFixed(1)}% vs last wk</p>
-      </div>
+        <table style="width:100%;border-collapse:separate;border-spacing:8px 0;margin-bottom:20px;">
+      <tr>
+        <td style="width:20%;background:linear-gradient(135deg,#064e3b,#065f46);padding:18px 14px;border-radius:8px;text-align:center;">
+          <p style="margin:0;font-size:9px;color:#6ee7b7;letter-spacing:1px;">TOTAL REVENUE</p>
+          <p style="margin:6px 0 0;font-size:24px;font-weight:900;color:#fff;">${globalTotal.toFixed(2)}</p>
+          <p style="margin:4px 0 0;font-size:9px;color:${globalGrowth >= 0 ? '#86efac' : '#fca5a5'};${globalGrowth >= 0 ? '↑' : '↓'} ${Math.abs(globalGrowth).toFixed(1)}%</p>
+        </td>
+        <td style="width:20%;background:linear-gradient(135deg,#1e3a5f,#1e40af);padding:18px 14px;border-radius:8px;text-align:center;">
+          <p style="margin:0;font-size:9px;color:#93c5fd;letter-spacing:1px;">OPS DEPOSITS</p>
+          <p style="margin:6px 0 0;font-size:24px;font-weight:900;color:#fff;">${totalDeposits.toFixed(2)}</p>
+        </td>
+        <td style="width:20%;background:linear-gradient(135deg,#7c2d12,#991b1b);padding:18px 14px;border-radius:8px;text-align:center;">
+          <p style="margin:0;font-size:9px;color:#fca5a5;letter-spacing:1px;">OPS EXPENSES</p>
+          <p style="margin:6px 0 0;font-size:24px;font-weight:900;color:#fff;">${totalExpenses.toFixed(2)}</p>
+        </td>
+        <td style="width:20%;background:linear-gradient(135deg,#6b21a8,#7c3aed);padding:18px 14px;border-radius:8px;text-align:center;">
+          <p style="margin:0;font-size:9px;color:#ddd6fe;letter-spacing:1px;">INVEST/PERFUME</p>
+          <p style="margin:6px 0 0;font-size:24px;font-weight:900;color:#fff;">${totalInvest.toFixed(2)}</p>
+        </td>
+        <td style="width:20%;background:linear-gradient(135deg,#064e3b,#1e3a5f);padding:18px 14px;border-radius:8px;text-align:center;">
+          <p style="margin:0;font-size:9px;color:#94a3b8;letter-spacing:1px;">NET OPS</p>
+          <p style="margin:6px 0 0;font-size:24px;font-weight:900;color:${netOps >= 0 ? '#10b981' : '#ef4444'};${netOps >= 0 ? '+' : ''}${netOps.toFixed(2)}</p>
+        </td>
+      </tr>
+    </table>
       <div style="background:linear-gradient(135deg,#1e3a5f,#1e40af);padding:18px 14px;border-radius:8px;text-align:center;">
         <p style="margin:0;font-size:9px;color:#93c5fd;letter-spacing:1px;">OPS DEPOSITS</p>
         <p style="margin:6px 0 0;font-size:26px;font-weight:900;color:#fff;">$${totalDeposits.toFixed(2)}</p>
