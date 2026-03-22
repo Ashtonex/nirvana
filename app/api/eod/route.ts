@@ -964,6 +964,28 @@ export async function POST(req: Request) {
   const posExpenseRows = ledgerRows.filter((l: any) => ["POS Expense", "Perfume", "Overhead"].includes(l.category));
   const totalExpenses = posExpenseRows.reduce((sum: number, e: any) => sum + Number(e.amount || 0), 0);
 
+  const { data: todayOpsLedger } = await supabaseAdmin
+    .from('operations_ledger')
+    .select('amount, created_at, notes')
+    .eq('shop_id', shopId)
+    .gte('created_at', since)
+    .then((r: any) => r, () => ({ data: [] as any[] }));
+  const { data: todayInvestRouting } = await supabaseAdmin
+    .from('invest_deposits')
+    .select('amount, created_at')
+    .eq('shop_id', shopId)
+    .gte('created_at', since)
+    .then((r: any) => r, () => ({ data: [] as any[] }));
+
+  const routedToOps = (e: any) => (todayOpsLedger || []).some((r: any) =>
+    Number(r.amount) === Number(e.amount) &&
+    Math.abs(new Date(r.created_at).getTime() - new Date(e.date).getTime()) < 60000
+  );
+  const routedToInvest = (e: any) => (todayInvestRouting || []).some((r: any) =>
+    Number(r.amount) === Number(e.amount) &&
+    Math.abs(new Date(r.created_at).getTime() - new Date(e.date).getTime()) < 60000
+  );
+
   const openingRows = ledgerRows
     .filter((l: any) => l.category === "Cash Drawer Opening")
     .sort((a: any, b: any) => new Date(a.date).getTime() - new Date(b.date).getTime());
@@ -1102,18 +1124,23 @@ export async function POST(req: Request) {
                   <th style="text-align:left;border-bottom:1px solid #cbd5e1;padding:6px;">Time</th>
                   <th style="text-align:left;border-bottom:1px solid #cbd5e1;padding:6px;">Description</th>
                   <th style="text-align:right;border-bottom:1px solid #cbd5e1;padding:6px;">Amount</th>
+                  <th style="text-align:left;border-bottom:1px solid #cbd5e1;padding:6px;">Routing</th>
                 </tr>
               </thead>
               <tbody>
                 ${posExpenseRows.length > 0 ? posExpenseRows
                   .sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime())
-                  .map((e: any) => `
-                    <tr>
+                  .map((e: any) => {
+                    const toOps = routedToOps(e);
+                    const toInvest = routedToInvest(e);
+                    const routeTag = toInvest ? '<span style="color:#0891b2;font-weight:bold;">-&gt; INVEST</span>' : toOps ? '<span style="color:#059669;font-weight:bold;">-&gt; OPS</span>' : '-';
+                    return `<tr>
                       <td style="padding:6px;border-bottom:1px solid #e2e8f0;">${new Date(e.date).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})}</td>
                       <td style="padding:6px;border-bottom:1px solid #e2e8f0;">${String(e.description || e.category || 'Expense')}</td>
                       <td style="padding:6px;border-bottom:1px solid #e2e8f0;text-align:right;color:#dc2626;">-$${Number(e.amount || 0).toFixed(2)}</td>
-                    </tr>
-                  `).join("") : '<tr><td colspan="3" style="padding:12px;text-align:center;color:#64748b;">No POS expenses recorded</td></tr>'}
+                      <td style="padding:6px;border-bottom:1px solid #e2e8f0;">${routeTag}</td>
+                    </tr>`;
+                  }).join("") : '<tr><td colspan="4" style="padding:12px;text-align:center;color:#64748b;">No POS expenses recorded</td></tr>'}
               </tbody>
             </table>
 

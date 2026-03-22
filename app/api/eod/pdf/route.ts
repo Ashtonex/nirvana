@@ -129,13 +129,15 @@ export async function GET(req: Request) {
     })();
 
     // Parallel Fetching
-    const [salesRes, ledgerRes, lowStockRes, allInventoryRes, thirtyDaySalesRes, sevenDaySalesRes] = await Promise.all([
+    const [salesRes, ledgerRes, lowStockRes, allInventoryRes, thirtyDaySalesRes, sevenDaySalesRes, opsLedgerRes, investDepositsRes] = await Promise.all([
       supabaseAdmin.from("sales").select("id, total_with_tax, total_before_tax, tax, discount_applied, payment_method, date, item_name, quantity").eq("shop_id", shopId).gte("date", since).lte("date", until).then((r: any) => r, (e: any) => ({ data: [] })),
       supabaseAdmin.from("ledger_entries").select("id,category,amount,date,description,employee_id").eq("shop_id", shopId).gte("date", since).lte("date", until).then((r: any) => r, (e: any) => ({ data: [] })),
       supabaseAdmin.from("inventory_allocations").select("item_id, quantity").eq("shop_id", shopId).lte("quantity", 5).order("quantity", { ascending: true }).limit(15).then((r: any) => r, (e: any) => ({ data: [] })),
       supabaseAdmin.from("inventory_items").select("id, name, category, landed_cost, price").limit(1000).then((r: any) => r, (e: any) => ({ data: [] })),
       supabaseAdmin.from("sales").select("item_id, quantity").eq("shop_id", shopId).gte("date", new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()).limit(2000).then((r: any) => r, (e: any) => ({ data: [] })),
       supabaseAdmin.from("sales").select("item_name, total_with_tax, date").eq("shop_id", shopId).gte("date", since7).lte("date", until).then((r: any) => r, (e: any) => ({ data: [] })),
+      supabaseAdmin.from("operations_ledger").select("amount, created_at, notes, shop_id, effective_date").eq("shop_id", shopId).gte("effective_date", date ? `${date}T00:00:00` : since).lte("effective_date", date ? `${date}T23:59:59` : until).then((r: any) => r, (e: any) => ({ data: [] })),
+      supabaseAdmin.from("invest_deposits").select("amount, created_at, shop_id, deposited_by").eq("shop_id", shopId).gte("created_at", since).lte("created_at", until).then((r: any) => r, (e: any) => ({ data: [] })),
     ]);
 
     const sales = salesRes.data || [];
@@ -144,6 +146,14 @@ export async function GET(req: Request) {
     const allInventory = allInventoryRes.data || [];
     const recentSales = thirtyDaySalesRes.data || [];
     const sevenDaySales = sevenDaySalesRes.data || [];
+    const opsLedger = opsLedgerRes.data || [];
+    const investDeposits = investDepositsRes.data || [];
+
+    const todayDateStr = date ? new Date(`${date}T12:00:00Z`).toISOString().split('T')[0] : new Date().toISOString().split('T')[0];
+    const todayOpsLedger = opsLedger.filter((l: any) =>
+      l.effective_date === todayDateStr && l.notes?.includes("Auto-routed from POS expense")
+    );
+    const todayInvestDeposits = investDeposits;
 
     const todayDate = date ? new Date(`${date}T12:00:00Z`) : new Date();
     const isSaturday = todayDate.getUTCDay() === 6;
@@ -175,6 +185,20 @@ export async function GET(req: Request) {
       const shop = shopRes.data;
       const settings = settingsRes.data;
       const opsLedger = opsLedgerRes.data || [];
+      const todayDateStr = todayDate.toISOString().split('T')[0];
+
+      // Fetch invest deposits for today (for expense routing display)
+      const todayStart = `${todayDateStr}T00:00:00`;
+      const { data: todayInvestDeposits } = await supabaseAdmin
+        .from("invest_deposits")
+        .select("amount, created_at, shop_id, deposited_by")
+        .eq("shop_id", shopId)
+        .gte("created_at", todayStart)
+        .then((r: any) => r, () => ({ data: [] as any[] }));
+
+      const todayOpsLedger = opsLedger.filter((l: any) =>
+        l.effective_date === todayDateStr && l.notes?.includes("Auto-routed from POS expense")
+      );
 
       // Resolve missing sales metadata (landed_cost, category)
       const wItemIds = Array.from(new Set(wSalesBase.map((s: any) => s.item_id).filter(Boolean)));
@@ -648,11 +672,22 @@ export async function GET(req: Request) {
     if (posExpenses.length === 0) {
       drawText("No POS expenses recorded.", 9, false, rgb(0.5, 0.5, 0.5));
     } else {
+      const routedToOps = (e: any) => todayOpsLedger.some((r: any) =>
+        Number(r.amount) === Number(e.amount) &&
+        Math.abs(new Date(r.created_at).getTime() - new Date(e.date).getTime()) < 60000
+      );
+      const routedToInvest = (e: any) => todayInvestDeposits.some((r: any) =>
+        Number(r.amount) === Number(e.amount) &&
+        Math.abs(new Date(r.created_at).getTime() - new Date(e.date).getTime()) < 60000
+      );
       posExpenses.slice(0, 10).forEach((e: any) => {
         ensureSpace(70);
         const t = new Date(e.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
         const desc = String(e.description || 'POS Expense');
-        drawText(`- ${t}  ${desc}  (-$${Number(e.amount || 0).toFixed(2)})`, 8);
+        const toOps = routedToOps(e);
+        const toInvest = routedToInvest(e);
+        const routeTag = toInvest ? " [-> INVEST]" : toOps ? " [-> OPS]" : "";
+        drawText(`- ${t}  ${desc}  (-$${Number(e.amount || 0).toFixed(2)})${routeTag}`, 8);
       });
       if (posExpenses.length > 10) drawText(`...and ${posExpenses.length - 10} more expenses`, 8, false, rgb(0.4, 0.4, 0.4));
     }

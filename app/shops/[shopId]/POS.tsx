@@ -133,9 +133,26 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
     const { saveSaleOffline, syncPendingSales, getPendingCount, isOnline } = useOfflineSales();
     const [pendingSyncCount, setPendingSyncCount] = useState(0);
 
+    const [opsLedger, setOpsLedger] = useState<any[]>([]);
+
     useEffect(() => {
         getPendingCount().then(setPendingSyncCount);
     }, [getPendingCount]);
+
+    useEffect(() => {
+        const today = new Date().toISOString().split('T')[0];
+        fetch(`/api/operations/ledger?limit=500&shopId=${shopId}`, { cache: "no-store", credentials: "include" })
+            .then(r => r.ok ? r.json() : { rows: [] })
+            .then(d => {
+                const rows = Array.isArray(d.rows) ? d.rows : [];
+                const todayEntries = rows.filter((r: any) =>
+                    r.shop_id === shopId &&
+                    String(r.created_at).startsWith(today)
+                );
+                setOpsLedger(todayEntries);
+            })
+            .catch(() => {});
+    }, [shopId]);
 
     // Auto-select the currently logged-in staff member so sales/audit entries are attributed correctly.
     useEffect(() => {
@@ -344,6 +361,10 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
         l.shopId === shopId &&
         String(l.date).startsWith(todayStr)
     ).reduce((sum: number, l: any) => sum + Number(l.amount || 0), 0);
+
+    const todaysOpsIncome = opsLedger
+        .filter((r: any) => r.amount > 0 && r.notes?.includes('Auto-routed from POS expense'))
+        .reduce((sum: number, r: any) => sum + Number(r.amount || 0), 0);
 
     const baseBalance = hasOpenedRegister ? Number(todaysOpening.amount) : expectedOpeningCash;
     const liveCashInDrawer = baseBalance + todaysCashSales - (todaysPosExpenses + todaysOpsPosts);
@@ -1515,9 +1536,17 @@ Generated via NIRVANA POS`;
                     </div>
 
                     <div className="bg-slate-900 border border-slate-800 px-4 py-2 rounded-lg flex items-center gap-3 h-10 shadow-lg min-w-max">
-                        <Coins className="h-4 w-4 text-emerald-400" />
+                        <TrendingUp className="h-4 w-4 text-emerald-400" />
                         <div className="flex flex-col">
-                            <span className="text-[10px] text-slate-500 uppercase font-black leading-none">Ops Posted</span>
+                            <span className="text-[10px] text-slate-500 uppercase font-black leading-none">Ops Income</span>
+                            <span className="text-xs font-bold text-emerald-400">+${todaysOpsIncome.toFixed(2)}</span>
+                        </div>
+                    </div>
+
+                    <div className="bg-slate-900 border border-slate-800 px-4 py-2 rounded-lg flex items-center gap-3 h-10 shadow-lg min-w-max">
+                        <Coins className="h-4 w-4 text-amber-400" />
+                        <div className="flex flex-col">
+                            <span className="text-[10px] text-slate-500 uppercase font-black leading-none">Drawer Post</span>
                             <span className="text-xs font-bold text-slate-200">${todaysOpsPosts.toFixed(2)}</span>
                         </div>
                     </div>
@@ -2617,33 +2646,80 @@ Generated via NIRVANA POS`;
                 title="Expenses History"
             >
                 <div className="space-y-4 max-h-[60vh] overflow-y-auto">
-                    {ledger.filter((l: any) => l.category === 'POS Expense' && l.shopId === shopId).length === 0 ? (
-                        <p className="text-slate-500 text-center py-8">No expenses recorded</p>
-                    ) : (
-                        <div className="space-y-2">
-                            <p className="text-[10px] text-slate-500 font-bold uppercase">
-                                {ledger.filter((l: any) => l.category === 'POS Expense' && l.shopId === shopId).length} expense{ledger.filter((l: any) => l.category === 'POS Expense' && l.shopId === shopId).length !== 1 ? 's' : ''} recorded
-                            </p>
-                            {ledger.filter((l: any) => l.category === 'POS Expense' && l.shopId === shopId).map((expense: any) => (
-                                <div key={expense.id} className="bg-slate-950 border border-slate-800 rounded-lg p-3">
-                                    <div className="flex justify-between items-start">
-                                        <div className="flex-1">
-                                            <div className="flex justify-between items-start mb-1">
-                                                <p className="text-xs font-black text-slate-100 uppercase italic tracking-tight">{expense.description || 'Expense'}</p>
-                                                <p className="text-xs font-mono font-bold text-rose-400">-${(expense.amount || 0).toFixed(2)}</p>
-                                            </div>
-                                            <div className="mt-2 pt-2 border-t border-slate-800/50 flex justify-between items-center">
-                                                <p className="text-[9px] text-slate-500 font-bold uppercase tracking-widest">
-                                                    {expense.date ? new Date(expense.date).toLocaleDateString() : 'Today'}
-                                                </p>
-                                                <p className="text-[9px] text-slate-600 font-mono italic">{expense.id}</p>
-                                            </div>
-                                        </div>
+                    {(() => {
+                        const allExpenses = ledger.filter((l: any) =>
+                            ['POS Expense', 'Perfume', 'Overhead'].includes(l.category) &&
+                            l.shopId === shopId
+                        ).sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+                        if (allExpenses.length === 0) {
+                            return <p className="text-slate-500 text-center py-8">No expenses recorded</p>;
+                        }
+
+                        const todayOpsEntries = opsLedger.filter((r: any) =>
+                            r.notes?.includes('Auto-routed from POS expense')
+                        );
+
+                        const routedToOps = (expense: any) =>
+                            todayOpsEntries.some((r: any) =>
+                                r.amount === expense.amount &&
+                                Math.abs(new Date(r.created_at).getTime() - new Date(expense.date).getTime()) < 60000
+                            );
+
+                        const totalExpenses = allExpenses.reduce((sum: number, e: any) => sum + Number(e.amount || 0), 0);
+                        const totalRouted = allExpenses.filter(routedToOps).reduce((sum: number, e: any) => sum + Number(e.amount || 0), 0);
+
+                        return (
+                            <div className="space-y-3">
+                                <div className="flex gap-4">
+                                    <div className="bg-rose-950/30 border border-rose-800/30 rounded-lg px-3 py-2 flex-1 text-center">
+                                        <p className="text-[10px] text-slate-500 font-bold uppercase">Total Expenses</p>
+                                        <p className="text-sm font-black text-rose-400 font-mono">-${totalExpenses.toFixed(2)}</p>
+                                    </div>
+                                    <div className="bg-emerald-950/30 border border-emerald-800/30 rounded-lg px-3 py-2 flex-1 text-center">
+                                        <p className="text-[10px] text-slate-500 font-bold uppercase">Routed to Ops</p>
+                                        <p className="text-sm font-black text-emerald-400 font-mono">+${totalRouted.toFixed(2)}</p>
                                     </div>
                                 </div>
-                            ))}
-                        </div>
-                    )}
+
+                                <div className="space-y-2">
+                                    <p className="text-[10px] text-slate-500 font-bold uppercase">
+                                        {allExpenses.length} expense{allExpenses.length !== 1 ? 's' : ''} recorded
+                                    </p>
+                                    {allExpenses.map((expense: any) => {
+                                        const isRouted = routedToOps(expense);
+                                        const categoryColor = expense.category === 'Perfume' ? 'bg-violet-500/20 text-violet-400' :
+                                            expense.category === 'Overhead' ? 'bg-amber-500/20 text-amber-400' :
+                                            'bg-slate-700/50 text-slate-400';
+                                        return (
+                                            <div key={expense.id} className="bg-slate-950 border border-slate-800 rounded-lg p-3">
+                                                <div className="flex justify-between items-start">
+                                                    <div className="flex-1">
+                                                        <div className="flex justify-between items-start mb-1">
+                                                            <p className="text-xs font-black text-slate-100 uppercase italic tracking-tight">{expense.description || expense.category}</p>
+                                                            <p className="text-xs font-mono font-bold text-rose-400">-${(expense.amount || 0).toFixed(2)}</p>
+                                                        </div>
+                                                        <div className="flex items-center gap-2 mt-1">
+                                                            <span className={`text-[8px] font-black uppercase px-2 py-0.5 rounded-full ${categoryColor}`}>{expense.category}</span>
+                                                            {isRouted && (
+                                                                <span className="text-[8px] font-black uppercase px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400">→ Ops Income</span>
+                                                            )}
+                                                        </div>
+                                                        <div className="mt-2 pt-2 border-t border-slate-800/50 flex justify-between items-center">
+                                                            <p className="text-[9px] text-slate-500 font-bold uppercase tracking-widest">
+                                                                {expense.date ? new Date(expense.date).toLocaleDateString() : 'Today'}
+                                                            </p>
+                                                            <p className="text-[9px] text-slate-600 font-mono italic">{expense.id}</p>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        );
+                    })()}
                 </div>
             </Modal>
 
