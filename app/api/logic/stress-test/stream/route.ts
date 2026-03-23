@@ -1,6 +1,4 @@
 import { NextResponse } from "next/server";
-import fs from "fs";
-import path from "path";
 import { supabaseAdmin } from "@/lib/supabase";
 import { getOperationsComputedBalance } from "@/lib/operations";
 import { requirePrivilegedActor } from "@/lib/apiAuth";
@@ -225,15 +223,9 @@ export async function POST(req: Request) {
 
         const html = generateReportHtml(scenario, summary);
         const timestamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
-        const filename = `stress_test_${scenario.toLowerCase()}_${timestamp}.html`;
+        const filename = `nirvana_stress_test_${scenario.toLowerCase()}_${timestamp}.html`;
 
-        const reportsDir = path.join(process.cwd(), "public", "reports");
-        if (!fs.existsSync(reportsDir)) fs.mkdirSync(reportsDir, { recursive: true });
-
-        const filePath = path.join(reportsDir, filename);
-        fs.writeFileSync(filePath, html);
-
-        send({ progress: 100, message: "Report ready!", reportUrl: `/reports/${filename}`, filename, complete: true });
+        send({ progress: 100, message: "Report ready!", reportHtml: html, filename, complete: true });
       } catch (e: any) {
         send({ error: e.message || "Simulation crashed", complete: true });
       } finally {

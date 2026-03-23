@@ -465,9 +465,17 @@ export default function LogicPage() {
               if (data.error) {
                 setSimulationMessage(`Error: ${data.error}`);
                 setSimulationProgress(0);
-              } else if (data.reportUrl) {
-                setReports(prev => [{ reportUrl: data.reportUrl, filename: data.filename }, ...prev]);
-                window.open(data.reportUrl, "_blank");
+              } else if (data.reportHtml) {
+                const blob = new Blob([data.reportHtml], { type: "text/html" });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement("a");
+                a.href = url;
+                a.download = data.filename || `stress_test_${Date.now()}.html`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+                setReports(prev => [{ filename: data.filename }, ...prev]);
                 setSimulationMessage("Complete!");
                 setSimulationComplete(true);
               }
