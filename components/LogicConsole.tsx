@@ -740,16 +740,18 @@ export default function LogicPage() {
                 <CardTitle className="flex items-center gap-3 text-2xl font-black uppercase italic text-white">
                   <TrendingUp className="h-6 w-6 text-violet-400" /> Monte Carlo Stress Engine
                 </CardTitle>
-                <CardDescription className="text-[10px] font-black text-slate-500 uppercase tracking-widest">
-                  Simulate business pathways based on current liquidity and inventory metadata.
-                </CardDescription>
+                  <CardDescription className="text-[10px] font-black text-slate-500 uppercase tracking-widest">
+                    1,000 Monte Carlo paths · 12 real-world risk factors · 180-day forecast
+                  </CardDescription>
               </CardHeader>
               <CardContent className="space-y-8">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   {[
-                    { id: "Recession", label: "Economic Downturn", icon: <TrendingDown className="text-rose-400" />, desc: "High inflation, 40-60% revenue drop." },
-                    { id: "Liquidation", label: "Inventory Purge", icon: <ShoppingCart className="text-emerald-400" />, desc: "Aggressive discounts to boost cash." },
-                    { id: "Hypergrowth", label: "Aggressive Scale", icon: <Zap className="text-violet-400" />, desc: "3x revenue surge with overhead spikes." }
+                    { id: "Normal Operations", label: "Normal Ops", icon: <ShieldCheck className="text-emerald-400" />, desc: "Baseline — no shocks. Tests pure cash runway." },
+                    { id: "Recession", label: "Recession", icon: <TrendingDown className="text-rose-400" />, desc: "35-70% revenue drop for 60-180 days. Pure demand shock." },
+                    { id: "Black Swan (2 Events)", label: "Black Swan x2", icon: <Activity className="text-rose-400" />, desc: "Two economic shocks fire simultaneously — e.g. recession + overhead surge." },
+                    { id: "Black Swan (3 Events)", label: "Black Swan x3", icon: <Activity className="text-rose-400 animate-pulse" />, desc: "Three shocks together — recession + overhead + tax event. Worst-case." },
+                    { id: "Full Monte Carlo", label: "Full Monte", icon: <Zap className="text-violet-400" />, desc: "All 12 risk events fire independently. Most realistic — every path is unique." },
                   ].map(scenario => (
                     <button
                       key={scenario.id}
@@ -799,7 +801,7 @@ export default function LogicPage() {
                         ? `Completed in ${simulationElapsed}s — your report is open in a new tab.`
                         : runningSimulation
                         ? simulationMessage || "Processing Monte Carlo paths..."
-                        : "Running the stress test will execute 100 algorithmic paths to predict business survival probability."}
+                        : "Running 1,000 Monte Carlo paths across 12 real-world risk factors. Tests every combination of economic shocks."}
                     </p>
                   </div>
 
