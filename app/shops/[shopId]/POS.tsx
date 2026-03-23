@@ -36,6 +36,7 @@ import {
     Coins,
     PackagePlus,
     ClipboardList,
+    ArrowRightLeft,
     Power,
     MessageSquare,
     LogOut,
@@ -134,22 +135,28 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
     const [pendingSyncCount, setPendingSyncCount] = useState(0);
 
     const [opsLedger, setOpsLedger] = useState<any[]>([]);
+    const [investBalance, setInvestBalance] = useState<{ availableBalance: number; totalDeposited: number; totalWithdrawn: number; depositCount: number } | null>(null);
 
     useEffect(() => {
         getPendingCount().then(setPendingSyncCount);
     }, [getPendingCount]);
 
     useEffect(() => {
-        const today = new Date().toISOString().split('T')[0];
-        fetch(`/api/operations/ledger?limit=500&shopId=${shopId}`, { cache: "no-store", credentials: "include" })
+        fetch(`/api/operations/ledger?limit=5000&shopId=${shopId}`, { cache: "no-store", credentials: "include" })
             .then(r => r.ok ? r.json() : { rows: [] })
             .then(d => {
                 const rows = Array.isArray(d.rows) ? d.rows : [];
-                const todayEntries = rows.filter((r: any) =>
-                    r.shop_id === shopId &&
-                    String(r.created_at).startsWith(today)
-                );
-                setOpsLedger(todayEntries);
+                setOpsLedger(rows.filter((r: any) => r.shop_id === shopId));
+            })
+            .catch(() => {});
+    }, [shopId]);
+
+    useEffect(() => {
+        if (!shopId) return;
+        fetch(`/api/invest/balance?shopId=${shopId}`, { cache: "no-store", credentials: "include" })
+            .then(r => r.ok ? r.json() : null)
+            .then(d => {
+                if (d && !d.error) setInvestBalance(d);
             })
             .catch(() => {});
     }, [shopId]);
@@ -363,6 +370,10 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
     ).reduce((sum: number, l: any) => sum + Number(l.amount || 0), 0);
 
     const todaysOpsIncome = opsLedger
+        .filter((r: any) => r.amount > 0 && r.notes?.includes('Auto-routed from POS expense') && String(r.created_at).startsWith(todayStr))
+        .reduce((sum: number, r: any) => sum + Number(r.amount || 0), 0);
+
+    const cumulativeOpsIncome = opsLedger
         .filter((r: any) => r.amount > 0 && r.notes?.includes('Auto-routed from POS expense'))
         .reduce((sum: number, r: any) => sum + Number(r.amount || 0), 0);
 
@@ -1512,6 +1523,24 @@ Generated via NIRVANA POS`;
                         >
                             <ClipboardList className="mr-2 h-4 w-4" /> Stocktake Audit
                         </Button>
+                        <Button
+                            className="w-full bg-sky-900 hover:bg-sky-800 border border-sky-500/30 text-sky-400 text-[10px] font-black uppercase italic tracking-widest"
+                            onClick={() => {
+                                setIsManagerToolsOpen(false);
+                                window.location.href = "/invest";
+                            }}
+                        >
+                            <Coins className="mr-2 h-4 w-4" /> Perfume Deposits
+                        </Button>
+                        <Button
+                            className="w-full bg-slate-800 hover:bg-slate-700 text-[10px] font-black uppercase italic tracking-widest"
+                            onClick={() => {
+                                setIsManagerToolsOpen(false);
+                                window.location.href = "/transfers";
+                            }}
+                        >
+                            <ArrowRightLeft className="mr-2 h-4 w-4" /> Cash Transfers
+                        </Button>
                         <div className="text-[10px] font-bold uppercase text-slate-400">
                             If you cannot see these pages, your staff role must be Manager/Admin/Owner.
                         </div>
@@ -1548,6 +1577,14 @@ Generated via NIRVANA POS`;
                         <div className="flex flex-col">
                             <span className="text-[10px] text-slate-500 uppercase font-black leading-none">Drawer Post</span>
                             <span className="text-xs font-bold text-slate-200">${todaysOpsPosts.toFixed(2)}</span>
+                        </div>
+                    </div>
+
+                    <div className="bg-slate-900 border border-sky-500/30 px-4 py-2 rounded-lg flex items-center gap-3 h-10 shadow-lg min-w-max">
+                        <Sparkles className="h-4 w-4 text-sky-400" />
+                        <div className="flex flex-col">
+                            <span className="text-[10px] text-slate-500 uppercase font-black leading-none">Invest Drawer</span>
+                            <span className="text-xs font-bold text-sky-400">${(investBalance?.availableBalance ?? 0).toFixed(2)}</span>
                         </div>
                     </div>
                 </div>
@@ -2656,18 +2693,19 @@ Generated via NIRVANA POS`;
                             return <p className="text-slate-500 text-center py-8">No expenses recorded</p>;
                         }
 
-                        const todayOpsEntries = opsLedger.filter((r: any) =>
-                            r.notes?.includes('Auto-routed from POS expense')
+                        const allOpsRouted = opsLedger.filter((r: any) =>
+                            r.amount > 0 && r.notes?.includes('Auto-routed from POS expense')
                         );
 
                         const routedToOps = (expense: any) =>
-                            todayOpsEntries.some((r: any) =>
+                            allOpsRouted.some((r: any) =>
                                 r.amount === expense.amount &&
                                 Math.abs(new Date(r.created_at).getTime() - new Date(expense.date).getTime()) < 60000
                             );
 
                         const totalExpenses = allExpenses.reduce((sum: number, e: any) => sum + Number(e.amount || 0), 0);
                         const totalRouted = allExpenses.filter(routedToOps).reduce((sum: number, e: any) => sum + Number(e.amount || 0), 0);
+                        const cumulativeRouted = allOpsRouted.reduce((sum: number, r: any) => sum + Number(r.amount || 0), 0);
 
                         return (
                             <div className="space-y-3">
@@ -2677,8 +2715,12 @@ Generated via NIRVANA POS`;
                                         <p className="text-sm font-black text-rose-400 font-mono">-${totalExpenses.toFixed(2)}</p>
                                     </div>
                                     <div className="bg-emerald-950/30 border border-emerald-800/30 rounded-lg px-3 py-2 flex-1 text-center">
-                                        <p className="text-[10px] text-slate-500 font-bold uppercase">Routed to Ops</p>
-                                        <p className="text-sm font-black text-emerald-400 font-mono">+${totalRouted.toFixed(2)}</p>
+                                        <p className="text-[10px] text-slate-500 font-bold uppercase">Cumul. Ops Income</p>
+                                        <p className="text-sm font-black text-emerald-400 font-mono">+${cumulativeRouted.toFixed(2)}</p>
+                                    </div>
+                                    <div className="bg-sky-950/30 border border-sky-800/30 rounded-lg px-3 py-2 flex-1 text-center">
+                                        <p className="text-[10px] text-slate-500 font-bold uppercase">Today's Ops Inc.</p>
+                                        <p className="text-sm font-black text-sky-400 font-mono">+${todaysOpsIncome.toFixed(2)}</p>
                                     </div>
                                 </div>
 

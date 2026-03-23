@@ -741,17 +741,18 @@ export default function LogicPage() {
                   <TrendingUp className="h-6 w-6 text-violet-400" /> Monte Carlo Stress Engine
                 </CardTitle>
                   <CardDescription className="text-[10px] font-black text-slate-500 uppercase tracking-widest">
-                    1,000 Monte Carlo paths · 12 real-world risk factors · 180-day forecast
+                    1,000 Monte Carlo paths · 21 Mutare-specific risk factors · 180-day forecast · Zimbabwe/Mutare context
                   </CardDescription>
               </CardHeader>
               <CardContent className="space-y-8">
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                   {[
-                    { id: "Normal Operations", label: "Normal Ops", icon: <ShieldCheck className="text-emerald-400" />, desc: "Baseline — no shocks. Tests pure cash runway." },
-                    { id: "Recession", label: "Recession", icon: <TrendingDown className="text-rose-400" />, desc: "35-70% revenue drop for 60-180 days. Pure demand shock." },
-                    { id: "Black Swan (2 Events)", label: "Black Swan x2", icon: <Activity className="text-rose-400" />, desc: "Two economic shocks fire simultaneously — e.g. recession + overhead surge." },
-                    { id: "Black Swan (3 Events)", label: "Black Swan x3", icon: <Activity className="text-rose-400 animate-pulse" />, desc: "Three shocks together — recession + overhead + tax event. Worst-case." },
-                    { id: "Full Monte Carlo", label: "Full Monte", icon: <Zap className="text-violet-400" />, desc: "All 12 risk events fire independently. Most realistic — every path is unique." },
+                    { id: "Normal Operations", label: "Normal Ops", icon: <ShieldCheck className="text-emerald-400" />, desc: "Mutare baseline — local + tourism revenue, ZWG overhead, stock from SA/Dubai/China." },
+                    { id: "ZWG / USD Crisis", label: "ZWG Crisis", icon: <TrendingDown className="text-rose-400" />, desc: "ZWG devalues 40-80%, inflation surges, customs duty spikes. Full currency shock." },
+                    { id: "Fuel & Power Crisis", label: "Fuel & Power", icon: <Activity className="text-orange-400" />, desc: "Combined fuel + ZESA load-shedding. Deliveries halted, generator costs spike, foot traffic drops." },
+                    { id: "Black Swan (2 Events)", label: "Black Swan x2", icon: <Activity className="text-rose-400" />, desc: "Two Mutare shocks fire simultaneously — e.g. port delay + customs duty hike." },
+                    { id: "Black Swan (3 Events)", label: "Black Swan x3", icon: <Activity className="text-rose-400 animate-pulse" />, desc: "Three correlated shocks — ZWG devaluation + customs + USD shortage. Worst-case." },
+                    { id: "Full Monte Carlo", label: "Full Monte", icon: <Zap className="text-violet-400" />, desc: "All 21 risk events fire independently. Most realistic Mutare test — every path is unique." },
                   ].map(scenario => (
                     <button
                       key={scenario.id}
