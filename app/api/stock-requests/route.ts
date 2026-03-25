@@ -133,3 +133,21 @@ export async function POST(req: Request) {
 
   return NextResponse.json({ success: true });
 }
+
+export async function GET(req: Request) {
+  const actor = await getActor(req);
+  if (!actor) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  try {
+    const { data: requests, error } = await supabaseAdmin
+      .from("stock_requests")
+      .select("*")
+      .order("created_at", { ascending: false });
+
+    if (error) throw error;
+
+    return NextResponse.json({ requests: requests || [] });
+  } catch (e: any) {
+    return NextResponse.json({ error: e.message }, { status: 500 });
+  }
+}

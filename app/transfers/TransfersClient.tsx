@@ -35,11 +35,19 @@ export default function TransfersPage({ db }: { db: any }) {
 
     useEffect(() => {
         loadStockRequests();
+        const interval = setInterval(loadStockRequests, 10000);
+        return () => clearInterval(interval);
     }, []);
 
     const loadStockRequests = async () => {
-        const requests = await getStockRequests();
-        setStockRequests(requests);
+        try {
+            const res = await fetch('/api/stock-requests', { credentials: 'include' });
+            const data = await res.json();
+            setStockRequests(data.requests || []);
+        } catch (err) {
+            console.error('Failed to load stock requests:', err);
+            setStockRequests([]);
+        }
     };
 
     const canApprove = (role: string) => role === 'owner' || role === 'manager';
