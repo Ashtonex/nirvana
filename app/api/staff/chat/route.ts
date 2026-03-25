@@ -110,8 +110,8 @@ function resolveShopForRoom(actor: Actor, room: string, shopId: string) {
   if (room !== "shop") return null;
 
   if (actor.role === "staff") return actor.shop_id || null;
-  // Owners can read/write any shop room (provided explicitly)
-  return shopId || null;
+  // Owners can read/write any shop room (provided explicitly), or default to universal
+  return shopId || "universal";
 }
 
 export async function GET(req: Request) {

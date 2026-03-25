@@ -187,10 +187,14 @@ export async function GET(req: Request) {
       .select("*")
       .order("created_at", { ascending: false });
 
-    if (error) throw error;
+    if (error) {
+      console.error("[STOCK-REQUESTS] Query error:", error);
+      return NextResponse.json({ requests: [], warning: "Table may not exist" });
+    }
 
     return NextResponse.json({ requests: requests || [] });
   } catch (e: any) {
-    return NextResponse.json({ error: e.message }, { status: 500 });
+    console.error("[STOCK-REQUESTS] Error:", e);
+    return NextResponse.json({ requests: [], error: e.message }, { status: 500 });
   }
 }
