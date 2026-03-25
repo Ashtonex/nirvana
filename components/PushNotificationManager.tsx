@@ -79,7 +79,7 @@ export function PushNotificationListener() {
       eventSource.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data);
-          if (data.type === "heartbeat" || data.type === "chat") return;
+          if (data.type === "heartbeat") return;
 
           showPushNotification(data.title, {
             body: data.message,

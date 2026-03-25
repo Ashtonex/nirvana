@@ -23,6 +23,7 @@ export async function GET(req: Request) {
       let lastLedgerId: string | null = null;
       let lastStaffLogId: string | null = null;
       let lastChatMessageId: string | null = null;
+      let lastStockRequestId: string | null = null;
 
       const sendEvent = (data: object) => {
         if (!isClosed) {
@@ -101,20 +102,61 @@ export async function GET(req: Request) {
           // Check for new chat messages
           const { data: latestChatMessage } = await supabaseAdmin
             .from("chat_messages")
-            .select("id, content, message, sender_id, created_at")
+            .select("id, content, message, sender_id, created_at, message_type, metadata, shop_id")
             .order("created_at", { ascending: false })
             .limit(1)
             .single();
 
           if (latestChatMessage && latestChatMessage.id !== lastChatMessageId) {
             lastChatMessageId = latestChatMessage.id;
+            // Check if it's a stock request
+            const isStockRequest = (latestChatMessage as any).message_type === 'stock_request' || 
+              ((latestChatMessage as any).message?.startsWith?.('@') && (latestChatMessage as any).message?.includes?.('need'));
+            
+            if (isStockRequest) {
+              const metadata = (latestChatMessage as any).metadata || {};
+              events.push({
+                type: "stock_request",
+                id: latestChatMessage.id,
+                title: "Stock Request",
+                message: `Need ${metadata.quantity || '?'} × ${metadata.itemName || (latestChatMessage.message || 'items')}`,
+                shop: metadata.shop || (latestChatMessage as any).shop_id,
+                quantity: metadata.quantity,
+                itemName: metadata.itemName,
+                timestamp: latestChatMessage.created_at,
+              });
+            } else {
+              events.push({
+                type: "chat",
+                id: latestChatMessage.id,
+                title: "New Message",
+                message: latestChatMessage.message || latestChatMessage.content || "New chat message",
+                sender: latestChatMessage.sender_id,
+                timestamp: latestChatMessage.created_at,
+              });
+            }
+          }
+
+          // Also check stock_requests table directly
+          const { data: latestStockRequest } = await supabaseAdmin
+            .from("stock_requests")
+            .select("id, item_name, quantity, source_shop_id, target_shop_id, status, created_at")
+            .order("created_at", { ascending: false })
+            .limit(1)
+            .single();
+
+          if (latestStockRequest && latestStockRequest.id !== lastStockRequestId) {
+            lastStockRequestId = latestStockRequest.id;
             events.push({
-              type: "chat",
-              id: latestChatMessage.id,
-              title: "New Message",
-              message: latestChatMessage.message || latestChatMessage.content || "New chat message",
-              sender: latestChatMessage.sender_id,
-              timestamp: latestChatMessage.created_at,
+              type: "stock_request",
+              id: latestStockRequest.id,
+              title: "Stock Request",
+              message: `${latestStockRequest.item_name} (${latestStockRequest.quantity} units) from ${latestStockRequest.source_shop_id}`,
+              shop: latestStockRequest.target_shop_id,
+              quantity: latestStockRequest.quantity,
+              itemName: latestStockRequest.item_name,
+              status: latestStockRequest.status,
+              timestamp: latestStockRequest.created_at,
             });
           }
 
