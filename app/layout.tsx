@@ -8,6 +8,7 @@ import { ServiceWorkerRegistration } from "@/components/ServiceWorkerRegistratio
 import { OfflineIndicator } from "@/components/OfflineIndicator";
 import { ToastProvider } from "@/components/ToastProvider";
 import { NotificationListener } from "@/components/NotificationListener";
+import { PushNotificationListener } from "@/components/PushNotificationManager";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -56,6 +57,7 @@ export default function RootLayout({
                 <ServiceWorkerRegistration />
                 <OfflineIndicator />
                 <NotificationListener />
+                <PushNotificationListener />
                 {children}
               </AppShell>
             </ToastProvider>

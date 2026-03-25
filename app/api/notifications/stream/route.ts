@@ -22,6 +22,7 @@ export async function GET(req: Request) {
       let lastSaleId: string | null = null;
       let lastLedgerId: string | null = null;
       let lastStaffLogId: string | null = null;
+      let lastChatMessageId: string | null = null;
 
       const sendEvent = (data: object) => {
         if (!isClosed) {
@@ -94,6 +95,26 @@ export async function GET(req: Request) {
               message: `${latestStaffLog.employee_name} ${latestStaffLog.action === "logout" ? "ended" : "started"} shift`,
               shop: latestStaffLog.shop_id,
               timestamp: latestStaffLog.created_at,
+            });
+          }
+
+          // Check for new chat messages
+          const { data: latestChatMessage } = await supabaseAdmin
+            .from("chat_messages")
+            .select("id, content, message, sender_id, created_at")
+            .order("created_at", { ascending: false })
+            .limit(1)
+            .single();
+
+          if (latestChatMessage && latestChatMessage.id !== lastChatMessageId) {
+            lastChatMessageId = latestChatMessage.id;
+            events.push({
+              type: "chat",
+              id: latestChatMessage.id,
+              title: "New Message",
+              message: latestChatMessage.message || latestChatMessage.content || "New chat message",
+              sender: latestChatMessage.sender_id,
+              timestamp: latestChatMessage.created_at,
             });
           }
 

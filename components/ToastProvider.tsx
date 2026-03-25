@@ -1,7 +1,7 @@
 "use client";
 
 import { createContext, useContext, useState, useCallback, useEffect, useRef, ReactNode } from "react";
-import { X, Bell, ShoppingCart, UserPlus, UserMinus, DollarSign, TrendingUp, AlertTriangle, CheckCircle, Info, ChevronDown } from "lucide-react";
+import { X, Bell, ShoppingCart, UserPlus, UserMinus, DollarSign, TrendingUp, AlertTriangle, CheckCircle, Info, ChevronDown, MessageCircle } from "lucide-react";
 import { cn } from "@/components/ui";
 
 function playNotificationSound(type: string) {
@@ -13,7 +13,7 @@ function playNotificationSound(type: string) {
     oscillator.connect(gainNode);
     gainNode.connect(ctx.destination);
 
-    if (type === "sale" || type === "deposit") {
+    if (type === "sale" || type === "deposit" || type === "chat") {
       oscillator.frequency.setValueAtTime(880, ctx.currentTime);
       oscillator.frequency.setValueAtTime(1100, ctx.currentTime + 0.1);
       gainNode.gain.setValueAtTime(0.08, ctx.currentTime);
@@ -40,7 +40,7 @@ function playNotificationSound(type: string) {
   }
 }
 
-export type ToastType = "sale" | "deposit" | "expense" | "staff_login" | "staff_logout" | "alert" | "success" | "info";
+export type ToastType = "sale" | "deposit" | "expense" | "staff_login" | "staff_logout" | "chat" | "alert" | "success" | "info";
 
 export type Toast = {
   id: string;
@@ -117,6 +117,12 @@ const TOAST_CONFIG: Record<ToastType, { icon: ReactNode; color: string; bg: stri
     color: "text-blue-400", 
     bg: "bg-blue-500/10", 
     border: "border-blue-500/30" 
+  },
+  chat: { 
+    icon: <MessageCircle className="h-4 w-4" />, 
+    color: "text-amber-400", 
+    bg: "bg-amber-500/10", 
+    border: "border-amber-500/30" 
   },
 };
 
