@@ -61,6 +61,7 @@ export default function StaffChatPage() {
     const res = await fetch(`/api/staff/chat?${qs.toString()}`,
       {
         cache: "no-store",
+        credentials: "include",
         headers: token ? { Authorization: `Bearer ${token}` } : undefined,
       }
     );
@@ -93,6 +94,7 @@ export default function StaffChatPage() {
       const token = await getOwnerToken();
       const res = await fetch("/api/staff/chat", {
         method: "POST",
+        credentials: "include",
         headers: {
           "Content-Type": "application/json",
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
