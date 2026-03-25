@@ -1141,12 +1141,20 @@ export async function recordPosExpense(
     const overheadKeywords = ["rent", "utilities", "utility", "electric", "electricity", "water", "internet", "wifi", "rates", "rates", "municipal", "insurance", "security", "cleaning", "maintenance", "repair", "overhead", "salary", "wages", "staff", "payroll"];
     const isOverheadExpense = overheadKeywords.some(kw => descLower.includes(kw));
 
+    // Auto-detect tithe expenses
+    const titheKeywords = ["tithe", "tithes", "offering", "church", "donation", "charity", "10%", "ten percent"];
+    const isTitheExpense = titheKeywords.some(kw => descLower.includes(kw));
+
+    // Auto-detect groceries expenses
+    const groceriesKeywords = ["groceries", "grocery", "food", "supermarket", "provisions", "sundries", "rice", "sugar", "cooking oil", "flour", "bread", "milk", "eggs", "meat", "vegetables", "fruits", "snacks", "drinks", "beverages"];
+    const isGroceriesExpense = groceriesKeywords.some(kw => descLower.includes(kw));
+
     // Log expense to ledger
     const ledgerEntry = await supabaseAdmin.from('ledger_entries').insert([{
         id,
         shop_id: shopId,
         type: 'expense',
-        category: isPerfumeExpense ? 'Perfume' : isOverheadExpense ? 'Overhead' : 'POS Expense',
+        category: isPerfumeExpense ? 'Perfume' : isOverheadExpense ? 'Overhead' : isTitheExpense ? 'Tithe' : isGroceriesExpense ? 'Groceries' : 'POS Expense',
         amount: amount,
         date: timestamp,
         description: description,

@@ -40,7 +40,8 @@ import {
     Power,
     MessageSquare,
     LogOut,
-    Printer
+    Printer,
+    Heart
 } from "lucide-react";
 import {
     recordSale,
@@ -136,6 +137,10 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
 
     const [opsLedger, setOpsLedger] = useState<any[]>([]);
     const [investBalance, setInvestBalance] = useState<{ availableBalance: number; totalDeposited: number; totalWithdrawn: number; depositCount: number } | null>(null);
+    const [isTitheModalOpen, setIsTitheModalOpen] = useState(false);
+    const [titheWithdrawAmount, setTitheWithdrawAmount] = useState("");
+    const [titheWithdrawDesc, setTitheWithdrawDesc] = useState("");
+    const [isRecordingTithe, setIsRecordingTithe] = useState(false);
 
     useEffect(() => {
         getPendingCount().then(setPendingSyncCount);
@@ -311,7 +316,7 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
     // Calculate Cash Drawer Math
     const ledger = db.ledger || [];
     const todayStr = new Date().toISOString().split('T')[0];
-    const CASH_OUT_CATEGORIES = new Set(["POS Expense", "Operations Transfer", "Perfume", "Overhead"]);
+    const CASH_OUT_CATEGORIES = new Set(["POS Expense", "Operations Transfer", "Perfume", "Overhead", "Tithe", "Groceries"]);
 
     // 1. Did we open today?
     const todaysOpening = ledger.find((l: any) => l.category === 'Cash Drawer Opening' && l.shopId === shopId && String(l.date).startsWith(todayStr));
@@ -357,10 +362,35 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
     ).reduce((sum: number, s: any) => sum + Number(s.totalWithTax || 0), 0);
 
     const todaysPosExpenses = ledger.filter((l: any) =>
-        ['POS Expense', 'Perfume', 'Overhead'].includes(l.category) &&
+        ['POS Expense', 'Perfume', 'Overhead', 'Tithe', 'Groceries'].includes(l.category) &&
         l.shopId === shopId &&
         String(l.date).startsWith(todayStr)
     ).reduce((sum: number, l: any) => sum + Number(l.amount || 0), 0);
+
+    // Tithe expenses (cumulative all-time)
+    const cumulativeTithe = ledger.filter((l: any) =>
+        l.category === 'Tithe' && l.shopId === shopId
+    ).reduce((sum: number, l: any) => sum + Number(l.amount || 0), 0);
+
+    // Groceries - current month vs previous month
+    const currentMonth = todayStr.substring(0, 7); // YYYY-MM
+    const previousMonthDate = new Date();
+    previousMonthDate.setMonth(previousMonthDate.getMonth() - 1);
+    const previousMonth = previousMonthDate.toISOString().substring(0, 7);
+
+    const currentMonthGroceries = ledger.filter((l: any) =>
+        l.category === 'Groceries' &&
+        l.shopId === shopId &&
+        String(l.date).startsWith(currentMonth)
+    ).reduce((sum: number, l: any) => sum + Number(l.amount || 0), 0);
+
+    const previousMonthGroceries = ledger.filter((l: any) =>
+        l.category === 'Groceries' &&
+        l.shopId === shopId &&
+        String(l.date).startsWith(previousMonth)
+    ).reduce((sum: number, l: any) => sum + Number(l.amount || 0), 0);
+
+    const groceriesExceeded = currentMonthGroceries > previousMonthGroceries && previousMonthGroceries > 0;
 
     const todaysOpsPosts = ledger.filter((l: any) =>
         l.category === 'Operations Transfer' &&
@@ -1547,6 +1577,72 @@ Generated via NIRVANA POS`;
                     </div>
                 </Modal>
 
+                <Modal isOpen={isTitheModalOpen} onClose={() => setIsTitheModalOpen(false)} title="Tithe Withdrawal">
+                    <div className="space-y-4">
+                        <div className="bg-violet-950/30 border border-violet-500/20 p-4 rounded-lg">
+                            <div className="flex items-center gap-2 mb-2">
+                                <Heart className="h-4 w-4 text-violet-400" />
+                                <span className="text-xs font-bold text-violet-400 uppercase">Cumulative Tithe</span>
+                            </div>
+                            <p className="text-2xl font-black text-violet-300">${cumulativeTithe.toFixed(2)}</p>
+                        </div>
+
+                        <div>
+                            <label className="text-[10px] font-bold uppercase text-slate-500">Withdrawal Amount</label>
+                            <Input
+                                type="number"
+                                value={titheWithdrawAmount}
+                                onChange={(e) => setTitheWithdrawAmount(e.target.value)}
+                                placeholder="0.00"
+                                className="mt-1 bg-slate-800 border-slate-700"
+                            />
+                        </div>
+
+                        <div>
+                            <label className="text-[10px] font-bold uppercase text-slate-500">Description (e.g., Church Name)</label>
+                            <Input
+                                type="text"
+                                value={titheWithdrawDesc}
+                                onChange={(e) => setTitheWithdrawDesc(e.target.value)}
+                                placeholder="Enter description..."
+                                className="mt-1 bg-slate-800 border-slate-700"
+                            />
+                        </div>
+
+                        <div className="flex gap-2 pt-2">
+                            <Button
+                                onClick={() => setIsTitheModalOpen(false)}
+                                variant="outline"
+                                className="flex-1 border-slate-700"
+                            >
+                                Cancel
+                            </Button>
+                            <Button
+                                onClick={async () => {
+                                    const amount = Number(titheWithdrawAmount);
+                                    if (!amount || amount <= 0) return;
+                                    setIsRecordingTithe(true);
+                                    try {
+                                        await recordPosExpense(shopId, amount, titheWithdrawDesc || "Tithe withdrawal", selectedEmployeeId);
+                                        setTitheWithdrawAmount("");
+                                        setTitheWithdrawDesc("");
+                                        setIsTitheModalOpen(false);
+                                        window.location.reload();
+                                    } catch (e) {
+                                        console.error(e);
+                                    } finally {
+                                        setIsRecordingTithe(false);
+                                    }
+                                }}
+                                disabled={isRecordingTithe || !titheWithdrawAmount}
+                                className="flex-1 bg-violet-600 hover:bg-violet-700"
+                            >
+                                {isRecordingTithe ? "Recording..." : "Record Tithe"}
+                            </Button>
+                        </div>
+                    </div>
+                </Modal>
+
                 <div className="flex gap-2 w-full mt-4 sm:mt-0 sm:w-auto overflow-x-auto pb-2 scrollbar-hide">
                     <div className="bg-slate-900 border border-slate-800 px-4 py-2 rounded-lg flex items-center gap-3 h-10 shadow-lg min-w-max">
                         <Coins className="h-4 w-4 text-emerald-400" />
@@ -1585,6 +1681,25 @@ Generated via NIRVANA POS`;
                         <div className="flex flex-col">
                             <span className="text-[10px] text-slate-500 uppercase font-black leading-none">Invest Drawer</span>
                             <span className="text-xs font-bold text-sky-400">${(investBalance?.availableBalance ?? 0).toFixed(2)}</span>
+                        </div>
+                    </div>
+
+                    <button
+                        onClick={() => setIsTitheModalOpen(true)}
+                        className="bg-slate-900 border border-violet-500/30 px-4 py-2 rounded-lg flex items-center gap-3 h-10 shadow-lg min-w-max hover:border-violet-500/60 transition-colors cursor-pointer"
+                    >
+                        <Heart className="h-4 w-4 text-violet-400" />
+                        <div className="flex flex-col">
+                            <span className="text-[10px] text-slate-500 uppercase font-black leading-none">Tithe</span>
+                            <span className="text-xs font-bold text-violet-400">$${cumulativeTithe.toFixed(2)}</span>
+                        </div>
+                    </button>
+
+                    <div className={`bg-slate-900 border ${groceriesExceeded ? 'border-red-500/60 bg-red-950/20' : 'border-emerald-500/30'} px-4 py-2 rounded-lg flex items-center gap-3 h-10 shadow-lg min-w-max`}>
+                        <ShoppingCart className={`h-4 w-4 ${groceriesExceeded ? 'text-red-400' : 'text-emerald-400'}`} />
+                        <div className="flex flex-col">
+                            <span className="text-[10px] text-slate-500 uppercase font-black leading-none">Groceries</span>
+                            <span className={`text-xs font-bold ${groceriesExceeded ? 'text-red-400' : 'text-emerald-400'}`}>${currentMonthGroceries.toFixed(2)}</span>
                         </div>
                     </div>
                 </div>
