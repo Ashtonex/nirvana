@@ -57,6 +57,18 @@ export async function POST(req: Request) {
   // Consume code
   await supabaseAdmin.from("staff_login_codes").delete().eq("id", record.id);
 
+  // Log the login action for staff status tracking
+  try {
+    await supabaseAdmin.from("staff_logs").insert({
+      employee_id: employee.id,
+      employee_name: `${employee.name || ""} ${employee.surname || ""}`.trim() || employee.email,
+      shop_id: (employee as any).shop_id || null,
+      action: "login",
+    });
+  } catch (e) {
+    console.error("Failed to create staff log:", e);
+  }
+
   (await cookies()).set("nirvana_staff", token, {
     httpOnly: true,
     secure: true,

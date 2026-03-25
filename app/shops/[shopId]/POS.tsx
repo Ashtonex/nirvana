@@ -322,6 +322,12 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
     const todaysOpening = ledger.find((l: any) => l.category === 'Cash Drawer Opening' && l.shopId === shopId && String(l.date).startsWith(todayStr));
     const hasOpenedRegister = !!todaysOpening;
 
+    // Helper functions for keyword matching (must be defined early for carry-over calc)
+    const titheKeywords = ["tithe", "tithes", "offering", "church", "donation", "charity", "10%", "ten percent"];
+    const groceriesKeywords = ["groceries", "grocery", "food", "supermarket", "provisions", "sundries", "rice", "sugar", "cooking oil", "flour", "bread", "milk", "eggs", "meat", "vegetables", "fruits", "snacks", "drinks", "beverages"];
+    const isTitheExpense = (l: any) => l.category === 'Tithe' || titheKeywords.some(kw => String(l.description || "").toLowerCase().includes(kw));
+    const isGroceriesExpense = (l: any) => l.category === 'Groceries' || groceriesKeywords.some(kw => String(l.description || "").toLowerCase().includes(kw));
+
     // 2. What was yesterday's exact closing?
     // Last Opening + All Cash Sales since then - All POS Expenses since then
     let expectedOpeningCash = 0;
@@ -341,9 +347,9 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
         const salesSinceLastOpen = (db.sales || []).filter((s: any) => s.shopId === shopId && s.paymentMethod === 'cash' && new Date(s.date).getTime() >= lastOpenDate && !String(s.date).startsWith(todayStr));
         carryOverSales = salesSinceLastOpen.reduce((sum: number, s: any) => sum + Number(s.totalWithTax || 0), 0);
 
-        // POS Expenses after last opening, before today
+        // POS Expenses after last opening, before today (includes keyword-matched Groceries/Tithe)
         const expensesSinceLastOpen = ledger.filter((l: any) =>
-            CASH_OUT_CATEGORIES.has(String(l.category || "")) &&
+            (CASH_OUT_CATEGORIES.has(String(l.category || "")) || isGroceriesExpense(l) || isTitheExpense(l)) &&
             l.shopId === shopId &&
             new Date(l.date).getTime() >= lastOpenDate &&
             !String(l.date).startsWith(todayStr)
@@ -369,7 +375,7 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
 
     // Tithe expenses (cumulative all-time)
     const cumulativeTithe = ledger.filter((l: any) =>
-        l.category === 'Tithe' && l.shopId === shopId
+        isTitheExpense(l) && l.shopId === shopId
     ).reduce((sum: number, l: any) => sum + Number(l.amount || 0), 0);
 
     // Groceries - current month vs previous month
@@ -379,13 +385,13 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
     const previousMonth = previousMonthDate.toISOString().substring(0, 7);
 
     const currentMonthGroceries = ledger.filter((l: any) =>
-        l.category === 'Groceries' &&
+        isGroceriesExpense(l) &&
         l.shopId === shopId &&
         String(l.date).startsWith(currentMonth)
     ).reduce((sum: number, l: any) => sum + Number(l.amount || 0), 0);
 
     const previousMonthGroceries = ledger.filter((l: any) =>
-        l.category === 'Groceries' &&
+        isGroceriesExpense(l) &&
         l.shopId === shopId &&
         String(l.date).startsWith(previousMonth)
     ).reduce((sum: number, l: any) => sum + Number(l.amount || 0), 0);
@@ -1643,62 +1649,62 @@ Generated via NIRVANA POS`;
                     </div>
                 </Modal>
 
-                <div className="flex gap-2 w-full mt-4 sm:mt-0 sm:w-auto overflow-x-auto pb-2 scrollbar-hide">
-                    <div className="bg-slate-900 border border-slate-800 px-4 py-2 rounded-lg flex items-center gap-3 h-10 shadow-lg min-w-max">
+                <div className="flex gap-1.5 sm:gap-2 w-full mt-4 sm:mt-0 sm:w-auto overflow-x-auto pb-2 scrollbar-hide px-2 sm:px-0">
+                    <div className="bg-slate-900 border border-slate-800 px-2 sm:px-3 py-2 rounded-lg flex items-center gap-2 sm:gap-3 h-10 shadow-lg min-w-max">
                         <Coins className="h-4 w-4 text-emerald-400" />
                         <div className="flex flex-col">
-                            <span className="text-[10px] text-slate-500 uppercase font-black leading-none">Drawer Cash</span>
+                            <span className="text-[9px] sm:text-[10px] text-slate-500 uppercase font-black leading-none">Drawer</span>
                             <span className="text-xs font-bold text-slate-200">${liveCashInDrawer.toFixed(2)}</span>
                         </div>
                     </div>
 
-                    <div className="bg-slate-900 border border-slate-800 px-4 py-2 rounded-lg flex items-center gap-3 h-10 shadow-lg min-w-max">
+                    <div className="bg-slate-900 border border-slate-800 px-2 sm:px-3 py-2 rounded-lg flex items-center gap-2 sm:gap-3 h-10 shadow-lg min-w-max">
                         <AlertCircle className="h-4 w-4 text-rose-400" />
                         <div className="flex flex-col">
-                            <span className="text-[10px] text-slate-500 uppercase font-black leading-none">Today's Exp.</span>
+                            <span className="text-[9px] sm:text-[10px] text-slate-500 uppercase font-black leading-none">Exp.</span>
                             <span className="text-xs font-bold text-slate-200">${todaysPosExpenses.toFixed(2)}</span>
                         </div>
                     </div>
 
-                    <div className="bg-slate-900 border border-slate-800 px-4 py-2 rounded-lg flex items-center gap-3 h-10 shadow-lg min-w-max">
+                    <div className="bg-slate-900 border border-slate-800 px-2 sm:px-3 py-2 rounded-lg flex items-center gap-2 sm:gap-3 h-10 shadow-lg min-w-max">
                         <TrendingUp className="h-4 w-4 text-emerald-400" />
                         <div className="flex flex-col">
-                            <span className="text-[10px] text-slate-500 uppercase font-black leading-none">Ops Income</span>
+                            <span className="text-[9px] sm:text-[10px] text-slate-500 uppercase font-black leading-none">Ops Inc.</span>
                             <span className="text-xs font-bold text-emerald-400">+${todaysOpsIncome.toFixed(2)}</span>
                         </div>
                     </div>
 
-                    <div className="bg-slate-900 border border-slate-800 px-4 py-2 rounded-lg flex items-center gap-3 h-10 shadow-lg min-w-max">
+                    <div className="bg-slate-900 border border-slate-800 px-2 sm:px-3 py-2 rounded-lg flex items-center gap-2 sm:gap-3 h-10 shadow-lg min-w-max">
                         <Coins className="h-4 w-4 text-amber-400" />
                         <div className="flex flex-col">
-                            <span className="text-[10px] text-slate-500 uppercase font-black leading-none">Drawer Post</span>
+                            <span className="text-[9px] sm:text-[10px] text-slate-500 uppercase font-black leading-none">Post</span>
                             <span className="text-xs font-bold text-slate-200">${todaysOpsPosts.toFixed(2)}</span>
                         </div>
                     </div>
 
-                    <div className="bg-slate-900 border border-sky-500/30 px-4 py-2 rounded-lg flex items-center gap-3 h-10 shadow-lg min-w-max">
+                    <div className="bg-slate-900 border border-sky-500/30 px-2 sm:px-3 py-2 rounded-lg flex items-center gap-2 sm:gap-3 h-10 shadow-lg min-w-max">
                         <Sparkles className="h-4 w-4 text-sky-400" />
                         <div className="flex flex-col">
-                            <span className="text-[10px] text-slate-500 uppercase font-black leading-none">Invest Drawer</span>
+                            <span className="text-[9px] sm:text-[10px] text-slate-500 uppercase font-black leading-none">Invest</span>
                             <span className="text-xs font-bold text-sky-400">${(investBalance?.availableBalance ?? 0).toFixed(2)}</span>
                         </div>
                     </div>
 
                     <button
                         onClick={() => setIsTitheModalOpen(true)}
-                        className="bg-slate-900 border border-violet-500/30 px-4 py-2 rounded-lg flex items-center gap-3 h-10 shadow-lg min-w-max hover:border-violet-500/60 transition-colors cursor-pointer"
+                        className="bg-slate-900 border border-violet-500/30 px-2 sm:px-3 py-2 rounded-lg flex items-center gap-2 sm:gap-3 h-10 shadow-lg min-w-max hover:border-violet-500/60 transition-colors cursor-pointer"
                     >
                         <Heart className="h-4 w-4 text-violet-400" />
                         <div className="flex flex-col">
-                            <span className="text-[10px] text-slate-500 uppercase font-black leading-none">Tithe</span>
-                            <span className="text-xs font-bold text-violet-400">$${cumulativeTithe.toFixed(2)}</span>
+                            <span className="text-[9px] sm:text-[10px] text-slate-500 uppercase font-black leading-none">Tithe</span>
+                            <span className="text-xs font-bold text-violet-400">${cumulativeTithe.toFixed(2)}</span>
                         </div>
                     </button>
 
-                    <div className={`bg-slate-900 border ${groceriesExceeded ? 'border-red-500/60 bg-red-950/20' : 'border-emerald-500/30'} px-4 py-2 rounded-lg flex items-center gap-3 h-10 shadow-lg min-w-max`}>
+                    <div className={`bg-slate-900 border ${groceriesExceeded ? 'border-red-500/60 bg-red-950/20' : 'border-emerald-500/30'} px-2 sm:px-3 py-2 rounded-lg flex items-center gap-2 sm:gap-3 h-10 shadow-lg min-w-max`}>
                         <ShoppingCart className={`h-4 w-4 ${groceriesExceeded ? 'text-red-400' : 'text-emerald-400'}`} />
                         <div className="flex flex-col">
-                            <span className="text-[10px] text-slate-500 uppercase font-black leading-none">Groceries</span>
+                            <span className="text-[9px] sm:text-[10px] text-slate-500 uppercase font-black leading-none">Groceries</span>
                             <span className={`text-xs font-bold ${groceriesExceeded ? 'text-red-400' : 'text-emerald-400'}`}>${currentMonthGroceries.toFixed(2)}</span>
                         </div>
                     </div>
