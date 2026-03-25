@@ -55,11 +55,38 @@ async function getOwnerFromBearer(req: Request) {
   return { role: "owner" as const, id: user.id, name };
 }
 
+async function getOwnerFromCookie(req: Request) {
+  const token = (await cookies()).get("nirvana_owner")?.value;
+  if (!token) return null;
+
+  try {
+    const { data, error } = await supabaseAdmin.auth.getUser(token);
+    if (error || !data.user) return null;
+
+    const user = data.user;
+    const { data: emp } = await supabaseAdmin
+      .from("employees")
+      .select("name,surname")
+      .eq("id", user.id)
+      .maybeSingle();
+
+    const name = emp?.name
+      ? `${emp.name} ${emp.surname || ""}`.trim()
+      : (user.email || "Owner");
+
+    return { role: "owner" as const, id: user.id, name };
+  } catch {
+    return null;
+  }
+}
+
 async function getActor(req: Request): Promise<Actor | null> {
   const staff = await getStaffFromCookie();
   if (staff) return staff;
-  const owner = await getOwnerFromBearer(req);
-  if (owner) return owner;
+  const ownerBearer = await getOwnerFromBearer(req);
+  if (ownerBearer) return ownerBearer;
+  const ownerCookie = await getOwnerFromCookie(req);
+  if (ownerCookie) return ownerCookie;
   return null;
 }
 

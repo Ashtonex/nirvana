@@ -75,8 +75,28 @@ async function getActor(req: Request): Promise<Actor | null> {
     return { id: staff.id, name, role: "staff", shop_id: staff.shop_id };
   }
 
-  const owner = await getOwnerFromBearer(req);
-  if (owner) return owner;
+  const ownerBearer = await getOwnerFromBearer(req);
+  if (ownerBearer) return ownerBearer;
+
+  // Also check owner cookie
+  const ownerToken = (await cookies()).get("nirvana_owner")?.value;
+  if (ownerToken) {
+    try {
+      const { data, error } = await supabaseAdmin.auth.getUser(ownerToken);
+      if (!error && data.user) {
+        const user = data.user;
+        const { data: emp } = await supabaseAdmin
+          .from("employees")
+          .select("name,surname")
+          .eq("id", user.id)
+          .maybeSingle();
+        const name = emp?.name
+          ? `${emp.name} ${emp.surname || ""}`.trim()
+          : (user.email || "Owner");
+        return { id: user.id, name, role: "owner" as const };
+      }
+    } catch {}
+  }
 
   return null;
 }
