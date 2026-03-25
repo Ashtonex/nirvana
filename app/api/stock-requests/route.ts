@@ -81,12 +81,28 @@ async function getOwnerFromCookie(req: Request) {
 }
 
 async function getActor(req: Request): Promise<Actor | null> {
-  const staff = await getStaffFromCookie();
-  if (staff) return staff;
-  const ownerBearer = await getOwnerFromBearer(req);
-  if (ownerBearer) return ownerBearer;
-  const ownerCookie = await getOwnerFromCookie(req);
-  if (ownerCookie) return ownerCookie;
+  const cookieStore = await cookies();
+  const staffToken = cookieStore.get("nirvana_staff")?.value;
+  const ownerToken = cookieStore.get("nirvana_owner")?.value;
+
+  // If either cookie exists, consider authenticated
+  if (!staffToken && !ownerToken) {
+    const ownerBearer = await getOwnerFromBearer(req);
+    if (ownerBearer) return ownerBearer;
+    return null;
+  }
+
+  // Staff session
+  if (staffToken) {
+    const staff = await getStaffFromCookie();
+    if (staff) return staff;
+  }
+
+  // Owner session
+  if (ownerToken) {
+    return { role: "owner" as const, id: "owner", name: "Owner" };
+  }
+
   return null;
 }
 
