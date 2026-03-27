@@ -52,6 +52,7 @@ export default function InventoryManagerPage() {
     const [searchTerm, setSearchTerm] = useState("");
     const [isPending, startTransition] = useTransition();
     const [refreshKey, setRefreshKey] = useState(0);
+    const [debugInfo, setDebugInfo] = useState<string>("");
 
     // Modals
     const [isAdjustModalOpen, setIsAdjustModalOpen] = useState(false);
@@ -89,6 +90,12 @@ export default function InventoryManagerPage() {
     const handleOpenReapportion = (item: any) => {
         setSelectedItem(item);
         const currentAlloc: Record<string, string> = {};
+        
+        // Debug: log shop IDs and current allocations
+        const debug = `Shops:\n${shops.map((s: any) => `  ${s.name}: ID="${s.id}"`).join('\n')}\n\nAllocations:\n${item.allocations.map((a: any) => `  shopId="${a.shopId}" qty=${a.quantity}`).join('\n')}`;
+        console.log("[Reapportion Modal]", debug);
+        setDebugInfo(debug);
+        
         shops.forEach((s: any) => {
             const alloc = item.allocations.find((a: any) => a.shopId === s.id);
             currentAlloc[s.id] = String(alloc?.quantity || 0);
@@ -127,10 +134,9 @@ export default function InventoryManagerPage() {
             return;
         }
 
-        setIsReapportionModalOpen(false);
-
         try {
             console.log("[Reapportion] Starting with itemId:", selectedItem.id, "allocations:", allocs);
+            console.log("[Reapportion] Available shops:", shops.map(s => ({ id: s.id, name: s.name })));
             
             const response = await fetch("/api/inventory/reapportion", {
                 method: "POST",
@@ -152,7 +158,7 @@ export default function InventoryManagerPage() {
             setRefreshKey(k => k + 1);
             await new Promise(resolve => setTimeout(resolve, 1000));
             setRefreshKey(k => k + 1);
-            alert(`Stock reapportioned for ${selectedItem.name}.`);
+            alert(`Stock reapportioned for ${selectedItem.name}.\nKipasa: ${allocs.find(a => a.shopId.includes('kipasa'))?.quantity || 0}\nDub Dub: ${allocs.find(a => a.shopId.includes('dub'))?.quantity || 0}\nTrade: ${allocs.find(a => a.shopId.includes('trade'))?.quantity || 0}`);
         } catch (e: any) {
             console.error("[Reapportion] Error:", e);
             alert("Error: " + e.message);
@@ -269,7 +275,7 @@ export default function InventoryManagerPage() {
                                                     const alloc = item.allocations.find((a: any) => a.shopId === s.id);
                                                     const count = alloc?.quantity || 0;
                                                     return (
-                                                        <div key={s.id} className="flex flex-col items-center p-1.5 rounded bg-slate-900/50 border border-slate-800 min-w-[60px]">
+                                                        <div key={s.id} className="flex flex-col items-center p-1.5 rounded bg-slate-900/50 border border-slate-800 min-w-[60px]" title={`ID: ${s.id}`}>
                                                             <span className="text-[8px] font-black text-slate-500 uppercase truncate max-w-[50px]">{s.name}</span>
                                                             <span className={cn(
                                                                 "text-[10px] font-black italic",
@@ -368,8 +374,8 @@ export default function InventoryManagerPage() {
                         {shops.map((s: any) => (
                             <div key={s.id} className="space-y-2">
                                 <div className="flex justify-between items-center">
-                                    <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest">{s.name}</label>
-                                    <span className="text-[10px] font-bold text-slate-500 uppercase italic">Current Node Allocation</span>
+                                    <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest">{s.name} <span className="text-rose-400">[ID: {s.id}]</span></label>
+                                    <span className="text-[10px] font-bold text-slate-500 uppercase italic">Current: {newAllocations[s.id] || 0}</span>
                                 </div>
                                 <Input
                                     type="number"
