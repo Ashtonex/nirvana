@@ -169,8 +169,26 @@ export default function InventoryManagerPage() {
             if (!response.ok) throw new Error(data.error || "Reapportion failed");
 
             setIsReapportionModalOpen(false);
-            setRefreshKey(k => k + 1);
-            setTimeout(() => fetchDashboardData(), 100);
+            
+            // Update local state directly with the verified allocations from server
+            if (data.verifiedAllocations) {
+                setDb((prevDb: any) => {
+                    if (!prevDb) return prevDb;
+                    return {
+                        ...prevDb,
+                        inventory: prevDb.inventory.map((item: any) => {
+                            if (item.id === selectedItem.id) {
+                                return {
+                                    ...item,
+                                    allocations: data.verifiedAllocations
+                                };
+                            }
+                            return item;
+                        })
+                    };
+                });
+            }
+            
             alert(`Stock reapportioned for ${selectedItem.name}.\nKipasa: ${allocs.find(a => a.shopId.toLowerCase().includes('kipasa'))?.quantity || 0}\nDub Dub: ${allocs.find(a => a.shopId.toLowerCase().includes('dub'))?.quantity || 0}\nTradecenter: ${allocs.find(a => a.shopId.toLowerCase().includes('trade'))?.quantity || 0}`);
         } catch (e: any) {
             console.error("[Reapportion] Error:", e);

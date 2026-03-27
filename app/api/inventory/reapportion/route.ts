@@ -168,8 +168,16 @@ export async function POST(req: Request) {
     revalidatePath("/inventory");
     revalidatePath("/admin/inventory-manager");
     revalidatePath("/transfers");
+    revalidatePath("/api/dashboard/data");
 
-    return NextResponse.json({ success: true, message: `Stock reapportioned for ${item.name}` });
+    return NextResponse.json({ 
+      success: true, 
+      message: `Stock reapportioned for ${item.name}`,
+      verifiedAllocations: verifyAllocs?.map((a: any) => ({
+        shopId: a.shop_id,
+        quantity: a.quantity
+      }))
+    });
   } catch (e: any) {
     console.error("[REAPPORTION] Error:", e);
     return NextResponse.json({ error: e.message || "Server error" }, { status: 500 });
