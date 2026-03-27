@@ -99,24 +99,37 @@ export async function POST(req: Request) {
 
       console.log(`[REAPPORTION] Processing allocation for shop ${shopId}, qty: ${quantity}`);
 
-      const { data: existing } = await supabaseAdmin
+      const { data: existing, error: selectError } = await supabaseAdmin
         .from("inventory_allocations")
         .select("id")
         .eq("item_id", itemId)
         .eq("shop_id", shopId)
         .maybeSingle();
 
+      if (selectError) {
+        console.error(`[REAPPORTION] Select error for shop ${shopId}:`, selectError);
+        return NextResponse.json(
+          { error: `Database error selecting allocation: ${selectError.message}` },
+          { status: 500 }
+        );
+      }
+
       if (existing) {
-        const { error } = await supabaseAdmin
+        const { error: updateError } = await supabaseAdmin
           .from("inventory_allocations")
           .update({ quantity })
           .eq("id", existing.id);
 
-        if (error) {
-          console.error(`Failed to update allocation for shop ${shopId}:`, error);
+        if (updateError) {
+          console.error(`[REAPPORTION] Update error for shop ${shopId}:`, updateError);
+          return NextResponse.json(
+            { error: `Database error updating allocation: ${updateError.message}` },
+            { status: 500 }
+          );
         }
+        console.log(`[REAPPORTION] Updated allocation for shop ${shopId} to qty ${quantity}`);
       } else {
-        const { error } = await supabaseAdmin
+        const { error: insertError } = await supabaseAdmin
           .from("inventory_allocations")
           .insert({
             item_id: itemId,
@@ -124,11 +137,24 @@ export async function POST(req: Request) {
             quantity,
           });
 
-        if (error) {
-          console.error(`Failed to insert allocation for shop ${shopId}:`, error);
+        if (insertError) {
+          console.error(`[REAPPORTION] Insert error for shop ${shopId}:`, insertError);
+          return NextResponse.json(
+            { error: `Database error inserting allocation: ${insertError.message}` },
+            { status: 500 }
+          );
         }
+        console.log(`[REAPPORTION] Inserted new allocation for shop ${shopId} with qty ${quantity}`);
       }
     }
+
+    // Verify the allocations were saved
+    const { data: verifyAllocs, error: verifyError } = await supabaseAdmin
+      .from("inventory_allocations")
+      .select("*")
+      .eq("item_id", itemId);
+
+    console.log(`[REAPPORTION] Verification - all allocations for item ${itemId}:`, verifyAllocs);
 
     await supabaseAdmin.from("audit_log").insert({
       id: Math.random().toString(36).substring(2, 9),
