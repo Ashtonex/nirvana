@@ -66,16 +66,11 @@ export default function InventoryManagerPage() {
 
     const fetchDashboardData = async () => {
         try {
-            // Add timestamp to bust any caches
-            const timestamp = Date.now();
-            const res = await fetch(`/api/dashboard/data?_=${timestamp}`, { 
+            // Use random cache-buster to force fresh data from Vercel
+            const cacheBuster = Math.random().toString(36).substring(7);
+            const res = await fetch(`/api/dashboard/data?cb=${cacheBuster}&t=${Date.now()}`, { 
                 credentials: "include",
-                cache: "no-store",
-                headers: { 
-                    "Cache-Control": "no-cache, no-store, must-revalidate",
-                    "Pragma": "no-cache",
-                    "Expires": "0"
-                }
+                cache: "no-store"
             });
             if (res.ok) {
                 const data = await res.json();

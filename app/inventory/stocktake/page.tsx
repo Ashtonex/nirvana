@@ -31,6 +31,12 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
+type AllocationChange = {
+    shopId: string;
+    quantity: number;
+    originalQuantity: number;
+};
+
 type ViewMode = "shop" | "global";
 
 export default function StocktakePage() {
@@ -43,15 +49,18 @@ export default function StocktakePage() {
     const [refreshKey, setRefreshKey] = useState(0);
     const [savingItem, setSavingItem] = useState<string | null>(null);
     const [pendingChanges, setPendingChanges] = useState<Set<string>>(new Set());
+    const [allocationChanges, setAllocationChanges] = useState<Record<string, AllocationChange[]>>({});
+    const [savingAlloc, setSavingAlloc] = useState<boolean>(false);
 
     const fetchDashboardData = async () => {
         try {
+            const cacheBuster = Math.random().toString(36).substring(7);
             const timestamp = Date.now();
-            const res = await fetch(`/api/dashboard/data?_=${timestamp}`, { 
+            const res = await fetch(`/api/dashboard/data?cb=${cacheBuster}&t=${timestamp}`, { 
                 credentials: "include",
                 cache: "no-store",
                 headers: { 
-                    "Cache-Control": "no-cache, no-store, must-revalidate",
+                    "Cache-Control": "no-cache, no-store, must-revalidate, proxy-revalidate",
                     "Pragma": "no-cache",
                     "Expires": "0"
                 }
@@ -145,6 +154,111 @@ export default function StocktakePage() {
         } finally {
             setSavingItem(null);
         }
+    };
+
+    const handleAllocationChange = (itemId: string, shopId: string, delta: number) => {
+        setAllocationChanges(prev => {
+            const current = prev[itemId] || [];
+            const existingIdx = current.findIndex(c => c.shopId === shopId);
+            const item = inventory.find((i: any) => i.id === itemId);
+            const currentAlloc = item?.allocations.find((a: any) => a.shopId === shopId);
+            const originalQty = currentAlloc?.quantity || 0;
+            
+            if (existingIdx >= 0) {
+                const existing = current[existingIdx];
+                const newQty = Math.max(0, existing.quantity + delta);
+                if (newQty === existing.originalQuantity) {
+                    const updated = current.filter((_, i) => i !== existingIdx);
+                    return { ...prev, [itemId]: updated };
+                }
+                const newChanges = [...current];
+                newChanges[existingIdx] = { ...existing, quantity: newQty };
+                return { ...prev, [itemId]: newChanges };
+            } else {
+                const newQty = Math.max(0, originalQty + delta);
+                return { 
+                    ...prev, 
+                    [itemId]: [...current, { shopId, quantity: newQty, originalQuantity: originalQty }]
+                };
+            }
+        });
+    };
+
+    const handleAllocationInput = (itemId: string, shopId: string, value: string) => {
+        const qty = parseInt(value) || 0;
+        setAllocationChanges(prev => {
+            const current = prev[itemId] || [];
+            const existingIdx = current.findIndex(c => c.shopId === shopId);
+            const item = inventory.find((i: any) => i.id === itemId);
+            const currentAlloc = item?.allocations.find((a: any) => a.shopId === shopId);
+            const originalQty = currentAlloc?.quantity || 0;
+            
+            if (qty === originalQty) {
+                if (existingIdx >= 0) {
+                    return { ...prev, [itemId]: current.filter((_, i) => i !== existingIdx) };
+                }
+                return prev;
+            }
+            
+            if (existingIdx >= 0) {
+                const newChanges = [...current];
+                newChanges[existingIdx] = { shopId, quantity: qty, originalQuantity: originalQty };
+                return { ...prev, [itemId]: newChanges };
+            }
+            
+            return { ...prev, [itemId]: [...current, { shopId, quantity: qty, originalQuantity: originalQty }] };
+        });
+    };
+
+    const saveAllocations = async (itemId: string) => {
+        const changes = allocationChanges[itemId];
+        if (!changes || changes.length === 0) return;
+        
+        const item = inventory.find((i: any) => i.id === itemId);
+        if (!item) return;
+        
+        setSavingAlloc(true);
+        try {
+            const allocs = changes.map(c => ({ shopId: c.shopId, quantity: c.quantity }));
+            const response = await fetch("/api/inventory/reapportion", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                credentials: "include",
+                body: JSON.stringify({ itemId, allocations: allocs })
+            });
+            
+            if (!response.ok) {
+                const err = await response.json();
+                throw new Error(err.error || "Failed to save");
+            }
+            
+            setAllocationChanges(prev => {
+                const next = { ...prev };
+                delete next[itemId];
+                return next;
+            });
+            
+            await new Promise(r => setTimeout(r, 500));
+            setRefreshKey(k => k + 1);
+            
+            alert(`Stock updated for ${item.name}`);
+        } catch (e: any) {
+            alert("Error: " + e.message);
+        } finally {
+            setSavingAlloc(false);
+        }
+    };
+
+    const hasAllocationChanges = (itemId: string) => {
+        return (allocationChanges[itemId]?.length || 0) > 0;
+    };
+
+    const getAllocationQty = (itemId: string, shopId: string) => {
+        const item = inventory.find((i: any) => i.id === itemId);
+        const change = allocationChanges[itemId]?.find(c => c.shopId === shopId);
+        if (change) return change.quantity;
+        const alloc = item?.allocations.find((a: any) => a.shopId === shopId);
+        return alloc?.quantity || 0;
     };
 
     const generateShopPDF = async () => {
@@ -482,6 +596,9 @@ export default function StocktakePage() {
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
                         />
+                        <div className="text-[10px] text-slate-500 uppercase">
+                            {Object.keys(allocationChanges).length} items with changes
+                        </div>
                     </div>
 
                     <Card className="bg-slate-900/50 border-slate-800">
@@ -490,38 +607,102 @@ export default function StocktakePage() {
                                 <LayoutGrid className="h-5 w-5" />
                                 ALL PRODUCTS IN DATABASE ({filterItems(inventory).length})
                             </CardTitle>
+                            <p className="text-[10px] text-slate-500">Click +/- to adjust stock per shop, or type directly</p>
                         </CardHeader>
                         <CardContent className="p-0">
                             <div className="divide-y divide-slate-800 max-h-[600px] overflow-y-auto">
-                                {filterItems(inventory).map((item: any) => (
-                                    <div key={item.id} className="p-4 hover:bg-slate-900/30 transition-colors">
-                                        <div className="flex items-start justify-between gap-4">
-                                            <div className="flex-1">
-                                                <p className="font-black text-white uppercase italic">{item.name}</p>
-                                                <p className="text-[10px] text-slate-500 uppercase">{item.category} | Master: {item.quantity}</p>
+                                {filterItems(inventory).map((item: any) => {
+                                    const hasChanges = hasAllocationChanges(item.id);
+                                    return (
+                                        <div 
+                                            key={item.id} 
+                                            className={cn(
+                                                "p-4 transition-colors",
+                                                hasChanges ? "bg-violet-500/5" : "hover:bg-slate-900/30"
+                                            )}
+                                        >
+                                            <div className="flex items-start justify-between gap-4 mb-2">
+                                                <div className="flex-1">
+                                                    <p className="font-black text-white uppercase italic">{item.name}</p>
+                                                    <p className="text-[10px] text-slate-500 uppercase">{item.category} | Master: {item.quantity}</p>
+                                                </div>
+                                                {hasChanges && (
+                                                    <Button
+                                                        size="sm"
+                                                        onClick={() => saveAllocations(item.id)}
+                                                        disabled={savingAlloc}
+                                                        className="bg-violet-600 hover:bg-violet-500 h-7 text-[10px]"
+                                                    >
+                                                        {savingAlloc ? (
+                                                            <Loader2 className="h-3 w-3 animate-spin" />
+                                                        ) : (
+                                                            <>
+                                                                <Save className="h-3 w-3 mr-1" />
+                                                                Save
+                                                            </>
+                                                        )}
+                                                    </Button>
+                                                )}
                                             </div>
-                                            <div className="flex gap-1">
+                                            <div className="flex gap-2">
                                                 {shops.map((shop: any) => {
-                                                    const alloc = item.allocations.find((a: any) => a.shopId === shop.id);
-                                                    const qty = alloc?.quantity || 0;
+                                                    const qty = getAllocationQty(item.id, shop.id);
+                                                    const originalAlloc = item.allocations.find((a: any) => a.shopId === shop.id);
+                                                    const originalQty = originalAlloc?.quantity || 0;
+                                                    const hasChange = qty !== originalQty;
+                                                    
                                                     return (
                                                         <div 
                                                             key={shop.id} 
                                                             className={cn(
-                                                                "px-2 py-1 rounded text-center min-w-[50px]",
-                                                                qty > 0 ? "bg-emerald-500/20 text-emerald-400" : "bg-slate-800 text-slate-500"
+                                                                "flex flex-col items-center p-2 rounded border min-w-[80px]",
+                                                                hasChange 
+                                                                    ? "bg-violet-500/20 border-violet-500/50" 
+                                                                    : qty > 0 
+                                                                        ? "bg-emerald-500/10 border-emerald-500/30" 
+                                                                        : "bg-slate-800/50 border-slate-700"
                                                             )}
-                                                            title={shop.name}
                                                         >
-                                                            <div className="text-[8px] uppercase font-black">{shop.name.substring(0, 3)}</div>
-                                                            <div className="text-sm font-black">{qty}</div>
+                                                            <div className="text-[8px] uppercase font-black text-slate-400 mb-1">{shop.name}</div>
+                                                            <div className="flex items-center gap-1">
+                                                                <Button
+                                                                    variant="ghost"
+                                                                    size="sm"
+                                                                    className="h-6 w-6 p-0 text-slate-400 hover:text-white hover:bg-slate-700"
+                                                                    onClick={() => handleAllocationChange(item.id, shop.id, -1)}
+                                                                >
+                                                                    <Minus className="h-3 w-3" />
+                                                                </Button>
+                                                                <Input
+                                                                    type="number"
+                                                                    className={cn(
+                                                                        "w-12 h-6 text-center text-sm font-black bg-transparent border-none",
+                                                                        hasChange ? "text-violet-400" : "text-white"
+                                                                    )}
+                                                                    value={qty}
+                                                                    onChange={(e) => handleAllocationInput(item.id, shop.id, e.target.value)}
+                                                                />
+                                                                <Button
+                                                                    variant="ghost"
+                                                                    size="sm"
+                                                                    className="h-6 w-6 p-0 text-slate-400 hover:text-white hover:bg-slate-700"
+                                                                    onClick={() => handleAllocationChange(item.id, shop.id, 1)}
+                                                                >
+                                                                    <Plus className="h-3 w-3" />
+                                                                </Button>
+                                                            </div>
+                                                            {hasChange && (
+                                                                <div className="text-[8px] text-slate-500 mt-1">
+                                                                    was: {originalQty}
+                                                                </div>
+                                                            )}
                                                         </div>
                                                     );
                                                 })}
                                             </div>
                                         </div>
-                                    </div>
-                                ))}
+                                    );
+                                })}
                             </div>
                         </CardContent>
                     </Card>
