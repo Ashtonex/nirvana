@@ -5,12 +5,6 @@ const nextConfig: NextConfig = {
   images: {
     unoptimized: true,
   },
-  modularizeImports: {
-    'lucide-react': {
-      transform: 'lucide-react/dist/esm/icons/{{member}}',
-      skipDefaultConversion: true,
-    },
-  },
   experimental: {
     optimizePackageImports: ['lucide-react', '@/components/ui'],
   },
