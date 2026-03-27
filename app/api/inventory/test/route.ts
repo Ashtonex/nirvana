@@ -14,8 +14,8 @@ export async function GET() {
     // Get first 5 items with their allocations
     const { data: items } = await supabaseAdmin.from('inventory_items').select('*').limit(5);
     
-    const itemsWithAllocs = items?.map(item => {
-      const itemAllocs = allocations?.filter(a => a.item_id === item.id) || [];
+    const itemsWithAllocs = items?.map((item: any) => {
+      const itemAllocs = allocations?.filter((a: any) => a.item_id === item.id) || [];
       return {
         id: item.id,
         name: item.name,
@@ -25,7 +25,7 @@ export async function GET() {
     });
 
     return NextResponse.json({
-      shops: shops?.map(s => ({ id: s.id, name: s.name })),
+      shops: shops?.map((s: any) => ({ id: s.id, name: s.name })),
       totalAllocations: allocations?.length || 0,
       sampleItems: itemsWithAllocs,
       allAllocations: allocations?.slice(0, 20) // First 20 allocations
