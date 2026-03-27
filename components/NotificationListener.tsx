@@ -25,6 +25,13 @@ export function NotificationListener() {
             const data = JSON.parse(event.data);
             
             if (data.type === "heartbeat") return;
+            
+            // Handle session close event
+            if (data.type === "close") {
+              eventSourceRef.current?.close();
+              reconnectTimeout = setTimeout(connect, 5000);
+              return;
+            }
 
             addToast({
               type: data.type,
@@ -40,7 +47,7 @@ export function NotificationListener() {
 
         eventSourceRef.current.onerror = () => {
           eventSourceRef.current?.close();
-          reconnectTimeout = setTimeout(connect, 10000);
+          reconnectTimeout = setTimeout(connect, 5000);
         };
       } catch (e) {
         console.error("[NotificationListener] Connection failed:", e);
