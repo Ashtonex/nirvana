@@ -587,39 +587,45 @@ export default function StocktakePage() {
                                                 return (
                                                     <div 
                                                         key={shop.id} 
-                                                        style={{ pointerEvents: 'auto' }}
                                                         className={cn(
-                                                            "flex flex-col items-center gap-2 px-4 py-3 rounded-lg border min-w-[150px]",
+                                                            "flex flex-col items-center gap-2 px-4 py-3 rounded-lg border min-w-[160px]",
                                                             hasChange ? "bg-amber-500/10 border-amber-500/50" : "bg-slate-950 border-slate-800"
                                                         )}
                                                     >
                                                         <span className="text-xs font-black text-sky-400 uppercase">{shop.name}</span>
-                                                        <div className="flex items-center gap-3">
+                                                        <div className="flex items-center gap-2">
                                                             <button
                                                                 type="button"
-                                                                onClick={() => {
-                                                                    alert(`Minus clicked for ${item.name} at ${shop.name}!`);
-                                                                    handleGlobalAllocationChange(item.id, shop.id, -1);
-                                                                }}
-                                                                className="w-10 h-10 flex items-center justify-center rounded-lg bg-rose-600 hover:bg-rose-500 text-white font-black text-xl cursor-pointer active:scale-95 transition-all"
+                                                                onClick={() => handleGlobalAllocationChange(item.id, shop.id, -1)}
+                                                                className="w-8 h-8 flex items-center justify-center rounded bg-rose-600 hover:bg-rose-500 text-white font-black cursor-pointer active:scale-95"
                                                             >
-                                                                <Minus className="h-6 w-6" />
+                                                                <Minus className="h-4 w-4" />
                                                             </button>
-                                                            <span className={cn(
-                                                                "w-14 text-center font-black text-2xl select-none",
-                                                                displayQty > 0 ? "text-emerald-400" : "text-rose-400"
-                                                            )}>
-                                                                {displayQty}
-                                                            </span>
+                                                            <input
+                                                                type="number"
+                                                                min="0"
+                                                                className={cn(
+                                                                    "w-16 h-10 text-center font-black text-lg rounded border bg-slate-900 text-white",
+                                                                    hasChange ? "border-amber-500" : "border-slate-700"
+                                                                )}
+                                                                value={displayQty}
+                                                                onChange={(e) => {
+                                                                    const val = parseInt(e.target.value) || 0;
+                                                                    const key = `${item.id}_${shop.id}`;
+                                                                    setGlobalAllocations(prev => ({ ...prev, [key]: val }));
+                                                                    setGlobalChanges(prev => {
+                                                                        const next = new Set(prev);
+                                                                        next.add(key);
+                                                                        return next;
+                                                                    });
+                                                                }}
+                                                            />
                                                             <button
                                                                 type="button"
-                                                                onClick={() => {
-                                                                    alert(`Plus clicked for ${item.name} at ${shop.name}!`);
-                                                                    handleGlobalAllocationChange(item.id, shop.id, 1);
-                                                                }}
-                                                                className="w-10 h-10 flex items-center justify-center rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xl cursor-pointer active:scale-95 transition-all"
+                                                                onClick={() => handleGlobalAllocationChange(item.id, shop.id, 1)}
+                                                                className="w-8 h-8 flex items-center justify-center rounded bg-emerald-600 hover:bg-emerald-500 text-white font-black cursor-pointer active:scale-95"
                                                             >
-                                                                <Plus className="h-6 w-6" />
+                                                                <Plus className="h-4 w-4" />
                                                             </button>
                                                         </div>
                                                         {hasChange && (
@@ -629,7 +635,7 @@ export default function StocktakePage() {
                                                                 disabled={savingItem === key}
                                                                 className="w-full bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-700 h-8 px-3 text-xs font-black text-white rounded cursor-pointer"
                                                             >
-                                                                {savingItem === key ? "..." : "SAVE"}
+                                                                {savingItem === key ? "Saving..." : "SAVE"}
                                                             </button>
                                                         )}
                                                     </div>

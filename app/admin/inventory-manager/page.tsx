@@ -211,20 +211,35 @@ export default function InventoryManagerPage() {
                 </p>
             </div>
 
-            {/* DEBUG PANEL - Shows actual shop IDs from database */}
+            {/* DEBUG PANEL - Shows actual shop IDs and allocation counts */}
             <Card className="max-w-6xl mx-auto bg-amber-500/5 border-amber-500/20">
                 <CardHeader className="pb-2">
                     <CardTitle className="text-sm font-black uppercase italic flex items-center gap-2 text-amber-400">
-                        <AlertCircle className="h-4 w-4" /> Debug: Shop IDs from Database
+                        <AlertCircle className="h-4 w-4" /> Debug: Shop IDs & Allocations
                     </CardTitle>
                 </CardHeader>
                 <CardContent>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        {shops.map((s: any) => (
-                            <div key={s.id} className="p-3 bg-slate-900 rounded-lg border border-slate-800">
-                                <div className="text-lg font-black text-white">{s.name}</div>
-                                <div className="text-[10px] font-mono text-amber-400 mt-1">ID: "{s.id}"</div>
-                                <div className="text-[10px] text-slate-500 mt-1">Items with allocations: {inventory.filter((item: any) => item.allocations?.some((a: any) => a.shopId === s.id)).length}</div>
+                        {shops.map((s: any) => {
+                            const itemsWithAlloc = inventory.filter((item: any) => item.allocations?.some((a: any) => a.shopId === s.id));
+                            const totalAllocQty = itemsWithAlloc.reduce((sum: number, item: any) => {
+                                const alloc = item.allocations?.find((a: any) => a.shopId === s.id);
+                                return sum + (alloc?.quantity || 0);
+                            }, 0);
+                            return (
+                                <div key={s.id} className="p-3 bg-slate-900 rounded-lg border border-slate-800">
+                                    <div className="text-lg font-black text-white">{s.name}</div>
+                                    <div className="text-[10px] font-mono text-amber-400 mt-1">ID: "{s.id}"</div>
+                                    <div className="text-[10px] text-emerald-400 mt-1">Items: {itemsWithAlloc.length} | Total Qty: {totalAllocQty}</div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                    <div className="mt-4 p-3 bg-slate-900 rounded border border-slate-800">
+                        <div className="text-xs font-black text-slate-400 mb-2">Sample Allocation Data (first 3 items):</div>
+                        {inventory.slice(0, 3).map((item: any) => (
+                            <div key={item.id} className="text-[10px] font-mono text-slate-500 mb-1">
+                                {item.name}: {JSON.stringify(item.allocations)}
                             </div>
                         ))}
                     </div>

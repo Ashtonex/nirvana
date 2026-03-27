@@ -1244,10 +1244,8 @@ Generated via NIRVANA POS`;
     const filteredInventory = inventoryState.filter((item: any) => {
         const matchesSearch = item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
             item.category.toLowerCase().includes(searchTerm.toLowerCase());
-        const allocation = item.allocations?.find((a: any) => a.shopId === shopId);
-        const qtyAtShop = allocation ? allocation.quantity : 0;
-        const hasStock = qtyAtShop > 0 || item.id.startsWith('adhoc');
-        return matchesSearch && hasStock;
+        // Show ALL inventory - no allocation filter (showing global master stock)
+        return matchesSearch;
     });
 
     return (
@@ -1753,8 +1751,8 @@ Generated via NIRVANA POS`;
                 ) : (
                     <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
                         {filteredInventory.map((item) => {
-                            const allocation = item.allocations.find((a: any) => a.shopId === shopId);
-                            const qtyAtShop = (allocation ? allocation.quantity : 0);
+                            // Show GLOBAL master stock instead of shop allocation
+                            const qtyAtShop = item.quantity || 0;
                             const totalNetworkStock = item.quantity || 0;
 
                             const dynamicOverhead = totalShopStock > 0 ? (shopExpenses as number) / totalShopStock : 0;

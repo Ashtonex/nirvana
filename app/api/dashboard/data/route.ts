@@ -10,6 +10,17 @@ export async function GET() {
     const { data: allocations, error: allocError } = await supabaseAdmin.from('inventory_allocations').select('*');
     const { data: shops, error: shopsError } = await supabaseAdmin.from('shops').select('*');
 
+    console.log('[API /dashboard/data] Shops from DB:', shops?.map((s: any) => ({ id: s.id, name: s.name })));
+    console.log('[API /dashboard/data] All allocations:', allocations);
+    
+    // Check first item's allocations specifically
+    if (inventory && inventory.length > 0) {
+      const firstItem = inventory[0];
+      const firstItemAllocs = allocations?.filter((a: any) => a.item_id === firstItem.id);
+      console.log('[API /dashboard/data] First item:', firstItem.name, firstItem.id);
+      console.log('[API /dashboard/data] First item allocations:', firstItemAllocs);
+    }
+    
     if (invError) console.error('[API] Inventory error:', invError);
     if (allocError) console.error('[API] Allocations error:', allocError);
     if (shopsError) console.error('[API] Shops error:', shopsError);
@@ -43,7 +54,8 @@ export async function GET() {
       debug: {
         shopsRaw: shops,
         allocationsCount: (allocations || []).length,
-        inventoryCount: (inventory || []).length
+        inventoryCount: (inventory || []).length,
+        sampleAllocations: allocations?.slice(0, 5)
       }
     }, {
       headers: {

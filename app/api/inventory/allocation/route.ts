@@ -64,7 +64,7 @@ export async function POST(req: Request) {
     const body = await req.json();
     const { itemId, shopId, quantity } = body;
 
-    console.log("[UPDATE ALLOCATION] Request:", { itemId, shopId, quantity });
+    console.log("[UPDATE ALLOCATION] Request:", { itemId, shopId, quantity, body });
 
     if (!itemId || !shopId || quantity === undefined) {
       return NextResponse.json({ error: "Missing itemId, shopId, or quantity" }, { status: 400 });
