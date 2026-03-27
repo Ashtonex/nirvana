@@ -1095,6 +1095,7 @@ Generated via NIRVANA POS`;
             
             const isWeeklyDay = dayOfWeek === 6; // Saturday
             const isMonthlyDay = !isSunday && todayDate === lastDayOfMonth;
+            let pdfGenerated = false;
             
             const msgLines = [
                 `NIRVANA EOD — ${shopId.toUpperCase()}`,
@@ -1104,7 +1105,7 @@ Generated via NIRVANA POS`;
                 totals ? `Transactions: ${totals.count}` : null,
                 totals ? `Total (inc tax): $${Number(totals.totalWithTax || 0).toFixed(2)}` : null,
                 totals ? `Net Revenue: $${Number((totals.totalWithTax || 0) - (totals.totalExpenses || 0)).toFixed(2)}` : null,
-                `Report PDFs attached.`
+                pdfGenerated ? `Report PDFs attached.` : `PDF will be available in Reports section.`
             ].filter(Boolean);
             setEodShareText(msgLines.join('\n'));
 
@@ -1121,6 +1122,7 @@ Generated via NIRVANA POS`;
                     const url = URL.createObjectURL(blob);
                     setEodShareBlob(blob);
                     setEodShareUrl(url);
+                    pdfGenerated = true;
                     
                     // Save to history
                     const reportId = `${shopId}-${dayStamp}`;
@@ -1135,9 +1137,9 @@ Generated via NIRVANA POS`;
                     setEodHistory(prev => [newReport, ...prev].slice(0, 30));
                     console.log('EOD PDF generated and saved to history.');
                 } else {
-                    const err = await pdfRes.json().catch(() => ({}));
-                    console.error('EOD PDF failed:', err);
-                    alert("PDF generation failed, but you can still log out. Check 'Reports' later.");
+                    const errText = await pdfRes.text().catch(() => 'Unknown error');
+                    console.error('EOD PDF failed:', pdfRes.status, errText);
+                    // Don't alert - we'll handle gracefully and still show text report
                 }
 
                 if (isMonthlyDay) {
@@ -1161,7 +1163,21 @@ Generated via NIRVANA POS`;
                 }
             } catch (e) {
                 console.error('EOD PDF exception:', e);
-                alert("Could not generate PDF report. Network error?");
+            }
+
+            // Always save to history even if PDF failed - EOD data is critical
+            if (!pdfGenerated) {
+                const reportId = `${shopId}-${dayStamp}`;
+                const textOnlyReport = {
+                    id: reportId,
+                    date: new Date().toISOString(),
+                    text: msgLines.join('\n'),
+                    blob: null as Blob | null,
+                    url: '',
+                    shopId,
+                };
+                setEodHistory(prev => [textOnlyReport, ...prev].slice(0, 30));
+                console.log('EOD saved to history (text only - PDF generation had issues).');
             }
 
             // 3. Post cash to Operations (Master Vault)
