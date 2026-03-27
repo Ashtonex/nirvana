@@ -136,7 +136,7 @@ export default function InventoryManagerPage() {
 
         try {
             console.log("[Reapportion] Starting with itemId:", selectedItem.id, "allocations:", allocs);
-            console.log("[Reapportion] Available shops:", shops.map(s => ({ id: s.id, name: s.name })));
+            console.log("[Reapportion] Available shops:", shops.map((s: any) => ({ id: s.id, name: s.name })));
             
             const response = await fetch("/api/inventory/reapportion", {
                 method: "POST",
