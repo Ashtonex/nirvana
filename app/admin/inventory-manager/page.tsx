@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
-import { getDashboardData, increaseMasterStock, reapportionStock } from "../../actions";
+import { increaseMasterStock, reapportionStock } from "../../actions";
 import {
     Card,
     CardContent,
@@ -64,8 +64,26 @@ export default function InventoryManagerPage() {
     const [adjustReason, setAdjustReason] = useState("");
     const [newAllocations, setNewAllocations] = useState<Record<string, string>>({});
 
+    const fetchDashboardData = async () => {
+        try {
+            const res = await fetch("/api/dashboard/data", { 
+                credentials: "include",
+                cache: "no-store",
+                headers: { "Cache-Control": "no-cache" }
+            });
+            if (res.ok) {
+                const data = await res.json();
+                setDb({ inventory: data.inventory || [], shops: data.shops || [] });
+            } else {
+                setDb({ inventory: [], shops: [] });
+            }
+        } catch {
+            setDb({ inventory: [], shops: [] });
+        }
+    };
+
     useEffect(() => {
-        getDashboardData().then(setDb).catch(() => setDb({ inventory: [], shops: [] }));
+        fetchDashboardData();
     }, [refreshKey]);
 
     const refresh = () => {
@@ -108,16 +126,15 @@ export default function InventoryManagerPage() {
         const qty = parseInt(adjustQty);
         if (isNaN(qty) || !selectedItem) return;
 
-        startTransition(async () => {
-            try {
-                await increaseMasterStock(selectedItem.id, qty, adjustReason || "Manual adjustment via Global Inventory");
-                setIsAdjustModalOpen(false);
-                refresh();
-                alert(`Master stock for ${selectedItem.name} updated.`);
-            } catch (e: any) {
-                alert(e.message);
-            }
-        });
+        try {
+            await increaseMasterStock(selectedItem.id, qty, adjustReason || "Manual adjustment via Global Inventory");
+            setIsAdjustModalOpen(false);
+            setRefreshKey(k => k + 1);
+            setTimeout(() => fetchDashboardData(), 100);
+            alert(`Master stock for ${selectedItem.name} updated.`);
+        } catch (e: any) {
+            alert(e.message);
+        }
     };
 
     const handleReapportion = async () => {
@@ -151,14 +168,10 @@ export default function InventoryManagerPage() {
 
             if (!response.ok) throw new Error(data.error || "Reapportion failed");
 
-            // Close modal immediately and force fresh data fetch
             setIsReapportionModalOpen(false);
-            // Multiple refreshes with delays to ensure cache is busted
-            await new Promise(resolve => setTimeout(resolve, 500));
             setRefreshKey(k => k + 1);
-            await new Promise(resolve => setTimeout(resolve, 1000));
-            setRefreshKey(k => k + 1);
-            alert(`Stock reapportioned for ${selectedItem.name}.\nKipasa: ${allocs.find(a => a.shopId.includes('kipasa'))?.quantity || 0}\nDub Dub: ${allocs.find(a => a.shopId.includes('dub'))?.quantity || 0}\nTrade: ${allocs.find(a => a.shopId.includes('trade'))?.quantity || 0}`);
+            setTimeout(() => fetchDashboardData(), 100);
+            alert(`Stock reapportioned for ${selectedItem.name}.\nKipasa: ${allocs.find(a => a.shopId.toLowerCase().includes('kipasa'))?.quantity || 0}\nDub Dub: ${allocs.find(a => a.shopId.toLowerCase().includes('dub'))?.quantity || 0}\nTradecenter: ${allocs.find(a => a.shopId.toLowerCase().includes('trade'))?.quantity || 0}`);
         } catch (e: any) {
             console.error("[Reapportion] Error:", e);
             alert("Error: " + e.message);
@@ -197,6 +210,26 @@ export default function InventoryManagerPage() {
                     Central Node for Physical Count Adjustments & Multi-Shop Reapportionment.
                 </p>
             </div>
+
+            {/* DEBUG PANEL - Shows actual shop IDs from database */}
+            <Card className="max-w-6xl mx-auto bg-amber-500/5 border-amber-500/20">
+                <CardHeader className="pb-2">
+                    <CardTitle className="text-sm font-black uppercase italic flex items-center gap-2 text-amber-400">
+                        <AlertCircle className="h-4 w-4" /> Debug: Shop IDs from Database
+                    </CardTitle>
+                </CardHeader>
+                <CardContent>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        {shops.map((s: any) => (
+                            <div key={s.id} className="p-3 bg-slate-900 rounded-lg border border-slate-800">
+                                <div className="text-lg font-black text-white">{s.name}</div>
+                                <div className="text-[10px] font-mono text-amber-400 mt-1">ID: "{s.id}"</div>
+                                <div className="text-[10px] text-slate-500 mt-1">Items with allocations: {inventory.filter((item: any) => item.allocations?.some((a: any) => a.shopId === s.id)).length}</div>
+                            </div>
+                        ))}
+                    </div>
+                </CardContent>
+            </Card>
 
             {/* CONTROLS */}
             <Card className="max-w-6xl mx-auto bg-slate-950/40 border-slate-800">
