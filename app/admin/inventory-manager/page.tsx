@@ -128,11 +128,22 @@ export default function InventoryManagerPage() {
 
         startTransition(async () => {
             try {
-                await reapportionStock(selectedItem.id, allocs);
+                // Use API route instead of server action for better compatibility
+                const response = await fetch("/api/inventory/reapportion", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    credentials: "include",
+                    body: JSON.stringify({ itemId: selectedItem.id, allocations: allocs })
+                });
+
+                const data = await response.json();
+                if (!response.ok) throw new Error(data.error || "Reapportion failed");
+
                 setIsReapportionModalOpen(false);
                 refresh();
                 alert(`Stock reapportioned for ${selectedItem.name}.`);
             } catch (e: any) {
+                console.error("[Reapportion] Error:", e);
                 alert(e.message);
             }
         });
