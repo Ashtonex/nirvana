@@ -126,27 +126,30 @@ export default function InventoryManagerPage() {
             return;
         }
 
-        startTransition(async () => {
-            try {
-                // Use API route instead of server action for better compatibility
-                const response = await fetch("/api/inventory/reapportion", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    credentials: "include",
-                    body: JSON.stringify({ itemId: selectedItem.id, allocations: allocs })
-                });
+        setIsReapportionModalOpen(false);
 
-                const data = await response.json();
-                if (!response.ok) throw new Error(data.error || "Reapportion failed");
+        try {
+            console.log("[Reapportion] Starting with itemId:", selectedItem.id, "allocations:", allocs);
+            
+            const response = await fetch("/api/inventory/reapportion", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                credentials: "include",
+                body: JSON.stringify({ itemId: selectedItem.id, allocations: allocs })
+            });
 
-                setIsReapportionModalOpen(false);
-                refresh();
-                alert(`Stock reapportioned for ${selectedItem.name}.`);
-            } catch (e: any) {
-                console.error("[Reapportion] Error:", e);
-                alert(e.message);
-            }
-        });
+            console.log("[Reapportion] Response status:", response.status);
+            const data = await response.json();
+            console.log("[Reapportion] Response data:", data);
+
+            if (!response.ok) throw new Error(data.error || "Reapportion failed");
+
+            refresh();
+            alert(`Stock reapportioned for ${selectedItem.name}.`);
+        } catch (e: any) {
+            console.error("[Reapportion] Error:", e);
+            alert("Error: " + e.message);
+        }
     };
 
     const handleDownloadPDF = async () => {

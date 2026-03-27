@@ -57,9 +57,15 @@ async function requireManagerOrOwner(): Promise<Actor> {
 }
 
 export async function POST(req: Request) {
+  console.log("[REAPPORTION] Request received");
+  
   try {
     const actor = await requireManagerOrOwner();
+    console.log("[REAPPORTION] Actor authenticated:", actor);
+    
     const body = await req.json();
+    console.log("[REAPPORTION] Body:", body);
+    
     const { itemId, allocations } = body;
 
     if (!itemId || !allocations || !Array.isArray(allocations)) {
@@ -89,6 +95,8 @@ export async function POST(req: Request) {
     for (const alloc of allocations) {
       const shopId = alloc.shopId;
       const quantity = parseInt(alloc.quantity) || 0;
+
+      console.log(`[REAPPORTION] Processing allocation for shop ${shopId}, qty: ${quantity}`);
 
       const { data: existing } = await supabaseAdmin
         .from("inventory_allocations")
