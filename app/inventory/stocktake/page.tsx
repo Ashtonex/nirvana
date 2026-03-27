@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { getDashboardData, recordStocktake, increaseMasterStock, reapportionStock } from "../../actions";
 import {
     Card,
     CardContent,
@@ -12,10 +13,12 @@ import {
 } from "@/components/ui";
 import {
     ClipboardList,
+    Save,
     AlertTriangle,
     CheckCircle2,
     Search,
     Store,
+    ArrowRight,
     FileText,
     Loader2,
     Printer,
@@ -24,8 +27,7 @@ import {
     Minus,
     RefreshCw,
     LayoutGrid,
-    List,
-    Save
+    List
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -42,31 +44,8 @@ export default function StocktakePage() {
     const [savingItem, setSavingItem] = useState<string | null>(null);
     const [pendingChanges, setPendingChanges] = useState<Set<string>>(new Set());
 
-    // Track global allocation changes: {itemId_shopId: newQuantity}
-    const [globalAllocations, setGlobalAllocations] = useState<Record<string, number>>({});
-    const [globalChanges, setGlobalChanges] = useState<Set<string>>(new Set());
-
-    const fetchDashboardData = async () => {
-        try {
-            const res = await fetch("/api/dashboard/data", { 
-                credentials: "include",
-                cache: "no-store",
-                headers: { "Cache-Control": "no-cache" }
-            });
-            if (res.ok) {
-                const data = await res.json();
-                setDb({ inventory: data.inventory || [], shops: data.shops || [] });
-            } else {
-                setDb({ inventory: [], shops: [] });
-            }
-        } catch {
-            setDb({ inventory: [], shops: [] });
-        }
-    };
-
     useEffect(() => {
-        fetchDashboardData();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
+        getDashboardData().then(setDb).catch(() => setDb({ inventory: [], shops: [] }));
     }, [refreshKey]);
 
     if (!db) return (
@@ -82,7 +61,7 @@ export default function StocktakePage() {
     // Filter for shop view - items with allocations at selected shop
     const shopItems = selectedShop 
         ? inventory.filter((item: any) => 
-            item.allocations?.some((a: any) => a.shopId === selectedShop)
+            item.allocations.some((a: any) => a.shopId === selectedShop)
           )
         : [];
 
@@ -100,12 +79,12 @@ export default function StocktakePage() {
     
     // Split into "with stock" and "without stock"
     const itemsWithStock = filteredShopItems.filter((item: any) => {
-        const alloc = item.allocations?.find((a: any) => a.shopId === selectedShop);
+        const alloc = item.allocations.find((a: any) => a.shopId === selectedShop);
         return (alloc?.quantity || 0) > 0;
     });
     
     const itemsWithoutStock = filteredShopItems.filter((item: any) => {
-        const alloc = item.allocations?.find((a: any) => a.shopId === selectedShop);
+        const alloc = item.allocations.find((a: any) => a.shopId === selectedShop);
         return (alloc?.quantity || 0) === 0;
     });
 
@@ -114,89 +93,29 @@ export default function StocktakePage() {
         setPendingChanges(prev => new Set(prev).add(itemId));
     };
 
-    // Global allocation change handler
-    const handleGlobalAllocationChange = (itemId: string, shopId: string, change: number) => {
-        console.log("Button clicked!", { itemId, shopId, change });
-        
-        const key = `${itemId}_${shopId}`;
-        const item = inventory.find((i: any) => i.id === itemId);
-        const currentAlloc = item?.allocations?.find((a: any) => a.shopId === shopId);
-        const currentQty = globalAllocations[key] ?? currentAlloc?.quantity ?? 0;
-        const newQty = Math.max(0, currentQty + change);
-        
-        console.log("[handleGlobalAllocationChange]", { itemId, shopId, change, currentQty, newQty });
-        
-        setGlobalAllocations(prev => ({ ...prev, [key]: newQty }));
-        setGlobalChanges(prev => {
-            const next = new Set(prev);
-            next.add(key);
-            return next;
-        });
-    };
-
-    // Save single global allocation
-    const saveGlobalAllocation = async (itemId: string, shopId: string) => {
-        const key = `${itemId}_${shopId}`;
-        const quantity = globalAllocations[key];
-        if (quantity === undefined) return;
-        
-        setSavingItem(key);
-        try {
-            const res = await fetch("/api/inventory/allocation", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                credentials: "include",
-                body: JSON.stringify({ itemId, shopId, quantity })
-            });
-            
-            const data = await res.json();
-            console.log("[saveGlobalAllocation] Response:", data);
-            
-            if (res.ok) {
-                setGlobalChanges(prev => {
-                    const next = new Set(prev);
-                    next.delete(key);
-                    return next;
-                });
-                await new Promise(r => setTimeout(r, 300));
-                setRefreshKey(k => k + 1);
-                setTimeout(() => fetchDashboardData(), 200);
-            } else {
-                alert("Error: " + (data.error || "Unknown error"));
-            }
-        } catch (e) {
-            console.error(e);
-        } finally {
-            setSavingItem(null);
-        }
-    };
-
-    // Save single item for shop view
     const saveSingleItem = async (itemId: string) => {
         if (!selectedShop) return;
         setSavingItem(itemId);
         try {
             const item = shopItems.find((i: any) => i.id === itemId);
-            const alloc = item?.allocations?.find((a: any) => a.shopId === selectedShop);
+            const alloc = item?.allocations.find((a: any) => a.shopId === selectedShop);
             const systemQty = alloc?.quantity || 0;
             const physicalQty = counts[itemId] !== undefined ? counts[itemId] : systemQty;
             
-            const res = await fetch("/api/inventory/allocation", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                credentials: "include",
-                body: JSON.stringify({ itemId, shopId: selectedShop, quantity: physicalQty })
+            await recordStocktake({
+                shopId: selectedShop,
+                items: [{ itemId, physicalQuantity: physicalQty }]
             });
             
-            if (res.ok) {
-                setPendingChanges(prev => {
-                    const next = new Set(prev);
-                    next.delete(itemId);
-                    return next;
-                });
-                await new Promise(r => setTimeout(r, 500));
-                setRefreshKey(k => k + 1);
-            }
+            setPendingChanges(prev => {
+                const next = new Set(prev);
+                next.delete(itemId);
+                return next;
+            });
+
+            // Refresh data
+            await new Promise(r => setTimeout(r, 500));
+            setRefreshKey(k => k + 1);
         } catch (e) {
             console.error(e);
         } finally {
@@ -211,18 +130,21 @@ export default function StocktakePage() {
         
         let content = "";
         
+        // Section 1: With Stock
         content += "=======================================\n";
         content += `IN STOCK - ${shopName.toUpperCase()}\n`;
         content += "=======================================\n";
         content += `Date: ${new Date().toLocaleDateString()}\n\n`;
         
         itemsWithStock.forEach((item: any, idx: number) => {
-            const alloc = item.allocations?.find((a: any) => a.shopId === selectedShop);
+            const alloc = item.allocations.find((a: any) => a.shopId === selectedShop);
             const qty = counts[item.id] !== undefined ? counts[item.id] : (alloc?.quantity || 0);
             content += `${idx + 1}. ${item.name} | ${item.category} | Qty: ${qty}\n`;
         });
         
         content += `\nTotal In Stock: ${itemsWithStock.length} items\n\n`;
+        
+        // Section 2: Without Stock
         content += "=======================================\n";
         content += `OUT OF STOCK - ${shopName.toUpperCase()}\n`;
         content += "=======================================\n\n";
@@ -232,6 +154,7 @@ export default function StocktakePage() {
         });
         
         content += `\nTotal Out of Stock: ${itemsWithoutStock.length} items\n`;
+        content += "=======================================\n";
 
         const blob = new Blob([content], { type: 'text/plain' });
         const url = URL.createObjectURL(blob);
@@ -248,17 +171,25 @@ export default function StocktakePage() {
         content += "=======================================\n";
         content += `Generated: ${new Date().toLocaleString()}\n\n`;
 
-        const filteredInventory = filterItems(inventory);
-        filteredInventory.forEach((item: any, idx: number) => {
-            const allocs = item.allocations?.map((a: any) => {
-                const shop = shops.find((s: any) => s.id === a.shopId);
-                return `${shop?.name || a.shopId}: ${a.quantity}`;
-            }).join(", ") || "No stock";
-            content += `${idx + 1}. ${item.name} | ${item.category}\n   ${allocs}\n\n`;
+        // Group by category
+        const catMap: Record<string, boolean> = {};
+        inventory.forEach((i: any) => { catMap[String(i.category || "Uncategorized")] = true; });
+        const categories = Object.keys(catMap);
+        
+        categories.forEach((category: string) => {
+            content += `\n--- ${category.toUpperCase()} ---\n`;
+            const catItems = inventory.filter((i: any) => i.category === category);
+            catItems.forEach((item: any) => {
+                const allocs = item.allocations.map((a: any) => {
+                    const shop = shops.find((s: any) => s.id === a.shopId);
+                    return `${shop?.name || a.shopId}: ${a.quantity}`;
+                }).join(", ");
+                content += `${item.name}: [${allocs || "No stock"}]\n`;
+            });
         });
 
-        content += "=======================================\n";
-        content += `Total Products: ${filteredInventory.length}\n`;
+        content += "\n=======================================\n";
+        content += `Total Products: ${inventory.length}\n`;
 
         const blob = new Blob([content], { type: 'text/plain' });
         const url = URL.createObjectURL(blob);
@@ -268,6 +199,8 @@ export default function StocktakePage() {
         a.click();
         URL.revokeObjectURL(url);
     };
+
+    const hasPendingChanges = pendingChanges.size > 0;
 
     return (
         <div className="space-y-8 pb-32 pt-8">
@@ -399,7 +332,7 @@ export default function StocktakePage() {
                                     <CardContent className="p-0">
                                         <div className="divide-y divide-slate-800">
                                             {itemsWithStock.map((item: any) => {
-                                                const alloc = item.allocations?.find((a: any) => a.shopId === selectedShop);
+                                                const alloc = item.allocations.find((a: any) => a.shopId === selectedShop);
                                                 const systemQty = alloc?.quantity || 0;
                                                 const currentQty = counts[item.id] !== undefined ? counts[item.id] : systemQty;
                                                 const hasChange = pendingChanges.has(item.id);
@@ -521,126 +454,47 @@ export default function StocktakePage() {
                         <Search className="h-5 w-5 text-slate-500" />
                         <Input
                             placeholder="Search entire database..."
-                            className="bg-transparent border-none placeholder:text-slate-600 font-bold text-slate-200 flex-1"
+                            className="bg-transparent border-none placeholder:text-slate-600 font-bold text-slate-200"
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
                         />
-                        <Button 
-                            onClick={() => {
-                                setRefreshKey(k => k + 1);
-                                setTimeout(() => fetchDashboardData(), 100);
-                            }}
-                            className="bg-violet-600 hover:bg-violet-500"
-                        >
-                            <RefreshCw className="h-4 w-4 mr-2" />
-                            Refresh
-                        </Button>
                     </div>
-
-                    {/* SHOP IDs DEBUG */}
-                    <Card className="bg-slate-900/50 border-violet-500/20">
-                        <CardHeader className="pb-2">
-                            <CardTitle className="text-sm font-black uppercase italic flex items-center gap-2 text-violet-400">
-                                <Store className="h-4 w-4" /> Shop IDs from Database
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                {shops.map((s: any) => (
-                                    <div key={s.id} className="p-3 bg-slate-950 rounded-lg border border-slate-800">
-                                        <div className="text-lg font-black text-white">{s.name}</div>
-                                        <div className="text-[10px] font-mono text-violet-400 mt-1">ID: "{s.id}"</div>
-                                        <div className="text-[10px] text-slate-500 mt-1">Allocations: {inventory.filter((item: any) => item.allocations?.some((a: any) => a.shopId === s.id)).length} items</div>
-                                    </div>
-                                ))}
-                            </div>
-                        </CardContent>
-                    </Card>
 
                     <Card className="bg-slate-900/50 border-slate-800">
                         <CardHeader>
                             <CardTitle className="flex items-center gap-2 text-sky-400">
                                 <LayoutGrid className="h-5 w-5" />
-                                GLOBAL DATABASE - MODIFY STOCK PER SHOP ({filterItems(inventory).length})
+                                ALL PRODUCTS IN DATABASE ({filterItems(inventory).length})
                             </CardTitle>
-                            <p className="text-xs text-slate-500">Click +/- to adjust stock, then SAVE appears. Changes apply immediately.</p>
                         </CardHeader>
                         <CardContent className="p-0">
-                            <div className="divide-y divide-slate-800 max-h-[700px] overflow-y-auto">
+                            <div className="divide-y divide-slate-800 max-h-[600px] overflow-y-auto">
                                 {filterItems(inventory).map((item: any) => (
                                     <div key={item.id} className="p-4 hover:bg-slate-900/30 transition-colors">
-                                        <div className="flex items-start justify-between gap-4 mb-3">
+                                        <div className="flex items-start justify-between gap-4">
                                             <div className="flex-1">
                                                 <p className="font-black text-white uppercase italic">{item.name}</p>
                                                 <p className="text-[10px] text-slate-500 uppercase">{item.category} | Master: {item.quantity}</p>
                                             </div>
-                                            <Badge className="bg-slate-800 text-slate-400 text-[8px]">{item.allocations?.length || 0} shops</Badge>
-                                        </div>
-                                        <div className="flex flex-wrap gap-3">
-                                            {shops.map((shop: any) => {
-                                                const alloc = item.allocations?.find((a: any) => a.shopId === shop.id);
-                                                const currentQty = alloc?.quantity || 0;
-                                                const key = `${item.id}_${shop.id}`;
-                                                const displayQty = globalAllocations[key] !== undefined ? globalAllocations[key] : currentQty;
-                                                const hasChange = globalChanges.has(key);
-                                                
-                                                return (
-                                                    <div 
-                                                        key={shop.id} 
-                                                        className={cn(
-                                                            "flex flex-col items-center gap-2 px-4 py-3 rounded-lg border min-w-[160px]",
-                                                            hasChange ? "bg-amber-500/10 border-amber-500/50" : "bg-slate-950 border-slate-800"
-                                                        )}
-                                                    >
-                                                        <span className="text-xs font-black text-sky-400 uppercase">{shop.name}</span>
-                                                        <div className="flex items-center gap-2">
-                                                            <button
-                                                                type="button"
-                                                                onClick={() => handleGlobalAllocationChange(item.id, shop.id, -1)}
-                                                                className="w-8 h-8 flex items-center justify-center rounded bg-rose-600 hover:bg-rose-500 text-white font-black cursor-pointer active:scale-95"
-                                                            >
-                                                                <Minus className="h-4 w-4" />
-                                                            </button>
-                                                            <input
-                                                                type="number"
-                                                                min="0"
-                                                                className={cn(
-                                                                    "w-16 h-10 text-center font-black text-lg rounded border bg-slate-900 text-white",
-                                                                    hasChange ? "border-amber-500" : "border-slate-700"
-                                                                )}
-                                                                value={displayQty}
-                                                                onChange={(e) => {
-                                                                    const val = parseInt(e.target.value) || 0;
-                                                                    const key = `${item.id}_${shop.id}`;
-                                                                    setGlobalAllocations(prev => ({ ...prev, [key]: val }));
-                                                                    setGlobalChanges(prev => {
-                                                                        const next = new Set(prev);
-                                                                        next.add(key);
-                                                                        return next;
-                                                                    });
-                                                                }}
-                                                            />
-                                                            <button
-                                                                type="button"
-                                                                onClick={() => handleGlobalAllocationChange(item.id, shop.id, 1)}
-                                                                className="w-8 h-8 flex items-center justify-center rounded bg-emerald-600 hover:bg-emerald-500 text-white font-black cursor-pointer active:scale-95"
-                                                            >
-                                                                <Plus className="h-4 w-4" />
-                                                            </button>
+                                            <div className="flex gap-1">
+                                                {shops.map((shop: any) => {
+                                                    const alloc = item.allocations.find((a: any) => a.shopId === shop.id);
+                                                    const qty = alloc?.quantity || 0;
+                                                    return (
+                                                        <div 
+                                                            key={shop.id} 
+                                                            className={cn(
+                                                                "px-2 py-1 rounded text-center min-w-[50px]",
+                                                                qty > 0 ? "bg-emerald-500/20 text-emerald-400" : "bg-slate-800 text-slate-500"
+                                                            )}
+                                                            title={shop.name}
+                                                        >
+                                                            <div className="text-[8px] uppercase font-black">{shop.name.substring(0, 3)}</div>
+                                                            <div className="text-sm font-black">{qty}</div>
                                                         </div>
-                                                        {hasChange && (
-                                                            <button
-                                                                type="button"
-                                                                onClick={() => saveGlobalAllocation(item.id, shop.id)}
-                                                                disabled={savingItem === key}
-                                                                className="w-full bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-700 h-8 px-3 text-xs font-black text-white rounded cursor-pointer"
-                                                            >
-                                                                {savingItem === key ? "Saving..." : "SAVE"}
-                                                            </button>
-                                                        )}
-                                                    </div>
-                                                );
-                                            })}
+                                                    );
+                                                })}
+                                            </div>
                                         </div>
                                     </div>
                                 ))}

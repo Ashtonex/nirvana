@@ -6,9 +6,9 @@ export const revalidate = 0;
 
 export async function GET() {
   try {
-    const { data: inventory, error: invError } = await supabaseAdmin.from('inventory_items').select('*');
-    const { data: allocations, error: allocError } = await supabaseAdmin.from('inventory_allocations').select('*');
-    const { data: shops, error: shopsError } = await supabaseAdmin.from('shops').select('*');
+    const { data: inventory, error: invError } = await supabaseAdmin.from('inventory_items').select('*').limit(10000);
+    const { data: allocations, error: allocError } = await supabaseAdmin.from('inventory_allocations').select('*').limit(10000);
+    const { data: shops, error: shopsError } = await supabaseAdmin.from('shops').select('*').limit(10000);
 
     console.log('[API /dashboard/data] Shops from DB:', shops?.map((s: any) => ({ id: s.id, name: s.name })));
     console.log('[API /dashboard/data] All allocations:', allocations);

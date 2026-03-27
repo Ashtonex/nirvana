@@ -141,18 +141,18 @@ export async function getDashboardData() {
     }
 
     try {
-        const { data: inventory } = await supabaseAdmin.from('inventory_items').select('*').limit(10000);
-        const { data: allocations } = await supabaseAdmin.from('inventory_allocations').select('*').limit(10000);
-        const { data: sales } = await supabaseAdmin.from('sales').select('*').limit(50000);
-        const { data: shops } = await supabaseAdmin.from('shops').select('*').limit(1000);
-        const { data: quotations } = await supabaseAdmin.from('quotations').select('*').limit(10000);
-        const { data: employees } = await supabaseAdmin.from('employees').select('*').limit(1000);
-        const { data: shipments } = await supabaseAdmin.from('shipments').select('*').limit(5000);
+        const { data: inventory } = await supabaseAdmin.from('inventory_items').select('*');
+        const { data: allocations } = await supabaseAdmin.from('inventory_allocations').select('*');
+        const { data: sales } = await supabaseAdmin.from('sales').select('*');
+        const { data: shops } = await supabaseAdmin.from('shops').select('*');
+        const { data: quotations } = await supabaseAdmin.from('quotations').select('*');
+        const { data: employees } = await supabaseAdmin.from('employees').select('*');
+        const { data: shipments } = await supabaseAdmin.from('shipments').select('*');
         const { data: settings } = await supabaseAdmin.from('oracle_settings').select('*').single();
-        const { data: ledger } = await supabaseAdmin.from('ledger_entries').select('*').limit(50000);
-        const { data: auditLog } = await supabaseAdmin.from('audit_log').select('*').limit(10000);
-        const { data: transfers } = await supabaseAdmin.from('transfers').select('*').limit(10000);
-        const { data: emails } = await supabaseAdmin.from('oracle_emails').select('*').limit(5000);
+        const { data: ledger } = await supabaseAdmin.from('ledger_entries').select('*');
+        const { data: auditLog } = await supabaseAdmin.from('audit_log').select('*');
+        const { data: transfers } = await supabaseAdmin.from('transfers').select('*');
+        const { data: emails } = await supabaseAdmin.from('oracle_emails').select('*');
 
         const ledgerRows = ledger || [];
 
