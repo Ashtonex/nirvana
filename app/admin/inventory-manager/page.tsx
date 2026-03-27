@@ -144,6 +144,8 @@ export default function InventoryManagerPage() {
 
             if (!response.ok) throw new Error(data.error || "Reapportion failed");
 
+            // Force a delay and refresh to ensure data is fetched after cache invalidation
+            await new Promise(resolve => setTimeout(resolve, 1000));
             refresh();
             alert(`Stock reapportioned for ${selectedItem.name}.`);
         } catch (e: any) {

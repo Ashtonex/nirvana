@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { createHash } from "crypto";
 import { supabaseAdmin } from "@/lib/supabase";
+import { revalidatePath } from "next/cache";
 
 type Actor = {
   id: string;
@@ -136,6 +137,11 @@ export async function POST(req: Request) {
       action: "STOCKS_REAPPORTIONED",
       details: `${item.name} reapportioned across ${allocations.length} shops by ${actor.name}`,
     });
+
+    // Force cache invalidation
+    revalidatePath("/inventory");
+    revalidatePath("/admin/inventory-manager");
+    revalidatePath("/transfers");
 
     return NextResponse.json({ success: true, message: `Stock reapportioned for ${item.name}` });
   } catch (e: any) {
