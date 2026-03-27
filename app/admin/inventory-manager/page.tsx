@@ -51,6 +51,7 @@ export default function InventoryManagerPage() {
     const [db, setDb] = useState<any>(null);
     const [searchTerm, setSearchTerm] = useState("");
     const [isPending, startTransition] = useTransition();
+    const [refreshKey, setRefreshKey] = useState(0);
 
     // Modals
     const [isAdjustModalOpen, setIsAdjustModalOpen] = useState(false);
@@ -63,11 +64,11 @@ export default function InventoryManagerPage() {
     const [newAllocations, setNewAllocations] = useState<Record<string, string>>({});
 
     useEffect(() => {
-        refresh();
-    }, []);
+        getDashboardData().then(setDb).catch(() => setDb({ inventory: [], shops: [] }));
+    }, [refreshKey]);
 
     const refresh = () => {
-        getDashboardData().then(setDb).catch(() => setDb({ inventory: [], shops: [] }));
+        setRefreshKey(k => k + 1);
     };
 
     const inventory = db?.inventory || [];
@@ -144,9 +145,13 @@ export default function InventoryManagerPage() {
 
             if (!response.ok) throw new Error(data.error || "Reapportion failed");
 
-            // Force a delay and refresh to ensure data is fetched after cache invalidation
+            // Close modal immediately and force fresh data fetch
+            setIsReapportionModalOpen(false);
+            // Multiple refreshes with delays to ensure cache is busted
+            await new Promise(resolve => setTimeout(resolve, 500));
+            setRefreshKey(k => k + 1);
             await new Promise(resolve => setTimeout(resolve, 1000));
-            refresh();
+            setRefreshKey(k => k + 1);
             alert(`Stock reapportioned for ${selectedItem.name}.`);
         } catch (e: any) {
             console.error("[Reapportion] Error:", e);
