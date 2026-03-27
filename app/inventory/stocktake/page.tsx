@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { getDashboardData, recordStocktake } from "../../actions";
+import { getDashboardData, recordStocktake, increaseMasterStock, reapportionStock } from "../../actions";
 import {
     Card,
     CardContent,
@@ -21,10 +21,17 @@ import {
     ArrowRight,
     FileText,
     Loader2,
-    Printer
+    Printer,
+    Package,
+    Plus,
+    Minus,
+    RefreshCw,
+    LayoutGrid,
+    List
 } from "lucide-react";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { cn } from "@/lib/utils";
+
+type ViewMode = "shop" | "global";
 
 export default function StocktakePage() {
     const [db, setDb] = useState<any>(null);
@@ -32,47 +39,54 @@ export default function StocktakePage() {
     const [counts, setCounts] = useState<Record<string, number>>({});
     const [loading, setLoading] = useState(false);
     const [searchTerm, setSearchTerm] = useState("");
-    const [executor, setExecutor] = useState<string>("");
+    const [viewMode, setViewMode] = useState<ViewMode>("shop");
+    const [refreshKey, setRefreshKey] = useState(0);
     const [savingItem, setSavingItem] = useState<string | null>(null);
     const [pendingChanges, setPendingChanges] = useState<Set<string>>(new Set());
-    const router = useRouter();
 
     useEffect(() => {
-        getDashboardData().then(setDb);
-    }, []);
+        getDashboardData().then(setDb).catch(() => setDb({ inventory: [], shops: [] }));
+    }, [refreshKey]);
 
-    useEffect(() => {
-        let cancelled = false;
-        async function loadExecutor() {
-            try {
-                const r = await fetch("/api/staff/me", { cache: "no-store", credentials: "include" });
-                if (r.ok) {
-                    const data = await r.json().catch(() => ({}));
-                    const staff = data?.staff;
-                    const name = staff ? `${staff.name || ""} ${staff.surname || ""}`.trim() : "";
-                    if (!cancelled) setExecutor(name || String(staff?.id || ""));
-                } else {
-                    if (!cancelled) setExecutor("Owner");
-                }
-            } catch {
-                if (!cancelled) setExecutor("Owner");
-            }
-        }
-        loadExecutor();
-        return () => { cancelled = true; };
-    }, []);
-
-    if (!db) return <div className="p-8 text-slate-500 animate-pulse uppercase font-black">Loading Manifest...</div>;
+    if (!db) return (
+        <div className="flex items-center justify-center h-64">
+            <Loader2 className="h-8 w-8 text-sky-500 animate-spin" />
+            <span className="ml-4 text-slate-500 uppercase font-black tracking-widest">Loading Manifest...</span>
+        </div>
+    );
 
     const shops = db.shops || [];
-    const shopItems = db.inventory.filter((item: any) =>
-        item.allocations.some((a: any) => a.shopId === selectedShop)
-    ).filter((item: any) =>
-        !searchTerm ||
-        item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        item.category.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        item.id.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    const inventory = db.inventory || [];
+
+    // Filter for shop view - items with allocations at selected shop
+    const shopItems = selectedShop 
+        ? inventory.filter((item: any) => 
+            item.allocations.some((a: any) => a.shopId === selectedShop)
+          )
+        : [];
+
+    // Search filter
+    const filterItems = (items: any[]) => {
+        return items.filter((item: any) =>
+            !searchTerm ||
+            item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            item.category.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            item.id.toLowerCase().includes(searchTerm.toLowerCase())
+        );
+    };
+
+    const filteredShopItems = filterItems(shopItems);
+    
+    // Split into "with stock" and "without stock"
+    const itemsWithStock = filteredShopItems.filter((item: any) => {
+        const alloc = item.allocations.find((a: any) => a.shopId === selectedShop);
+        return (alloc?.quantity || 0) > 0;
+    });
+    
+    const itemsWithoutStock = filteredShopItems.filter((item: any) => {
+        const alloc = item.allocations.find((a: any) => a.shopId === selectedShop);
+        return (alloc?.quantity || 0) === 0;
+    });
 
     const handleCountChange = (itemId: string, val: string) => {
         setCounts(prev => ({ ...prev, [itemId]: parseInt(val) || 0 }));
@@ -98,8 +112,10 @@ export default function StocktakePage() {
                 next.delete(itemId);
                 return next;
             });
-            
-            router.refresh();
+
+            // Refresh data
+            await new Promise(r => setTimeout(r, 500));
+            setRefreshKey(k => k + 1);
         } catch (e) {
             console.error(e);
         } finally {
@@ -107,53 +123,40 @@ export default function StocktakePage() {
         }
     };
 
-    const saveAllItems = async () => {
+    const generateShopPDF = async () => {
         if (!selectedShop) return;
-        setLoading(true);
-        try {
-            const itemsToSync = shopItems.map((item: any) => ({
-                itemId: item.id,
-                physicalQuantity: counts[item.id] !== undefined
-                    ? counts[item.id]
-                    : item.allocations.find((a: any) => a.shopId === selectedShop).quantity
-            }));
-
-            await recordStocktake({
-                shopId: selectedShop,
-                items: itemsToSync
-            });
-
-            setPendingChanges(new Set());
-            alert("Inventory Synchronized Successfully.");
-            router.refresh();
-        } catch (e) {
-            console.error(e);
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const generatePDF = async () => {
         const shop = shops.find((s: any) => s.id === selectedShop);
         const shopName = shop?.name || selectedShop;
         
-        const content = shopItems.map((item: any) => {
+        let content = "";
+        
+        // Section 1: With Stock
+        content += "=======================================\n";
+        content += `IN STOCK - ${shopName.toUpperCase()}\n`;
+        content += "=======================================\n";
+        content += `Date: ${new Date().toLocaleDateString()}\n\n`;
+        
+        itemsWithStock.forEach((item: any, idx: number) => {
             const alloc = item.allocations.find((a: any) => a.shopId === selectedShop);
             const qty = counts[item.id] !== undefined ? counts[item.id] : (alloc?.quantity || 0);
-            return `${item.name} | ${item.category} | Qty: ${qty}`;
-        }).join('\n');
+            content += `${idx + 1}. ${item.name} | ${item.category} | Qty: ${qty}\n`;
+        });
+        
+        content += `\nTotal In Stock: ${itemsWithStock.length} items\n\n`;
+        
+        // Section 2: Without Stock
+        content += "=======================================\n";
+        content += `OUT OF STOCK - ${shopName.toUpperCase()}\n`;
+        content += "=======================================\n\n";
+        
+        itemsWithoutStock.forEach((item: any, idx: number) => {
+            content += `${idx + 1}. ${item.name} | ${item.category} | Qty: 0\n`;
+        });
+        
+        content += `\nTotal Out of Stock: ${itemsWithoutStock.length} items\n`;
+        content += "=======================================\n";
 
-        const text = `STOCKTAKE AUDIT - ${shopName.toUpperCase()}
-Date: ${new Date().toLocaleDateString()}
-Executor: ${executor}
-========================================
-
-${content}
-
-========================================
-Total Items: ${shopItems.length}`;
-
-        const blob = new Blob([text], { type: 'text/plain' });
+        const blob = new Blob([content], { type: 'text/plain' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
@@ -163,202 +166,343 @@ Total Items: ${shopItems.length}`;
     };
 
     const generateFullInventoryPDF = async () => {
-        setLoading(true);
-        try {
-            const allItems = db.inventory.map((item: any) => {
-                const allocations = item.allocations.map((a: any) => `${a.shopName}: ${a.quantity}`).join(', ');
-                return `${item.name} | ${item.category} | ${allocations || 'No stock'}`;
-            }).join('\n');
+        let content = "=======================================\n";
+        content += "FULL DATABASE INVENTORY REPORT\n";
+        content += "=======================================\n";
+        content += `Generated: ${new Date().toLocaleString()}\n\n`;
 
-            const text = `NIRVANA FULL INVENTORY REPORT
-Generated: ${new Date().toLocaleString()}
-========================================
+        // Group by category
+        const catMap: Record<string, boolean> = {};
+        inventory.forEach((i: any) => { catMap[String(i.category || "Uncategorized")] = true; });
+        const categories = Object.keys(catMap);
+        
+        categories.forEach((category: string) => {
+            content += `\n--- ${category.toUpperCase()} ---\n`;
+            const catItems = inventory.filter((i: any) => i.category === category);
+            catItems.forEach((item: any) => {
+                const allocs = item.allocations.map((a: any) => {
+                    const shop = shops.find((s: any) => s.id === a.shopId);
+                    return `${shop?.name || a.shopId}: ${a.quantity}`;
+                }).join(", ");
+                content += `${item.name}: [${allocs || "No stock"}]\n`;
+            });
+        });
 
-${allItems}
+        content += "\n=======================================\n";
+        content += `Total Products: ${inventory.length}\n`;
 
-========================================
-Total Products: ${db.inventory.length}`;
-
-            const blob = new Blob([text], { type: 'text/plain' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `FullInventory_${new Date().toISOString().split('T')[0]}.txt`;
-            a.click();
-            URL.revokeObjectURL(url);
-        } finally {
-            setLoading(false);
-        }
+        const blob = new Blob([content], { type: 'text/plain' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `FullInventory_${new Date().toISOString().split('T')[0]}.txt`;
+        a.click();
+        URL.revokeObjectURL(url);
     };
 
     const hasPendingChanges = pendingChanges.size > 0;
 
     return (
         <div className="space-y-8 pb-32 pt-8">
+            {/* HEADER */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div className="space-y-1">
                     <h1 className="text-4xl font-black tracking-tighter uppercase italic text-white flex items-center gap-3">
                         Stocktake Engine <ClipboardList className="h-8 w-8 text-sky-500" />
                     </h1>
-                    <p className="text-slate-400 font-medium tracking-tight uppercase text-xs">Physical inventory reconciliation & shrinkage control.</p>
+                    <p className="text-slate-400 font-medium tracking-tight uppercase text-xs">
+                        Physical inventory reconciliation & shrinkage control.
+                    </p>
                 </div>
 
                 <div className="flex flex-wrap gap-2">
+                    {/* View Mode Toggle */}
+                    <div className="flex bg-slate-900 rounded-lg border border-slate-800 p-1">
+                        <button
+                            onClick={() => setViewMode("shop")}
+                            className={cn(
+                                "px-3 py-1 rounded text-xs font-black uppercase transition-colors",
+                                viewMode === "shop" ? "bg-sky-600 text-white" : "text-slate-400 hover:text-white"
+                            )}
+                        >
+                            <Store className="h-3 w-3 inline mr-1" />
+                            Per Shop
+                        </button>
+                        <button
+                            onClick={() => setViewMode("global")}
+                            className={cn(
+                                "px-3 py-1 rounded text-xs font-black uppercase transition-colors",
+                                viewMode === "global" ? "bg-violet-600 text-white" : "text-slate-400 hover:text-white"
+                            )}
+                        >
+                            <LayoutGrid className="h-3 w-3 inline mr-1" />
+                            Global DB
+                        </button>
+                    </div>
+
                     <Button 
                         onClick={generateFullInventoryPDF}
                         disabled={loading}
                         className="bg-slate-700 hover:bg-slate-600 text-white font-black uppercase text-xs"
                     >
                         <Printer className="h-4 w-4 mr-2" />
-                        Full DB PDF
+                        Full DB
                     </Button>
-                    <select
-                        className="bg-slate-900 border-2 border-slate-800 text-white rounded-lg px-4 py-2 font-black uppercase text-xs"
-                        value={selectedShop}
-                        onChange={(e) => {
-                            setSelectedShop(e.target.value);
-                            setCounts({});
-                            setPendingChanges(new Set());
-                        }}
-                    >
-                        <option value="">Select Shop</option>
-                        {shops.map((s: any) => <option key={s.id} value={s.id}>{s.name}</option>)}
-                    </select>
+
+                    {viewMode === "shop" && (
+                        <select
+                            className="bg-slate-900 border-2 border-slate-800 text-white rounded-lg px-4 py-2 font-black uppercase text-xs"
+                            value={selectedShop}
+                            onChange={(e) => {
+                                setSelectedShop(e.target.value);
+                                setCounts({});
+                                setPendingChanges(new Set());
+                            }}
+                        >
+                            <option value="">Select Shop</option>
+                            {shops.map((s: any) => (
+                                <option key={s.id} value={s.id}>{s.name}</option>
+                            ))}
+                        </select>
+                    )}
                 </div>
             </div>
 
-            {selectedShop ? (
-                <div className="space-y-6">
-                    <div className="flex items-center gap-4">
-                        <div className="flex-1 flex items-center gap-4 bg-slate-950/50 p-4 border border-slate-800 rounded-xl">
-                            <Search className="h-5 w-5 text-slate-500" />
-                            <Input
-                                placeholder="Search by Name, Category, or SKU..."
-                                className="bg-transparent border-none placeholder:text-slate-600 font-bold text-slate-200"
-                                value={searchTerm}
-                                onChange={(e) => setSearchTerm(e.target.value)}
-                            />
-                        </div>
-                        <Button 
-                            onClick={generatePDF}
-                            disabled={loading}
-                            className="bg-violet-700 hover:bg-violet-600 text-white font-black uppercase text-xs"
-                        >
-                            <FileText className="h-4 w-4 mr-2" />
-                            Export List
-                        </Button>
-                        {hasPendingChanges && (
-                            <Badge className="bg-amber-500/20 text-amber-400 border-amber-500/30">
-                                {pendingChanges.size} unsaved
-                            </Badge>
-                        )}
-                    </div>
+            {/* SHOP VIEW */}
+            {viewMode === "shop" && (
+                <>
+                    {selectedShop ? (
+                        <div className="space-y-6">
+                            {/* Search & Actions */}
+                            <div className="flex items-center gap-4 bg-slate-950/50 p-4 border border-slate-800 rounded-xl">
+                                <Search className="h-5 w-5 text-slate-500" />
+                                <Input
+                                    placeholder="Search by Name, Category, or SKU..."
+                                    className="bg-transparent border-none placeholder:text-slate-600 font-bold text-slate-200"
+                                    value={searchTerm}
+                                    onChange={(e) => setSearchTerm(e.target.value)}
+                                />
+                                <Button 
+                                    onClick={generateShopPDF}
+                                    disabled={loading}
+                                    className="bg-violet-700 hover:bg-violet-600 text-white font-black uppercase text-xs"
+                                >
+                                    <FileText className="h-4 w-4 mr-2" />
+                                    Export
+                                </Button>
+                            </div>
 
-                    <div className="grid grid-cols-1 gap-4">
-                        {shopItems.map((item: any) => {
-                            const alloc = item.allocations.find((a: any) => a.shopId === selectedShop);
-                            const systemQty = alloc?.quantity || 0;
-                            const physicalQty = counts[item.id] !== undefined ? counts[item.id] : systemQty;
-                            const diff = physicalQty - systemQty;
-                            const isPending = pendingChanges.has(item.id);
+                            {/* Stats */}
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                <Card className="bg-slate-900/50 border-slate-800">
+                                    <CardContent className="p-4 text-center">
+                                        <div className="text-3xl font-black text-white">{itemsWithStock.length}</div>
+                                        <div className="text-[10px] uppercase text-emerald-400 font-black">In Stock</div>
+                                    </CardContent>
+                                </Card>
+                                <Card className="bg-slate-900/50 border-slate-800">
+                                    <CardContent className="p-4 text-center">
+                                        <div className="text-3xl font-black text-white">{itemsWithoutStock.length}</div>
+                                        <div className="text-[10px] uppercase text-rose-400 font-black">Out of Stock</div>
+                                    </CardContent>
+                                </Card>
+                                <Card className="bg-slate-900/50 border-slate-800">
+                                    <CardContent className="p-4 text-center">
+                                        <div className="text-3xl font-black text-white">{filteredShopItems.length}</div>
+                                        <div className="text-[10px] uppercase text-sky-400 font-black">Total Items</div>
+                                    </CardContent>
+                                </Card>
+                                <Card className="bg-slate-900/50 border-slate-800">
+                                    <CardContent className="p-4 text-center">
+                                        <div className="text-3xl font-black text-white">{pendingChanges.size}</div>
+                                        <div className="text-[10px] uppercase text-amber-400 font-black">Pending</div>
+                                    </CardContent>
+                                </Card>
+                            </div>
 
-                            return (
-                                <Card key={item.id} className={cn(
-                                    "bg-slate-900/40 border-slate-800 transition-all overflow-hidden",
-                                    isPending && "border-amber-500/50"
-                                )}>
-                                    <CardContent className="p-0 flex items-stretch">
-                                        <div className="p-6 flex-1 space-y-1">
-                                            <div className="flex items-center gap-2 mb-1">
-                                                <Badge className="bg-slate-950 text-slate-500 text-[8px] font-black uppercase">{item.category}</Badge>
-                                                {diff < 0 && <Badge className="bg-rose-500/10 text-rose-500 border-rose-500/10 text-[8px] font-black uppercase tracking-widest"><AlertTriangle className="h-2 w-2 mr-1" /> Shrinkage</Badge>}
-                                                {diff > 0 && <Badge className="bg-sky-500/10 text-sky-500 border-sky-500/10 text-[8px] font-black uppercase tracking-widest"><CheckCircle2 className="h-2 w-2 mr-1" /> Surplus</Badge>}
-                                                {isPending && <Badge className="bg-amber-500/10 text-amber-500 border-amber-500/10 text-[8px] font-black uppercase tracking-widest">Changed</Badge>}
-                                            </div>
-                                            <h3 className="text-lg font-black text-white uppercase italic tracking-tight">{item.name}</h3>
-                                            <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">SKU: {item.id.toUpperCase()}</p>
-                                        </div>
-
-                                        <div className="bg-slate-950/50 border-l border-slate-800 p-6 flex items-center gap-6">
-                                            <div className="text-right">
-                                                <p className="text-[10px] font-black text-slate-500 uppercase">System</p>
-                                                <p className="text-2xl font-black text-slate-300 italic font-mono">{systemQty}</p>
-                                            </div>
-
-                                            <ArrowRight className="h-4 w-4 text-slate-700" />
-
-                                            <div className="space-y-1">
-                                                <p className="text-[10px] font-black text-sky-400 uppercase">Physical Count</p>
-                                                <Input
-                                                    type="number"
-                                                    className={cn(
-                                                        "w-24 bg-slate-900 border-slate-700 text-white font-black text-lg h-10 text-center",
-                                                        isPending && "border-amber-500/50"
-                                                    )}
-                                                    value={physicalQty}
-                                                    onChange={(e) => handleCountChange(item.id, e.target.value)}
-                                                />
-                                            </div>
-
-                                            <div className="w-20 text-center">
-                                                <p className="text-[10px] font-black text-slate-500 uppercase">Delta</p>
-                                                <p className={cn("text-xl font-black italic font-mono", diff === 0 ? 'text-slate-600' : diff < 0 ? 'text-rose-500' : 'text-sky-500')}>
-                                                    {diff > 0 ? '+' : ''}{diff}
-                                                </p>
-                                            </div>
-
-                                            <Button 
-                                                size="sm"
-                                                onClick={() => saveSingleItem(item.id)}
-                                                disabled={savingItem === item.id || !isPending}
-                                                className={cn(
-                                                    "h-10 px-4 font-black uppercase text-xs",
-                                                    isPending ? "bg-emerald-600 hover:bg-emerald-500" : "bg-slate-800"
-                                                )}
-                                            >
-                                                {savingItem === item.id ? (
-                                                    <Loader2 className="h-4 w-4 animate-spin" />
-                                                ) : (
-                                                    <Save className="h-4 w-4" />
-                                                )}
-                                            </Button>
+                            {/* SECTION 1: IN STOCK */}
+                            {itemsWithStock.length > 0 && (
+                                <Card className="border-emerald-500/20">
+                                    <CardHeader className="bg-emerald-500/10 border-b border-emerald-500/20">
+                                        <CardTitle className="flex items-center gap-2 text-emerald-400">
+                                            <CheckCircle2 className="h-5 w-5" />
+                                            IN STOCK ({itemsWithStock.length})
+                                        </CardTitle>
+                                    </CardHeader>
+                                    <CardContent className="p-0">
+                                        <div className="divide-y divide-slate-800">
+                                            {itemsWithStock.map((item: any) => {
+                                                const alloc = item.allocations.find((a: any) => a.shopId === selectedShop);
+                                                const systemQty = alloc?.quantity || 0;
+                                                const currentQty = counts[item.id] !== undefined ? counts[item.id] : systemQty;
+                                                const hasChange = pendingChanges.has(item.id);
+                                                
+                                                return (
+                                                    <div key={item.id} className={cn(
+                                                        "flex items-center gap-4 p-4 hover:bg-slate-900/30 transition-colors",
+                                                        hasChange && "bg-amber-500/5"
+                                                    )}>
+                                                        <div className="flex-1">
+                                                            <p className="font-black text-white uppercase italic">{item.name}</p>
+                                                            <p className="text-[10px] text-slate-500 uppercase">{item.category}</p>
+                                                        </div>
+                                                        <div className="flex items-center gap-2">
+                                                            <Input
+                                                                type="number"
+                                                                className="w-20 bg-slate-900 border-slate-800 text-center font-black"
+                                                                value={currentQty}
+                                                                onChange={(e) => handleCountChange(item.id, e.target.value)}
+                                                            />
+                                                            {hasChange && (
+                                                                <Button
+                                                                    size="sm"
+                                                                    onClick={() => saveSingleItem(item.id)}
+                                                                    disabled={savingItem === item.id}
+                                                                    className="bg-emerald-600 hover:bg-emerald-500"
+                                                                >
+                                                                    {savingItem === item.id ? (
+                                                                        <Loader2 className="h-4 w-4 animate-spin" />
+                                                                    ) : (
+                                                                        <Save className="h-4 w-4" />
+                                                                    )}
+                                                                </Button>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })}
                                         </div>
                                     </CardContent>
                                 </Card>
-                            );
-                        })}
+                            )}
+
+                            {/* SECTION 2: OUT OF STOCK */}
+                            {itemsWithoutStock.length > 0 && (
+                                <Card className="border-rose-500/20">
+                                    <CardHeader className="bg-rose-500/10 border-b border-rose-500/20">
+                                        <CardTitle className="flex items-center gap-2 text-rose-400">
+                                            <AlertTriangle className="h-5 w-5" />
+                                            OUT OF STOCK ({itemsWithoutStock.length})
+                                        </CardTitle>
+                                    </CardHeader>
+                                    <CardContent className="p-0">
+                                        <div className="divide-y divide-slate-800">
+                                            {itemsWithoutStock.map((item: any) => (
+                                                <div key={item.id} className="flex items-center gap-4 p-4 hover:bg-slate-900/30 transition-colors opacity-60">
+                                                    <div className="flex-1">
+                                                        <p className="font-black text-white uppercase italic">{item.name}</p>
+                                                        <p className="text-[10px] text-slate-500 uppercase">{item.category}</p>
+                                                    </div>
+                                                    <div className="flex items-center gap-2">
+                                                        <Input
+                                                            type="number"
+                                                            className="w-20 bg-slate-900 border-slate-800 text-center font-black"
+                                                            placeholder="0"
+                                                            value={counts[item.id] || ""}
+                                                            onChange={(e) => handleCountChange(item.id, e.target.value)}
+                                                        />
+                                                        {pendingChanges.has(item.id) && (
+                                                            <Button
+                                                                size="sm"
+                                                                onClick={() => saveSingleItem(item.id)}
+                                                                disabled={savingItem === item.id}
+                                                                className="bg-emerald-600 hover:bg-emerald-500"
+                                                            >
+                                                                {savingItem === item.id ? (
+                                                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                                                ) : (
+                                                                    <Plus className="h-4 w-4" />
+                                                                )}
+                                                            </Button>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </CardContent>
+                                </Card>
+                            )}
+
+                            {filteredShopItems.length === 0 && (
+                                <Card className="bg-slate-900/50 border-slate-800">
+                                    <CardContent className="p-12 text-center">
+                                        <Package className="h-12 w-12 text-slate-700 mx-auto mb-4" />
+                                        <p className="text-slate-500 uppercase font-black tracking-widest">
+                                            {searchTerm ? "No matching items found" : "No items allocated to this shop"}
+                                        </p>
+                                    </CardContent>
+                                </Card>
+                            )}
+                        </div>
+                    ) : (
+                        <Card className="bg-slate-900/50 border-slate-800">
+                            <CardContent className="p-12 text-center">
+                                <Store className="h-12 w-12 text-slate-700 mx-auto mb-4" />
+                                <p className="text-slate-500 uppercase font-black tracking-widest">
+                                    Select a shop to begin stocktake
+                                </p>
+                            </CardContent>
+                        </Card>
+                    )}
+                </>
+            )}
+
+            {/* GLOBAL VIEW */}
+            {viewMode === "global" && (
+                <div className="space-y-6">
+                    <div className="flex items-center gap-4 bg-slate-950/50 p-4 border border-slate-800 rounded-xl">
+                        <Search className="h-5 w-5 text-slate-500" />
+                        <Input
+                            placeholder="Search entire database..."
+                            className="bg-transparent border-none placeholder:text-slate-600 font-bold text-slate-200"
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                        />
                     </div>
 
-                    <div className="flex justify-end pt-4">
-                        <Button
-                            className="bg-sky-600 hover:bg-sky-500 text-white font-black uppercase px-8 py-6 rounded-xl shadow-xl shadow-sky-900/20"
-                            onClick={saveAllItems}
-                            disabled={loading}
-                        >
-                            {loading ? (
-                                <>
-                                    <Loader2 className="h-5 w-5 mr-2 animate-spin" />
-                                    Reconciling...
-                                </>
-                            ) : (
-                                <>Sync All ({shopItems.length} items) <Save className="ml-2 h-5 w-5" /></>
-                            )}
-                        </Button>
-                    </div>
+                    <Card className="bg-slate-900/50 border-slate-800">
+                        <CardHeader>
+                            <CardTitle className="flex items-center gap-2 text-sky-400">
+                                <LayoutGrid className="h-5 w-5" />
+                                ALL PRODUCTS IN DATABASE ({filterItems(inventory).length})
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent className="p-0">
+                            <div className="divide-y divide-slate-800 max-h-[600px] overflow-y-auto">
+                                {filterItems(inventory).map((item: any) => (
+                                    <div key={item.id} className="p-4 hover:bg-slate-900/30 transition-colors">
+                                        <div className="flex items-start justify-between gap-4">
+                                            <div className="flex-1">
+                                                <p className="font-black text-white uppercase italic">{item.name}</p>
+                                                <p className="text-[10px] text-slate-500 uppercase">{item.category} | Master: {item.quantity}</p>
+                                            </div>
+                                            <div className="flex gap-1">
+                                                {shops.map((shop: any) => {
+                                                    const alloc = item.allocations.find((a: any) => a.shopId === shop.id);
+                                                    const qty = alloc?.quantity || 0;
+                                                    return (
+                                                        <div 
+                                                            key={shop.id} 
+                                                            className={cn(
+                                                                "px-2 py-1 rounded text-center min-w-[50px]",
+                                                                qty > 0 ? "bg-emerald-500/20 text-emerald-400" : "bg-slate-800 text-slate-500"
+                                                            )}
+                                                            title={shop.name}
+                                                        >
+                                                            <div className="text-[8px] uppercase font-black">{shop.name.substring(0, 3)}</div>
+                                                            <div className="text-sm font-black">{qty}</div>
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </CardContent>
+                    </Card>
                 </div>
-            ) : (
-                <Card className="bg-slate-900/20 border-slate-800 border-dashed py-24">
-                    <CardContent className="flex flex-col items-center text-center space-y-4">
-                        <Store className="h-16 w-16 text-slate-700 mb-2" />
-                        <h2 className="text-xl font-black text-slate-500 uppercase tracking-widest italic">Node Selection Required</h2>
-                        <p className="text-slate-600 font-bold text-xs uppercase max-w-xs">Please select a shop location from the dropdown to initiate a physical stock audit.</p>
-                    </CardContent>
-                </Card>
             )}
         </div>
     );
-}
-
-function cn(...classes: (string | boolean | undefined | null)[]): string {
-    return classes.filter(Boolean).join(' ');
 }

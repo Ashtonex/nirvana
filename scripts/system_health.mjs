@@ -1,12 +1,10 @@
-import { NextResponse } from "next/server";
-import { supabaseAdmin } from "@/lib/supabase";
-import { listOperationsLedgerEntries } from "@/lib/operations";
-import { requirePrivilegedActor } from "@/lib/apiAuth";
+/**
+ * System Health Check Script
+ * Converts Python system_health.py to JavaScript
+ */
 
-export const dynamic = "force-dynamic";
-
-function checkSelfHealth(data: any) {
-    const healthReport: any = {
+function checkSelfHealth(data) {
+    const healthReport = {
         status: "healthy",
         timestamp: new Date().toISOString(),
         checks: [],
@@ -15,7 +13,7 @@ function checkSelfHealth(data: any) {
 
     // 1. Audit Log Anomaly Detection
     const auditLog = data.audit_log || [];
-    const errorCount = auditLog.filter((entry: any) => 
+    const errorCount = auditLog.filter(entry => 
         (entry.action || "").toLowerCase().includes("error")
     ).length;
     
@@ -32,7 +30,7 @@ function checkSelfHealth(data: any) {
 
     // 2. Financial Connection (Uncommitted entries)
     const ledger = data.ledger || [];
-    const unassigned = ledger.filter((entry: any) => 
+    const unassigned = ledger.filter(entry => 
         !entry.employee_id && entry.category === "POS Sale"
     ).length;
     
@@ -55,35 +53,28 @@ function checkSelfHealth(data: any) {
     return healthReport;
 }
 
-export async function GET() {
-  try {
-    await requirePrivilegedActor();
-  } catch {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+// Export for use
+module.exports = { checkSelfHealth };
 
-  try {
-    // 1. Fetch Audit Logs
-    const { data: auditLog } = await supabaseAdmin
-      .from("audit_log")
-      .select("*")
-      .order("timestamp", { ascending: false })
-      .limit(50);
-
-    // 2. Fetch Ledger
-    const ledger = await listOperationsLedgerEntries(50);
-
-    const payload = { audit_log: auditLog || [], ledger: ledger || [] };
-
-    // Execute the health check directly (no Python!)
-    const result = checkSelfHealth(payload);
-
-    return NextResponse.json(result);
-  } catch (e: any) {
-    console.error("[SYSTEM HEALTH]", e);
-    return NextResponse.json(
-      { status: "error", message: e.message || "Health check failed" },
-      { status: 500 }
-    );
-  }
+// CLI usage
+if (require.main === module) {
+    const readline = require('readline');
+    const rl = readline.createInterface({ input: process.stdin, output: process.stdout, terminal: false });
+    
+    let input = '';
+    rl.on('line', (line) => { input += line; });
+    rl.on('close', () => {
+        try {
+            if (!input.trim()) {
+                console.log(JSON.stringify({ status: "error", message: "No input received" }));
+                process.exit(1);
+            }
+            const payload = JSON.parse(input);
+            const result = checkSelfHealth(payload);
+            console.log(JSON.stringify(result));
+        } catch (e) {
+            console.log(JSON.stringify({ status: "error", message: e.message }));
+            process.exit(1);
+        }
+    });
 }
