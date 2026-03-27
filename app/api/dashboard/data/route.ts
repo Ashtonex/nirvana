@@ -4,23 +4,31 @@ import { supabaseAdmin } from "@/lib/supabase";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
-    const { data: inventory, error: invError } = await supabaseAdmin.from('inventory_items').select('*').limit(10000);
-    const { data: allocations, error: allocError } = await supabaseAdmin.from('inventory_allocations').select('*').limit(10000);
-    const { data: shops, error: shopsError } = await supabaseAdmin.from('shops').select('*').limit(10000);
+    // Use POST body or query to force fresh data
+    const timestamp = Date.now();
+    
+    // Fetch with fresh flag - query directly without caching
+    const { data: inventory, error: invError } = await supabaseAdmin
+      .from('inventory_items')
+      .select('*')
+      .limit(10000);
+      
+    const { data: allocations, error: allocError } = await supabaseAdmin
+      .from('inventory_allocations')
+      .select('*')
+      .limit(10000);
+      
+    const { data: shops, error: shopsError } = await supabaseAdmin
+      .from('shops')
+      .select('*')
+      .limit(10000);
 
-    console.log('[API /dashboard/data] Shops from DB:', shops?.map((s: any) => ({ id: s.id, name: s.name })));
-    console.log('[API /dashboard/data] All allocations:', allocations);
-    
-    // Check first item's allocations specifically
-    if (inventory && inventory.length > 0) {
-      const firstItem = inventory[0];
-      const firstItemAllocs = allocations?.filter((a: any) => a.item_id === firstItem.id);
-      console.log('[API /dashboard/data] First item:', firstItem.name, firstItem.id);
-      console.log('[API /dashboard/data] First item allocations:', firstItemAllocs);
-    }
-    
+    console.log('[API /dashboard/data] Timestamp:', timestamp);
+    console.log('[API /dashboard/data] Shops:', shops?.map((s: any) => ({ id: s.id, name: s.name })));
+    console.log('[API /dashboard/data] Total allocations fetched:', allocations?.length);
+
     if (invError) console.error('[API] Inventory error:', invError);
     if (allocError) console.error('[API] Allocations error:', allocError);
     if (shopsError) console.error('[API] Shops error:', shopsError);
@@ -51,15 +59,15 @@ export async function GET() {
     return NextResponse.json({
       inventory: mappedInventory,
       shops: mappedShops,
-      debug: {
-        shopsRaw: shops,
-        allocationsCount: (allocations || []).length,
-        inventoryCount: (inventory || []).length,
-        sampleAllocations: allocations?.slice(0, 5)
+      meta: {
+        fetchedAt: timestamp,
+        totalAllocations: allocations?.length,
+        totalInventory: inventory?.length,
+        totalShops: shops?.length
       }
     }, {
       headers: {
-        'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+        'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate, private',
         'Pragma': 'no-cache',
         'Expires': '0'
       }
