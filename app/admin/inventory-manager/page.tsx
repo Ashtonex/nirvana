@@ -66,10 +66,16 @@ export default function InventoryManagerPage() {
 
     const fetchDashboardData = async () => {
         try {
-            const res = await fetch("/api/dashboard/data", { 
+            // Add timestamp to bust any caches
+            const timestamp = Date.now();
+            const res = await fetch(`/api/dashboard/data?_=${timestamp}`, { 
                 credentials: "include",
                 cache: "no-store",
-                headers: { "Cache-Control": "no-cache" }
+                headers: { 
+                    "Cache-Control": "no-cache, no-store, must-revalidate",
+                    "Pragma": "no-cache",
+                    "Expires": "0"
+                }
             });
             if (res.ok) {
                 const data = await res.json();

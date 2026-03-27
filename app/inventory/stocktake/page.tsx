@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { getDashboardData, recordStocktake, increaseMasterStock, reapportionStock } from "../../actions";
+import { recordStocktake, increaseMasterStock, reapportionStock } from "../../actions";
 import {
     Card,
     CardContent,
@@ -44,8 +44,32 @@ export default function StocktakePage() {
     const [savingItem, setSavingItem] = useState<string | null>(null);
     const [pendingChanges, setPendingChanges] = useState<Set<string>>(new Set());
 
+    const fetchDashboardData = async () => {
+        try {
+            const timestamp = Date.now();
+            const res = await fetch(`/api/dashboard/data?_=${timestamp}`, { 
+                credentials: "include",
+                cache: "no-store",
+                headers: { 
+                    "Cache-Control": "no-cache, no-store, must-revalidate",
+                    "Pragma": "no-cache",
+                    "Expires": "0"
+                }
+            });
+            if (res.ok) {
+                const data = await res.json();
+                setDb({ inventory: data.inventory || [], shops: data.shops || [] });
+            } else {
+                setDb({ inventory: [], shops: [] });
+            }
+        } catch {
+            setDb({ inventory: [], shops: [] });
+        }
+    };
+
     useEffect(() => {
-        getDashboardData().then(setDb).catch(() => setDb({ inventory: [], shops: [] }));
+        fetchDashboardData();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [refreshKey]);
 
     if (!db) return (
