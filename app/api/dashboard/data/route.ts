@@ -56,6 +56,18 @@ export async function GET(request: Request) {
       expenses: sh.expenses || { rent: 0, salaries: 0, utilities: 0, misc: 0 }
     }));
 
+    // Debug: check first item's allocations
+    const firstItem = mappedInventory[0];
+    const firstItemAllocCount = firstItem?.allocations?.length || 0;
+    
+    // Count allocations per shop in mapped data
+    const mappedAllocByShop: Record<string, number> = {};
+    mappedInventory.forEach((item: any) => {
+      item.allocations?.forEach((a: any) => {
+        mappedAllocByShop[a.shopId] = (mappedAllocByShop[a.shopId] || 0) + 1;
+      });
+    });
+
     return NextResponse.json({
       inventory: mappedInventory,
       shops: mappedShops,
@@ -63,7 +75,11 @@ export async function GET(request: Request) {
         fetchedAt: timestamp,
         totalAllocations: allocations?.length,
         totalInventory: inventory?.length,
-        totalShops: shops?.length
+        totalShops: shops?.length,
+        firstItemName: firstItem?.name,
+        firstItemAllocations: firstItem?.allocations,
+        firstItemAllocCount,
+        mappedAllocByShop
       }
     }, {
       headers: {
