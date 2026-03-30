@@ -1331,10 +1331,47 @@ export async function GET(req: Request) {
 
   } catch (err: any) {
     console.error('EOD PDF route failed:', err);
-    return NextResponse.json({
-      error: 'Failed to generate PDF',
-      details: err?.message || String(err),
-      stack: err?.stack
-    }, { status: 500 });
+    // Fail-safe: always return a PDF so POS/EOD flows don't hard-fail.
+    // This avoids "500 from service worker" and lets staff still share/print something.
+    try {
+      const pdf = await PDFDocument.create();
+      const page = pdf.addPage([595.28, 841.89]); // A4
+      const font = await pdf.embedFont(StandardFonts.Helvetica);
+      const fontBold = await pdf.embedFont(StandardFonts.HelveticaBold);
+
+      const margin = 48;
+      let y = 841.89 - margin;
+
+      const safe = (t: any) => winAnsiSafe(t);
+      const line = (t: any, size = 12, bold = false, color = rgb(0.1, 0.14, 0.22)) => {
+        page.drawText(safe(t), { x: margin, y, size, font: bold ? fontBold : font, color });
+        y -= size + 10;
+      };
+
+      line("NIRVANA — EOD PDF (FALLBACK)", 18, true);
+      line("We couldn't generate the full PDF report right now.", 12, false, rgb(0.5, 0.1, 0.1));
+      line("This file is valid, but may be missing sections.", 11, false, rgb(0.38, 0.45, 0.55));
+      y -= 10;
+      line("Technical details:", 12, true);
+      line(err?.message || String(err), 10, false, rgb(0.2, 0.2, 0.2));
+
+      const bytes = await pdf.save();
+      const filename = `EOD_FALLBACK_${new Date().toISOString().slice(0, 10)}.pdf`;
+
+      return new NextResponse(Buffer.from(bytes), {
+        status: 200,
+        headers: {
+          "Content-Type": "application/pdf",
+          "Content-Disposition": `attachment; filename=${filename}`,
+          "Cache-Control": "no-store",
+        },
+      });
+    } catch (fallbackErr: any) {
+      console.error("EOD PDF fallback failed:", fallbackErr);
+      return NextResponse.json({
+        error: 'Failed to generate PDF (and fallback PDF failed)',
+        details: err?.message || String(err),
+      }, { status: 500 });
+    }
   }
 }
