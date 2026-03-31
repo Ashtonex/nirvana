@@ -1094,7 +1094,8 @@ Generated via NIRVANA POS`;
             const monthStamp = dayStamp.slice(0, 7); // YYYY-MM
             
             const isWeeklyDay = dayOfWeek === 6; // Saturday
-            const isMonthlyDay = !isSunday && todayDate === lastDayOfMonth;
+            const isMonthlyDay = !isSunday && (todayDate === 30 || todayDate === 31);
+            const isQuarterlyDay = isMonthlyDay && [2, 5, 8, 11].includes(now.getMonth());
             let pdfGenerated = false;
             
             const msgLines = [
@@ -1143,23 +1144,38 @@ Generated via NIRVANA POS`;
                 }
 
                 if (isMonthlyDay) {
-                     const moRes = await fetch(`/api/reports/monthly/pdf?shopId=${encodeURIComponent(shopId)}&month=${encodeURIComponent(monthStamp)}`, {
-                        cache: "no-store",
-                        credentials: "include"
-                     });
-                     if (moRes.ok) {
-                         const moBlob = await moRes.blob();
-                         const fileUrl = window.URL.createObjectURL(moBlob);
-                         const a = document.createElement("a");
-                         a.href = fileUrl;
-                         a.download = `Monthly_Strategic_${shopId}_${monthStamp}.pdf`;
-                         document.body.appendChild(a);
-                         a.click();
-                         window.URL.revokeObjectURL(fileUrl);
-                     } else {
-                        const err = await moRes.json().catch(() => ({}));
-                        console.error("Monthly PDF failed:", err);
-                     }
+                     const mMonth = now.toISOString().substring(0, 7);
+                     const mUrl = `/api/reports/monthly/pdf?shopId=${encodeURIComponent(shopId)}&month=${encodeURIComponent(mMonth)}`;
+                     
+                     // Trigger download
+                     const link = document.createElement("a");
+                     link.href = mUrl;
+                     link.download = `Monthly_Business_Report_${shopId}_${mMonth}.pdf`;
+                     document.body.appendChild(link);
+                     link.click();
+                     document.body.removeChild(link);
+                }
+
+                if (isQuarterlyDay) {
+                    const qMonth = now.toISOString().substring(0, 7);
+                    
+                    // Quarterly Business Report
+                    const qUrl = `/api/reports/quarterly/pdf?shopId=${encodeURIComponent(shopId)}&month=${encodeURIComponent(qMonth)}`;
+                    const qLink = document.createElement("a");
+                    qLink.href = qUrl;
+                    qLink.download = `Quarterly_Business_Report_${shopId}_${qMonth}.pdf`;
+                    document.body.appendChild(qLink);
+                    qLink.click();
+                    document.body.removeChild(qLink);
+
+                    // CEO-Level Quarterly Report
+                    const cUrl = `/api/reports/quarterly/ceo/pdf?shopId=${encodeURIComponent(shopId)}&month=${encodeURIComponent(qMonth)}`;
+                    const cLink = document.createElement("a");
+                    cLink.href = cUrl;
+                    cLink.download = `CEO_Quarterly_Report_${shopId}_${qMonth}.pdf`;
+                    document.body.appendChild(cLink);
+                    cLink.click();
+                    document.body.removeChild(cLink);
                 }
             } catch (e) {
                 console.error('EOD PDF exception:', e);

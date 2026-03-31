@@ -2653,7 +2653,8 @@ export async function getMonthlyReportData(
             operatingExpenses,
             inventoryValue: currentInvValue,
             daysOfInventory,
-            netProfit: grossProfit - fixedCosts - variableCosts
+            ebitda: grossProfit - operatingExpenses,
+            netProfit: grossProfit - operatingExpenses
         },
         weeks,
         categories: Array.from(catStats.entries()).map(([name, stats]) => ({ name, ...stats })),
@@ -2993,7 +2994,8 @@ export async function getQuarterlyReportData(
             variableCosts,
             operatingExpenses: fixedCosts + variableCosts,
             inventoryValue: currentInvValue,
-            netProfit: grossProfit - fixedCosts - variableCosts
+            ebitda: grossProfit - (fixedCosts + variableCosts),
+            netProfit: grossProfit - (fixedCosts + variableCosts)
         },
         months,
         categories: Array.from(catStats.entries()).map(([name, stats]) => ({ name, ...stats })),

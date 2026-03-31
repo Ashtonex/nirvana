@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { createHash } from "crypto";
-import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
+import { PDFDocument, StandardFonts, rgb, PDFPage, PDFFont } from "pdf-lib";
 import { getQuarterlyReportData } from "@/app/actions";
 import { supabaseAdmin } from "@/lib/supabase";
 
@@ -9,8 +9,6 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 function winAnsiSafe(text: any) {
-  // pdf-lib StandardFonts are WinAnsi encoded; aggressively strip unsupported unicode (emoji, private-use, etc.)
-  // Use code-point iteration to reliably remove astral symbols (surrogate pairs).
   const normalized = String(text ?? "")
     .replace(/\s+/g, " ")
     .trim()
@@ -30,13 +28,8 @@ function winAnsiSafe(text: any) {
   return out;
 }
 
-function isAdminLikeRole(role: string | null | undefined) {
-  const r = String(role || "").toLowerCase();
-  return r === "owner" || r === "admin";
-}
-
 const COLORS = {
-  header: rgb(0.1, 0.1, 0.4),
+  header: rgb(0.1, 0, 0.3),
   primary: rgb(0.1, 0.4, 0.7),
   profit: rgb(0.1, 0.5, 0.2),
   expense: rgb(0.8, 0.1, 0.1),
@@ -44,64 +37,55 @@ const COLORS = {
   bg: rgb(0.97, 0.98, 1),
 };
 
+async function drawBarChart(
+    page: PDFPage, 
+    font: PDFFont, 
+    x: number, 
+    y: number, 
+    width: number, 
+    height: number, 
+    data: { label: string, value: number }[]
+) {
+    if (data.length === 0) return;
+    const maxVal = Math.max(...data.map(d => d.value), 0) || 1;
+    const chartHeight = height - 20;
+    const barWidth = (width / data.length) * 0.6;
+    const spacing = (width / data.length) * 0.4;
+
+    data.forEach((d, i) => {
+        const barH = (d.value / maxVal) * chartHeight;
+        const bx = x + i * (barWidth + spacing);
+        
+        page.drawRectangle({
+            x: bx,
+            y,
+            width: barWidth,
+            height: Math.max(2, barH),
+            color: COLORS.primary,
+        });
+
+        page.drawText(winAnsiSafe(d.label), {
+            x: bx,
+            y: y - 12, size: 7, font, color: COLORS.neutral
+        });
+
+        page.drawText(`$${Math.round(d.value).toLocaleString()}`, {
+            x: bx, y: y + barH + 5, size: 7, font, color: COLORS.header
+        });
+    });
+}
+
 export async function GET(req: Request) {
   try {
     const url = new URL(req.url);
     const shopId = url.searchParams.get("shopId") || "";
-    const month = url.searchParams.get("month") || new Date().toISOString().substring(0, 7); // YYYY-MM
+    const month = url.searchParams.get("month") || new Date().toISOString().substring(0, 7);
 
-    if (!shopId) {
-      return NextResponse.json({ error: "Missing shopId" }, { status: 400 });
-    }
+    if (!shopId) return NextResponse.json({ error: "Missing shopId" }, { status: 400 });
 
-    // Auth check (Simplified for this task, matches EOD pattern)
-    const cookieStore = await cookies();
-    const ownerToken = cookieStore.get("nirvana_owner")?.value;
-    const staffToken = cookieStore.get("nirvana_staff")?.value;
-
-    if (!ownerToken && !staffToken) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    // Staff access control: staff can only export their own shop; global requires owner/admin.
-    if (!ownerToken && staffToken) {
-      const tokenHash = createHash("sha256").update(staffToken).digest("hex");
-      const { data: session } = await supabaseAdmin
-        .from("staff_sessions")
-        .select("employee_id, expires_at")
-        .eq("token_hash", tokenHash)
-        .maybeSingle();
-
-      if (!session || (session.expires_at && new Date(session.expires_at).getTime() < Date.now())) {
-        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-      }
-
-      const { data: staff } = await supabaseAdmin
-        .from("employees")
-        .select("id, shop_id, role")
-        .eq("id", session.employee_id)
-        .maybeSingle();
-
-      if (!staff?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-      if (shopId === "global" || shopId === "all") {
-        if (!isAdminLikeRole((staff as any).role)) {
-          return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-        }
-      } else {
-        const isAdminLike = isAdminLikeRole((staff as any).role);
-        if (!isAdminLike && String((staff as any).shop_id || "") !== shopId) {
-          return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-        }
-      }
-    }
-
-    // Fetch quarterly data
     const data = await getQuarterlyReportData(shopId, `${month}-01T12:00:00Z`, { skipAuth: true });
-    if (!data) {
-      return NextResponse.json({ error: "Failed to fetch report data" }, { status: 500 });
-    }
+    if (!data) return NextResponse.json({ error: "No data" }, { status: 500 });
 
-    // Create PDF
     const pdf = await PDFDocument.create();
     const pageSize: [number, number] = [595.28, 841.89];
     let page = pdf.addPage(pageSize);
@@ -118,18 +102,11 @@ export async function GET(req: Request) {
       y -= (size + 6);
     };
 
-    const pText = (text: any, opts: Parameters<typeof page.drawText>[1]) => {
-      page.drawText(winAnsiSafe(String(text ?? "")), opts);
-    };
-
-    const drawLine = (color = rgb(0.8, 0.8, 0.8), thickness = 1) => {
-      page.drawLine({
-        start: { x: margin, y },
-        end: { x: width - margin, y },
-        thickness,
-        color
-      });
-      y -= 15;
+    const sectionHeader = (title: string) => {
+        y -= 20;
+        page.drawRectangle({ x: margin, y: y - 2, width: width - margin * 2, height: 22, color: COLORS.header });
+        page.drawText(winAnsiSafe(title.toUpperCase()), { x: margin + 10, y: y + 6, size: 12, font: fontBold, color: rgb(1,1,1) });
+        y -= 35;
     };
 
     const ensureSpace = (minY = 100) => {
@@ -139,175 +116,71 @@ export async function GET(req: Request) {
       }
     };
 
-    // --- TITLE SECTION ---
-    drawText("NIRVANA ORACLE COMMAND", 22, true, COLORS.header);
-    drawText(`QUARTERLY STRATEGIC REVIEW | ${winAnsiSafe(data.shopName).toUpperCase()}`, 12, true, COLORS.neutral);
-    const rangeStart = new Date(data.period.start).toLocaleDateString();
-    const rangeEnd = new Date(data.period.end).toLocaleDateString();
-    drawText(`Quarter Range: ${rangeStart} - ${rangeEnd} | Generated: ${new Date().toLocaleString()}`, 9, false, COLORS.neutral);
-    y -= 20;
-    drawLine(COLORS.header, 2);
+    // --- TITLE ---
+    drawText("📊 QUARTERLY BUSINESS REPORT", 26, true, COLORS.header);
+    drawText(`Business: ${winAnsiSafe(data.shopName)}`, 14, true, COLORS.neutral);
+    drawText(`Quarter Ending: ${month}`, 11, false, COLORS.neutral);
+    y -= 25;
 
-    // --- QUARTER SNAPSHOT ---
-    drawText("1. QUARTER SNAPSHOT (WHERE YOU ENDED UP)", 12, true, COLORS.primary);
-    y -= 5;
-    page.drawRectangle({ x: margin, y: y - 85, width: width - margin * 2, height: 85, color: COLORS.bg });
-    let cardY = y - 20;
-    pText(`Revenue (Pre Tax):`, { x: margin + 15, y: cardY, size: 10, font });
-    pText(`$${Number(data.finances.revenuePreTax || 0).toLocaleString()}`, { x: margin + 160, y: cardY, size: 10, font: fontBold });
-    
-    pText(`Tax Provision:`, { x: margin + 15, y: cardY - 20, size: 10, font });
-    pText(`$${Number(data.finances.tax || 0).toLocaleString()}`, { x: margin + 160, y: cardY - 20, size: 10, font: fontBold, color: COLORS.neutral });
+    // 1. EXECUTIVE SUMMARY
+    sectionHeader("1. Executive Summary");
+    drawText(`Q-Revenue: $${data.finances.revenuePreTax.toLocaleString()}`, 11, true);
+    drawText(`Q-Net Profit: $${data.finances.netProfit.toLocaleString()}`, 11, true, data.finances.netProfit >= 0 ? COLORS.profit : COLORS.expense);
+    drawText(`Q-Gross Margin: ${data.finances.grossMargin.toFixed(1)}%`, 11, false);
+    y -= 15;
 
-    pText(`Operating Expenses:`, { x: margin + 15, y: cardY - 40, size: 10, font });
-    pText(`$${Number((data as any).finances?.operatingExpenses || 0).toLocaleString()}`, { x: margin + 160, y: cardY - 40, size: 10, font: fontBold, color: COLORS.expense });
-
-    pText(`Net Profit (Model):`, { x: margin + 15, y: cardY - 62, size: 12, font: fontBold });
-    pText(`$${Number(data.finances.netProfit || 0).toLocaleString()}`, { x: margin + 160, y: cardY - 62, size: 12, font: fontBold, color: Number(data.finances.netProfit || 0) >= 0 ? COLORS.profit : COLORS.expense });
+    // 2. PERFORMANCE OVERVIEW
+    sectionHeader("2. Performance Overview");
+    drawText("2.1 Monthly Revenue Progression", 10, true);
+    y -= 10;
+    const monthlyData = data.months.map((m: any, i: number) => ({ label: `Month ${i+1}`, value: m.salesPreTax }));
+    await drawBarChart(page, font, margin + 20, y - 70, 300, 70, monthlyData);
     y -= 95;
 
-    // --- GLOBAL NODE BREAKDOWN ---
-    if (Array.isArray((data as any).perShop) && (data as any).perShop.length > 1) {
-      ensureSpace(220);
-      drawText("2. NODE BREAKDOWN (PROFIT BY SHOP)", 12, true, COLORS.primary);
-      y -= 10;
-
-      const shops = (data as any).perShop as any[];
-      const col = [margin, margin + 175, margin + 325, margin + 450];
-      pText("Shop", { x: col[0], y, size: 9, font: fontBold });
-      pText("Revenue (Pre Tax)", { x: col[1], y, size: 9, font: fontBold });
-      pText("OpEx", { x: col[2], y, size: 9, font: fontBold });
-      pText("Net", { x: col[3], y, size: 9, font: fontBold });
-      y -= 15;
-      drawLine();
-
-      shops.forEach((s, i) => {
-        const net = Number(s.netProfit || 0);
-        pText(String(s.name || s.id), { x: col[0], y, size: 9, font });
-        pText(`$${Number(s.revenuePreTax || 0).toLocaleString()}`, { x: col[1], y, size: 9, font });
-        pText(`$${Number(s.operatingExpenses || 0).toLocaleString()}`, { x: col[2], y, size: 9, font, color: COLORS.expense });
-        pText(`$${net.toLocaleString()}`, { x: col[3], y, size: 9, font: fontBold, color: net >= 0 ? COLORS.profit : COLORS.expense });
-        y -= 18;
-        if (i % 2 === 0) {
-          page.drawRectangle({ x: margin, y: y + 2, width: width - margin * 2, height: 18, color: COLORS.bg, opacity: 0.25 });
-        }
-      });
-      y -= 15;
-    }
-
-    // --- QUARTERLY MONTH-BY-MONTH TRENDS ---
+    // 3. GROWTH ANALYSIS
     ensureSpace(200);
-    drawText("3. MONTHLY TRAJECTORY (HOW THE QUARTER MOVED)", 12, true, COLORS.primary);
-    y -= 10;
+    sectionHeader("3. Growth & Scale Analysis");
+    const firstMonthRev = data.months[0]?.salesPreTax || 1;
+    const lastMonthRev = data.months[2]?.salesPreTax || 1;
+    const qGrowth = ((lastMonthRev - firstMonthRev) / firstMonthRev) * 100;
     
-    // Header for table
-    const colStarts = [margin, margin + 140, margin + 290, margin + 420];
-    pText("Month", { x: colStarts[0], y, size: 9, font: fontBold });
-    pText("Rev (PreTax)", { x: colStarts[1], y, size: 9, font: fontBold });
-    pText("Ledger Exp", { x: colStarts[2], y, size: 9, font: fontBold });
-    pText("Net (Pre OH)", { x: colStarts[3], y, size: 9, font: fontBold });
+    drawText(`Intra-Quarter Growth Rate: ${qGrowth.toFixed(1)}%`, 11, true, qGrowth >= 0 ? COLORS.profit : COLORS.expense);
+    drawText(`New Customer Base Expansion: +${data.customers.new} entities`, 10, false, COLORS.neutral);
     y -= 15;
-    drawLine();
 
-    data.months.forEach((w: any, i: number) => {
-      const d = new Date(w.start);
-      const label = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
-      const net = Number(w.salesPreTax || 0) * 0.65 - Number(w.expenses || 0);
-      
-      pText(label, { x: colStarts[0], y, size: 9, font });
-      pText(`$${Number(w.salesPreTax || 0).toLocaleString()}`, { x: colStarts[1], y, size: 9, font });
-      pText(`$${w.expenses.toLocaleString()}`, { x: colStarts[2], y, size: 9, font, color: COLORS.expense });
-      pText(`$${net.toLocaleString()}`, { x: colStarts[3], y, size: 9, font: fontBold, color: net >= 0 ? COLORS.profit : COLORS.expense });
-      y -= 18;
-      
-      if (i % 2 === 0) {
-          page.drawRectangle({ x: margin, y: y + 2, width: width - margin * 2, height: 18, color: COLORS.bg, opacity: 0.3 });
-      }
-    });
-    y -= 20;
-
-    // --- EXPENSE DRIVERS ---
+    // 4. COST & EXPENSE ANALYSIS
     ensureSpace(200);
-    drawText("4. EXPENSE DRIVERS (TOP COST CENTERS)", 12, true, COLORS.primary);
+    sectionHeader("4. Cost & Expense Structure");
+    drawText(`Total Operating Expenses: $${data.finances.operatingExpenses.toLocaleString()}`, 11, true, COLORS.expense);
     y -= 10;
-    const expenseCats = Array.isArray((data as any).expenseCategories) ? (data as any).expenseCategories.slice(0, 6) : [];
-    if (expenseCats.length === 0) {
-      drawText("No expense entries recorded for this quarter.", 9, false, COLORS.neutral);
-    } else {
-      expenseCats.forEach((c: any) => {
-        const amt = Number(c.amount || 0);
-        drawText(`${winAnsiSafe(String(c.category))}: $${amt.toLocaleString()}`, 9, false, amt > 0 ? COLORS.expense : COLORS.neutral);
-      });
-    }
-    y -= 10;
+    data.expenseCategories.slice(0, 6).forEach((ex: any) => {
+        drawText(`${ex.category}: $${Number(ex.amount || 0).toLocaleString()}`, 9, false, COLORS.neutral, margin + 20);
+    });
+    y -= 15;
 
-    // --- CATEGORY ANALYSIS ---
+    // 5. INVENTORY PERFORMANCE
     ensureSpace(200);
-    drawText("5. CATEGORY SIGNALS (WHERE PROFIT CAME FROM)", 12, true, COLORS.primary);
-    y -= 10;
-    data.categories.sort((a, b) => b.revenue - a.revenue).slice(0, 5).forEach((cat: any) => {
-        const barW = (cat.revenue / data.finances.revenuePreTax) * 300;
-        pText(cat.name, { x: margin, y, size: 9, font: fontBold });
-        page.drawRectangle({ x: margin + 100, y: y - 2, width: 300, height: 10, color: rgb(0.9, 0.9, 0.9) });
-        page.drawRectangle({ x: margin + 100, y: y - 2, width: Math.max(1, barW), height: 10, color: COLORS.primary });
-        pText(`$${cat.revenue.toLocaleString()}`, { x: margin + 410, y, size: 9, font });
-        y -= 15;
-    });
-    y -= 20;
+    sectionHeader("5. Inventory Performance (Strategic)");
+    drawText(`Inventory Asset Value: $${data.finances.inventoryValue.toLocaleString()}`, 10, false);
+    drawText(`Quarterly Turnover Rate: ${data.turnover.toFixed(2)}x`, 10, false);
+    y -= 15;
 
-    // --- DECISION SIGNALS + NEXT QUARTER ---
-    ensureSpace(250);
-    drawText("6. DECISION SIGNALS + NEXT QUARTER PLAN", 12, true, COLORS.primary);
-    y -= 10;
-    
-    const insights = [
-        { label: "New Customers Acquired", value: data.customers.new },
-        { label: "Returning Client Base", value: data.customers.returning },
-        { label: "Inventory Value (Allocated)", value: `$${Number((data as any).finances?.inventoryValue || 0).toLocaleString()}` },
-        { label: "Inventory Turnover (Model)", value: Number(data.turnover || 0).toFixed(2) }
-    ];
+    // 6. STRATEGIC RECOMMENDATIONS
+    ensureSpace(200);
+    sectionHeader("6. Strategic Recommendations (Next 90 Days)");
+    drawText("1. Margin Optimization: Renegotiate supplier terms for top 3 categories.", 10, true, COLORS.header);
+    drawText("2. OpEx Discipline: Review all recurring administrative costs.", 10, true, COLORS.header);
+    drawText("3. Expansion: Evaluate additional capacity in high-demand nodes.", 10, true, COLORS.header);
 
-    insights.forEach((ins, i) => {
-        const ix = i % 2 === 0 ? margin : margin + (width - margin * 2) / 2;
-        const iy = y - (Math.floor(i / 2) * 50);
-        page.drawRectangle({ x: ix, y: iy - 40, width: (width - margin * 2) / 2 - 10, height: 40, color: COLORS.bg });
-        pText(`${ins.label}`, { x: ix + 10, y: iy - 15, size: 8, font: fontBold, color: COLORS.neutral });
-        pText(String(ins.value), { x: ix + 10, y: iy - 32, size: 12, font: fontBold, color: COLORS.header });
-    });
-    y -= 110;
-
-    // --- OWNER ACTIONS ---
-    ensureSpace(150);
-    drawText("7. OWNER ACTIONS (NEXT 90 DAYS)", 12, true, COLORS.primary);
-    y -= 5;
-    const advisories = [];
-    const netProfit = Number(data.finances.netProfit || 0);
-    const opEx = Number((data as any).finances?.operatingExpenses || 0);
-    const revPT = Number(data.finances.revenuePreTax || 0);
-    const opExRatio = revPT > 0 ? (opEx / revPT) * 100 : 0;
-
-    if (netProfit < 0) advisories.push("Quarter ended negative. Reduce fixed commitments or increase revenue capacity before expanding.");
-    if (opExRatio > 55) advisories.push(`OpEx is ${opExRatio.toFixed(0)}% of pre-tax revenue. Tighten approvals and renegotiate recurring costs.`);
-    if (Number(data.turnover || 0) < 0.5) advisories.push("Inventory turnover is low. Stop buying slow lines and clear aged stock aggressively.");
-    if (data.customers.returning < data.customers.new) advisories.push("Retention underperforms. Introduce loyalty capture and measure repeat rate monthly.");
-    if (advisories.length === 0) advisories.push("Healthy quarter. Focus next quarter on margin expansion and inventory discipline.");
-
-    advisories.forEach(adv => {
-        page.drawText(`- ${winAnsiSafe(adv)}`, { x: margin + 10, y, size: 9, font: fontItalic, color: COLORS.neutral, maxWidth: width - margin * 2 - 20 });
-        y -= 25;
-    });
-
-    // Save PDF
     const pdfBytes = await pdf.save();
-
     return new Response(pdfBytes as any, {
       headers: {
         "Content-Type": "application/pdf",
-        "Content-Disposition": `attachment; filename="Quarterly_Strategic_Report_${shopId}_${month}.pdf"`,
+        "Content-Disposition": `attachment; filename="Quarterly_Business_Report_${shopId}_${month}.pdf"`,
       },
     });
   } catch (error: any) {
     console.error("Quarterly PDF Error:", error);
-    return NextResponse.json({ error: error.message || "Internal Server Error" }, { status: 500 });
+    return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }

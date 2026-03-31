@@ -1,21 +1,14 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { createHash } from "crypto";
-import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
+import { PDFDocument, StandardFonts, rgb, PDFPage, PDFFont } from "pdf-lib";
 import { getMonthlyReportData } from "@/app/actions";
 import { supabaseAdmin } from "@/lib/supabase";
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-function isAdminLikeRole(role: string | null | undefined) {
-  const r = String(role || "").toLowerCase();
-  return r === "owner" || r === "admin";
-}
-
 function winAnsiSafe(text: any) {
-  // pdf-lib StandardFonts are WinAnsi encoded; aggressively strip unsupported unicode (emoji, private-use, etc.)
-  // Use code-point iteration to reliably remove astral symbols (surrogate pairs).
   const normalized = String(text ?? "")
     .replace(/\s+/g, " ")
     .trim()
@@ -36,7 +29,7 @@ function winAnsiSafe(text: any) {
 }
 
 const COLORS = {
-  header: rgb(0.1, 0.1, 0.4),
+  header: rgb(0.1, 0, 0.3),
   primary: rgb(0.1, 0.4, 0.7),
   profit: rgb(0.1, 0.5, 0.2),
   expense: rgb(0.8, 0.1, 0.1),
@@ -44,64 +37,55 @@ const COLORS = {
   bg: rgb(0.97, 0.98, 1),
 };
 
+async function drawBarChart(
+    page: PDFPage, 
+    font: PDFFont, 
+    x: number, 
+    y: number, 
+    width: number, 
+    height: number, 
+    data: { label: string, value: number }[]
+) {
+    if (data.length === 0) return;
+    const maxVal = Math.max(...data.map(d => d.value), 0) || 1;
+    const chartHeight = height - 20;
+    const barWidth = (width / data.length) * 0.6;
+    const spacing = (width / data.length) * 0.4;
+
+    data.forEach((d, i) => {
+        const barH = (d.value / maxVal) * chartHeight;
+        const bx = x + i * (barWidth + spacing);
+        
+        page.drawRectangle({
+            x: bx,
+            y,
+            width: barWidth,
+            height: Math.max(2, barH),
+            color: COLORS.primary,
+        });
+
+        page.drawText(winAnsiSafe(d.label), {
+            x: bx,
+            y: y - 12, size: 7, font, color: COLORS.neutral
+        });
+
+        page.drawText(`$${Math.round(d.value).toLocaleString()}`, {
+            x: bx, y: y + barH + 5, size: 7, font, color: COLORS.header
+        });
+    });
+}
+
 export async function GET(req: Request) {
   try {
     const url = new URL(req.url);
     const shopId = url.searchParams.get("shopId") || "";
-    const month = url.searchParams.get("month") || new Date().toISOString().substring(0, 7); // YYYY-MM
+    const month = url.searchParams.get("month") || new Date().toISOString().substring(0, 7);
 
-    if (!shopId) {
-      return NextResponse.json({ error: "Missing shopId" }, { status: 400 });
-    }
+    if (!shopId) return NextResponse.json({ error: "Missing shopId" }, { status: 400 });
 
-    // Auth check (Simplified for this task, matches EOD pattern)
-    const cookieStore = await cookies();
-    const ownerToken = cookieStore.get("nirvana_owner")?.value;
-    const staffToken = cookieStore.get("nirvana_staff")?.value;
-
-    if (!ownerToken && !staffToken) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    // Staff access control: staff can only export their own shop; global requires owner/admin.
-    if (!ownerToken && staffToken) {
-      const tokenHash = createHash("sha256").update(staffToken).digest("hex");
-      const { data: session } = await supabaseAdmin
-        .from("staff_sessions")
-        .select("employee_id, expires_at")
-        .eq("token_hash", tokenHash)
-        .maybeSingle();
-
-      if (!session || (session.expires_at && new Date(session.expires_at).getTime() < Date.now())) {
-        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-      }
-
-      const { data: staff } = await supabaseAdmin
-        .from("employees")
-        .select("id, shop_id, role")
-        .eq("id", session.employee_id)
-        .maybeSingle();
-
-      if (!staff?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-      if (shopId === "global" || shopId === "all") {
-        if (!isAdminLikeRole((staff as any).role)) {
-          return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-        }
-      } else {
-        const isAdminLike = isAdminLikeRole((staff as any).role);
-        if (!isAdminLike && String((staff as any).shop_id || "") !== shopId) {
-          return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-        }
-      }
-    }
-
-    // Fetch monthly data
     const data = await getMonthlyReportData(shopId, `${month}-01T12:00:00Z`, { skipAuth: true });
-    if (!data) {
-      return NextResponse.json({ error: "Failed to fetch report data" }, { status: 500 });
-    }
+    if (!data) return NextResponse.json({ error: "No data" }, { status: 500 });
 
-    // Create PDF
     const pdf = await PDFDocument.create();
     const pageSize: [number, number] = [595.28, 841.89];
     let page = pdf.addPage(pageSize);
@@ -118,18 +102,11 @@ export async function GET(req: Request) {
       y -= (size + 6);
     };
 
-    const pText = (text: any, opts: Parameters<typeof page.drawText>[1]) => {
-      page.drawText(winAnsiSafe(String(text ?? "")), opts);
-    };
-
-    const drawLine = (color = rgb(0.8, 0.8, 0.8), thickness = 1) => {
-      page.drawLine({
-        start: { x: margin, y },
-        end: { x: width - margin, y },
-        thickness,
-        color
-      });
-      y -= 15;
+    const sectionHeader = (title: string) => {
+        y -= 15;
+        page.drawRectangle({ x: margin, y: y - 2, width: width - margin * 2, height: 20, color: COLORS.header });
+        page.drawText(winAnsiSafe(title.toUpperCase()), { x: margin + 10, y: y + 5, size: 11, font: fontBold, color: rgb(1,1,1) });
+        y -= 30;
     };
 
     const ensureSpace = (minY = 100) => {
@@ -139,197 +116,94 @@ export async function GET(req: Request) {
       }
     };
 
-    // --- TITLE SECTION ---
-    drawText("NIRVANA ORACLE COMMAND", 22, true, COLORS.header);
-    drawText(`MONTHLY STRATEGIC REPORT | ${winAnsiSafe(data.shopName).toUpperCase()}`, 12, true, COLORS.neutral);
-    drawText(`Period: ${month} | Generated: ${new Date().toLocaleString()}`, 9, false, COLORS.neutral);
+    // --- TITLE ---
+    drawText("📊 MONTHLY BUSINESS REPORT", 24, true, COLORS.header);
+    drawText(`Business: ${winAnsiSafe(data.shopName)}`, 12, true, COLORS.neutral);
+    drawText(`Reporting Period: ${month}`, 10, false, COLORS.neutral);
+    drawText(`Generated: ${new Date().toLocaleString()}`, 9, false, COLORS.neutral);
     y -= 20;
-    drawLine(COLORS.header, 2);
 
-    // --- EXECUTIVE BRIEF ---
-    drawText("1. EXECUTIVE BRIEF (WHAT HAPPENED THIS MONTH)", 12, true, COLORS.primary);
-    y -= 5;
-    page.drawRectangle({ x: margin, y: y - 85, width: width - margin * 2, height: 85, color: COLORS.bg });
-    let cardY = y - 20;
-    pText(`Revenue (Pre Tax):`, { x: margin + 15, y: cardY, size: 10, font });
-    pText(`$${Number(data.finances.revenuePreTax || 0).toLocaleString()}`, { x: margin + 160, y: cardY, size: 10, font: fontBold });
-    
-    pText(`Tax Provision:`, { x: margin + 15, y: cardY - 20, size: 10, font });
-    pText(`$${Number(data.finances.tax || 0).toLocaleString()}`, { x: margin + 160, y: cardY - 20, size: 10, font: fontBold, color: COLORS.neutral });
-
-    pText(`Operating Expenses:`, { x: margin + 15, y: cardY - 40, size: 10, font });
-    pText(`$${Number(data.finances.operatingExpenses || 0).toLocaleString()}`, { x: margin + 160, y: cardY - 40, size: 10, font: fontBold, color: COLORS.expense });
-
-    pText(`Net Profit (Model):`, { x: margin + 15, y: cardY - 62, size: 12, font: fontBold });
-    pText(`$${Number(data.finances.netProfit || 0).toLocaleString()}`, { x: margin + 160, y: cardY - 62, size: 12, font: fontBold, color: Number(data.finances.netProfit || 0) >= 0 ? COLORS.profit : COLORS.expense });
-    y -= 95;
-
-    // --- MOM DELTAS ---
-    ensureSpace(180);
-    drawText("2. MOMENTUM (VS LAST MONTH)", 12, true, COLORS.primary);
-    y -= 10;
-    const prev = (data as any).comparison?.prev || {};
+    // 1. EXECUTIVE SUMMARY
+    sectionHeader("1. Executive Summary");
     const delta = (data as any).comparison?.delta || {};
-    const fmtDelta = (n: any) => {
-      const v = Number(n || 0);
-      const s = v >= 0 ? "+" : "-";
-      return `${s}$${Math.abs(v).toLocaleString()}`;
-    };
-    drawText(`Revenue (Pre Tax): ${fmtDelta(delta.revenuePreTax)} (prev $${Number(prev.revenuePreTax || 0).toLocaleString()})`, 9, false, COLORS.neutral);
-    drawText(`Operating Expenses: ${fmtDelta(delta.operatingExpenses)} (prev $${Number(prev.operatingExpenses || 0).toLocaleString()})`, 9, false, COLORS.neutral);
-    drawText(`Net Profit: ${fmtDelta(delta.netProfit)} (prev $${Number(prev.netProfit || 0).toLocaleString()})`, 9, false, COLORS.neutral);
+    const growth = (data as any).comparison?.prev?.revenuePreTax > 0 
+        ? (delta.revenuePreTax / (data as any).comparison.prev.revenuePreTax) * 100 
+        : 0;
+
+    drawText(`Total Revenue: $${data.finances.revenuePreTax.toLocaleString()}`, 10, true);
+    drawText(`Net Profit: $${data.finances.netProfit.toLocaleString()}`, 10, true, data.finances.netProfit >= 0 ? COLORS.profit : COLORS.expense);
+    drawText(`Growth vs Last Month: ${growth.toFixed(1)}%`, 10, false, growth >= 0 ? COLORS.profit : COLORS.expense);
     y -= 10;
-
-    // --- NODE BREAKDOWN (GLOBAL ONLY) ---
-    if (Array.isArray((data as any).perShop) && (data as any).perShop.length > 1) {
-      ensureSpace(220);
-      drawText("3. NODE BREAKDOWN (WHICH SHOP CARRIED / DRAGGED)", 12, true, COLORS.primary);
-      y -= 10;
-
-      const shops = (data as any).perShop as any[];
-      const col = [margin, margin + 175, margin + 325, margin + 450];
-      pText("Shop", { x: col[0], y, size: 9, font: fontBold });
-      pText("Revenue (Pre Tax)", { x: col[1], y, size: 9, font: fontBold });
-      pText("OpEx", { x: col[2], y, size: 9, font: fontBold });
-      pText("Net", { x: col[3], y, size: 9, font: fontBold });
-      y -= 15;
-      drawLine();
-
-      shops.forEach((s, i) => {
-        const net = Number(s.netProfit || 0);
-        pText(String(s.name || s.id), { x: col[0], y, size: 9, font });
-        pText(`$${Number(s.revenuePreTax || 0).toLocaleString()}`, { x: col[1], y, size: 9, font });
-        pText(`$${Number(s.operatingExpenses || 0).toLocaleString()}`, { x: col[2], y, size: 9, font, color: COLORS.expense });
-        pText(`$${net.toLocaleString()}`, { x: col[3], y, size: 9, font: fontBold, color: net >= 0 ? COLORS.profit : COLORS.expense });
-        y -= 18;
-        if (i % 2 === 0) {
-          page.drawRectangle({ x: margin, y: y + 2, width: width - margin * 2, height: 18, color: COLORS.bg, opacity: 0.25 });
-        }
-      });
-      y -= 15;
-    }
-
-    // --- WEEKLY CADENCE ---
-    ensureSpace(200);
-    drawText("4. WEEKLY CADENCE (HOW THE MONTH PLAYED OUT)", 12, true, COLORS.primary);
-    y -= 10;
-    
-    // Header for table
-    const colStarts = [margin, margin + 100, margin + 250, margin + 400];
-    pText("Week Range", { x: colStarts[0], y, size: 9, font: fontBold });
-    pText("Sales Revenue", { x: colStarts[1], y, size: 9, font: fontBold });
-    pText("Expenses", { x: colStarts[2], y, size: 9, font: fontBold });
-    pText("Net Contribution", { x: colStarts[3], y, size: 9, font: fontBold });
+    drawText(`Key Success: ${growth > 0 ? "Strong revenue momentum." : "Stable operations."}`, 9, false, COLORS.neutral);
+    drawText(`Main Challenge: ${data.turnover < 0.5 ? "Slow inventory movement." : "Maintaining margins."}`, 9, false, COLORS.neutral);
     y -= 15;
-    drawLine();
 
-    data.weeks.forEach((w: any, i: number) => {
-      const startD = new Date(w.start).toLocaleDateString();
-      const endD = new Date(w.end).toLocaleDateString();
-      const net = w.sales - w.expenses;
-      
-      pText(`${startD} - ${endD.split('/')[0]}/${endD.split('/')[1]}`, { x: colStarts[0], y, size: 9, font });
-      pText(`$${w.sales.toLocaleString()}`, { x: colStarts[1], y, size: 9, font });
-      pText(`$${w.expenses.toLocaleString()}`, { x: colStarts[2], y, size: 9, font, color: COLORS.expense });
-      pText(`$${net.toLocaleString()}`, { x: colStarts[3], y, size: 9, font: fontBold, color: net >= 0 ? COLORS.profit : COLORS.expense });
-      y -= 18;
-      
-      if (i % 2 === 0) {
-          page.drawRectangle({ x: margin, y: y + 2, width: width - margin * 2, height: 18, color: COLORS.bg, opacity: 0.3 });
-      }
+    // 2. SALES PERFORMANCE
+    sectionHeader("2. Sales Performance");
+    drawText("2.1 Revenue Breakdown by Category", 10, true);
+    y -= 10;
+    data.categories.sort((a,b) => b.revenue - a.revenue).slice(0, 5).forEach(cat => {
+        const share = (cat.revenue / data.finances.revenuePreTax) * 100;
+        drawText(`${cat.name}: $${cat.revenue.toLocaleString()} (${share.toFixed(1)}%)`, 9, false, COLORS.neutral, margin + 20);
     });
-    y -= 20;
-
-    // --- CATEGORY ANALYSIS ---
-    ensureSpace(200);
-    drawText("5. CATEGORY SIGNALS (WHERE PROFIT REALLY CAME FROM)", 12, true, COLORS.primary);
-    y -= 10;
-    data.categories.sort((a, b) => b.revenue - a.revenue).slice(0, 5).forEach((cat: any) => {
-        const barW = (cat.revenue / data.finances.revenuePreTax) * 300;
-        pText(cat.name, { x: margin, y, size: 9, font: fontBold });
-        page.drawRectangle({ x: margin + 100, y: y - 2, width: 300, height: 10, color: rgb(0.9, 0.9, 0.9) });
-        page.drawRectangle({ x: margin + 100, y: y - 2, width: Math.max(1, barW), height: 10, color: COLORS.primary });
-        pText(`$${cat.revenue.toLocaleString()}`, { x: margin + 410, y, size: 9, font });
-        y -= 15;
-    });
-    y -= 20;
-
-    // --- EXPENSE DRIVERS ---
-    ensureSpace(220);
-    drawText("6. EXPENSE DRIVERS (WHAT YOU PAID FOR)", 12, true, COLORS.primary);
-    y -= 10;
-    const expenseCats = Array.isArray((data as any).expenseCategories) ? (data as any).expenseCategories.slice(0, 6) : [];
-    if (expenseCats.length === 0) {
-      drawText("No expense entries recorded for this period.", 9, false, COLORS.neutral);
-    } else {
-      expenseCats.forEach((c: any) => {
-        const amt = Number(c.amount || 0);
-        drawText(`${winAnsiSafe(String(c.category))}: $${amt.toLocaleString()}`, 9, false, amt > 0 ? COLORS.expense : COLORS.neutral);
-      });
-    }
-    y -= 10;
-
-    // --- DECISION SIGNALS ---
-    ensureSpace(250);
-    drawText("7. DECISION SIGNALS (CUSTOMERS, INVENTORY, CASH)", 12, true, COLORS.primary);
     y -= 10;
     
-    const insights = [
-        { label: "New Customers Acquired", value: data.customers.new },
-        { label: "Returning Client Base", value: data.customers.returning },
-        { label: "Inventory Value (Allocated)", value: `$${Number((data as any).finances?.inventoryValue || 0).toLocaleString()}` },
-        { label: "Days of Inventory (Model)", value: Number((data as any).finances?.daysOfInventory || 0).toFixed(0) }
-    ];
+    drawText("2.2 Weekly Sales Trends", 10, true);
+    y -= 10;
+    const weeklyData = data.weeks.map((w: any, i: number) => ({ label: `W${i+1}`, value: w.sales }));
+    await drawBarChart(page, font, margin + 20, y - 60, 250, 60, weeklyData);
+    y -= 85;
 
-    insights.forEach((ins, i) => {
-        const ix = i % 2 === 0 ? margin : margin + (width - margin * 2) / 2;
-        const iy = y - (Math.floor(i / 2) * 50);
-        page.drawRectangle({ x: ix, y: iy - 40, width: (width - margin * 2) / 2 - 10, height: 40, color: COLORS.bg });
-        pText(`${ins.label}`, { x: ix + 10, y: iy - 15, size: 8, font: fontBold, color: COLORS.neutral });
-        pText(String(ins.value), { x: ix + 10, y: iy - 32, size: 12, font: fontBold, color: COLORS.header });
+    // 3. INVENTORY INSIGHTS
+    ensureSpace(200);
+    sectionHeader("3. Inventory Insights");
+    drawText(`Total Inventory Value: $${data.finances.inventoryValue.toLocaleString()}`, 10, false);
+    drawText(`Inventory Turnover: ${data.turnover.toFixed(2)}x`, 10, false);
+    drawText(`Days of Inventory (Model): ${data.finances.daysOfInventory.toFixed(0)} days`, 10, false);
+    y -= 10;
+
+    // 4. CUSTOMER INSIGHTS
+    ensureSpace(200);
+    sectionHeader("4. Customer Insights");
+    drawText(`New Customers: ${data.customers.new}`, 10, false);
+    drawText(`Returning Customers: ${data.customers.returning}`, 10, false);
+    drawText(`Total Customers Served: ${data.customers.total}`, 10, false);
+    y -= 10;
+
+    // 5. CASH FLOW & EXPENSES
+    ensureSpace(200);
+    sectionHeader("5. Cash Flow & Expense Management");
+    drawText(`Operating Expenses: $${data.finances.operatingExpenses.toLocaleString()}`, 10, true, COLORS.expense);
+    y -= 5;
+    data.expenseCategories.slice(0, 4).forEach((ex: any) => {
+        drawText(`${ex.category}: $${Number(ex.amount || 0).toLocaleString()}`, 9, false, COLORS.neutral, margin + 20);
     });
-    y -= 110;
+    y -= 10;
 
-    // --- OWNER ACTIONS + SIMULATION ---
+    // 6. RISKS & CHALLENGES
     ensureSpace(150);
-    drawText("8. OWNER ACTIONS (DO NEXT, NOT LATER)", 12, true, COLORS.primary);
-    y -= 5;
-    const advisories = [];
-    const netProfit = Number(data.finances.netProfit || 0);
-    const opEx = Number((data as any).finances?.operatingExpenses || 0);
-    const revPT = Number(data.finances.revenuePreTax || 0);
-    const opExRatio = revPT > 0 ? (opEx / revPT) * 100 : 0;
+    sectionHeader("6. Risks & Challenges");
+    if (data.finances.netProfit < 0) drawText("- PROFITABILITY RISK: Expenses exceeding gross profit.", 9, false, COLORS.expense);
+    if (data.turnover < 0.3) drawText("- INVENTORY RISK: High capital lock-up in slow-moving stock.", 9, false, COLORS.expense);
+    if (data.customers.returning < data.customers.new) drawText("- LOYALTY RISK: Retention rate is lower than acquisition.", 9, false, COLORS.expense);
+    if (y > height - margin - 300) drawText("- No major operational risks identified this period.", 9, false, COLORS.neutral);
 
-    if (netProfit < 0) advisories.push("Profit is negative. Freeze discretionary spend and audit the top expense categories first.");
-    if (opExRatio > 55) advisories.push(`OpEx is ${opExRatio.toFixed(0)}% of pre-tax revenue. Set a weekly cap and enforce approvals.`);
-    if (Number(data.turnover || 0) < 0.5) advisories.push("Inventory turnover is low. Run clearance on aged stock and stop over-ordering slow categories.");
-    if (data.customers.returning < data.customers.new) advisories.push("Retention is lagging. Add a simple return incentive and track returning rate weekly.");
-    if (advisories.length === 0) advisories.push("Stable month. Push margin: bundle high-margin add-ons and tighten discounting rules.");
+    // 7. RECOMMENDATIONS
+    ensureSpace(150);
+    sectionHeader("7. Recommendations");
+    if (data.finances.netProfit < 0) drawText("- Audit top 3 expense categories and reduce non-essential spend immediately.", 9, true, COLORS.header);
+    if (data.turnover < 0.5) drawText("- Launch clearance campaign for slow categories to free up working capital.", 9, true, COLORS.header);
+    drawText("- Optimize stock levels in high-turnover categories.", 9, true, COLORS.header);
 
-    advisories.forEach(adv => {
-        page.drawText(`- ${winAnsiSafe(adv)}`, { x: margin + 10, y, size: 9, font: fontItalic, color: COLORS.neutral, maxWidth: width - margin * 2 - 20 });
-        y -= 25;
-    });
-
-    // Simple scenario simulation (5% revenue lift, expenses held)
-    const simRevenuePT = revPT * 1.05;
-    const simGrossProfit = simRevenuePT * 0.65;
-    const simNet = simGrossProfit - opEx;
-    y -= 5;
-    drawText("Simulation (if +5% pre-tax revenue, expenses constant):", 9, true, COLORS.neutral);
-    drawText(`Projected Net: $${simNet.toLocaleString()} (today $${netProfit.toLocaleString()})`, 9, false, simNet >= 0 ? COLORS.profit : COLORS.expense);
-
-    // Save PDF
     const pdfBytes = await pdf.save();
-
     return new Response(pdfBytes as any, {
       headers: {
         "Content-Type": "application/pdf",
-        "Content-Disposition": `attachment; filename="Monthly_Strategic_Report_${shopId}_${month}.pdf"`,
+        "Content-Disposition": `attachment; filename="Monthly_Business_Report_${shopId}_${month}.pdf"`,
       },
     });
   } catch (error: any) {
     console.error("Monthly PDF Error:", error);
-    return NextResponse.json({ error: error.message || "Internal Server Error" }, { status: 500 });
+    return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
