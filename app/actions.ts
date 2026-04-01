@@ -114,7 +114,7 @@ function getLaybyPaidAmountFromLedger(ledgerEntries: any[], laybyId: string): nu
         .reduce((sum: number, l: any) => sum + Number(l?.amount || 0), 0);
 }
 
-export async function getDashboardData() {
+export async function getDashboardData(daysLimit = 60) {
     // Guard: if Supabase env is missing/misconfigured, never crash the whole app.
     // Return safe empty structures so pages can render and show UI.
     const hasSupabase = Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY);
@@ -141,18 +141,20 @@ export async function getDashboardData() {
     }
 
     try {
+        const dateThreshold = new Date(Date.now() - daysLimit * 24 * 60 * 60 * 1000).toISOString();
+
         const { data: inventory } = await supabaseAdmin.from('inventory_items').select('*').limit(10000);
         const { data: allocations } = await supabaseAdmin.from('inventory_allocations').select('*').limit(10000);
-        const { data: sales } = await supabaseAdmin.from('sales').select('*').limit(50000);
+        const { data: sales } = await supabaseAdmin.from('sales').select('*').gte('date', dateThreshold).limit(20000);
         const { data: shops } = await supabaseAdmin.from('shops').select('*').limit(1000);
         const { data: quotations } = await supabaseAdmin.from('quotations').select('*').limit(10000);
         const { data: employees } = await supabaseAdmin.from('employees').select('*').limit(1000);
         const { data: shipments } = await supabaseAdmin.from('shipments').select('*').limit(5000);
         const { data: settings } = await supabaseAdmin.from('oracle_settings').select('*').single();
-        const { data: ledger } = await supabaseAdmin.from('ledger_entries').select('*').limit(50000);
-        const { data: auditLog } = await supabaseAdmin.from('audit_log').select('*').limit(10000);
-        const { data: transfers } = await supabaseAdmin.from('transfers').select('*').limit(10000);
-        const { data: emails } = await supabaseAdmin.from('oracle_emails').select('*').limit(5000);
+        const { data: ledger } = await supabaseAdmin.from('ledger_entries').select('*').gte('date', dateThreshold).limit(20000);
+        const { data: auditLog } = await supabaseAdmin.from('audit_log').select('*').limit(5000);
+        const { data: transfers } = await supabaseAdmin.from('transfers').select('*').limit(5000);
+        const { data: emails } = await supabaseAdmin.from('oracle_emails').select('*').limit(1000);
 
         const ledgerRows = ledger || [];
 
@@ -367,7 +369,9 @@ export async function recordSale(sale: any) {
 
     const totalWithTax = subtotalAfterDiscount + tax;
     const saleId = Math.random().toString(36).substring(2, 9);
-    const timestamp = new Date().toISOString();
+    
+    // Support backlog sales with custom date
+    const timestamp = sale.date ? new Date(sale.date).toISOString() : new Date().toISOString();
 
     await supabaseAdmin.from('sales').insert({
         id: saleId, shop_id: sale.shopId, item_id: sale.itemId, item_name: sale.itemName,
@@ -436,7 +440,7 @@ export async function recordSale(sale: any) {
 }
 
 export async function recordUntrackedSale(sale: any) {
-    const timestamp = new Date().toISOString();
+    const timestamp = sale.date ? new Date(sale.date).toISOString() : new Date().toISOString();
     const desiredQty = Math.max(1, Number(sale.quantity || 1));
 
     // Check if product exists by name in database
@@ -1128,9 +1132,10 @@ export async function recordPosExpense(
     options?: {
         toInvest?: boolean;
         toOperations?: boolean;
+        date?: string;
     }
 ) {
-    const timestamp = new Date().toISOString();
+    const timestamp = options?.date ? new Date(options.date).toISOString() : new Date().toISOString();
     const id = Math.random().toString(36).substring(2, 9);
     const descLower = String(description || "").toLowerCase();
 
@@ -1236,14 +1241,15 @@ export async function recordPosExpense(
 }
 
 
-export async function getOracleMasterPulse() {
+export async function getOracleMasterPulse(daysLimit = 60) {
+    const dateThreshold = new Date(Date.now() - daysLimit * 24 * 60 * 60 * 1000).toISOString();
 
     const { data: settings } = await supabaseAdmin.from('oracle_settings').select('*').single();
     const { data: inventory } = await supabaseAdmin.from('inventory_items').select('*, inventory_allocations(*)');
-    const { data: sales } = await supabaseAdmin.from('sales').select('*');
+    const { data: sales } = await supabaseAdmin.from('sales').select('*').gte('date', dateThreshold);
     const { data: shops } = await supabaseAdmin.from('shops').select('*');
-    const { data: ledger } = await supabaseAdmin.from('ledger_entries').select('*');
-    const { data: investDeposits } = await supabaseAdmin.from('invest_deposits').select('*');
+    const { data: ledger } = await supabaseAdmin.from('ledger_entries').select('*').gte('date', dateThreshold);
+    const { data: investDeposits } = await supabaseAdmin.from('invest_deposits').select('*').gte('created_at', dateThreshold);
     if (!inventory || !sales || !shops || !settings) return null;
 
     const totalRevenue = sales.reduce((sum: number, s: any) => sum + Number(s.total_with_tax), 0);

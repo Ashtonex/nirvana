@@ -9,8 +9,11 @@ export async function GET(req: Request) {
   try {
     await requirePrivilegedActor();
     const url = new URL(req.url);
-    const limit = Math.min(200, Math.max(1, Number(url.searchParams.get("limit") || 50)));
-    const rows = await listOperationsLedgerEntries(limit);
+    const limit = Math.min(500, Math.max(1, Number(url.searchParams.get("limit") || 100)));
+    const month = url.searchParams.get("month") || new Date().toISOString().substring(0, 7);
+    
+    // We'll need to update listOperationsLedgerEntries to support filtering
+    const rows = await listOperationsLedgerEntries(limit, month);
     return NextResponse.json({ rows });
   } catch (e: any) {
     const msg = e?.message || String(e);

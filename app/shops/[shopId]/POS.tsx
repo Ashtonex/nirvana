@@ -130,6 +130,8 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
     const [staffRole, setStaffRole] = useState<string>("");
     const [staffDisplayName, setStaffDisplayName] = useState<string>("");
     const [paymentMethod, setPaymentMethod] = useState<'cash' | 'ecocash'>('cash');
+    const [backlogDate, setBacklogDate] = useState<string>(new Date().toISOString().split('T')[0]);
+    const [isBacklogMode, setIsBacklogMode] = useState(false);
 
     // Offline handling
     const { saveSaleOffline, syncPendingSales, getPendingCount, isOnline } = useOfflineSales();
@@ -471,7 +473,8 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
                     selectedEmployeeId || "system",
                     {
                         toInvest: expenseToInvest,
-                        toOperations: expenseToOperations
+                        toOperations: expenseToOperations,
+                        date: isBacklogMode ? backlogDate : undefined
                     }
                 );
                 setIsExpenseModalOpen(false);
@@ -911,7 +914,8 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
                                     employeeId: selectedEmployeeId || "system",
                                     clientName: clientName || "General Walk-in",
                                     paymentMethod,
-                                    discount: discountAmount
+                                    discount: discountAmount,
+                                    date: isBacklogMode ? backlogDate : undefined
                                 });
                             } else {
                                 await recordSale({
@@ -924,7 +928,8 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
                                     employeeId: selectedEmployeeId || "system",
                                     clientName: clientName || "General Walk-in",
                                     paymentMethod,
-                                    discount: discountAmount
+                                    discount: discountAmount,
+                                    date: isBacklogMode ? backlogDate : undefined
                                 });
                             }
 
@@ -954,8 +959,8 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
                             discount: discountAmount,
                             tax: totalTax,
                             total: totalDue,
-                            dateStamp: new Date().toLocaleDateString(),
-                            timeStamp: new Date().toLocaleTimeString(),
+                            dateStamp: isBacklogMode ? new Date(backlogDate).toLocaleDateString() : new Date().toLocaleDateString(),
+                            timeStamp: isBacklogMode ? "00:00:00 (Backlog)" : new Date().toLocaleTimeString(),
                             paymentMethod
                         };
 
@@ -1350,6 +1355,27 @@ Generated via NIRVANA POS`;
                         </Badge>
                     ) : null}
 
+                    <div className="flex items-center gap-1 bg-slate-900 border border-slate-800 rounded-lg p-1 h-10 px-3">
+                        <div className="flex items-center gap-2 mr-1">
+                            <input 
+                                type="checkbox" 
+                                id="backlog-mode" 
+                                checked={isBacklogMode} 
+                                onChange={(e) => setIsBacklogMode(e.target.checked)}
+                                className="h-3 w-3 rounded border-slate-700 bg-slate-800 text-violet-600 focus:ring-violet-500"
+                            />
+                            <label htmlFor="backlog-mode" className="text-[9px] font-black uppercase text-slate-400 cursor-pointer whitespace-nowrap">Backlog</label>
+                        </div>
+                        {isBacklogMode && (
+                            <input 
+                                type="date" 
+                                value={backlogDate} 
+                                onChange={(e) => setBacklogDate(e.target.value)}
+                                className="bg-transparent border-none text-[9px] font-black uppercase text-violet-400 focus:ring-0 w-24 p-0 ml-1"
+                            />
+                        )}
+                    </div>
+
                     <div className="flex items-center gap-1 bg-slate-900 border border-slate-800 rounded-lg p-1 h-10">
                         <Button
                             onClick={() => handleConnectPrinter('usb')}
@@ -1424,6 +1450,18 @@ Generated via NIRVANA POS`;
                         className="bg-emerald-600 hover:bg-emerald-500 text-[10px] font-black uppercase italic h-10 px-3 flex items-center gap-2"
                     >
                         <Printer className="h-4 w-4" /> {cart.length > 0 ? "Print Preview" : "Test Print"}
+                    </Button>
+
+                    <Button
+                        onClick={() => {
+                            const month = new Date().toISOString().substring(0, 7);
+                            const date = new Date().toISOString().split('T')[0];
+                            window.open(`/api/reports/combined?shopId=${shopId}&month=${month}&date=${date}`, '_blank');
+                        }}
+                        className="bg-indigo-600 hover:bg-indigo-500 text-[10px] font-black uppercase italic h-10 px-3 flex items-center gap-2"
+                        title="Download unified EOD, Monthly and Quarterly master report"
+                    >
+                        <FileText className="h-4 w-4" /> Strategic Master Report
                     </Button>
 
                     <Button
