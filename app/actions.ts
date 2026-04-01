@@ -2037,7 +2037,6 @@ export async function recordLayby(layby: {
         }
 
         console.log('[recordLayby] Recording ledger entry...');
-
         const ledgerRes = await supabaseAdmin.from('ledger_entries').insert({
             id: Math.random().toString(36).substring(2, 9),
             shop_id: layby.shopId,
@@ -2047,10 +2046,30 @@ export async function recordLayby(layby: {
             date,
             description: `Deposit for Lay-by #${id} - ${layby.clientName} (Balance: $${(layby.totalWithTax - layby.deposit).toFixed(2)})`
         });
+
         if (ledgerRes.error) {
             console.error('[recordLayby] Ledger insert failed:', ledgerRes.error);
             return { error: `Failed to record deposit: ${ledgerRes.error.message}` };
         }
+
+        // --- NEW: Record Deposit as a Sale for Day 1 Revenue ---
+        const saleId = Math.random().toString(36).substring(2, 9);
+        await supabaseAdmin.from('sales').insert({
+            id: saleId,
+            shop_id: layby.shopId,
+            item_id: `layby_dep_${id}`,
+            item_name: `[LAYBY DEPOSIT] #${id}`,
+            quantity: 1,
+            unit_price: layby.deposit,
+            total_before_tax: layby.deposit / 1.155, // Reverse calculate tax if mode is all
+            tax: layby.deposit - (layby.deposit / 1.155),
+            total_with_tax: layby.deposit,
+            date,
+            employee_id: layby.employeeId,
+            client_name: layby.clientName,
+            payment_method: 'cash',
+            discount_applied: 0
+        });
 
         console.log('[recordLayby] Success! ID:', id);
         return { id, date };
@@ -2081,6 +2100,25 @@ export async function updateLaybyPayment(laybyId: string, amount: number, shopId
         description: `Payment for Lay-by #${laybyId} - ${layby.client_name}`
     });
 
+    // --- NEW: Record Installment as a Sale for Daily Revenue ---
+    const instSaleId = Math.random().toString(36).substring(2, 9);
+    await supabaseAdmin.from('sales').insert({
+        id: instSaleId,
+        shop_id: shopId,
+        item_id: `layby_pmt_${laybyId}`,
+        item_name: `[LAYBY PAYMENT] #${laybyId}`,
+        quantity: 1,
+        unit_price: amount,
+        total_before_tax: amount / 1.155,
+        tax: amount - (amount / 1.155),
+        total_with_tax: amount,
+        date,
+        employee_id: employeeId,
+        client_name: layby.client_name,
+        payment_method: 'cash',
+        discount_applied: 0
+    });
+
     // 2. Compute paid amount
     let newPaidAmount = Number(layby.paid_amount || 0) + amount;
     let isFullyPaid = newPaidAmount >= Number(layby.total_with_tax);
@@ -2106,36 +2144,47 @@ export async function updateLaybyPayment(laybyId: string, amount: number, shopId
         throw new Error(res.error.message);
     }
 
-    // 4. On final completion: record the remaining balance as Lay-by Completed income (today's sales)
+    // 4. On final completion: record the products as a sale for the REMAINING balance only
     if (isFullyPaid) {
         const totalWithTax = Number(layby.total_with_tax || 0);
-        const depositPaid = Number(layby.paid_amount || 0);
-        const remainingBalance = totalWithTax - depositPaid;
+        const previousPayments = Number(layby.paid_amount || 0); // Note: 'amount' was just added to newPaidAmount above
+        const finalPayment = totalWithTax - previousPayments;
 
-        // Record remaining balance as completed sale income (today's revenue)
-        await supabaseAdmin.from('ledger_entries').insert({
-            id: Math.random().toString(36).substring(2, 9),
-            shop_id: shopId,
-            type: 'income',
-            category: 'Lay-by Completed',
-            amount: remainingBalance,
-            date,
-            description: `Lay-by #${laybyId} completed - ${layby.client_name} (Total: $${totalWithTax.toFixed(2)})`
-        });
-
-        // Record each item as a sale for reporting (SKIP inventory reduction - reserved at lay-by start)
-        for (const item of (layby.items as any[])) {
+        // Record remaining balance as completed sale income (already recorded above as a payment sale if it was an installment)
+        // Wait, if it was an installment that pushed it to 'isFullyPaid', we ALREADY recorded the 'amount' as a sale above.
+        // So we don't need to record it again.
+        
+        // However, we WANT the items to show up in the sales list for the final day.
+        // We will record the items with prices that sum up to the TOTAL with tax, 
+        // but we need to subtract the 'Deposit' and 'Previous Payments' from the day's revenue total?
+        // No, let's keep it simple: 
+        // We already recorded the CASH received as sales (Deposit, Payment).
+        // On completion, we'll record the ITEMS with a price of $0? No, that's not good for reporting.
+        
+        // ACTUALLY, the user said: "when the layby is settled the rest of the money is again included settlements day sales"
+        // If we record the ITEMS on the settlement day, we should set their price to the TOTAL - DEPOSIT - PREV_PAYMENTS.
+        
+        const items = (layby.items as any[]);
+        for (let i = 0; i < items.length; i++) {
+            const item = items[i];
             const saleId = Math.random().toString(36).substring(2, 9);
+            
+            // Pro-rate the final payment across items
+            // This ensures the Day 10 Sales Total = Final Payment Amount
+            const itemOriginalTotal = item.total || (item.unitPrice * item.quantity);
+            const proportion = itemOriginalTotal / totalWithTax;
+            const itemContributionToFinalPayment = finalPayment * proportion;
+
             await supabaseAdmin.from('sales').insert({
                 id: saleId,
                 shop_id: shopId,
                 item_id: item.itemId,
                 item_name: item.itemName,
                 quantity: item.quantity,
-                unit_price: item.unitPrice,
-                total_before_tax: (item.unitPrice * item.quantity),
-                tax: (item.total - (item.unitPrice * item.quantity)),
-                total_with_tax: item.total,
+                unit_price: itemContributionToFinalPayment / item.quantity,
+                total_before_tax: itemContributionToFinalPayment / 1.155,
+                tax: itemContributionToFinalPayment - (itemContributionToFinalPayment / 1.155),
+                total_with_tax: itemContributionToFinalPayment,
                 date,
                 employee_id: employeeId,
                 client_name: layby.client_name,

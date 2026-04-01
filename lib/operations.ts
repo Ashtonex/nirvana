@@ -16,16 +16,15 @@ export type OperationsLedgerKind =
 export type OverheadCategory = "rent" | "salaries" | "utilities" | "misc";
 
 export async function getOperationsComputedBalance(month?: string) {
-  // If no month provided, default to the current month (YYYY-MM)
-  const targetMonth = month || new Date().toISOString().substring(0, 7);
-  
   let query = supabaseAdmin
     .from("operations_ledger")
     .select("amount");
     
-  // Filter by month using the effective_date (if present) or created_at
-  query = query.gte("created_at", `${targetMonth}-01T00:00:00Z`)
-               .lt("created_at", new Date(new Date(`${targetMonth}-01T00:00:00Z`).setMonth(new Date(`${targetMonth}-01`).getMonth() + 1)).toISOString());
+  if (month) {
+    // Filter by month using the effective_date (if present) or created_at
+    query = query.gte("created_at", `${month}-01T00:00:00Z`)
+                 .lt("created_at", new Date(new Date(`${month}-01T00:00:00Z`).setMonth(new Date(`${month}-01`).getMonth() + 1)).toISOString());
+  }
 
   const { data, error } = await query;
   if (error) throw new Error(error.message);
@@ -84,15 +83,18 @@ export async function createOperationsLedgerEntry(input: {
 }
 
 export async function listOperationsLedgerEntries(limit = 50, month?: string) {
-  const targetMonth = month || new Date().toISOString().substring(0, 7);
-  
-  const { data, error } = await supabaseAdmin
+  let query = supabaseAdmin
     .from("operations_ledger")
-    .select("*")
-    .gte("created_at", `${targetMonth}-01T00:00:00Z`)
-    .lt("created_at", new Date(new Date(`${targetMonth}-01T00:00:00Z`).setMonth(new Date(`${targetMonth}-01`).getMonth() + 1)).toISOString())
-    .order("created_at", { ascending: false })
-    .limit(limit);
+    .select("*");
+    
+  if (month) {
+    query = query.gte("created_at", `${month}-01T00:00:00Z`)
+                 .lt("created_at", new Date(new Date(`${month}-01T00:00:00Z`).setMonth(new Date(`${month}-01`).getMonth() + 1)).toISOString());
+  }
+  
+  query = query.order("created_at", { ascending: false }).limit(limit);
+  
+  const { data, error } = await query;
   if (error) throw new Error(error.message);
   return data || [];
 }

@@ -129,11 +129,16 @@ export function OperationsConsole({
   const combinedTotal = masterVault + investTotal;
 
   const overheadSummary: OverheadSummary[] = useMemo(() => {
+    const currentMonth = new Date().toISOString().substring(0, 7);
     const summary: Record<string, OverheadSummary> = {};
     shops.forEach(shop => {
       summary[shop.id] = { shopId: shop.id, shopName: shop.name, contributed: 0, paid: 0, net: 0 };
     });
     ledger.forEach(entry => {
+      // Only include current month for the overhead tracker "reset"
+      const entryMonth = entry.created_at?.substring(0, 7);
+      if (entryMonth !== currentMonth) return;
+
       if (entry.kind === "overhead_contribution" && entry.shop_id) {
         summary[entry.shop_id] = { ...summary[entry.shop_id], contributed: (summary[entry.shop_id]?.contributed || 0) + Number(entry.amount || 0) };
       } else if (entry.kind === "overhead_payment" && entry.shop_id) {

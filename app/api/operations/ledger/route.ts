@@ -10,7 +10,7 @@ export async function GET(req: Request) {
     await requirePrivilegedActor();
     const url = new URL(req.url);
     const limit = Math.min(500, Math.max(1, Number(url.searchParams.get("limit") || 100)));
-    const month = url.searchParams.get("month") || new Date().toISOString().substring(0, 7);
+    const month = url.searchParams.get("month") || undefined;
     
     // We'll need to update listOperationsLedgerEntries to support filtering
     const rows = await listOperationsLedgerEntries(limit, month);
