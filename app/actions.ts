@@ -1252,7 +1252,7 @@ export async function recordTitheWithdrawal(
     await supabaseAdmin.from('ledger_entries').insert([{
         id,
         shop_id: shopId,
-        type: 'transfer', // Using transfer since it's just moving money out of a virtual pile
+        type: 'asset', // Using asset since it's a non-p&l capital withdrawal from the tithe pot
         category: 'Tithe Withdrawal',
         amount: amount,
         date: timestamp,
