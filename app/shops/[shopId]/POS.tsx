@@ -52,7 +52,8 @@ import {
     recordPosExpense,
     postDrawerToOperations,
     recordLayby,
-    updateLaybyPayment
+    updateLaybyPayment,
+    recordTitheWithdrawal
 } from "../../actions";
 import { useOfflineSales } from "@/components/useOfflineSales";
 import { thermalPrinter } from "@/lib/thermalPrinter";
@@ -327,7 +328,7 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
     // Helper functions for keyword matching (must be defined early for carry-over calc)
     const titheKeywords = ["tithe", "tithes", "offering", "church", "donation", "charity", "10%", "ten percent"];
     const groceriesKeywords = ["groceries", "grocery", "food", "supermarket", "provisions", "sundries", "rice", "sugar", "cooking oil", "flour", "bread", "milk", "eggs", "meat", "vegetables", "fruits", "snacks", "drinks", "beverages"];
-    const isTitheExpense = (l: any) => l.category === 'Tithe' || titheKeywords.some(kw => String(l.description || "").toLowerCase().includes(kw));
+    const isTitheExpense = (l: any) => l.category !== 'Tithe Withdrawal' && (l.category === 'Tithe' || titheKeywords.some(kw => String(l.description || "").toLowerCase().includes(kw)));
     const isGroceriesExpense = (l: any) => l.category === 'Groceries' || groceriesKeywords.some(kw => String(l.description || "").toLowerCase().includes(kw));
 
     // 2. What was yesterday's exact closing?
@@ -377,8 +378,12 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
 
     // Tithe expenses (cumulative all-time)
     const cumulativeTithe = ledger.filter((l: any) =>
-        isTitheExpense(l) && l.shopId === shopId
-    ).reduce((sum: number, l: any) => sum + Number(l.amount || 0), 0);
+        l.shopId === shopId
+    ).reduce((sum: number, l: any) => {
+        if (isTitheExpense(l)) return sum + Number(l.amount || 0);
+        if (l.category === 'Tithe Withdrawal') return sum - Number(l.amount || 0);
+        return sum;
+    }, 0);
 
     // Groceries - current month vs previous month
     const currentMonth = todayStr.substring(0, 7); // YYYY-MM
@@ -1697,7 +1702,7 @@ Generated via NIRVANA POS`;
                                     if (!amount || amount <= 0) return;
                                     setIsRecordingTithe(true);
                                     try {
-                                        await recordPosExpense(shopId, amount, titheWithdrawDesc || "Tithe withdrawal", selectedEmployeeId);
+                                        await recordTitheWithdrawal(shopId, amount, titheWithdrawDesc || "Tithe withdrawal", selectedEmployeeId);
                                         setTitheWithdrawAmount("");
                                         setTitheWithdrawDesc("");
                                         setIsTitheModalOpen(false);

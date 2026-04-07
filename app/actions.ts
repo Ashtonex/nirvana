@@ -1240,6 +1240,40 @@ export async function recordPosExpense(
     revalidatePath('/admin/pos-audit');
 }
 
+export async function recordTitheWithdrawal(
+    shopId: string,
+    amount: number,
+    description: string,
+    employeeId: string
+) {
+    const timestamp = new Date().toISOString();
+    const id = Math.random().toString(36).substring(2, 9);
+
+    await supabaseAdmin.from('ledger_entries').insert([{
+        id,
+        shop_id: shopId,
+        type: 'transfer', // Using transfer since it's just moving money out of a virtual pile
+        category: 'Tithe Withdrawal',
+        amount: amount,
+        date: timestamp,
+        description: description || "Tithe Withdrawal",
+        employee_id: employeeId
+    }]);
+
+    await supabaseAdmin.from('audit_log').insert([{
+        id: Math.random().toString(36).substring(2, 9),
+        action: 'record_tithe_withdrawal',
+        shop_id: shopId,
+        employee_id: employeeId,
+        details: { amount, description },
+        timestamp
+    }]);
+
+    revalidatePath(`/shops/${shopId}`);
+    revalidatePath('/');
+    revalidatePath('/finance/oracle');
+}
+
 
 export async function getOracleMasterPulse(daysLimit = 60) {
     const dateThreshold = new Date(Date.now() - daysLimit * 24 * 60 * 60 * 1000).toISOString();
