@@ -1,10 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState, useTransition } from "react";
-import { getDashboardData, getPosAuditReport } from "../../actions";
-import { Badge, Button, Card, CardContent, CardDescription, CardHeader, CardTitle, Input } from "@/components/ui";
-import { AlertCircle, Calendar, Download, FileSearch, ShieldCheck, TriangleAlert, Edit2, X } from "lucide-react";
-import { updatePosExpense } from "../../actions";
+import { AlertCircle, Calendar, Download, FileSearch, ShieldCheck, TriangleAlert, Edit2, X, PackageOpen } from "lucide-react";
+import { updatePosExpense, updateSale } from "../../actions";
 
 function money(n: any) {
   const v = Number(n || 0);
@@ -61,6 +59,12 @@ export default function PosAuditPage() {
   const [newExpenseAmount, setNewExpenseAmount] = useState("");
   const [newExpenseDesc, setNewExpenseDesc] = useState("");
 
+  const [editingSale, setEditingSale] = useState<any>(null);
+  const [newSaleTotal, setNewSaleTotal] = useState("");
+  const [newSaleQty, setNewSaleQty] = useState("");
+  const [newSaleItemName, setNewSaleItemName] = useState("");
+  const [shouldRestock, setShouldRestock] = useState(false);
+
   const openEditExpense = (exp: any) => {
     setEditingExpense(exp);
     setNewExpenseAmount(String(exp.amount));
@@ -86,7 +90,40 @@ export default function PosAuditPage() {
       } catch (e: any) {
         alert(e.message || "Failed to update expense");
       }
+      }
     });
+  };
+
+  const saveSaleEdit = async () => {
+    if (!editingSale) return;
+    const total = parseFloat(newSaleTotal);
+    const qty = parseInt(newSaleQty);
+    if (isNaN(total) || total < 0 || isNaN(qty) || qty < 0) {
+      alert("Invalid input figures");
+      return;
+    }
+
+    startTransition(async () => {
+      try {
+        await updateSale(editingSale.id, {
+          total_with_tax: total,
+          quantity: qty,
+          item_name: newSaleItemName
+        }, shouldRestock);
+        setEditingSale(null);
+        run(); // Refresh report
+      } catch (e: any) {
+        alert(e.message || "Failed to update sale");
+      }
+    });
+  };
+
+  const openEditSale = (sale: any) => {
+    setEditingSale(sale);
+    setNewSaleTotal(String(sale.totalWithTax));
+    setNewSaleQty(String(sale.qty));
+    setNewSaleItemName(sale.itemName);
+    setShouldRestock(false);
   };
 
   return (
@@ -318,6 +355,16 @@ export default function PosAuditPage() {
                           <td className="py-2 pr-3 text-right text-slate-400">{money(s.tax)}</td>
                           <td className="py-2 pr-3 text-right text-slate-100 font-black">{money(s.totalWithTax)}</td>
                           <td className="py-2 text-right text-slate-400 uppercase font-black">{String(s.paymentMethod || "")}</td>
+                          <td className="py-2 text-right">
+                             <Button 
+                                variant="ghost" 
+                                size="icon" 
+                                className="h-6 w-6 text-slate-500 hover:text-white"
+                                onClick={() => openEditSale(s)}
+                             >
+                                <Edit2 className="h-3 w-3" />
+                             </Button>
+                          </td>
                         </tr>
                       ))}
                     </tbody>
@@ -409,6 +456,77 @@ export default function PosAuditPage() {
                 onClick={saveExpenseEdit}
               >
                 {loading ? "Updating..." : "Save Changes"}
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      ) : null}
+
+      {/* EDIT SALE MODAL */}
+      {editingSale ? (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
+          <Card className="w-full max-w-md bg-slate-900 border-slate-800 shadow-2xl">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-xl font-black uppercase italic tracking-tight">Edit Sale Record</CardTitle>
+              <Button variant="ghost" size="icon" onClick={() => setEditingSale(null)} className="h-8 w-8 text-slate-500 hover:text-white">
+                <X className="h-4 w-4" />
+              </Button>
+            </CardHeader>
+            <CardContent className="space-y-4 pt-4">
+              <div className="space-y-2">
+                <label className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Item Name</label>
+                <Input
+                  className="bg-slate-950 border-slate-800 font-bold"
+                  value={newSaleItemName}
+                  onChange={(e) => setNewSaleItemName(e.target.value)}
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                   <label className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Total (inc tax)</label>
+                   <Input
+                     type="number"
+                     className="bg-slate-950 border-slate-800 font-black italic"
+                     value={newSaleTotal}
+                     onChange={(e) => setNewSaleTotal(e.target.value)}
+                   />
+                </div>
+                <div className="space-y-2">
+                   <label className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Quantity</label>
+                   <Input
+                     type="number"
+                     className="bg-slate-950 border-slate-800 font-black italic"
+                     value={newSaleQty}
+                     onChange={(e) => setNewSaleQty(e.target.value)}
+                   />
+                </div>
+              </div>
+              
+              <div className="flex items-center gap-3 p-3 bg-slate-950 rounded-xl border border-slate-800">
+                <input 
+                  type="checkbox" 
+                  id="restock-check"
+                  checked={shouldRestock}
+                  onChange={(e) => setShouldRestock(e.target.checked)}
+                  className="h-4 w-4 rounded border-slate-700 bg-slate-800 text-emerald-600 focus:ring-emerald-500"
+                />
+                <label htmlFor="restock-check" className="text-xs font-black uppercase italic text-slate-300 cursor-pointer flex items-center gap-2">
+                  <PackageOpen className="h-4 w-4 text-emerald-500" /> Restock item in inventory?
+                </label>
+              </div>
+
+              <div className="bg-amber-500/10 border border-amber-500/20 p-3 rounded-lg">
+                <p className="text-[10px] font-medium text-amber-200 uppercase leading-relaxed italic">
+                  Note: Zeroing the figure will void its impact on the report totals. Restocking will increment the master stock by the difference in quantity.
+                </p>
+              </div>
+
+              <Button
+                className="w-full bg-sky-600 hover:bg-sky-500 font-black uppercase italic text-xs h-12"
+                disabled={loading}
+                onClick={saveSaleEdit}
+              >
+                {loading ? "Syncing..." : "Apply Financial Correction"}
               </Button>
             </CardContent>
           </Card>

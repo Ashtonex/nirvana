@@ -2030,15 +2030,15 @@ Generated via NIRVANA POS`;
                                         type="number"
                                         min="0"
                                         max="5"
-                                        step="0.50"
+                                        step="1"
                                         value={discount || ''}
                                         onChange={(e) => {
-                                            const val = parseFloat(e.target.value) || 0;
+                                            const val = Math.floor(parseFloat(e.target.value) || 0);
                                             if (val >= 0 && val <= 5) {
                                                 setDiscount(val);
                                             }
                                         }}
-                                        placeholder="0.00"
+                                        placeholder="0"
                                         className="w-16 bg-transparent text-right text-xs font-black focus:outline-none text-amber-500 border-b border-amber-500/30 focus:border-amber-500"
                                     />
                                 </div>

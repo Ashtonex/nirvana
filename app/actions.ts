@@ -145,15 +145,15 @@ export async function getDashboardData(daysLimit = 60) {
 
         const { data: inventory } = await supabaseAdmin.from('inventory_items').select('*').limit(10000);
         const { data: allocations } = await supabaseAdmin.from('inventory_allocations').select('*').limit(10000);
-        const { data: sales } = await supabaseAdmin.from('sales').select('*').gte('date', dateThreshold).limit(20000);
+        const { data: sales } = await supabaseAdmin.from('sales').select('*').gte('date', dateThreshold).order('date', { ascending: false }).limit(20000);
         const { data: shops } = await supabaseAdmin.from('shops').select('*').limit(1000);
         const { data: quotations } = await supabaseAdmin.from('quotations').select('*').limit(10000);
         const { data: employees } = await supabaseAdmin.from('employees').select('*').limit(1000);
         const { data: shipments } = await supabaseAdmin.from('shipments').select('*').limit(5000);
         const { data: settings } = await supabaseAdmin.from('oracle_settings').select('*').single();
-        const { data: ledger } = await supabaseAdmin.from('ledger_entries').select('*').gte('date', dateThreshold).limit(20000);
-        const { data: auditLog } = await supabaseAdmin.from('audit_log').select('*').limit(5000);
-        const { data: transfers } = await supabaseAdmin.from('transfers').select('*').limit(5000);
+        const { data: ledger } = await supabaseAdmin.from('ledger_entries').select('*').gte('date', dateThreshold).order('date', { ascending: false }).limit(20000);
+        const { data: auditLog } = await supabaseAdmin.from('audit_log').select('*').order('timestamp', { ascending: false }).limit(5000);
+        const { data: transfers } = await supabaseAdmin.from('transfers').select('*').order('created_at', { ascending: false }).limit(5000);
         const { data: emails } = await supabaseAdmin.from('oracle_emails').select('*').limit(1000);
 
         const ledgerRows = ledger || [];
@@ -2785,6 +2785,73 @@ export async function updatePosExpense(id: string, updates: { amount?: number; d
     revalidatePath('/admin/pos-audit');
     revalidatePath('/intelligence');
     revalidatePath('/finance/oracle');
+}
+
+export async function updateSale(id: string, updates: { total_with_tax?: number; total_before_tax?: number; tax?: number; quantity?: number; item_name?: string }, restock?: boolean) {
+    const actor = await requireManagerOrOwner();
+    const timestamp = new Date().toISOString();
+
+    const { data: existing } = await supabaseAdmin.from('sales').select('*').eq('id', id).single();
+    if (!existing) throw new Error("Sale event not found");
+
+    // Recalculate tax if total_with_tax is provided but tax is not
+    let finalTax = updates.tax ?? existing.tax;
+    let finalTotalBefore = updates.total_before_tax ?? existing.total_before_tax;
+    if (updates.total_with_tax !== undefined && updates.tax === undefined) {
+        // Assume 15.5% tax rate if not specified
+        const taxRate = 0.155; 
+        finalTotalBefore = updates.total_with_tax / (1 + taxRate);
+        finalTax = updates.total_with_tax - finalTotalBefore;
+    }
+
+    await supabaseAdmin.from('sales').update({
+        total_with_tax: updates.total_with_tax ?? existing.total_with_tax,
+        total_before_tax: finalTotalBefore,
+        tax: finalTax,
+        quantity: updates.quantity ?? existing.quantity,
+        item_name: updates.item_name ?? existing.item_name
+    }).eq('id', id);
+
+    if (restock && existing.item_id && !existing.item_id.startsWith('QUICK_') && !existing.item_id.startsWith('service_')) {
+        const qtyDifference = Number(existing.quantity || 0) - (updates.quantity ?? existing.quantity);
+        if (qtyDifference > 0) {
+            // Restore to shop allocation
+            const { data: alloc } = await supabaseAdmin.from('inventory_allocations')
+                .select('quantity')
+                .eq('item_id', existing.item_id)
+                .eq('shop_id', existing.shop_id)
+                .single();
+            if (alloc) {
+                await supabaseAdmin.from('inventory_allocations')
+                    .update({ quantity: Number(alloc.quantity) + qtyDifference })
+                    .eq('item_id', existing.item_id)
+                    .eq('shop_id', existing.shop_id);
+            }
+
+            // Restore to master inventory
+            const { data: item } = await supabaseAdmin.from('inventory_items')
+                .select('quantity')
+                .eq('id', existing.item_id)
+                .single();
+            if (item) {
+                await supabaseAdmin.from('inventory_items')
+                    .update({ quantity: Number(item.quantity) + qtyDifference })
+                    .eq('id', existing.item_id);
+            }
+        }
+    }
+
+    await supabaseAdmin.from('audit_log').insert([{
+        id: Math.random().toString(36).substring(2, 9),
+        action: 'UPDATE_SALE',
+        employee_id: actor.id,
+        details: { id, updates, restock, prev: existing },
+        timestamp
+    }]);
+
+    revalidatePath(`/shops/${existing.shop_id}`);
+    revalidatePath('/admin/pos-audit');
+    revalidatePath('/intelligence');
 }
 
 export async function increaseMasterStock(itemId: string, increment: number, reason: string) {
