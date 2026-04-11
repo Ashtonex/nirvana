@@ -1,14 +1,17 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 export async function GET() {
-  const today = new Date().toISOString().split('T')[0];
+  const last24h = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
   
-  // Get today's sales
+  // Get today's sales (24h window for accuracy)
   const { data: sales } = await supabaseAdmin
     .from('sales')
     .select('id, item_name, quantity, total_with_tax, client_name, date, shop_id')
-    .gte('date', `${today}T00:00:00`)
+    .gte('date', last24h)
     .order('date', { ascending: false });
 
   // Get active staff (online in last 5 minutes)
@@ -22,7 +25,7 @@ export async function GET() {
   const { data: unreadMessages } = await supabaseAdmin
     .from('chat_messages')
     .select('id')
-    .gte('created_at', `${today}T00:00:00`)
+    .gte('created_at', last24h)
     .eq('read', false);
 
   // Get pending stock requests
@@ -30,7 +33,7 @@ export async function GET() {
     .from('stock_requests')
     .select('id')
     .eq('status', 'pending')
-    .gte('created_at', `${today}T00:00:00`);
+    .gte('created_at', last24h);
 
   return NextResponse.json({
     sales: (sales || []).map((s: any) => ({

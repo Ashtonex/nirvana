@@ -523,12 +523,12 @@ export async function getSalesHistory(days = 30): Promise<DailySalesMetric[]> {
 
 // 5b. TODAY'S SALES (For Real-time Recent Activity)
 export async function getTodaysSales(): Promise<TodaySaleMetric[]> {
-    const today = new Date().toISOString().split('T')[0];
+    // Use a rolling 24-hour window to avoid missing sales at timezone boundaries
+    const last24h = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
     const { data: sales } = await supabaseAdmin
         .from('sales')
         .select('id, item_name, quantity, total_with_tax, client_name, date')
-        .gte('date', `${today}T00:00:00`)
-        .lte('date', `${today}T23:59:59`)
+        .gte('date', last24h)
         .order('date', { ascending: false });
 
     return (sales || []).map((s: any) => ({

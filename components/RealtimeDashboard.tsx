@@ -72,7 +72,7 @@ export function RealtimeDashboard() {
             </div>
           ) : (
             <div className="space-y-3 max-h-80 overflow-y-auto">
-              {metrics.sales.slice(0, 10).map((sale) => (
+              {metrics.sales.slice(0, 100).map((sale) => (
                 <div key={sale.id} className="flex items-center justify-between p-3 bg-slate-900/50 rounded-lg border border-slate-800 hover:border-emerald-500/30 transition-colors">
                   <div className="flex items-center gap-3">
                     <div className="p-2 bg-emerald-500/10 rounded-lg">
