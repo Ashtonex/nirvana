@@ -90,7 +90,6 @@ export default function PosAuditPage() {
       } catch (e: any) {
         alert(e.message || "Failed to update expense");
       }
-      }
     });
   };
 
