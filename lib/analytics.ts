@@ -486,7 +486,17 @@ export interface TodaySaleMetric {
 }
 
 export async function getSalesHistory(days = 30): Promise<DailySalesMetric[]> {
-    const { data: sales } = await supabaseAdmin.from('sales').select('date, total_with_tax, total_before_tax, item_id, quantity');
+    // Only fetch sales within the requested window — prevents PostgREST row-cap
+    // from cutting off today's newest sales when there is lots of historical data.
+    const cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
+
+    const { data: sales } = await supabaseAdmin
+        .from('sales')
+        .select('date, total_with_tax, total_before_tax, item_id, quantity')
+        .gte('date', cutoff)
+        .order('date', { ascending: false })
+        .limit(10000);
+
     const { data: inventory } = await supabaseAdmin.from('inventory_items').select('id, landed_cost');
 
     const invMap = new Map((inventory || []).map((i: any) => [i.id, i.landed_cost]));
@@ -501,13 +511,16 @@ export async function getSalesHistory(days = 30): Promise<DailySalesMetric[]> {
             const saleDate = new Date(s.date).toISOString().split('T')[0];
             return saleDate === dateStr;
         });
-        const revenue = daySales.reduce((sum: number, s: any) => sum + s.total_with_tax, 0);
+
+        // Use Number() to guard against PostgreSQL NUMERIC returning as string,
+        // which would cause string concatenation instead of addition.
+        const revenue = daySales.reduce((sum: number, s: any) => sum + Number(s.total_with_tax || 0), 0);
 
         let cost = 0;
         daySales.forEach((s: any) => {
             const itemCost = invMap.get(s.item_id) as any;
             if (itemCost) {
-                cost += ((itemCost || 0) * s.quantity);
+                cost += (Number(itemCost || 0) * Number(s.quantity || 0));
             }
         });
 
@@ -520,6 +533,7 @@ export async function getSalesHistory(days = 30): Promise<DailySalesMetric[]> {
 
     return history;
 }
+
 
 // 5b. TODAY'S SALES (For Real-time Recent Activity)
 export async function getTodaysSales(): Promise<TodaySaleMetric[]> {
