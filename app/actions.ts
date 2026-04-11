@@ -373,13 +373,18 @@ export async function recordSale(sale: any) {
     // Support backlog sales with custom date
     const timestamp = sale.date ? new Date(sale.date).toISOString() : new Date().toISOString();
 
-    await supabaseAdmin.from('sales').insert({
+    const { error: saleError } = await supabaseAdmin.from('sales').insert({
         id: saleId, shop_id: sale.shopId, item_id: sale.itemId, item_name: sale.itemName,
         quantity: sale.quantity, unit_price: sale.unitPrice, total_before_tax: subtotalAfterDiscount,
         tax, total_with_tax: totalWithTax, date: timestamp, employee_id: sale.employeeId, client_name: sale.clientName,
         payment_method: sale.paymentMethod || 'cash',
         discount_applied: discount
     });
+
+    if (saleError) {
+        console.error('[recordSale] Database Error:', saleError);
+        throw new Error(`Failed to record sale: ${saleError.message}`);
+    }
 
     const isService = sale.itemId?.startsWith('service_');
 

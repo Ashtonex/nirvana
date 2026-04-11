@@ -233,7 +233,7 @@ export async function getSalesVsOverheadsData() {
     };
 
     for (let day = 1; day <= daysInMonth; day++) {
-        const dateStr = new Date(now.getFullYear(), now.getMonth(), day).toISOString().split('T')[0];
+        const dateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
 
         // Overhead grows linearly across the month (fixed cost projection)
         const dailyGlobalOverhead = daysInMonth > 0 ? globalMonthlyOverhead / daysInMonth : 0;
@@ -356,7 +356,7 @@ export async function getRevenueExpenseProfitTrajectoryData() {
     const dailyGlobalFixed = daysInMonth > 0 ? globalFixedMonthly / daysInMonth : 0;
 
     for (let day = 1; day <= daysInMonth; day++) {
-        const dateStr = new Date(now.getFullYear(), now.getMonth(), day).toISOString().split('T')[0];
+        const dateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
 
         // Global revenue - ALL shops combined
         const globalDayRevenue = salesRows
