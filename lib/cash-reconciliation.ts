@@ -1,7 +1,7 @@
 type GenericRecord = Record<string, unknown>;
 
-export function sumNumbers(values: Array<number | string | null | undefined>) {
-  return values.reduce((sum, value) => sum + Number(value || 0), 0);
+export function sumNumbers(values: Array<number | string | null | undefined>): number {
+  return values.reduce((sum: number, value) => sum + Number(value || 0), 0);
 }
 
 export function buildCashReconciliation(input: {
@@ -16,21 +16,23 @@ export function buildCashReconciliation(input: {
   const drawerOpening = sumNumbers(
     shopLedger
       .filter((entry) => entry.category === "Cash Drawer Opening")
-      .map((entry) => entry.amount)
+      .map((entry) => entry.amount as number | string | null | undefined)
   );
 
-  const salesCash = sumNumbers((input.sales || []).map((sale) => sale.total_with_tax));
+  const salesCash = sumNumbers(
+    (input.sales || []).map((sale) => sale.total_with_tax as number | string | null | undefined)
+  );
 
   const drawerExpenses = sumNumbers(
     shopLedger
       .filter((entry) => String(entry.type || "").toLowerCase() === "expense")
-      .map((entry) => entry.amount)
+      .map((entry) => entry.amount as number | string | null | undefined)
   );
 
   const postedToOperations = sumNumbers(
     shopLedger
       .filter((entry) => entry.category === "Operations Transfer")
-      .map((entry) => entry.amount)
+      .map((entry) => entry.amount as number | string | null | undefined)
   );
 
   const drawerExpectedCash = drawerOpening + salesCash - drawerExpenses - postedToOperations;
