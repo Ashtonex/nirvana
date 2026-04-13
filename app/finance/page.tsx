@@ -42,10 +42,10 @@ export default async function FinancePage() {
        getFinancials(),
        getOperationsComputedBalance().catch(() => 0),
        getOperationsState().catch(() => ({ actual_balance: 0 })),
-       supabaseAdmin
-           .from("invest_deposits")
-           .select("amount, withdrawn_amount")
-           .then(({ data }) => data || [])
+        supabaseAdmin
+            .from("invest_deposits")
+            .select("amount, withdrawn_amount")
+            .then(({ data }: { data: InvestDepositRow[] | null }) => data || [])
            .catch(() => []),
    ]);
 
