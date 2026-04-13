@@ -5,6 +5,7 @@ import { Badge, Button, Card, CardContent, CardDescription, CardHeader, CardTitl
 import { Coins, Loader2, Trash2, ArrowRightLeft, DollarSign, History, TrendingUp, TrendingDown, Warehouse, Upload, Download, Plus, Minus, Activity, Users, Shield, Handshake, LogOut, Wifi, WifiOff, Edit, X } from "lucide-react";
 import { cn } from "@/components/ui";
 import { StockvelPanel } from "@/components/StockvelPanel";
+import { MoneyAuditBrain } from "@/components/MoneyAuditBrain";
 
 function detectOverheadCategory(title: string): string {
   const t = title.toLowerCase();
@@ -680,6 +681,9 @@ export function OperationsConsole({
           </CardContent>
         </Card>
       </div>
+
+      {/* Money Audit Brain - Full Width */}
+      <MoneyAuditBrain shops={shops} />
 
       {/* Link to Handshake Page */}
       <div className="flex justify-center">
