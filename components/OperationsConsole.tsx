@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useMemo, useRef, memo } from "react";
 import { Badge, Button, Card, CardContent, CardDescription, CardHeader, CardTitle, Input } from "@/components/ui";
 import { Coins, Loader2, Trash2, ArrowRightLeft, DollarSign, History, TrendingUp, TrendingDown, Warehouse, Upload, Download, Plus, Minus, Activity, Users, Shield, Handshake, LogOut, Wifi, WifiOff, Edit, X } from "lucide-react";
 import { cn } from "@/components/ui";
+import { StockvelPanel } from "@/components/StockvelPanel";
 
 function detectOverheadCategory(title: string): string {
   const t = title.toLowerCase();
@@ -62,6 +63,7 @@ type LedgerEntry = {
 type OpsState = {
   computedBalance: number;
   actualBalance: number;
+  delta?: number;
   invest?: { available: number; byShop: Record<string, { available: number }> };
   savings?: { byShop: Record<string, number> };
 };
@@ -118,6 +120,7 @@ export function OperationsConsole({
   const [employees, setEmployees] = useState<any[]>([]);
   const [isGeneratingReport, setIsGeneratingReport] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [activeTab, setActiveTab] = useState<"overview" | "stockvel">("overview");
 
   const [opsState, setOpsState] = useState<OpsState>(initialState);
 
@@ -126,7 +129,9 @@ export function OperationsConsole({
   }, [ledger]);
 
   const investTotal = opsState?.invest?.available || 0;
-  const combinedTotal = masterVault + investTotal;
+  const actualVault = Number(opsState?.actualBalance || 0);
+  const computedDelta = actualVault - masterVault;
+  const combinedTotal = actualVault + investTotal;
 
   const overheadSummary: OverheadSummary[] = useMemo(() => {
     const currentMonth = new Date().toISOString().substring(0, 7);
@@ -397,19 +402,48 @@ export function OperationsConsole({
 
   return (
     <div className="space-y-6">
+      <div className="flex gap-2 border-b border-slate-800 pb-2">
+        <button
+          type="button"
+          onClick={() => setActiveTab("overview")}
+          className={cn(
+            "px-4 py-2 text-xs font-black uppercase italic tracking-widest border-b-2 transition-colors",
+            activeTab === "overview" ? "border-emerald-500 text-emerald-400" : "border-transparent text-slate-500 hover:text-slate-300"
+          )}
+        >
+          Overview
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab("stockvel")}
+          className={cn(
+            "px-4 py-2 text-xs font-black uppercase italic tracking-widest border-b-2 transition-colors",
+            activeTab === "stockvel" ? "border-amber-500 text-amber-300" : "border-transparent text-slate-500 hover:text-slate-300"
+          )}
+        >
+          Stockvel
+        </button>
+      </div>
+
+      {activeTab === "stockvel" ? (
+        <StockvelPanel ledger={ledger} onRefresh={fetchData} />
+      ) : (
+        <>
       {/* Top Cards Row */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card className="bg-gradient-to-br from-emerald-950/60 to-slate-950 border-emerald-800/40">
           <CardHeader className="pb-2">
             <CardDescription className="text-[10px] font-black uppercase tracking-widest text-emerald-500/70 flex items-center gap-1">
-              <Warehouse className="h-3 w-3" /> Master Vault
+              <Warehouse className="h-3 w-3" /> Actual Vault
             </CardDescription>
           </CardHeader>
           <CardContent>
             <div className="text-4xl font-black italic text-emerald-300 font-mono">
-              $<AnimatedNumber value={masterVault} />
+              $<AnimatedNumber value={actualVault} />
             </div>
-            <p className="text-[10px] text-slate-500 mt-1">Total cash in business</p>
+            <p className="text-[10px] text-slate-500 mt-1">
+              Actual vault | ledger: ${masterVault.toFixed(2)} | delta: ${computedDelta.toFixed(2)}
+            </p>
           </CardContent>
         </Card>
 
@@ -858,6 +892,8 @@ export function OperationsConsole({
             </CardContent>
           </Card>
 
+        </>
+      )}
     </div>
   );
 }

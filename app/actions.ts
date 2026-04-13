@@ -1182,9 +1182,10 @@ export async function recordPosExpense(
     }
 
     // Auto-create Operations entry for overhead expenses OR if manually toggled
-    // IMPORTANT: EOD deposits (from Post to Ops) should NOT affect drift - only overhead balances may cause drift
+    // Overhead logged at POS is a contribution into the central ops pool.
+    // Actual overhead payments are only recorded when money leaves Operations.
     if (options?.toOperations || isOverheadExpense) {
-        const opsKind = isOverheadExpense ? "overhead_payment" : "eod_deposit";
+        const opsKind = isOverheadExpense ? "overhead_contribution" : "eod_deposit";
         
         // Insert to ledger
         await supabaseAdmin.from('operations_ledger').insert({
@@ -1192,7 +1193,7 @@ export async function recordPosExpense(
             kind: opsKind,
             shop_id: shopId,
             title: description,
-            notes: `Auto-routed from POS expense: ${isOverheadExpense ? 'Overhead' : 'Manual'}`,
+            notes: `Auto-routed from POS expense: ${isOverheadExpense ? 'Overhead contribution' : 'Manual deposit'}`,
             employee_id: employeeId,
             effective_date: new Date().toISOString().split('T')[0],
         });
@@ -1231,7 +1232,7 @@ export async function recordPosExpense(
             toOperations: options?.toOperations || isOverheadExpense,
             isPerfume: isPerfumeExpense,
             isOverhead: isOverheadExpense,
-            kind: isOverheadExpense ? "overhead_payment" : "eod_deposit"
+            kind: isOverheadExpense ? "overhead_contribution" : "eod_deposit"
         },
         timestamp
     }]);
@@ -2921,7 +2922,20 @@ export async function reapportionStock(itemId: string, allocations: { shopId: st
         details: `${item.name} reapportioned across ${allocations.length} shops by ${actor.name}`
     });
 
+    const { data: verifiedAllocations } = await supabaseAdmin
+        .from('inventory_allocations')
+        .select('shop_id, quantity')
+        .eq('item_id', itemId);
+
     revalidatePath('/shops');
+    revalidatePath('/inventory');
+    revalidatePath('/inventory/stocktake');
+    revalidatePath('/admin/inventory-manager');
+
+    return (verifiedAllocations || []).map((row: any) => ({
+        shopId: row.shop_id,
+        quantity: Number(row.quantity || 0),
+    }));
 }
 
 export async function getQuarterlyReportData(

@@ -314,7 +314,10 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
 
     const topSellers = inventoryState.filter(item => topSellerIds.includes(item.id));
     // Fallback if no sales yet: just show first 3
-    const defaultDisplayItems = topSellers.length >= 1 ? topSellers : inventoryState.slice(0, 3);
+    const activeInventory = inventoryState.filter((item: any) => Number(item.quantity || 0) > 0);
+    const defaultDisplayItems = topSellers.length >= 1
+        ? topSellers.filter((item: any) => Number(item.quantity || 0) > 0)
+        : activeInventory.slice(0, 3);
 
     // Calculate Cash Drawer Math
     const ledger = db.ledger || [];
@@ -1286,9 +1289,25 @@ Generated via NIRVANA POS`;
     const filteredInventory = inventoryState.filter((item: any) => {
         const matchesSearch = item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
             item.category.toLowerCase().includes(searchTerm.toLowerCase());
-        // Show ALL inventory - no allocation filter (showing global master stock)
-        return matchesSearch;
+        return matchesSearch && Number(item.quantity || 0) > 0;
     });
+
+    const purgeZeroInventory = async () => {
+        if (!confirm("Delete every inventory item that is at 0 units or below?")) return;
+        try {
+            const res = await fetch("/api/inventory/purge-zero", {
+                method: "POST",
+                credentials: "include",
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) throw new Error(data?.error || "Failed to delete zero stock");
+            setInventoryState((prev) => prev.filter((item: any) => Number(item.quantity || 0) > 0));
+            setIsManagerToolsOpen(false);
+            alert(`Deleted ${Number(data?.deletedCount || 0)} zero-stock item(s).`);
+        } catch (e: any) {
+            alert(e?.message || "Failed to delete zero-stock items.");
+        }
+    };
 
     return (
         <div className="grid gap-4 md:gap-6 md:grid-cols-12 grid-cols-1">
@@ -1649,6 +1668,21 @@ Generated via NIRVANA POS`;
                             }}
                         >
                             <ArrowRightLeft className="mr-2 h-4 w-4" /> Cash Transfers
+                        </Button>
+                        <Button
+                            className="w-full bg-rose-900 hover:bg-rose-800 border border-rose-500/30 text-rose-300 text-[10px] font-black uppercase italic tracking-widest"
+                            onClick={purgeZeroInventory}
+                        >
+                            <Trash2 className="mr-2 h-4 w-4" /> Delete Zero Stock
+                        </Button>
+                        <Button
+                            className="w-full bg-slate-800 hover:bg-slate-700 text-[10px] font-black uppercase italic tracking-widest"
+                            onClick={() => {
+                                setIsManagerToolsOpen(false);
+                                window.location.href = "/expenses";
+                            }}
+                        >
+                            <Receipt className="mr-2 h-4 w-4" /> Expenses Page
                         </Button>
                         <div className="text-[10px] font-bold uppercase text-slate-400">
                             If you cannot see these pages, your staff role must be Manager/Admin/Owner.

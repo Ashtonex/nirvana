@@ -15,14 +15,9 @@ import {
 import {
     Package,
     Plus,
-    RefreshCcw,
     Search,
-    Truck,
-    AlertCircle,
-    LayoutGrid,
     Boxes,
     ArrowRightLeft,
-    TrendingUp,
     ShieldCheck,
     X,
     FileText,
@@ -52,7 +47,6 @@ export default function InventoryManagerPage() {
     const [searchTerm, setSearchTerm] = useState("");
     const [isPending, startTransition] = useTransition();
     const [refreshKey, setRefreshKey] = useState(0);
-    const [debugInfo, setDebugInfo] = useState<string>("");
 
     // Modals
     const [isAdjustModalOpen, setIsAdjustModalOpen] = useState(false);
@@ -87,10 +81,6 @@ export default function InventoryManagerPage() {
         fetchDashboardData();
     }, [refreshKey]);
 
-    const refresh = () => {
-        setRefreshKey(k => k + 1);
-    };
-
     const inventory = db?.inventory || [];
     const shops = db?.shops || [];
 
@@ -109,12 +99,7 @@ export default function InventoryManagerPage() {
     const handleOpenReapportion = (item: any) => {
         setSelectedItem(item);
         const currentAlloc: Record<string, string> = {};
-        
-        // Debug: log shop IDs and current allocations
-        const debug = `Shops:\n${shops.map((s: any) => `  ${s.name}: ID="${s.id}"`).join('\n')}\n\nAllocations:\n${item.allocations.map((a: any) => `  shopId="${a.shopId}" qty=${a.quantity}`).join('\n')}`;
-        console.log("[Reapportion Modal]", debug);
-        setDebugInfo(debug);
-        
+
         shops.forEach((s: any) => {
             const alloc = item.allocations.find((a: any) => a.shopId === s.id);
             currentAlloc[s.id] = String(alloc?.quantity || 0);
@@ -152,49 +137,29 @@ export default function InventoryManagerPage() {
             return;
         }
 
-        try {
-            console.log("[Reapportion] Starting with itemId:", selectedItem.id, "allocations:", allocs);
-            console.log("[Reapportion] Available shops:", shops.map((s: any) => ({ id: s.id, name: s.name })));
-            
-            const response = await fetch("/api/inventory/reapportion", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                credentials: "include",
-                body: JSON.stringify({ itemId: selectedItem.id, allocations: allocs })
-            });
-
-            console.log("[Reapportion] Response status:", response.status);
-            const data = await response.json();
-            console.log("[Reapportion] Response data:", data);
-
-            if (!response.ok) throw new Error(data.error || "Reapportion failed");
-
-            setIsReapportionModalOpen(false);
-            
-            // Update local state directly with the verified allocations from server
-            if (data.verifiedAllocations) {
+        startTransition(async () => {
+            try {
+                const verifiedAllocations = await reapportionStock(selectedItem.id, allocs);
+                setIsReapportionModalOpen(false);
                 setDb((prevDb: any) => {
                     if (!prevDb) return prevDb;
                     return {
                         ...prevDb,
                         inventory: prevDb.inventory.map((item: any) => {
-                            if (item.id === selectedItem.id) {
-                                return {
-                                    ...item,
-                                    allocations: data.verifiedAllocations
-                                };
-                            }
-                            return item;
+                            if (item.id !== selectedItem.id) return item;
+                            return {
+                                ...item,
+                                allocations: verifiedAllocations
+                            };
                         })
                     };
                 });
+                setTimeout(() => fetchDashboardData(), 150);
+                alert(`Stock reapportioned for ${selectedItem.name}.`);
+            } catch (e: any) {
+                alert("Error: " + e.message);
             }
-            
-            alert(`Stock reapportioned for ${selectedItem.name}.\nKipasa: ${allocs.find(a => a.shopId.toLowerCase().includes('kipasa'))?.quantity || 0}\nDub Dub: ${allocs.find(a => a.shopId.toLowerCase().includes('dub'))?.quantity || 0}\nTradecenter: ${allocs.find(a => a.shopId.toLowerCase().includes('trade'))?.quantity || 0}`);
-        } catch (e: any) {
-            console.error("[Reapportion] Error:", e);
-            alert("Error: " + e.message);
-        }
+        });
     };
 
     const handleDownloadPDF = async () => {
@@ -229,41 +194,6 @@ export default function InventoryManagerPage() {
                     Central Node for Physical Count Adjustments & Multi-Shop Reapportionment.
                 </p>
             </div>
-
-            {/* DEBUG PANEL - Shows actual shop IDs and allocation counts */}
-            <Card className="max-w-6xl mx-auto bg-amber-500/5 border-amber-500/20">
-                <CardHeader className="pb-2">
-                    <CardTitle className="text-sm font-black uppercase italic flex items-center gap-2 text-amber-400">
-                        <AlertCircle className="h-4 w-4" /> Debug: Shop IDs & Allocations
-                    </CardTitle>
-                </CardHeader>
-                <CardContent>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        {shops.map((s: any) => {
-                            const itemsWithAlloc = inventory.filter((item: any) => item.allocations?.some((a: any) => a.shopId === s.id));
-                            const totalAllocQty = itemsWithAlloc.reduce((sum: number, item: any) => {
-                                const alloc = item.allocations?.find((a: any) => a.shopId === s.id);
-                                return sum + (alloc?.quantity || 0);
-                            }, 0);
-                            return (
-                                <div key={s.id} className="p-3 bg-slate-900 rounded-lg border border-slate-800">
-                                    <div className="text-lg font-black text-white">{s.name}</div>
-                                    <div className="text-[10px] font-mono text-amber-400 mt-1">ID: "{s.id}"</div>
-                                    <div className="text-[10px] text-emerald-400 mt-1">Items: {itemsWithAlloc.length} | Total Qty: {totalAllocQty}</div>
-                                </div>
-                            );
-                        })}
-                    </div>
-                    <div className="mt-4 p-3 bg-slate-900 rounded border border-slate-800">
-                        <div className="text-xs font-black text-slate-400 mb-2">Sample Allocation Data (first 3 items):</div>
-                        {inventory.slice(0, 3).map((item: any) => (
-                            <div key={item.id} className="text-[10px] font-mono text-slate-500 mb-1">
-                                {item.name}: {JSON.stringify(item.allocations)}
-                            </div>
-                        ))}
-                    </div>
-                </CardContent>
-            </Card>
 
             {/* CONTROLS */}
             <Card className="max-w-6xl mx-auto bg-slate-950/40 border-slate-800">

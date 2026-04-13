@@ -34,7 +34,6 @@ export function InvestConsole() {
     shopId: "",
     amount: "",
   });
-  const [withdrawDepositId, setWithdrawDepositId] = useState<string>("");
   const [withdrawAmount, setWithdrawAmount] = useState<string>("");
   const [withdrawTitle, setWithdrawTitle] = useState<string>("");
 
@@ -164,14 +163,12 @@ export function InvestConsole() {
     try {
       const amount = Number(withdrawAmount);
       if (!Number.isFinite(amount) || amount <= 0) throw new Error("Invalid amount");
-      if (!withdrawDepositId) throw new Error("Select a deposit");
       
       const res = await fetch("/api/invest/deposits/withdraw", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
         body: JSON.stringify({
-          depositId: withdrawDepositId,
           amount,
           title: withdrawTitle,
         }),
@@ -332,7 +329,7 @@ export function InvestConsole() {
           <Card className="bg-sky-950/20 border-sky-800/30">
             <CardHeader>
               <CardTitle className="text-lg font-black uppercase italic text-sky-400">Deposits by Shop</CardTitle>
-              <CardDescription className="text-[10px]">Each shop's contribution to perfume growth capital</CardDescription>
+              <CardDescription className="text-[10px]">Each shop&apos;s contribution to perfume growth capital</CardDescription>
             </CardHeader>
             <CardContent className="space-y-2">
               {(() => {
@@ -416,26 +413,15 @@ export function InvestConsole() {
             <CardHeader>
               <CardTitle className="text-lg font-black uppercase italic">Record Withdrawal</CardTitle>
               <CardDescription className="text-[10px] font-bold uppercase italic">
-                Withdraw from accumulated perfume growth capital.
+                Withdraw a bulk figure from the full perfume capital pool. Oldest active deposits are reduced first.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
               <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-                <select
-                  value={withdrawDepositId}
-                  onChange={(e) => setWithdrawDepositId(e.target.value)}
-                  className="bg-slate-900 border border-slate-800 text-white px-3 py-2 rounded-md md:col-span-1"
-                >
-                  <option value="">Select Deposit</option>
-                  {deposits.filter(d => d.status !== 'withdrawn').map((d) => {
-                    const available = Number(d.amount) - Number(d.withdrawn_amount || 0);
-                    return (
-                      <option key={d.id} value={d.id}>
-                        {d.shop_id} - ${available.toFixed(2)} available
-                      </option>
-                    );
-                  })}
-                </select>
+                <div className="rounded-md border border-slate-800 bg-slate-900 px-3 py-2 md:col-span-1">
+                  <div className="text-[10px] font-black uppercase tracking-widest text-slate-500">Pool Available</div>
+                  <div className="text-lg font-black italic text-sky-400">${totalAvailable.toFixed(2)}</div>
+                </div>
                 <Input 
                   value={withdrawAmount} 
                   onChange={(e) => setWithdrawAmount(e.target.value)} 
@@ -449,7 +435,7 @@ export function InvestConsole() {
                   className="bg-slate-900 border-slate-800 md:col-span-1" 
                   placeholder="Purpose/Label" 
                 />
-                <Button disabled={busy || !withdrawDepositId || !withdrawAmount} onClick={withdrawFromDeposit} className="font-black uppercase md:col-span-1">
+                <Button disabled={busy || !withdrawAmount} onClick={withdrawFromDeposit} className="font-black uppercase md:col-span-1">
                   Withdraw
                 </Button>
               </div>
@@ -465,7 +451,6 @@ export function InvestConsole() {
                 <div className="text-center py-6 text-[10px] font-black text-slate-600 uppercase italic">No deposits yet.</div>
               ) : (
                 deposits.map((d) => {
-                  const available = Number(d.amount) - Number(d.withdrawn_amount || 0);
                   return (
                     <div key={d.id} className="flex items-center justify-between p-3 rounded-lg bg-slate-900/40 border border-slate-800">
                       <div className="min-w-0">
