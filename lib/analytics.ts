@@ -1,5 +1,15 @@
 import { supabaseAdmin } from "@/lib/supabase";
 
+function toLocalDateString(date: Date | string | null | undefined): string {
+    if (!date) return '';
+    const d = typeof date === 'string' ? new Date(date) : date;
+    return d.toLocaleDateString('en-CA');
+}
+
+function getLocalDateStr(year: number, month: number, day: number): string {
+    return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+}
+
 export interface SalesMetric {
     itemId: string;
     itemName: string;
@@ -233,7 +243,7 @@ export async function getSalesVsOverheadsData() {
     };
 
     for (let day = 1; day <= daysInMonth; day++) {
-        const dateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+        const dateStr = getLocalDateStr(now.getFullYear(), now.getMonth() + 1, day);
 
         // Overhead grows linearly across the month (fixed cost projection)
         const dailyGlobalOverhead = daysInMonth > 0 ? globalMonthlyOverhead / daysInMonth : 0;
@@ -242,7 +252,7 @@ export async function getSalesVsOverheadsData() {
         // Sales are cumulative up to today; future days are null - ALL shops combined
         const globalDaySales = (sales || [])
             .filter((s: any) => {
-                const saleDate = s.date ? new Date(s.date).toISOString().split('T')[0] : '';
+                const saleDate = toLocalDateString(s.date);
                 return saleDate === dateStr;
             })
             .reduce((sum: number, s: any) => sum + Number(s.total_with_tax || 0), 0);
@@ -271,7 +281,7 @@ export async function getSalesVsOverheadsData() {
             // Match sales by exact shop key match
             const shopDaySales = (sales || [])
                 .filter((s: any) => {
-                    const saleDate = s.date ? new Date(s.date).toISOString().split('T')[0] : '';
+                    const saleDate = toLocalDateString(s.date);
                     const saleShopKey = normalizeShopKey(s.shop_id, '');
                     return saleShopKey === shopKey && saleDate === dateStr;
                 })
@@ -360,12 +370,12 @@ export async function getRevenueExpenseProfitTrajectoryData() {
     const dailyGlobalFixed = daysInMonth > 0 ? globalFixedMonthly / daysInMonth : 0;
 
     for (let day = 1; day <= daysInMonth; day++) {
-        const dateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+        const dateStr = getLocalDateStr(now.getFullYear(), now.getMonth() + 1, day);
 
         // Global revenue - ALL shops combined
         const globalDayRevenue = salesRows
             .filter((s: any) => {
-                const saleDate = s.date ? new Date(s.date).toISOString().split('T')[0] : '';
+                const saleDate = toLocalDateString(s.date);
                 return saleDate === dateStr;
             })
             .reduce((sum: number, s: any) => sum + Number(s.total_with_tax || 0), 0);
@@ -374,7 +384,7 @@ export async function getRevenueExpenseProfitTrajectoryData() {
 
         const globalDayVariableExp = ledgerExpenses
             .filter((l: any) => {
-                const ledgerDate = l.date ? new Date(l.date).toISOString().split('T')[0] : '';
+                const ledgerDate = toLocalDateString(l.date);
                 return ledgerDate === dateStr;
             })
             .reduce((sum: number, l: any) => sum + Number(l.amount || 0), 0);
@@ -408,7 +418,7 @@ export async function getRevenueExpenseProfitTrajectoryData() {
             // Match revenue by normalized shop key
             const shopDayRevenue = salesRows
                 .filter((s: any) => {
-                    const saleDate = s.date ? new Date(s.date).toISOString().split('T')[0] : '';
+                    const saleDate = toLocalDateString(s.date);
                     return normalizeShopKey(s.shop_id, '') === shopKey && saleDate === dateStr;
                 })
                 .reduce((sum: number, s: any) => sum + Number(s.total_with_tax || 0), 0);
@@ -418,7 +428,7 @@ export async function getRevenueExpenseProfitTrajectoryData() {
             // Match expenses by normalized shop key
             const shopDayVarExp = ledgerExpenses
                 .filter((l: any) => {
-                    const ledgerDate = l.date ? new Date(l.date).toISOString().split('T')[0] : '';
+                    const ledgerDate = toLocalDateString(l.date);
                     return normalizeShopKey(l.shop_id, '') === shopKey && ledgerDate === dateStr;
                 })
                 .reduce((sum: number, l: any) => sum + Number(l.amount || 0), 0);
