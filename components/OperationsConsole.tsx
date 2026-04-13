@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo, useRef, memo } from "react";
 import { Badge, Button, Card, CardContent, CardDescription, CardHeader, CardTitle, Input } from "@/components/ui";
-import { Coins, Loader2, Trash2, ArrowRightLeft, DollarSign, History, TrendingUp, TrendingDown, Warehouse, Upload, Download, Plus, Minus, Activity, Users, Shield, Handshake, LogOut, Wifi, WifiOff, Edit, X } from "lucide-react";
+import { Coins, Loader2, Trash2, ArrowRightLeft, DollarSign, History, TrendingUp, TrendingDown, Warehouse, Upload, Download, Plus, Minus, Activity, Users, Shield, Handshake, LogOut, Wifi, WifiOff, Edit, X, Brain } from "lucide-react";
 import { cn } from "@/components/ui";
 import { StockvelPanel } from "@/components/StockvelPanel";
 import { MoneyAuditBrain } from "@/components/MoneyAuditBrain";
@@ -121,7 +121,7 @@ export function OperationsConsole({
   const [employees, setEmployees] = useState<any[]>([]);
   const [isGeneratingReport, setIsGeneratingReport] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [activeTab, setActiveTab] = useState<"overview" | "stockvel">("overview");
+  const [activeTab, setActiveTab] = useState<"overview" | "stockvel" | "moneybrain">("overview");
 
   const [opsState, setOpsState] = useState<OpsState>(initialState);
 
@@ -424,10 +424,23 @@ export function OperationsConsole({
         >
           Stockvel
         </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab("moneybrain")}
+          className={cn(
+            "px-4 py-2 text-xs font-black uppercase italic tracking-widest border-b-2 transition-colors",
+            activeTab === "moneybrain" ? "border-violet-500 text-violet-400" : "border-transparent text-slate-500 hover:text-slate-300"
+          )}
+        >
+          <Brain className="h-3 w-3 inline mr-1" />
+          Money Brain
+        </button>
       </div>
 
       {activeTab === "stockvel" ? (
         <StockvelPanel ledger={ledger} onRefresh={fetchData} />
+      ) : activeTab === "moneybrain" ? (
+        <MoneyAuditBrain shops={shops} />
       ) : (
         <>
       {/* Top Cards Row */}
@@ -681,9 +694,6 @@ export function OperationsConsole({
           </CardContent>
         </Card>
       </div>
-
-      {/* Money Audit Brain - Full Width */}
-      <MoneyAuditBrain shops={shops} />
 
       {/* Link to Handshake Page */}
       <div className="flex justify-center">
