@@ -241,7 +241,10 @@ export async function getSalesVsOverheadsData() {
 
         // Sales are cumulative up to today; future days are null - ALL shops combined
         const globalDaySales = (sales || [])
-            .filter((s: any) => (s.date || '').startsWith(dateStr))
+            .filter((s: any) => {
+                const saleDate = s.date ? new Date(s.date).toISOString().split('T')[0] : '';
+                return saleDate === dateStr;
+            })
             .reduce((sum: number, s: any) => sum + Number(s.total_with_tax || 0), 0);
         const prevGlobalSales = datasets.global[day - 2]?.sales || 0;
         const cumulativeGlobalSales = day > currentDay ? null : Math.round((prevGlobalSales + globalDaySales) * 100) / 100;
@@ -268,8 +271,9 @@ export async function getSalesVsOverheadsData() {
             // Match sales by exact shop key match
             const shopDaySales = (sales || [])
                 .filter((s: any) => {
+                    const saleDate = s.date ? new Date(s.date).toISOString().split('T')[0] : '';
                     const saleShopKey = normalizeShopKey(s.shop_id, '');
-                    return saleShopKey === shopKey && (s.date || '').startsWith(dateStr);
+                    return saleShopKey === shopKey && saleDate === dateStr;
                 })
                 .reduce((sum: number, s: any) => sum + Number(s.total_with_tax || 0), 0);
             const prevShopSales = datasets[shopKey]?.[day - 2]?.sales || 0;
@@ -360,13 +364,19 @@ export async function getRevenueExpenseProfitTrajectoryData() {
 
         // Global revenue - ALL shops combined
         const globalDayRevenue = salesRows
-            .filter((s: any) => (s.date || '').startsWith(dateStr))
+            .filter((s: any) => {
+                const saleDate = s.date ? new Date(s.date).toISOString().split('T')[0] : '';
+                return saleDate === dateStr;
+            })
             .reduce((sum: number, s: any) => sum + Number(s.total_with_tax || 0), 0);
         const prevGlobalRevenue = datasets.global[day - 2]?.revenue || 0;
         const cumulativeGlobalRevenue = day > currentDay ? null : Math.round((prevGlobalRevenue + globalDayRevenue) * 100) / 100;
 
         const globalDayVariableExp = ledgerExpenses
-            .filter((l: any) => (l.date || '').startsWith(dateStr))
+            .filter((l: any) => {
+                const ledgerDate = l.date ? new Date(l.date).toISOString().split('T')[0] : '';
+                return ledgerDate === dateStr;
+            })
             .reduce((sum: number, l: any) => sum + Number(l.amount || 0), 0);
         const prevGlobalVar = datasets.global[day - 2]?.variableExpenses || 0;
         const cumulativeGlobalVar = Math.round((prevGlobalVar + globalDayVariableExp) * 100) / 100;
@@ -397,14 +407,20 @@ export async function getRevenueExpenseProfitTrajectoryData() {
 
             // Match revenue by normalized shop key
             const shopDayRevenue = salesRows
-                .filter((s: any) => normalizeShopKey(s.shop_id, '') === shopKey && (s.date || '').startsWith(dateStr))
+                .filter((s: any) => {
+                    const saleDate = s.date ? new Date(s.date).toISOString().split('T')[0] : '';
+                    return normalizeShopKey(s.shop_id, '') === shopKey && saleDate === dateStr;
+                })
                 .reduce((sum: number, s: any) => sum + Number(s.total_with_tax || 0), 0);
             const prevShopRevenue = datasets[shopKey]?.[day - 2]?.revenue || 0;
             const cumulativeShopRevenue = day > currentDay ? null : Math.round((prevShopRevenue + shopDayRevenue) * 100) / 100;
 
             // Match expenses by normalized shop key
             const shopDayVarExp = ledgerExpenses
-                .filter((l: any) => normalizeShopKey(l.shop_id, '') === shopKey && (l.date || '').startsWith(dateStr))
+                .filter((l: any) => {
+                    const ledgerDate = l.date ? new Date(l.date).toISOString().split('T')[0] : '';
+                    return normalizeShopKey(l.shop_id, '') === shopKey && ledgerDate === dateStr;
+                })
                 .reduce((sum: number, l: any) => sum + Number(l.amount || 0), 0);
             const prevShopVar = datasets[shopKey]?.[day - 2]?.variableExpenses || 0;
             const cumulativeShopVar = Math.round((prevShopVar + shopDayVarExp) * 100) / 100;

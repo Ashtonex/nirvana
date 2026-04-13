@@ -50,6 +50,7 @@ const navItems = [
     { name: 'Transfers', href: '/transfers', icon: RefreshCcw },
     { name: 'Tax Ledger', href: '/admin/tax', icon: Scale },
     { name: 'Financials', href: '/finance', icon: BarChart3 },
+    { name: 'Expenses', href: '/expenses', icon: BarChart3 },
     { name: 'Reports', href: '/reports', icon: BarChart3 },
     { name: 'Operations', href: '/operations', icon: Wallet },
     { name: 'Cash Handshake', href: '/handshake', icon: ArrowRightLeft },
