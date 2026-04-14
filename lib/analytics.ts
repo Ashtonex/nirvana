@@ -2,12 +2,25 @@ import { supabaseAdmin } from "@/lib/supabase";
 
 function toLocalDateString(date: Date | string | null | undefined): string {
     if (!date) return '';
-    const d = typeof date === 'string' ? new Date(date) : date;
-    return d.toLocaleDateString('en-CA');
+    try {
+        const d = typeof date === 'string' ? new Date(date) : date;
+        return d.toLocaleDateString('en-CA');
+    } catch {
+        return '';
+    }
 }
 
 function getLocalDateStr(year: number, month: number, day: number): string {
     return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+}
+
+function getMonthDateRange(year: number, month: number): { start: string; end: string } {
+    const start = new Date(year, month - 1, 1);
+    const end = new Date(year, month, 0, 23, 59, 59, 999);
+    return {
+        start: start.toISOString(),
+        end: end.toISOString()
+    };
 }
 
 export interface SalesMetric {
@@ -186,54 +199,48 @@ const KNOWN_SHOP_KEYS = ['kipasa', 'dubdub', 'tradecenter'];
 
 export async function getSalesVsOverheadsData() {
     const now = new Date();
-    const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+    const year = now.getFullYear();
+    const month = now.getMonth() + 1;
+    const daysInMonth = new Date(year, month, 0).getDate();
     const currentDay = now.getDate();
-    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
-    const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString();
+    
+    const { start: monthStart, end: monthEnd } = getMonthDateRange(year, month);
 
-    const { data: shops, error: shopsError } = await supabaseAdmin.from('shops').select('id, name, expenses');
+    const { data: shops } = await supabaseAdmin.from('shops').select('id, name, expenses');
     const { data: ledger } = await supabaseAdmin.from('ledger_entries').select('shop_id, type, amount, date')
         .eq('type', 'expense')
         .gte('date', monthStart)
         .lte('date', monthEnd);
-    const { data: sales } = await supabaseAdmin.from('sales').select('shop_id, total_with_tax, date');
+    const { data: sales } = await supabaseAdmin.from('sales').select('shop_id, total_with_tax, date')
+        .gte('date', monthStart)
+        .lte('date', monthEnd);
 
-    // Debug: log shop IDs to understand the data
-    console.log('[getSalesVsOverheadsData] Shops from DB:', shops?.map((s: any) => ({ id: s.id, name: s.name })));
-    console.log('[getSalesVsOverheadsData] Sales shop_ids:', [...new Set((sales || []).map((s: any) => s.shop_id))]);
+    console.log('[getSalesVsOverheadsData] Month:', `${year}-${month}, days: ${daysInMonth}, currentDay: ${currentDay}`);
+    console.log('[getSalesVsOverheadsData] Date range:', monthStart, 'to', monthEnd);
+    console.log('[getSalesVsOverheadsData] Sales count:', sales?.length || 0);
+    console.log('[getSalesVsOverheadsData] Sample sales:', (sales || []).slice(0, 3).map((s: any) => ({ date: s.date, shop_id: s.shop_id, total: s.total_with_tax })));
     
     const shopList = shops || [];
-    const ledgerExpenses = ledger || [];
+    const ledgerExpenses = (ledger || []).filter((l: any) => l.type === 'expense');
 
-    // Create mapping from normalized keys to shop data
     const shopKeyMap: Record<string, { id: string; name: string; expenses: any }> = {};
     shopList.forEach((s: any) => {
         const key = normalizeShopKey(s.id, s.name);
-        console.log(`[getSalesVsOverheadsData] Mapping shop: id=${s.id}, name=${s.name} -> key=${key}`);
         shopKeyMap[key] = s;
     });
 
-    // Compute global monthly overhead from all shops
     const shopExpensesByKey: Record<string, number> = {};
     KNOWN_SHOP_KEYS.forEach(key => {
         const shop = shopKeyMap[key];
         if (shop) {
             const exp = shop.expenses || {};
             shopExpensesByKey[key] = Object.values(exp).reduce((a: number, b: any) => a + Number(b || 0), 0);
-            console.log(`[getSalesVsOverheadsData] ${key} expenses:`, shopExpensesByKey[key]);
         }
     });
     
     const shopStructuredTotal = Object.values(shopExpensesByKey).reduce((sum, val) => sum + val, 0);
-    const ledgerExpenseTotal = ledgerExpenses.reduce((sum: number, l: any) => sum + Number(l.amount || 0), 0);
-
-    console.log('[getSalesVsOverheadsData] Total structured overhead:', shopStructuredTotal);
-    console.log('[getSalesVsOverheadsData] Total ledger expenses:', ledgerExpenseTotal);
-
-    // If we have structured expenses, use them. Otherwise fall back to ledger. Always show something.
-    // CAP at $4,900 maximum monthly overhead
-    const rawOverhead = shopStructuredTotal > 0 ? shopStructuredTotal + ledgerExpenseTotal : ledgerExpenseTotal;
-    const globalMonthlyOverhead = Math.min(rawOverhead, 4900);
+    const ledgerExpenseTotal = ledgerExpenses.reduce((sum: number, l: any) => sum + Math.abs(Number(l.amount || 0)), 0);
+    const globalMonthlyOverhead = Math.min(shopStructuredTotal > 0 ? shopStructuredTotal + ledgerExpenseTotal : ledgerExpenseTotal, 4900);
 
     const datasets: Record<string, any[]> = {
         global: [],
@@ -242,24 +249,32 @@ export async function getSalesVsOverheadsData() {
         tradecenter: []
     };
 
-    for (let day = 1; day <= daysInMonth; day++) {
-        const dateStr = getLocalDateStr(now.getFullYear(), now.getMonth() + 1, day);
+    let runningTotal = 0;
+    const shopRunningTotals: Record<string, number> = {
+        kipasa: 0,
+        dubdub: 0,
+        tradecenter: 0
+    };
 
-        // Overhead grows linearly across the month (fixed cost projection)
+    for (let day = 1; day <= daysInMonth; day++) {
+        const dateStr = getLocalDateStr(year, month, day);
+
         const dailyGlobalOverhead = daysInMonth > 0 ? globalMonthlyOverhead / daysInMonth : 0;
         const cumulativeGlobalOverhead = Math.round(dailyGlobalOverhead * day * 100) / 100;
 
-        // Sales are cumulative up to today; future days are null - ALL shops combined
-        const globalDaySales = (sales || [])
-            .filter((s: any) => {
-                const saleDate = toLocalDateString(s.date);
-                return saleDate === dateStr;
-            })
-            .reduce((sum: number, s: any) => sum + Number(s.total_with_tax || 0), 0);
-        const prevGlobalSales = datasets.global[day - 2]?.sales || 0;
-        const cumulativeGlobalSales = day > currentDay ? null : Math.round((prevGlobalSales + globalDaySales) * 100) / 100;
+        const daySales = (sales || []).filter((s: any) => {
+            if (!s.date) return false;
+            const saleDate = toLocalDateString(s.date);
+            return saleDate === dateStr;
+        });
+        
+        const globalDayRevenue = daySales.reduce((sum: number, s: any) => sum + Number(s.total_with_tax || 0), 0);
+        
+        if (day <= currentDay) {
+            runningTotal += globalDayRevenue;
+        }
 
-        // Profit = sales - overhead (show always, even negative, so chart shows the relationship)
+        const cumulativeGlobalSales = day > currentDay ? null : Math.round(runningTotal * 100) / 100;
         const profitVal = cumulativeGlobalSales !== null
             ? Math.round((cumulativeGlobalSales - cumulativeGlobalOverhead) * 100) / 100
             : null;
@@ -271,24 +286,25 @@ export async function getSalesVsOverheadsData() {
             profit: profitVal
         });
 
-        // Per-shop datasets using normalized keys
         KNOWN_SHOP_KEYS.forEach((shopKey) => {
-            const shop = shopKeyMap[shopKey];
             const shopMonthlyOverhead = shopExpensesByKey[shopKey] || 0;
             const dailyShopOverhead = daysInMonth > 0 ? shopMonthlyOverhead / daysInMonth : 0;
             const cumulativeShopOverhead = Math.round(dailyShopOverhead * day * 100) / 100;
 
-            // Match sales by exact shop key match
-            const shopDaySales = (sales || [])
-                .filter((s: any) => {
-                    const saleDate = toLocalDateString(s.date);
-                    const saleShopKey = normalizeShopKey(s.shop_id, '');
-                    return saleShopKey === shopKey && saleDate === dateStr;
-                })
-                .reduce((sum: number, s: any) => sum + Number(s.total_with_tax || 0), 0);
-            const prevShopSales = datasets[shopKey]?.[day - 2]?.sales || 0;
-            const cumulativeShopSales = day > currentDay ? null : Math.round((prevShopSales + shopDaySales) * 100) / 100;
+            const shopDaySales = (sales || []).filter((s: any) => {
+                if (!s.date) return false;
+                const saleDate = toLocalDateString(s.date);
+                const saleShopKey = normalizeShopKey(s.shop_id, '');
+                return saleShopKey === shopKey && saleDate === dateStr;
+            });
+            
+            const shopDayRevenue = shopDaySales.reduce((sum: number, s: any) => sum + Number(s.total_with_tax || 0), 0);
+            
+            if (day <= currentDay) {
+                shopRunningTotals[shopKey] += shopDayRevenue;
+            }
 
+            const cumulativeShopSales = day > currentDay ? null : Math.round(shopRunningTotals[shopKey] * 100) / 100;
             const shopProfitVal = cumulativeShopSales !== null
                 ? Math.round((cumulativeShopSales - cumulativeShopOverhead) * 100) / 100
                 : null;
@@ -302,22 +318,20 @@ export async function getSalesVsOverheadsData() {
         });
     }
 
-    // Debug: log final dataset summary
-    console.log('[getSalesVsOverheadsData] Final - global last entry:', datasets.global[datasets.global.length - 1]);
-    console.log('[getSalesVsOverheadsData] Final - kipasa expenses:', shopExpensesByKey.kipasa);
-    console.log('[getSalesVsOverheadsData] Final - dubdub expenses:', shopExpensesByKey.dubdub);
-    console.log('[getSalesVsOverheadsData] Final - tradecenter expenses:', shopExpensesByKey.tradecenter);
+    console.log('[getSalesVsOverheadsData] Final running total:', runningTotal);
+    console.log('[getSalesVsOverheadsData] Final global dataset:', datasets.global.filter(d => d.sales !== null).slice(-5));
 
     return datasets;
 }
 
 export async function getRevenueExpenseProfitTrajectoryData() {
     const now = new Date();
-    const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+    const year = now.getFullYear();
+    const month = now.getMonth() + 1;
+    const daysInMonth = new Date(year, month, 0).getDate();
     const currentDay = now.getDate();
-
-    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
-    const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999).toISOString();
+    
+    const { start: monthStart, end: monthEnd } = getMonthDateRange(year, month);
 
     const { data: shops } = await supabaseAdmin.from('shops').select('id, name, expenses');
     const { data: ledger } = await supabaseAdmin
@@ -332,15 +346,13 @@ export async function getRevenueExpenseProfitTrajectoryData() {
         .gte('date', monthStart)
         .lte('date', monthEnd);
 
-    // Debug: log shop IDs
-    console.log('[getRevenueExpenseProfitTrajectoryData] Shops:', shops?.map((s: any) => ({ id: s.id, name: s.name })));
-    console.log('[getRevenueExpenseProfitTrajectoryData] Sales shop_ids:', [...new Set((sales || []).map((s: any) => s.shop_id))]);
+    console.log('[getRevenueExpenseProfitTrajectoryData] Sales count:', sales?.length || 0);
+    console.log('[getRevenueExpenseProfitTrajectoryData] Sample:', (sales || []).slice(0, 3));
     
     const shopList = shops || [];
-    const ledgerExpenses = ledger || [];
+    const ledgerExpenses = (ledger || []).filter((l: any) => l.type === 'expense');
     const salesRows = sales || [];
 
-    // Create mapping from normalized keys to shop data
     const shopKeyMap: Record<string, { id: string; name: string; expenses: any }> = {};
     shopList.forEach((s: any) => {
         const key = normalizeShopKey(s.id, s.name);
@@ -354,7 +366,6 @@ export async function getRevenueExpenseProfitTrajectoryData() {
         tradecenter: []
     };
 
-    // Compute shop expenses by key
     const shopExpensesByKey: Record<string, number> = {};
     KNOWN_SHOP_KEYS.forEach(key => {
         const shop = shopKeyMap[key];
@@ -364,77 +375,80 @@ export async function getRevenueExpenseProfitTrajectoryData() {
     });
 
     const rawGlobalFixed = Object.values(shopExpensesByKey).reduce((sum: number, val) => sum + val, 0);
-    // CAP at $4,900 maximum monthly overhead
     const globalFixedMonthly = Math.min(rawGlobalFixed, 4900);
-    
     const dailyGlobalFixed = daysInMonth > 0 ? globalFixedMonthly / daysInMonth : 0;
 
-    for (let day = 1; day <= daysInMonth; day++) {
-        const dateStr = getLocalDateStr(now.getFullYear(), now.getMonth() + 1, day);
+    let runningRevenue = 0;
+    let runningVariableExp = 0;
+    const shopRunningRevenue: Record<string, number> = { kipasa: 0, dubdub: 0, tradecenter: 0 };
+    const shopRunningVarExp: Record<string, number> = { kipasa: 0, dubdub: 0, tradecenter: 0 };
 
-        // Global revenue - ALL shops combined
-        const globalDayRevenue = salesRows
+    for (let day = 1; day <= daysInMonth; day++) {
+        const dateStr = getLocalDateStr(year, month, day);
+
+        const dayRevenue = salesRows
             .filter((s: any) => {
-                const saleDate = toLocalDateString(s.date);
-                return saleDate === dateStr;
+                if (!s.date) return false;
+                return toLocalDateString(s.date) === dateStr;
             })
             .reduce((sum: number, s: any) => sum + Number(s.total_with_tax || 0), 0);
-        const prevGlobalRevenue = datasets.global[day - 2]?.revenue || 0;
-        const cumulativeGlobalRevenue = day > currentDay ? null : Math.round((prevGlobalRevenue + globalDayRevenue) * 100) / 100;
-
-        const globalDayVariableExp = ledgerExpenses
+        
+        const dayVariableExp = ledgerExpenses
             .filter((l: any) => {
-                const ledgerDate = toLocalDateString(l.date);
-                return ledgerDate === dateStr;
+                if (!l.date) return false;
+                return toLocalDateString(l.date) === dateStr;
             })
-            .reduce((sum: number, l: any) => sum + Number(l.amount || 0), 0);
-        const prevGlobalVar = datasets.global[day - 2]?.variableExpenses || 0;
-        const cumulativeGlobalVar = Math.round((prevGlobalVar + globalDayVariableExp) * 100) / 100;
+            .reduce((sum: number, l: any) => sum + Math.abs(Number(l.amount || 0)), 0);
+
+        if (day <= currentDay) {
+            runningRevenue += dayRevenue;
+            runningVariableExp += dayVariableExp;
+        }
 
         const cumulativeGlobalFixed = Math.round((dailyGlobalFixed * day) * 100) / 100;
+        const cumulativeGlobalVar = Math.round(runningVariableExp * 100) / 100;
         const cumulativeGlobalExpenses = Math.round((cumulativeGlobalFixed + cumulativeGlobalVar) * 100) / 100;
-
-        const globalProfit = cumulativeGlobalRevenue !== null
-            ? Math.round((cumulativeGlobalRevenue - cumulativeGlobalExpenses) * 100) / 100
+        const cumulativeRevenue = day > currentDay ? null : Math.round(runningRevenue * 100) / 100;
+        const globalProfit = cumulativeRevenue !== null
+            ? Math.round((cumulativeRevenue - cumulativeGlobalExpenses) * 100) / 100
             : null;
 
         datasets.global.push({
             day,
             date: dateStr,
-            revenue: cumulativeGlobalRevenue,
+            revenue: cumulativeRevenue,
             expenses: cumulativeGlobalExpenses,
             profit: globalProfit,
             fixedOverhead: cumulativeGlobalFixed,
             variableExpenses: cumulativeGlobalVar,
         });
 
-        // Per-shop datasets using known keys
         KNOWN_SHOP_KEYS.forEach((shopKey) => {
-            const shop = shopKeyMap[shopKey];
             const shopMonthlyOverhead = shopExpensesByKey[shopKey] || 0;
             const dailyShopFixed = daysInMonth > 0 ? shopMonthlyOverhead / daysInMonth : 0;
             const cumulativeShopFixed = Math.round((dailyShopFixed * day) * 100) / 100;
 
-            // Match revenue by normalized shop key
             const shopDayRevenue = salesRows
                 .filter((s: any) => {
-                    const saleDate = toLocalDateString(s.date);
-                    return normalizeShopKey(s.shop_id, '') === shopKey && saleDate === dateStr;
+                    if (!s.date) return false;
+                    return normalizeShopKey(s.shop_id, '') === shopKey && toLocalDateString(s.date) === dateStr;
                 })
                 .reduce((sum: number, s: any) => sum + Number(s.total_with_tax || 0), 0);
-            const prevShopRevenue = datasets[shopKey]?.[day - 2]?.revenue || 0;
-            const cumulativeShopRevenue = day > currentDay ? null : Math.round((prevShopRevenue + shopDayRevenue) * 100) / 100;
 
-            // Match expenses by normalized shop key
             const shopDayVarExp = ledgerExpenses
                 .filter((l: any) => {
-                    const ledgerDate = toLocalDateString(l.date);
-                    return normalizeShopKey(l.shop_id, '') === shopKey && ledgerDate === dateStr;
+                    if (!l.date) return false;
+                    return normalizeShopKey(l.shop_id, '') === shopKey && toLocalDateString(l.date) === dateStr;
                 })
-                .reduce((sum: number, l: any) => sum + Number(l.amount || 0), 0);
-            const prevShopVar = datasets[shopKey]?.[day - 2]?.variableExpenses || 0;
-            const cumulativeShopVar = Math.round((prevShopVar + shopDayVarExp) * 100) / 100;
+                .reduce((sum: number, l: any) => sum + Math.abs(Number(l.amount || 0)), 0);
 
+            if (day <= currentDay) {
+                shopRunningRevenue[shopKey] += shopDayRevenue;
+                shopRunningVarExp[shopKey] += shopDayVarExp;
+            }
+
+            const cumulativeShopRevenue = day > currentDay ? null : Math.round(shopRunningRevenue[shopKey] * 100) / 100;
+            const cumulativeShopVar = Math.round(shopRunningVarExp[shopKey] * 100) / 100;
             const cumulativeShopExpenses = Math.round((cumulativeShopFixed + cumulativeShopVar) * 100) / 100;
             const shopProfit = cumulativeShopRevenue !== null
                 ? Math.round((cumulativeShopRevenue - cumulativeShopExpenses) * 100) / 100
