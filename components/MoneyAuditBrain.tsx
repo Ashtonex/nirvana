@@ -615,90 +615,137 @@ export function MoneyAuditBrain({ shops }: Props) {
           <CardHeader>
             <CardTitle className="text-sm font-black uppercase flex items-center gap-2">
               <DollarSign className="h-4 w-4 text-emerald-400" />
-              Real Business Expenses
+              Expense Intelligence
               <Badge className="bg-emerald-500/20 text-emerald-400 ml-2">{rules.length} Rules Active</Badge>
             </CardTitle>
             <CardDescription className="text-[10px]">
-              Filters out internal transfers (POS → Invest/Savings) to show TRUE business expenses
+              Smart filtering: separates internal transfers, personal, and TRUE business expenses
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            {/* Expense Summary */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              <div className="bg-emerald-950/30 rounded-lg p-3 border border-emerald-900/50">
-                <div className="text-[10px] font-black uppercase text-emerald-500">Real Expenses</div>
-                <div className="text-2xl font-black text-emerald-400">${realExpenseData.totalRealExpenses?.toFixed(2) || "0.00"}</div>
-              </div>
-              <div className="bg-slate-800/50 rounded-lg p-3 border border-slate-700/50">
-                <div className="text-[10px] font-black uppercase text-slate-400">Internal Transfers</div>
-                <div className="text-2xl font-black text-slate-400">${realExpenseData.internalTransfers?.toFixed(2) || "0.00"}</div>
-              </div>
-              <div className="bg-rose-950/30 rounded-lg p-3 border border-rose-900/50">
-                <div className="text-[10px] font-black uppercase text-rose-500">Personal</div>
-                <div className="text-2xl font-black text-rose-400">${realExpenseData.personalExpenses?.toFixed(2) || "0.00"}</div>
-              </div>
-              <div className="bg-amber-950/30 rounded-lg p-3 border border-amber-900/50">
-                <div className="text-[10px] font-black uppercase text-amber-500">Groceries</div>
-                <div className="text-2xl font-black text-amber-400">${realExpenseData.groceryExpenses?.toFixed(2) || "0.00"}</div>
-              </div>
-            </div>
-
-            {/* Breakdown by Type */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              <div className="bg-violet-950/30 rounded-lg p-3 border border-violet-900/50">
-                <div className="text-[10px] font-black uppercase text-violet-400">Small/Misc</div>
-                <div className="text-xl font-black text-violet-300">${realExpenseData.smallExpenses?.toFixed(2) || "0.00"}</div>
-              </div>
-              <div className="bg-sky-950/30 rounded-lg p-3 border border-sky-900/50">
-                <div className="text-[10px] font-black uppercase text-sky-400">Overhead</div>
-                <div className="text-xl font-black text-sky-300">${realExpenseData.overheadExpenses?.toFixed(2) || "0.00"}</div>
-              </div>
-              <div className="bg-slate-800/50 rounded-lg p-3 border border-slate-700/50">
-                <div className="text-[10px] font-black uppercase text-slate-400">Other</div>
-                <div className="text-xl font-black text-slate-300">${realExpenseData.miscExpenses?.toFixed(2) || "0.00"}</div>
-              </div>
-              <div className="bg-amber-500/20 rounded-lg p-3 border border-amber-500/30">
-                <div className="text-[10px] font-black uppercase text-amber-400">Flagged</div>
-                <div className="text-xl font-black text-amber-300">{realExpenseData.flaggedItems?.length || 0}</div>
+            {/* What was Filtered vs What Remains */}
+            <div className="bg-slate-900/40 rounded-lg p-4 border border-slate-800">
+              <h4 className="text-xs font-black uppercase text-slate-400 mb-3">What's Being Filtered Out</h4>
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                <div className="bg-slate-800/50 rounded-lg p-3 border border-slate-700/50">
+                  <div className="text-[10px] font-black uppercase text-slate-400">Internal Transfers</div>
+                  <div className="text-xl font-black text-slate-400">${realExpenseData.internalTransfers?.toFixed(2) || "0.00"}</div>
+                  <div className="text-[10px] text-slate-500 mt-1">Invest/Savings/Perfume deposits</div>
+                </div>
+                <div className="bg-rose-950/30 rounded-lg p-3 border border-rose-900/50">
+                  <div className="text-[10px] font-black uppercase text-rose-400">Personal/Household</div>
+                  <div className="text-xl font-black text-rose-400">${realExpenseData.personalExpenses?.toFixed(2) || "0.00"}</div>
+                  <div className="text-[10px] text-rose-400/70 mt-1">Groceries for home, personal</div>
+                </div>
+                <div className="bg-emerald-950/30 rounded-lg p-3 border border-emerald-900/50">
+                  <div className="text-[10px] font-black uppercase text-emerald-500">Real Business Expenses</div>
+                  <div className="text-2xl font-black text-emerald-400">${realExpenseData.realBusinessExpenses?.toFixed(2) || "0.00"}</div>
+                </div>
               </div>
             </div>
 
-            {/* Insights */}
-            {realExpenseData.insights && realExpenseData.insights.length > 0 && (
+            {/* Business Expense Breakdown */}
+            <div>
+              <h4 className="text-xs font-black uppercase text-emerald-400 mb-3">Business Expense Breakdown</h4>
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                <div className="bg-sky-950/30 rounded-lg p-3 border border-sky-900/50">
+                  <div className="text-[10px] font-black uppercase text-sky-400">Overhead</div>
+                  <div className="text-lg font-black text-sky-300">${realExpenseData.overheadExpenses?.toFixed(2) || "0.00"}</div>
+                  <div className="text-[10px] text-sky-400/70">Rent, utilities, salaries</div>
+                </div>
+                <div className="bg-violet-950/30 rounded-lg p-3 border border-violet-900/50">
+                  <div className="text-[10px] font-black uppercase text-violet-400">Stock</div>
+                  <div className="text-lg font-black text-violet-300">${realExpenseData.stockExpenses?.toFixed(2) || "0.00"}</div>
+                  <div className="text-[10px] text-violet-400/70">Inventory, purchases</div>
+                </div>
+                <div className="bg-amber-950/30 rounded-lg p-3 border border-amber-900/50">
+                  <div className="text-[10px] font-black uppercase text-amber-400">Transport</div>
+                  <div className="text-lg font-black text-amber-300">${realExpenseData.transportExpenses?.toFixed(2) || "0.00"}</div>
+                  <div className="text-[10px] text-amber-400/70">Fuel, transport</div>
+                </div>
+                <div className="bg-rose-950/30 rounded-lg p-3 border border-rose-900/50">
+                  <div className="text-[10px] font-black uppercase text-rose-400">Groceries</div>
+                  <div className="text-lg font-black text-rose-300">${realExpenseData.groceryExpenses?.toFixed(2) || "0.00"}</div>
+                  <div className="text-[10px] text-rose-400/70">Groceries from POS</div>
+                </div>
+                <div className="bg-slate-800/50 rounded-lg p-3 border border-slate-700/50">
+                  <div className="text-[10px] font-black uppercase text-slate-400">Operational</div>
+                  <div className="text-lg font-black text-slate-300">${realExpenseData.operationalExpenses?.toFixed(2) || "0.00"}</div>
+                  <div className="text-[10px] text-slate-400/70">Airtime, data, misc</div>
+                </div>
+              </div>
+            </div>
+
+            {/* Expense Breakdown by Type */}
+            {realExpenseData.expenseBreakdown && Object.keys(realExpenseData.expenseBreakdown).length > 0 && (
+              <div className="bg-slate-900/40 rounded-lg p-4 border border-slate-800">
+                <h4 className="text-xs font-black uppercase text-slate-400 mb-3">Detailed Breakdown</h4>
+                <div className="space-y-2">
+                  {Object.entries(realExpenseData.expenseBreakdown).map(([type, data]: [string, any]) => (
+                    <div key={type} className="flex items-center justify-between p-2 bg-slate-800/50 rounded">
+                      <div className="flex items-center gap-3">
+                        <Badge className={cn(
+                          "text-[8px]",
+                          type === 'overhead' ? "bg-sky-500/30 text-sky-400" :
+                          type === 'stock' ? "bg-violet-500/30 text-violet-400" :
+                          type === 'transport' ? "bg-amber-500/30 text-amber-400" :
+                          type === 'groceries' ? "bg-rose-500/30 text-rose-400" :
+                          type === 'operational' ? "bg-emerald-500/30 text-emerald-400" :
+                          "bg-slate-600 text-slate-300"
+                        )}>{type}</Badge>
+                        <span className="text-xs text-slate-400">{data.count} items</span>
+                      </div>
+                      <div className="text-right">
+                        <span className="text-sm font-mono text-white">${data.total.toFixed(2)}</span>
+                        <span className="text-[10px] text-slate-500 ml-2">avg ${data.avg.toFixed(2)}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Oracle Insights */}
+            {realExpenseData.oracleInsights && realExpenseData.oracleInsights.length > 0 && (
               <div className="space-y-2">
-                <h4 className="text-xs font-black uppercase text-slate-400">Brain Insights</h4>
-                {realExpenseData.insights.map((insight: any, i: number) => (
+                <h4 className="text-xs font-black uppercase text-indigo-400 flex items-center gap-2">
+                  <Brain className="h-4 w-4" />
+                  Oracle Insights
+                </h4>
+                {realExpenseData.oracleInsights.map((insight: any, i: number) => (
                   <div key={i} className={cn(
                     "rounded-lg p-3 border",
-                    insight.type === 'warning' ? "bg-amber-950/20 border-amber-900/50" :
-                    insight.type === 'tip' ? "bg-emerald-950/20 border-emerald-900/50" :
+                    insight.includes("Warning") ? "bg-rose-950/20 border-rose-900/50" :
+                    insight.includes("Healthy") ? "bg-emerald-950/20 border-emerald-900/50" :
                     "bg-slate-900/40 border-slate-800"
                   )}>
-                    <p className="text-xs text-slate-300">{insight.message}</p>
+                    <p className="text-xs text-slate-300">{insight}</p>
                   </div>
                 ))}
               </div>
             )}
 
-            {/* Flagged Items */}
-            {realExpenseData.flaggedItems && realExpenseData.flaggedItems.length > 0 && (
+            {/* Anomaly Alerts */}
+            {realExpenseData.anomalyAlerts && realExpenseData.anomalyAlerts.length > 0 && (
               <div className="space-y-2">
                 <h4 className="text-xs font-black uppercase text-amber-400 flex items-center gap-2">
                   <AlertTriangle className="h-4 w-4" />
-                  Flagged Expenses ({realExpenseData.flaggedItems.length})
+                  Alerts ({realExpenseData.anomalyAlerts.length})
                 </h4>
-                {realExpenseData.flaggedItems.map((item: any) => (
-                  <div key={item.id} className="bg-amber-950/20 rounded-lg p-3 border border-amber-900/50">
+                {realExpenseData.anomalyAlerts.map((alert: any, i: number) => (
+                  <div key={i} className={cn(
+                    "rounded-lg p-3 border",
+                    alert.severity === 'warning' ? "bg-amber-950/20 border-amber-900/50" :
+                    "bg-slate-900/40 border-slate-800"
+                  )}>
                     <div className="flex items-center justify-between">
                       <div>
-                        <div className="flex items-center gap-2">
-                          <Badge className="bg-amber-500/30 text-amber-400 text-[8px]">{item.source}</Badge>
-                          <Badge className="bg-rose-500/30 text-rose-400 text-[8px]">{item.flagType.toUpperCase()}</Badge>
-                        </div>
-                        <p className="text-sm font-black text-white mt-1">{item.title}</p>
-                        <p className="text-[10px] text-amber-400/80">{item.flagReason}</p>
+                        <p className="text-sm font-black text-white">{alert.title}</p>
+                        <p className="text-[10px] text-slate-400 mt-1">{alert.message}</p>
                       </div>
-                      <div className="text-xl font-black text-amber-400">${item.amount.toFixed(2)}</div>
+                      {alert.total && (
+                        <span className="text-lg font-black text-amber-400">${alert.total.toFixed(2)}</span>
+                      )}
                     </div>
                   </div>
                 ))}
@@ -737,48 +784,37 @@ export function MoneyAuditBrain({ shops }: Props) {
             {showAddRule && (
               <div className="bg-violet-950/30 rounded-lg p-4 border border-violet-900/50 space-y-3">
                 <h4 className="text-sm font-black text-violet-300">Create New Rule</h4>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                   <div className="space-y-1">
                     <label className="text-[10px] font-black uppercase text-slate-400">Pattern to Match</label>
                     <Input
                       value={newRule.pattern}
                       onChange={(e) => setNewRule({...newRule, pattern: e.target.value})}
-                      placeholder="e.g. groceries, transport, rent"
+                      placeholder="e.g. groceries for home"
                       className="border-violet-900/50"
                     />
                   </div>
                   <div className="space-y-1">
-                    <label className="text-[10px] font-black uppercase text-slate-400">Rule Type</label>
-                    <select
-                      value={newRule.type}
-                      onChange={(e) => setNewRule({...newRule, type: e.target.value})}
-                      className="w-full bg-slate-900 border border-slate-800 text-white px-3 py-2 rounded-md"
-                    >
-                      <option value="expense_filter">Expense Filter</option>
-                      <option value="expense_tag">Expense Tag</option>
-                      <option value="category_map">Category Map</option>
-                      <option value="personal_marker">Personal Marker</option>
-                    </select>
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-black uppercase text-slate-400">Action</label>
+                    <label className="text-[10px] font-black uppercase text-slate-400">Classify As</label>
                     <select
                       value={newRule.action}
                       onChange={(e) => setNewRule({...newRule, action: e.target.value})}
                       className="w-full bg-slate-900 border border-slate-800 text-white px-3 py-2 rounded-md"
                     >
-                      <option value="classify">Classify</option>
-                      <option value="filter">Filter Out</option>
-                      <option value="ignore">Ignore</option>
-                      <option value="flag">Flag for Review</option>
+                      <option value="personal">Personal/Household</option>
+                      <option value="overhead">Overhead (Rent/Utilities)</option>
+                      <option value="stock">Stock/Inventory</option>
+                      <option value="filter">Internal Transfer (Filter)</option>
+                      <option value="operational">Operational Expense</option>
+                      <option value="classify">Custom Category</option>
                     </select>
                   </div>
                   <div className="space-y-1">
-                    <label className="text-[10px] font-black uppercase text-slate-400">Category</label>
+                    <label className="text-[10px] font-black uppercase text-slate-400">Custom Category (optional)</label>
                     <Input
                       value={newRule.category}
                       onChange={(e) => setNewRule({...newRule, category: e.target.value})}
-                      placeholder="e.g. groceries, overhead, personal"
+                      placeholder="e.g. travel, marketing"
                       className="border-violet-900/50"
                     />
                   </div>
@@ -786,7 +822,7 @@ export function MoneyAuditBrain({ shops }: Props) {
                 <div className="flex gap-2">
                   <Button size="sm" onClick={saveRule} className="bg-emerald-600 hover:bg-emerald-500">
                     <Save className="h-4 w-4 mr-1" />
-                    Save Rule
+                    Teach This Rule
                   </Button>
                   <Button size="sm" variant="ghost" onClick={() => setShowAddRule(false)}>
                     Cancel
@@ -797,11 +833,11 @@ export function MoneyAuditBrain({ shops }: Props) {
 
             {/* Existing Rules */}
             <div className="space-y-2">
-              <h4 className="text-xs font-black uppercase text-slate-400">Active Rules ({rules.length})</h4>
+              <h4 className="text-xs font-black uppercase text-slate-400">Your Rules ({rules.length})</h4>
               {rules.length === 0 ? (
                 <div className="text-center py-8 text-slate-500">
-                  <Brain className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                  <p className="text-sm">No rules yet. Teach the brain by adding your first rule.</p>
+                  <GraduationCap className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                  <p className="text-sm">No rules yet. Teach the brain how you want expenses classified.</p>
                 </div>
               ) : (
                 rules.map(rule => (
@@ -811,17 +847,15 @@ export function MoneyAuditBrain({ shops }: Props) {
                         <div className="flex items-center gap-2">
                           <Badge className={cn(
                             "text-[8px]",
-                            rule.rule_type === 'personal_marker' ? "bg-rose-500/30 text-rose-400" :
-                            rule.rule_type === 'expense_filter' ? "bg-amber-500/30 text-amber-400" :
-                            "bg-sky-500/30 text-sky-400"
-                          )}>{rule.rule_type.replace('_', ' ')}</Badge>
-                          <Badge className="bg-slate-700 text-slate-300 text-[8px]">{rule.action}</Badge>
-                          <span className="text-[10px] text-slate-500">Triggered: {rule.times_triggered || 0}</span>
+                            rule.action === 'personal' ? "bg-rose-500/30 text-rose-400" :
+                            rule.action === 'overhead' ? "bg-sky-500/30 text-sky-400" :
+                            rule.action === 'stock' ? "bg-violet-500/30 text-violet-400" :
+                            rule.action === 'filter' ? "bg-amber-500/30 text-amber-400" :
+                            "bg-emerald-500/30 text-emerald-400"
+                          )}>{rule.action === 'classify' ? rule.category || 'custom' : rule.action}</Badge>
+                          <span className="text-[10px] text-slate-500">{rule.times_triggered || 0} times triggered</span>
                         </div>
                         <p className="text-sm font-mono text-white mt-1">"{rule.match_pattern}"</p>
-                        {rule.category && (
-                          <p className="text-[10px] text-emerald-400">→ {rule.category}</p>
-                        )}
                       </div>
                       <Button size="sm" variant="ghost" onClick={() => deleteRule(rule.id)} className="text-rose-400 hover:text-rose-300">
                         <Trash2 className="h-4 w-4" />
@@ -834,15 +868,27 @@ export function MoneyAuditBrain({ shops }: Props) {
 
             {/* Quick Start Suggestions */}
             <div className="bg-indigo-950/30 rounded-lg p-4 border border-indigo-900/50">
-              <h4 className="text-xs font-black uppercase text-indigo-400 mb-2 flex items-center gap-2">
+              <h4 className="text-xs font-black uppercase text-indigo-400 mb-3 flex items-center gap-2">
                 <Sparkles className="h-4 w-4" />
-                Quick Start Suggestions
+                Teaching Guide
               </h4>
-              <div className="space-y-2 text-xs text-slate-300">
-                <p>• Add "groceries for home" → Personal (marks as personal)</p>
-                <p>• Add "transport" → Small expense (tracks operational costs)</p>
-                <p>• Add "invest" → Filter (excludes from business expenses)</p>
-                <p>• Add "airtime" → Small expense (tracks communication costs)</p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+                <div>
+                  <p className="font-black text-rose-400 mb-1">→ Mark as PERSONAL:</p>
+                  <p className="text-slate-400">"groceries for home", "抽钱", "family food"</p>
+                </div>
+                <div>
+                  <p className="font-black text-sky-400 mb-1">→ Mark as OVERHEAD:</p>
+                  <p className="text-slate-400">"rent", "electricity", "water bill", "salary"</p>
+                </div>
+                <div>
+                  <p className="font-black text-violet-400 mb-1">→ Mark as STOCK:</p>
+                  <p className="text-slate-400">"inventory", "bulk order", "wholesale"</p>
+                </div>
+                <div>
+                  <p className="font-black text-amber-400 mb-1">→ Filter (Internal Transfer):</p>
+                  <p className="text-slate-400">"invest", "perfume deposit", "savings"</p>
+                </div>
               </div>
             </div>
           </CardContent>

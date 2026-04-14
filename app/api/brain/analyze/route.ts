@@ -3,50 +3,50 @@ import { supabaseAdmin } from "@/lib/supabase";
 
 export const dynamic = "force-dynamic";
 
-const INTERNAL_TRANSFER_KEYWORDS = [
-  "invest",
-  "savings",
-  "perfume",
-  "deposit to",
-  "transfer to",
-  "stockvel",
-  "operations",
-  "overhead contribution",
+const INTERNAL_TRANSFER_PATTERNS = [
+  "invest", "savings", "perfume", "deposit to", "transfer to",
+  "stockvel", "overhead contribution", "perfume invest",
+  "groceries to invest", "savings deposit"
 ];
 
-const PERSONAL_KEYWORDS = [
-  "personal",
-  "抽钱",
-  "withdrawal",
-  "own",
-  "my",
-  "me",
-  "family",
-  "home",
+const PERSONAL_HOUSEHOLD_PATTERNS = [
+  "groceries for home", "food for home", "抽钱", "personal withdrawal",
+  "my personal", "family food", "home groceries", "groceries for family",
+  "household groceries", "personal groceries"
 ];
 
-const GROCERY_KEYWORDS = [
-  "groceries",
-  "grocery",
-  "food for home",
-  "supermarket",
-  "market",
-  "provisions",
+const OVERHEAD_PATTERNS = [
+  "rent", "utilities", "electric", "electricity", "water", "rates",
+  "municipal", "insurance", "security", "cleaning", "maintenance",
+  "repair", "salary", "wages", "payroll", "staff salary", "staff wages",
+  "site rent", "premises rent", "electricity bill", "water bill"
 ];
 
-const SMALL_EXPENSE_KEYWORDS = [
-  "airtime",
-  "data",
-  "transport",
-  "petrol",
-  "fuel",
-  "lunch",
-  "snacks",
-  "coffee",
-  "water",
-  "parking",
-  "toll",
-  "sms",
+const STOCK_PATTERNS = [
+  "stock", "inventory", "purchases", "stock orders", "stock purchase",
+  "restock", "reorder", "wholesale", "bulk order", "procurement"
+];
+
+const TRANSPORT_PATTERNS = [
+  "transport", "petrol", "fuel", "diesel", "uber", "taxi",
+  "delivery", "logistics", "courier", "freight", "toll", "parking"
+];
+
+const GROCERY_PATTERNS = [
+  "groceries", "grocery", "supermarket", "market", "provisions",
+  "food items", "household food"
+];
+
+const OPERATIONAL_PATTERNS = [
+  "airtime", "data", "internet", "wifi", "phone", "communication",
+  "advertising", "marketing", "promotion", "signage", "packaging",
+  "stationery", "printing", "office supplies", "bank charges",
+  "commission", "service fee", "subscription"
+];
+
+const PERSONAL_PATTERNS = [
+  "personal", "own", "抽钱", "withdrawal", "meals out", "restaurant",
+  "entertainment", "leisure", "vacation", "travel personal"
 ];
 
 export async function POST(request: Request) {
@@ -76,15 +76,7 @@ export async function POST(request: Request) {
     );
 
     const realBusinessExpenses = classifiedExpenses.filter(
-      (e) => !e.isInternalTransfer && !e.isPersonal && e.expenseType !== "ignore"
-    );
-
-    const smallExpenses = realBusinessExpenses.filter(
-      (e) => e.expenseType === "small" || e.amount < 50
-    );
-
-    const groceryExpenses = realBusinessExpenses.filter(
-      (e) => e.expenseType === "groceries"
+      (e) => !e.isInternalTransfer && !e.isPersonal
     );
 
     const analysis = {
@@ -96,13 +88,30 @@ export async function POST(request: Request) {
       personalExpenses: classifiedExpenses
         .filter((e) => e.isPersonal)
         .reduce((sum, e) => sum + e.amount, 0),
-      smallExpenses: smallExpenses.reduce((sum, e) => sum + e.amount, 0),
-      groceryExpenses: groceryExpenses.reduce((sum, e) => sum + e.amount, 0),
+      overheadExpenses: realBusinessExpenses
+        .filter((e) => e.expenseType === "overhead")
+        .reduce((sum, e) => sum + e.amount, 0),
+      stockExpenses: realBusinessExpenses
+        .filter((e) => e.expenseType === "stock")
+        .reduce((sum, e) => sum + e.amount, 0),
+      transportExpenses: realBusinessExpenses
+        .filter((e) => e.expenseType === "transport")
+        .reduce((sum, e) => sum + e.amount, 0),
+      groceryExpenses: realBusinessExpenses
+        .filter((e) => e.expenseType === "groceries")
+        .reduce((sum, e) => sum + e.amount, 0),
+      operationalExpenses: realBusinessExpenses
+        .filter((e) => e.expenseType === "operational")
+        .reduce((sum, e) => sum + e.amount, 0),
+      otherExpenses: realBusinessExpenses
+        .filter((e) => e.expenseType === "other")
+        .reduce((sum, e) => sum + e.amount, 0),
       expenseBreakdown: getExpenseBreakdown(realBusinessExpenses),
+      allClassifiedExpenses: classifiedExpenses,
       dailyPatterns: getDailyPatterns(realBusinessExpenses),
-      anomalyAlerts: detectAnomalies(realBusinessExpenses, smallExpenses, groceryExpenses),
+      anomalyAlerts: detectAnomalies(classifiedExpenses, realBusinessExpenses),
       learnedRulesCount: rules.length,
-      oracleInsights: generateOracleInsights(oracleData, realBusinessExpenses),
+      oracleInsights: generateOracleInsights(oracleData, classifiedExpenses, realBusinessExpenses),
     };
 
     return NextResponse.json(analysis);
@@ -136,6 +145,7 @@ async function getExpenses(startDate: Date, endDate: Date) {
     title: row.description || row.category || "Expense",
     category: row.category || "Expense",
     shop_id: row.shop_id,
+    rawKind: row.kind || row.category || "expense",
   }));
 
   const opsExpenses = (opsRes.data || []).map((row: any) => ({
@@ -146,50 +156,101 @@ async function getExpenses(startDate: Date, endDate: Date) {
     title: row.title || row.kind || "Expense",
     category: row.kind || "Expense",
     shop_id: row.shop_id,
+    rawKind: row.kind,
   }));
 
   return [...posExpenses, ...opsExpenses];
 }
 
-function classifyExpense(
-  expense: any,
-  rules: any[]
-): any {
+function classifyExpense(expense: any, rules: any[]): any {
   const title = (expense.title || "").toLowerCase();
   const category = (expense.category || "").toLowerCase();
+  const rawKind = (expense.rawKind || "").toLowerCase();
   const fullText = `${title} ${category}`;
 
-  let isInternalTransfer = INTERNAL_TRANSFER_KEYWORDS.some((kw) =>
-    fullText.includes(kw)
-  );
-  let isPersonal = PERSONAL_KEYWORDS.some((kw) => fullText.includes(kw));
+  let isInternalTransfer = false;
+  let isPersonal = false;
   let expenseType = "other";
   let classification = "uncategorized";
   let confidence = 0.5;
+  let appliedRules: string[] = [];
 
-  if (GROCERY_KEYWORDS.some((kw) => fullText.includes(kw))) {
-    expenseType = "groceries";
-    classification = "personal_household";
-    confidence = 0.85;
-  } else if (SMALL_EXPENSE_KEYWORDS.some((kw) => fullText.includes(kw))) {
-    expenseType = "small";
-    classification = "operational_misc";
-    confidence = 0.7;
+  if (INTERNAL_TRANSFER_PATTERNS.some((kw) => fullText.includes(kw))) {
+    isInternalTransfer = true;
+    classification = "internal_transfer";
+    confidence = 0.95;
+    return { ...expense, isInternalTransfer, isPersonal, expenseType, classification, confidence, appliedRules };
   }
 
-  for (const rule of rules) {
-    const pattern = rule.match_pattern.toLowerCase();
-    const field = rule.match_field === "category" ? category : title;
+  if (PERSONAL_HOUSEHOLD_PATTERNS.some((kw) => fullText.includes(kw))) {
+    isPersonal = true;
+    expenseType = "personal";
+    classification = "personal_household";
+    confidence = 0.9;
+    return { ...expense, isInternalTransfer, isPersonal, expenseType, classification, confidence, appliedRules };
+  }
 
-    if (field.includes(pattern) || pattern.includes(field)) {
-      if (rule.action === "ignore" || rule.action === "filter") {
-        if (rule.action_value === "internal_transfer") isInternalTransfer = true;
-        if (rule.action_value === "personal") isPersonal = true;
-      }
-      if (rule.action === "classify") {
-        expenseType = rule.action_value || expenseType;
-        classification = rule.category || classification;
-        confidence = Math.max(confidence, 0.9);
+  if (OVERHEAD_PATTERNS.some((kw) => fullText.includes(kw))) {
+    expenseType = "overhead";
+    classification = "business_overhead";
+    confidence = 0.9;
+  } else if (STOCK_PATTERNS.some((kw) => fullText.includes(kw))) {
+    expenseType = "stock";
+    classification = "inventory_stock";
+    confidence = 0.85;
+  } else if (TRANSPORT_PATTERNS.some((kw) => fullText.includes(kw))) {
+    expenseType = "transport";
+    classification = "operational_transport";
+    confidence = 0.8;
+  } else if (GROCERY_PATTERNS.some((kw) => fullText.includes(kw))) {
+    expenseType = "groceries";
+    classification = "groceries";
+    confidence = 0.85;
+  } else if (OPERATIONAL_PATTERNS.some((kw) => fullText.includes(kw))) {
+    expenseType = "operational";
+    classification = "operational_misc";
+    confidence = 0.75;
+  }
+
+  if (rules.length > 0) {
+    for (const rule of rules) {
+      const pattern = rule.match_pattern.toLowerCase();
+      const field = rule.match_field === "category" ? category : title;
+      const matches = field.includes(pattern) || pattern.includes(field);
+
+      if (matches) {
+        appliedRules.push(rule.id);
+
+        if (rule.action === "personal" || rule.action === "mark_personal") {
+          isPersonal = true;
+          expenseType = "personal";
+          classification = rule.category || "personal";
+          confidence = 0.95;
+        }
+
+        if (rule.action === "overhead") {
+          expenseType = "overhead";
+          classification = rule.category || "business_overhead";
+          confidence = 0.95;
+        }
+
+        if (rule.action === "stock" || rule.action === "inventory") {
+          expenseType = "stock";
+          classification = rule.category || "inventory_stock";
+          confidence = 0.95;
+        }
+
+        if (rule.action === "filter" || rule.action === "ignore") {
+          isInternalTransfer = true;
+          classification = "filtered";
+          confidence = 0.95;
+        }
+
+        if (rule.action === "classify") {
+          expenseType = rule.action_value || expenseType;
+          classification = rule.category || classification;
+          confidence = 0.95;
+        }
       }
     }
   }
@@ -201,6 +262,7 @@ function classifyExpense(
     expenseType,
     classification,
     confidence,
+    appliedRules,
   };
 }
 
@@ -245,35 +307,52 @@ function getDailyPatterns(expenses: any[]) {
   };
 }
 
-function detectAnomalies(realExpenses: any[], smallExpenses: any[], groceryExpenses: any[]) {
+function detectAnomalies(allExpenses: any[], businessExpenses: any[]) {
   const alerts: any[] = [];
 
-  if (smallExpenses.length > 20) {
+  const personalExpenses = allExpenses.filter((e) => e.isPersonal);
+  if (personalExpenses.length > 0) {
+    const personalTotal = personalExpenses.reduce((s, e) => s + e.amount, 0);
     alerts.push({
-      type: "high_frequency_small",
+      type: "personal_expenses",
       severity: "info",
-      title: "Many Small Expenses",
-      message: `${smallExpenses.length} small expenses detected - monitor for patterns`,
-      count: smallExpenses.length,
-      total: smallExpenses.reduce((s, e) => s + e.amount, 0),
+      title: "Personal/Household Expenses",
+      message: `${personalExpenses.length} personal expenses totaling $${personalTotal.toFixed(2)}`,
+      count: personalExpenses.length,
+      total: personalTotal,
+      items: personalExpenses.slice(0, 5).map((e) => ({ title: e.title, amount: e.amount })),
     });
   }
 
-  if (groceryExpenses.length > 10) {
+  const internalTransfers = allExpenses.filter((e) => e.isInternalTransfer);
+  if (internalTransfers.length > 0) {
+    const transferTotal = internalTransfers.reduce((s, e) => s + e.amount, 0);
+    alerts.push({
+      type: "internal_transfers",
+      severity: "info",
+      title: "Internal Transfers Filtered",
+      message: `${internalTransfers.length} transfers to Invest/Savings filtered from business expenses`,
+      count: internalTransfers.length,
+      total: transferTotal,
+    });
+  }
+
+  const groceryExpenses = businessExpenses.filter((e) => e.expenseType === "groceries");
+  if (groceryExpenses.length > 0) {
     const groceryTotal = groceryExpenses.reduce((s, e) => s + e.amount, 0);
     alerts.push({
-      type: "grocery_tracking",
+      type: "grocery_expenses",
       severity: "info",
       title: "Grocery Expenses",
-      message: "Consider if these should be tracked separately or as personal",
+      message: `${groceryExpenses.length} grocery expenses totaling $${groceryTotal.toFixed(2)}`,
       count: groceryExpenses.length,
       total: groceryTotal,
     });
   }
 
   const byCategory: Record<string, any[]> = {};
-  realExpenses.forEach((e) => {
-    const cat = e.category || "other";
+  businessExpenses.forEach((e) => {
+    const cat = e.expenseType || "other";
     if (!byCategory[cat]) byCategory[cat] = [];
     byCategory[cat].push(e);
   });
@@ -283,12 +362,12 @@ function detectAnomalies(realExpenses: any[], smallExpenses: any[], groceryExpen
       const amounts = items.map((i) => i.amount);
       const avg = amounts.reduce((a, b) => a + b, 0) / amounts.length;
       const max = Math.max(...amounts);
-      if (max > avg * 2.5) {
+      if (avg > 0 && max > avg * 2.5) {
         alerts.push({
           type: "category_spike",
           severity: "warning",
           title: `${cat} Spike Detected`,
-          message: `Max expense ${max} is ${(max / avg).toFixed(1)}x the average`,
+          message: `Max expense $${max.toFixed(2)} is ${(max / avg).toFixed(1)}x the ${cat} average`,
           category: cat,
           amount: max,
           average: avg,
@@ -300,34 +379,39 @@ function detectAnomalies(realExpenses: any[], smallExpenses: any[], groceryExpen
   return alerts;
 }
 
-function generateOracleInsights(sales: any[], expenses: any[]) {
+function generateOracleInsights(sales: any[], allExpenses: any[], businessExpenses: any[]) {
   const insights: string[] = [];
 
   const totalSales = sales.reduce((sum: number, s: any) => sum + Number(s.total_with_tax || 0), 0);
-  const totalExpenses = expenses.reduce((sum: number, e: any) => sum + e.amount, 0);
+  const totalExpenses = businessExpenses.reduce((sum: number, e: any) => sum + e.amount, 0);
+  const personalTotal = allExpenses.filter((e) => e.isPersonal).reduce((sum: number, e: any) => sum + e.amount, 0);
+  const internalTotal = allExpenses.filter((e) => e.isInternalTransfer).reduce((sum: number, e: any) => sum + e.amount, 0);
+
+  insights.push(`Business expenses: $${totalExpenses.toFixed(2)} | Personal: $${personalTotal.toFixed(2)} | Internal transfers: $${internalTotal.toFixed(2)}`);
 
   if (totalSales > 0) {
     const expenseRatio = totalExpenses / totalSales;
     if (expenseRatio > 0.5) {
-      insights.push("Expense ratio above 50% - review overhead costs");
+      insights.push("Warning: Expense ratio above 50% - review overhead costs");
     } else if (expenseRatio < 0.3) {
       insights.push("Healthy expense ratio below 30% - good cost control");
+    } else {
+      insights.push(`Expense ratio at ${(expenseRatio * 100).toFixed(1)}% - within acceptable range`);
     }
   }
 
-  const byDay: Record<string, number> = {};
-  expenses.forEach((e) => {
-    const day = new Date(e.date).toLocaleDateString("en-CA", { weekday: "long" });
-    byDay[day] = (byDay[day] || 0) + e.amount;
-  });
+  const overheadTotal = businessExpenses.filter((e) => e.expenseType === "overhead").reduce((sum: number, e: any) => sum + e.amount, 0);
+  const stockTotal = businessExpenses.filter((e) => e.expenseType === "stock").reduce((sum: number, e: any) => sum + e.amount, 0);
 
-  const highestDay = Object.entries(byDay).sort((a, b) => b[1] - a[1])[0];
-  if (highestDay) {
-    insights.push(`${highestDay[0]}s tend to have highest expenses`);
+  if (overheadTotal > 0) {
+    insights.push(`Overhead expenses: $${overheadTotal.toFixed(2)}`);
+  }
+  if (stockTotal > 0) {
+    insights.push(`Stock/inventory purchases: $${stockTotal.toFixed(2)}`);
   }
 
   if (insights.length === 0) {
-    insights.push("No significant patterns detected - continue monitoring");
+    insights.push("Continue monitoring expenses - no significant patterns detected");
   }
 
   return insights;
