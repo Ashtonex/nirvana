@@ -526,8 +526,6 @@ export interface TodaySaleMetric {
 }
 
 export async function getSalesHistory(days = 30): Promise<DailySalesMetric[]> {
-    // Only fetch sales within the requested window — prevents PostgREST row-cap
-    // from cutting off today's newest sales when there is lots of historical data.
     const cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
 
     const { data: sales } = await supabaseAdmin
@@ -545,15 +543,13 @@ export async function getSalesHistory(days = 30): Promise<DailySalesMetric[]> {
 
     for (let i = days - 1; i >= 0; i--) {
         const d = new Date(now.getTime() - i * 24 * 60 * 60 * 1000);
-        const dateStr = d.toISOString().split('T')[0];
+        const dateStr = getLocalDateStr(d.getFullYear(), d.getMonth() + 1, d.getDate());
 
         const daySales = (sales || []).filter((s: any) => {
-            const saleDate = new Date(s.date).toISOString().split('T')[0];
-            return saleDate === dateStr;
+            if (!s.date) return false;
+            return toLocalDateString(s.date) === dateStr;
         });
 
-        // Use Number() to guard against PostgreSQL NUMERIC returning as string,
-        // which would cause string concatenation instead of addition.
         const revenue = daySales.reduce((sum: number, s: any) => sum + Number(s.total_with_tax || 0), 0);
 
         let cost = 0;
