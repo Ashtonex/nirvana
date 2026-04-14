@@ -90,6 +90,80 @@ export type TaxOptimization = {
   deadline?: string;
 };
 
+export type RealExpenseAnalysis = {
+  totalRealExpenses: number;
+  internalTransfers: number;
+  personalExpenses: number;
+  groceryExpenses: number;
+  smallExpenses: number;
+  overheadExpenses: number;
+  miscExpenses: number;
+  expenseBreakdown: Record<string, { total: number; count: number; avg: number }>;
+  flaggedItems: {
+    id: string;
+    source: string;
+    amount: number;
+    title: string;
+    category: string;
+    flagReason: string;
+    flagType: "abnormal" | "unusual" | "recurring";
+  }[];
+  insights: {
+    type: "info" | "warning" | "tip";
+    message: string;
+  }[];
+};
+
+const INTERNAL_TRANSFER_PATTERNS = [
+  "invest", "savings", "perfume", "deposit to", "transfer to",
+  "stockvel", "operations", "overhead contribution", "perfume invest"
+];
+
+const PERSONAL_EXPENSE_PATTERNS = [
+  "personal", "抽钱", "withdrawal", "own", "my ", " me ", "family",
+  "home", "lunch for home", "dinner for home", "breakfast for home"
+];
+
+const GROCERY_PATTERNS = [
+  "groceries", "grocery", "food for home", "supermarket", "market", "provisions"
+];
+
+const SMALL_EXPENSE_PATTERNS = [
+  "airtime", "data", "transport", "petrol", "fuel", "lunch", "snacks",
+  "coffee", "water", "parking", "toll", "sms", "bus fare", "minibus"
+];
+
+function classifyExpenseEntry(
+  title: string,
+  category: string,
+  amount: number
+): {
+  isInternalTransfer: boolean;
+  isPersonal: boolean;
+  expenseType: "groceries" | "small" | "overhead" | "other";
+  classification: string;
+} {
+  const text = `${title || ""} ${category || ""}`.toLowerCase();
+
+  const isInternalTransfer = INTERNAL_TRANSFER_PATTERNS.some(p => text.includes(p));
+  if (isInternalTransfer) {
+    return { isInternalTransfer: true, isPersonal: false, expenseType: "other", classification: "internal_transfer" };
+  }
+
+  const isPersonal = PERSONAL_EXPENSE_PATTERNS.some(p => text.includes(p));
+  if (isPersonal) {
+    return { isInternalTransfer: false, isPersonal: true, expenseType: "other", classification: "personal" };
+  }
+
+  const expenseType: "groceries" | "small" | "overhead" | "other" =
+    GROCERY_PATTERNS.some(p => text.includes(p)) ? "groceries" :
+    SMALL_EXPENSE_PATTERNS.some(p => text.includes(p)) ? "small" :
+    ["rent", "utilities", "electric", "water", "wages", "salary", "rates"].some(p => text.includes(p)) ? "overhead" :
+    "other";
+
+  return { isInternalTransfer: false, isPersonal: false, expenseType, classification: expenseType };
+}
+
 function toLocalDateString(date: unknown): string {
   if (!date) return '';
   const d = typeof date === 'string' ? new Date(date) : date instanceof Date ? date : new Date(String(date));
@@ -425,4 +499,167 @@ export async function runEnhancedMoneyAudit(daysBack = 30): Promise<{
   };
 
   return { audit, healthScore, recommendations, learningInsights, taxOptimizations, cashFlowForecast, benchmarkComparison };
+}
+
+export async function analyzeRealExpenses(daysBack = 30): Promise<RealExpenseAnalysis> {
+  const now = new Date();
+  const startDate = new Date(now);
+  startDate.setDate(startDate.getDate() - daysBack);
+  const periodStart = startDate.toISOString();
+  const periodEnd = now.toISOString();
+
+  const [ledgerData, opsLedgerData] = await Promise.all([
+    supabaseAdmin.from('ledger_entries').select('*').eq('type', 'expense').gte('date', periodStart).lte('date', periodEnd),
+    supabaseAdmin.from('operations_ledger').select('*').lt('amount', 0).gte('created_at', periodStart).lte('created_at', periodEnd),
+  ]);
+
+  const ledger = ledgerData.data || [];
+  const opsLedger = opsLedgerData.data || [];
+
+  const posExpenses = ledger.map((entry: any) => ({
+    id: `pos-${entry.id}`,
+    source: "POS",
+    amount: Math.abs(Number(entry.amount || 0)),
+    date: entry.date,
+    title: entry.description || entry.category || "Expense",
+    category: entry.category || "Expense",
+    shop_id: entry.shop_id,
+  }));
+
+  const opsExpenses = opsLedger.map((entry: any) => ({
+    id: `ops-${entry.id}`,
+    source: "Operations",
+    amount: Math.abs(Number(entry.amount || 0)),
+    date: entry.created_at,
+    title: entry.title || entry.kind || "Expense",
+    category: entry.kind || "Expense",
+    shop_id: entry.shop_id,
+  }));
+
+  const allExpenses = [...posExpenses, ...opsExpenses];
+
+  let internalTransfers = 0;
+  let personalExpenses = 0;
+  let groceryExpenses = 0;
+  let smallExpenses = 0;
+  let overheadExpenses = 0;
+  let miscExpenses = 0;
+  const flaggedItems: RealExpenseAnalysis["flaggedItems"] = [];
+  const insights: RealExpenseAnalysis["insights"] = [];
+
+  const breakdown: Record<string, { total: number; count: number; avg: number }> = {};
+
+  const expenseHistory: Record<string, number[]> = {};
+
+  for (const expense of allExpenses) {
+    const classification = classifyExpenseEntry(expense.title, expense.category, expense.amount);
+
+    if (classification.isInternalTransfer) {
+      internalTransfers += expense.amount;
+      continue;
+    }
+
+    if (classification.isPersonal) {
+      personalExpenses += expense.amount;
+      continue;
+    }
+
+    if (!breakdown[classification.expenseType]) {
+      breakdown[classification.expenseType] = { total: 0, count: 0, avg: 0 };
+    }
+    breakdown[classification.expenseType].total += expense.amount;
+    breakdown[classification.expenseType].count += 1;
+
+    switch (classification.expenseType) {
+      case "groceries":
+        groceryExpenses += expense.amount;
+        break;
+      case "small":
+        smallExpenses += expense.amount;
+        break;
+      case "overhead":
+        overheadExpenses += expense.amount;
+        break;
+      default:
+        miscExpenses += expense.amount;
+    }
+
+    const categoryKey = expense.category || "other";
+    if (!expenseHistory[categoryKey]) expenseHistory[categoryKey] = [];
+    expenseHistory[categoryKey].push(expense.amount);
+
+    if (expense.amount > 500) {
+      flaggedItems.push({
+        id: expense.id,
+        source: expense.source,
+        amount: expense.amount,
+        title: expense.title,
+        category: expense.category,
+        flagReason: "High value expense over $500",
+        flagType: "unusual",
+      });
+    }
+  }
+
+  Object.keys(breakdown).forEach(key => {
+    const data = breakdown[key];
+    data.avg = data.count > 0 ? data.total / data.count : 0;
+  });
+
+  Object.entries(expenseHistory).forEach(([category, amounts]) => {
+    if (amounts.length >= 3) {
+      const avg = amounts.reduce((a, b) => a + b, 0) / amounts.length;
+      const max = Math.max(...amounts);
+      if (max > avg * 2.5) {
+        const highExpense = allExpenses.find(e => e.category === category && e.amount === max);
+        if (highExpense) {
+          flaggedItems.push({
+            id: highExpense.id,
+            source: highExpense.source,
+            amount: highExpense.amount,
+            title: highExpense.title,
+            category: highExpense.category,
+            flagReason: `Abnormal: ${max.toFixed(2)} is ${(max / avg).toFixed(1)}x the ${category} average`,
+            flagType: "abnormal",
+          });
+        }
+      }
+    }
+  });
+
+  if (smallExpenses > 0) {
+    insights.push({
+      type: "info",
+      message: `Small/misc expenses total $${smallExpenses.toFixed(2)} - monitor for patterns`,
+    });
+  }
+
+  if (groceryExpenses > 0) {
+    insights.push({
+      type: "tip",
+      message: `Grocery expenses of $${groceryExpenses.toFixed(2)} detected - are these truly business expenses?`,
+    });
+  }
+
+  const totalRealExpenses = groceryExpenses + smallExpenses + overheadExpenses + miscExpenses;
+
+  if (totalRealExpenses > 0) {
+    insights.push({
+      type: "info",
+      message: `Real business expenses: $${totalRealExpenses.toFixed(2)} (excludes $${internalTransfers.toFixed(2)} internal transfers)`,
+    });
+  }
+
+  return {
+    totalRealExpenses,
+    internalTransfers,
+    personalExpenses,
+    groceryExpenses,
+    smallExpenses,
+    overheadExpenses,
+    miscExpenses,
+    expenseBreakdown: breakdown,
+    flaggedItems: flaggedItems.slice(0, 10),
+    insights,
+  };
 }
