@@ -7,15 +7,24 @@ export const dynamic = "force-dynamic";
 
 export async function GET() {
   const encoder = new TextEncoder();
+  let isClosed = false;
   
   const stream = new ReadableStream({
     async start(controller) {
       const sendEvent = (eventName: string, data: any) => {
-        const message = `event: ${eventName}\ndata: ${JSON.stringify(data)}\n\n`;
-        controller.enqueue(encoder.encode(message));
+        if (isClosed) return;
+        try {
+          const message = `event: ${eventName}\ndata: ${JSON.stringify(data)}\n\n`;
+          controller.enqueue(encoder.encode(message));
+        } catch (e: any) {
+          if (e?.name === "InvalidStateError" || e?.message?.includes("already closed")) {
+            isClosed = true;
+          }
+        }
       };
 
       const fetchUpdates = async () => {
+        if (isClosed) return;
         try {
           const cookieStore = await cookies();
           const ownerToken = cookieStore.get("nirvana_owner")?.value;
@@ -89,26 +98,42 @@ export async function GET() {
               activeShops: new Set((staffLogs || []).map((l: any) => l.shop_id)).size,
             },
           });
-        } catch (e) {
+        } catch (e: any) {
           console.error("SSE update error:", e);
-          sendEvent("error", { message: "Failed to fetch updates" });
+          if (!isClosed) {
+            sendEvent("error", { message: "Failed to fetch updates" });
+          }
         }
       };
 
       fetchUpdates();
 
-      const interval = setInterval(fetchUpdates, 8000);
-
-      const keepAlive = setInterval(() => {
-        try {
-          controller.enqueue(encoder.encode(": keepalive\n\n"));
-        } catch (e) {
+      const interval = setInterval(() => {
+        if (isClosed) {
           clearInterval(interval);
           clearInterval(keepAlive);
+          return;
+        }
+        fetchUpdates();
+      }, 8000);
+
+      const keepAlive = setInterval(() => {
+        if (isClosed) {
+          clearInterval(interval);
+          clearInterval(keepAlive);
+          return;
+        }
+        try {
+          controller.enqueue(encoder.encode(": keepalive\n\n"));
+        } catch (e: any) {
+          if (e?.name === "InvalidStateError" || e?.message?.includes("already closed")) {
+            isClosed = true;
+          }
         }
       }, 30000);
 
       return () => {
+        isClosed = true;
         clearInterval(interval);
         clearInterval(keepAlive);
       };
