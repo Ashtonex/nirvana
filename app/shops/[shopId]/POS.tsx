@@ -233,7 +233,7 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
     const today = new Date().toISOString().split('T')[0];
     const todaysSales = (db.sales || []).filter((s: any) => {
         const saleDate = s.date?.split('T')[0];
-        return saleDate === today && s.shopId === shopId;
+        return saleDate === today && s.shop_id === shopId;
     });
     const todaysTotalSales = todaysSales.reduce((sum: number, s: any) => sum + (s.totalWithTax || 0), 0);
 
@@ -304,7 +304,7 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
 
     // Identify Top 3 Best Sellers for this shop
     const itemSalesCount: Record<string, number> = {};
-    (db.sales || []).filter((s: any) => s.shopId === shopId).forEach((s: any) => {
+    (db.sales || []).filter((s: any) => s.shop_id === shopId).forEach((s: any) => {
         itemSalesCount[s.itemId] = (itemSalesCount[s.itemId] || 0) + Number(s.quantity || 0);
     });
     const topSellerIds = Object.entries(itemSalesCount)
@@ -325,7 +325,7 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
     const CASH_OUT_CATEGORIES = new Set(["POS Expense", "Operations Transfer", "Perfume", "Overhead", "Tithe", "Groceries"]);
 
     // 1. Did we open today?
-    const todaysOpening = ledger.find((l: any) => l.category === 'Cash Drawer Opening' && l.shopId === shopId && String(l.date).startsWith(todayStr));
+    const todaysOpening = ledger.find((l: any) => l.category === 'Cash Drawer Opening' && l.shop_id === shopId && String(l.date).startsWith(todayStr));
     const hasOpenedRegister = !!todaysOpening;
 
     // Helper functions for keyword matching (must be defined early for carry-over calc)
@@ -342,7 +342,7 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
     let carryOverBaseline = 0;
 
     // Find the very last opening before today
-    const pastOpenings = ledger.filter((l: any) => l.category === 'Cash Drawer Opening' && l.shopId === shopId && !String(l.date).startsWith(todayStr));
+    const pastOpenings = ledger.filter((l: any) => l.category === 'Cash Drawer Opening' && l.shop_id === shopId && !String(l.date).startsWith(todayStr));
     const lastOpening = pastOpenings.sort((a: any) => new Date(a.date).getTime() - new Date(todayStr).getTime())[0]; // Simplified sort to find recent
 
     if (lastOpening) {
@@ -350,13 +350,13 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
         carryOverBaseline = Number(lastOpening.amount);
 
         // Sales after the last opening, but before today started
-        const salesSinceLastOpen = (db.sales || []).filter((s: any) => s.shopId === shopId && s.paymentMethod === 'cash' && new Date(s.date).getTime() >= lastOpenDate && !String(s.date).startsWith(todayStr));
+        const salesSinceLastOpen = (db.sales || []).filter((s: any) => s.shop_id === shopId && s.paymentMethod === 'cash' && new Date(s.date).getTime() >= lastOpenDate && !String(s.date).startsWith(todayStr));
         carryOverSales = salesSinceLastOpen.reduce((sum: number, s: any) => sum + Number(s.totalWithTax || 0), 0);
 
         // POS Expenses after last opening, before today (includes keyword-matched Groceries/Tithe)
         const expensesSinceLastOpen = ledger.filter((l: any) =>
             (CASH_OUT_CATEGORIES.has(String(l.category || "")) || isGroceriesExpense(l) || isTitheExpense(l)) &&
-            l.shopId === shopId &&
+            l.shop_id === shopId &&
             new Date(l.date).getTime() >= lastOpenDate &&
             !String(l.date).startsWith(todayStr)
         );
@@ -368,20 +368,20 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
     // 3. Current Live Drawer (Today's Opening + Today's Cash Sales - Today's Expenses)
 
     const todaysCashSales = (db.sales || []).filter((s: any) =>
-        s.shopId === shopId &&
+        s.shop_id === shopId &&
         s.paymentMethod === 'cash' &&
         String(s.date).startsWith(todayStr)
     ).reduce((sum: number, s: any) => sum + Number(s.totalWithTax || 0), 0);
 
     const todaysPosExpenses = ledger.filter((l: any) =>
         ['POS Expense', 'Perfume', 'Overhead', 'Tithe', 'Groceries'].includes(l.category) &&
-        l.shopId === shopId &&
+        l.shop_id === shopId &&
         String(l.date).startsWith(todayStr)
     ).reduce((sum: number, l: any) => sum + Number(l.amount || 0), 0);
 
     // Tithe expenses (cumulative all-time)
     const cumulativeTithe = ledger.filter((l: any) =>
-        l.shopId === shopId
+        l.shop_id === shopId
     ).reduce((sum: number, l: any) => {
         if (isTitheExpense(l)) return sum + Number(l.amount || 0);
         if (l.category === 'Tithe Withdrawal') return sum - Number(l.amount || 0);
@@ -396,13 +396,13 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
 
     const currentMonthGroceries = ledger.filter((l: any) =>
         isGroceriesExpense(l) &&
-        l.shopId === shopId &&
+        l.shop_id === shopId &&
         String(l.date).startsWith(currentMonth)
     ).reduce((sum: number, l: any) => sum + Number(l.amount || 0), 0);
 
     const previousMonthGroceries = ledger.filter((l: any) =>
         isGroceriesExpense(l) &&
-        l.shopId === shopId &&
+        l.shop_id === shopId &&
         String(l.date).startsWith(previousMonth)
     ).reduce((sum: number, l: any) => sum + Number(l.amount || 0), 0);
 
@@ -411,7 +411,7 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
     const todaysOpsPosts = ledger.filter((l: any) =>
         l.category === 'Operations Transfer' &&
         !['POS Expense', 'Perfume', 'Overhead'].includes(l.category) &&
-        l.shopId === shopId &&
+        l.shop_id === shopId &&
         String(l.date).startsWith(todayStr)
     ).reduce((sum: number, l: any) => sum + Number(l.amount || 0), 0);
 
@@ -2914,7 +2914,7 @@ Generated via NIRVANA POS`;
                     {(() => {
                         const allExpenses = ledger.filter((l: any) =>
                             ['POS Expense', 'Perfume', 'Overhead'].includes(l.category) &&
-                            l.shopId === shopId
+                            l.shop_id === shopId
                         ).sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
                         if (allExpenses.length === 0) {

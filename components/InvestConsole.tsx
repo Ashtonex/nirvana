@@ -34,6 +34,7 @@ export function InvestConsole() {
     shopId: "",
     amount: "",
   });
+  const [withdrawShopId, setWithdrawShopId] = useState<string>("");
   const [withdrawAmount, setWithdrawAmount] = useState<string>("");
   const [withdrawTitle, setWithdrawTitle] = useState<string>("");
 
@@ -163,6 +164,7 @@ export function InvestConsole() {
     try {
       const amount = Number(withdrawAmount);
       if (!Number.isFinite(amount) || amount <= 0) throw new Error("Invalid amount");
+      if (!withdrawShopId) throw new Error("Select a shop first");
       
       const res = await fetch("/api/invest/deposits/withdraw", {
         method: "POST",
@@ -171,6 +173,7 @@ export function InvestConsole() {
         body: JSON.stringify({
           amount,
           title: withdrawTitle,
+          shopId: withdrawShopId,
         }),
       });
       const data = await res.json().catch(() => ({}));
@@ -186,6 +189,20 @@ export function InvestConsole() {
   const totalDeposits = deposits.reduce((sum, d) => sum + Number(d.amount || 0), 0);
   const totalWithdrawn = deposits.reduce((sum, d) => sum + Number(d.withdrawn_amount || 0), 0);
   const totalAvailable = totalDeposits - totalWithdrawn;
+
+  const shopTotals = useMemo(() => {
+    const byShop: Record<string, { total: number; withdrawn: number; available: number }> = {};
+    deposits.forEach((d) => {
+      const shop = d.shop_id || "unknown";
+      if (!byShop[shop]) byShop[shop] = { total: 0, withdrawn: 0, available: 0 };
+      byShop[shop].total += Number(d.amount || 0);
+      byShop[shop].withdrawn += Number(d.withdrawn_amount || 0);
+      byShop[shop].available += (Number(d.amount || 0) - Number(d.withdrawn_amount || 0));
+    });
+    return byShop;
+  }, [deposits]);
+
+  const selectedShopBalance = withdrawShopId ? (shopTotals[withdrawShopId]?.available || 0) : 0;
 
   return (
     <div className="space-y-6">
@@ -413,29 +430,39 @@ export function InvestConsole() {
             <CardHeader>
               <CardTitle className="text-lg font-black uppercase italic">Record Withdrawal</CardTitle>
               <CardDescription className="text-[10px] font-bold uppercase italic">
-                Withdraw a bulk figure from the full perfume capital pool. Oldest active deposits are reduced first.
+                Withdraw from a specific shop&apos;s perfume capital pool.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-                <div className="rounded-md border border-slate-800 bg-slate-900 px-3 py-2 md:col-span-1">
-                  <div className="text-[10px] font-black uppercase tracking-widest text-slate-500">Pool Available</div>
-                  <div className="text-lg font-black italic text-sky-400">${totalAvailable.toFixed(2)}</div>
+              <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
+                <select
+                  value={withdrawShopId}
+                  onChange={(e) => setWithdrawShopId(e.target.value)}
+                  className="bg-slate-900 border border-slate-800 text-white px-3 py-2 rounded-md md:col-span-1"
+                >
+                  <option value="">Select Shop</option>
+                  {shops.map((s) => (
+                    <option key={s.id} value={s.id}>{s.name}</option>
+                  ))}
+                </select>
+                <div className="rounded-md border border-sky-800 bg-sky-950/30 px-3 py-2 md:col-span-1">
+                  <div className="text-[10px] font-black uppercase tracking-widest text-sky-500">Shop Available</div>
+                  <div className="text-lg font-black italic text-sky-400">${selectedShopBalance.toFixed(2)}</div>
                 </div>
                 <Input 
                   value={withdrawAmount} 
                   onChange={(e) => setWithdrawAmount(e.target.value)} 
-                  className="bg-slate-900 border-slate-800 font-mono md:col-span-1" 
+                  className="bg-slate-900 border border-slate-800 font-mono md:col-span-1" 
                   placeholder="Amount" 
                   inputMode="decimal" 
                 />
                 <Input 
                   value={withdrawTitle} 
                   onChange={(e) => setWithdrawTitle(e.target.value)} 
-                  className="bg-slate-900 border-slate-800 md:col-span-1" 
+                  className="bg-slate-900 border border-slate-800 md:col-span-1" 
                   placeholder="Purpose/Label" 
                 />
-                <Button disabled={busy || !withdrawAmount} onClick={withdrawFromDeposit} className="font-black uppercase md:col-span-1">
+                <Button disabled={busy || !withdrawShopId || !withdrawAmount} onClick={withdrawFromDeposit} className="font-black uppercase md:col-span-1">
                   Withdraw
                 </Button>
               </div>

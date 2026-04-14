@@ -31,6 +31,7 @@ export async function POST(req: Request) {
     }
 
     const title = String(body?.title || "Withdrawal");
+    const shopId = body?.shopId ? String(body.shopId) : "";
     const withdrawnBy = actor.type === "staff" ? actor.employeeId : "owner";
     const depositId = body?.depositId ? String(body.depositId) : "";
     const withdrawnAt = new Date().toISOString();
@@ -72,15 +73,26 @@ export async function POST(req: Request) {
       return NextResponse.json({ success: true, deposit: data, mode: "single" });
     }
 
-    const { data: deposits, error: listError } = await supabaseAdmin
+    let query = supabaseAdmin
       .from("invest_deposits")
       .select("*")
       .in("status", ["active", "partial"])
       .order("deposited_at", { ascending: true });
 
+    if (shopId) {
+      query = query.eq("shop_id", shopId);
+    }
+
+    const { data: deposits, error: listError } = await query;
+
     if (listError) throw new Error(listError.message);
 
     const rows: InvestDepositRow[] = deposits || [];
+    
+    if (shopId && rows.length === 0) {
+      return NextResponse.json({ error: `No active deposits found for this shop` }, { status: 400 });
+    }
+
     const totalAvailable = rows.reduce((sum: number, row: InvestDepositRow) => {
       return sum + (Number(row.amount || 0) - Number(row.withdrawn_amount || 0));
     }, 0);
