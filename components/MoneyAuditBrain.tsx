@@ -7,7 +7,8 @@ import {
   ChevronDown, ChevronUp, Loader2, Scale, Target, Lightbulb, Calculator,
   PiggyBank, Landmark, Clock, CheckCircle, XCircle, MessageSquare, BookOpen,
   Plus, Trash2, Edit, Save, X, MapPin, Users, LineChart,
-  ArrowRight, Sparkles, GraduationCap, BarChart3
+  ArrowRight, Sparkles, GraduationCap, BarChart3, ArrowDownLeft, ArrowUpRight,
+  HelpCircle, Zap, Eye, EyeOff, ArrowLeftRight
 } from "lucide-react";
 import { cn } from "@/components/ui";
 
@@ -49,6 +50,15 @@ type ExpansionNode = {
   created_at: string;
 };
 
+type ExpenseExample = {
+  id: string;
+  source: string;
+  title: string;
+  amount: number;
+  classification: string;
+  isFiltered: boolean;
+};
+
 export function MoneyAuditBrain({ shops }: Props) {
   const [auditData, setAuditData] = useState<any>(null);
   const [realExpenseData, setRealExpenseData] = useState<any>(null);
@@ -77,6 +87,12 @@ export function MoneyAuditBrain({ shops }: Props) {
   });
   const [showAddRule, setShowAddRule] = useState(false);
   const [showAddExpansion, setShowAddExpansion] = useState(false);
+  
+  const [teachMode, setTeachMode] = useState(false);
+  const [selectedExpense, setSelectedExpense] = useState<ExpenseExample | null>(null);
+  const [expenseExamples, setExpenseExamples] = useState<ExpenseExample[]>([]);
+  const [patternSuggestions, setPatternSuggestions] = useState<string[]>([]);
+  const [showBusinessFlow, setShowBusinessFlow] = useState(true);
 
   const runAudit = useCallback(async () => {
     setIsRunning(true);
@@ -131,9 +147,10 @@ export function MoneyAuditBrain({ shops }: Props) {
 
   const loadBrainData = useCallback(async () => {
     try {
-      const [rulesRes, expansionsRes] = await Promise.all([
+      const [rulesRes, expansionsRes, teachRes] = await Promise.all([
         fetch('/api/brain/rules'),
-        fetch('/api/brain/expansion')
+        fetch('/api/brain/expansion'),
+        teachMode ? fetch('/api/brain/examples') : Promise.resolve({ ok: true, json: () => ({ examples: [] }) })
       ]);
       if (rulesRes.ok) {
         const data = await rulesRes.json();
@@ -143,17 +160,55 @@ export function MoneyAuditBrain({ shops }: Props) {
         const data = await expansionsRes.json();
         setExpansions(data.expansions || []);
       }
+      if (teachRes.ok) {
+        const data = await teachRes.json();
+        setExpenseExamples(data.examples || []);
+        setPatternSuggestions(data.suggestions || []);
+      }
     } catch (e) {
       console.error('Failed to load brain data:', e);
     }
+  }, [teachMode]);
+
+  const loadTeachData = useCallback(async () => {
+    try {
+      const res = await fetch('/api/brain/examples');
+      if (res.ok) {
+        const data = await res.json();
+        setExpenseExamples(data.examples || []);
+        setPatternSuggestions(data.suggestions || []);
+      }
+    } catch (e) {
+      console.error('Failed to load teach data:', e);
+    }
   }, []);
+
+  const selectExpenseForTeaching = (expense: ExpenseExample) => {
+    setSelectedExpense(expense);
+    setNewRule({ 
+      pattern: expense.title.toLowerCase().split(' ').slice(0, 3).join(' '),
+      action: expense.isFiltered ? 'filter' : expense.classification,
+      category: expense.classification,
+      type: 'expense_filter'
+    });
+  };
+
+  const applyTeachingFromExample = async () => {
+    if (!selectedExpense || !newRule.pattern) return;
+    await saveRule();
+    setSelectedExpense(null);
+    loadTeachData();
+  };
 
   useEffect(() => {
     if (!auditData) {
       runAudit();
     }
     loadBrainData();
-  }, []);
+    if (teachMode) {
+      loadTeachData();
+    }
+  }, [teachMode]);
 
   const toggleSection = (section: string) => {
     setExpandedSections(prev => ({ ...prev, [section]: !prev[section] }));
@@ -757,33 +812,251 @@ export function MoneyAuditBrain({ shops }: Props) {
 
       {/* Learn Tab */}
       {activeTab === 'learn' && (
-        <Card className="bg-slate-950/60 border-violet-500/20">
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <div>
+        <div className="space-y-4">
+          {/* Business Flow Understanding */}
+          <Card className="bg-gradient-to-br from-indigo-950/40 to-slate-950 border-indigo-500/30">
+            <CardHeader className="pb-2">
+              <div className="flex items-center justify-between">
                 <CardTitle className="text-sm font-black uppercase flex items-center gap-2">
-                  <GraduationCap className="h-4 w-4 text-violet-400" />
-                  Teach the Brain
+                  <Zap className="h-4 w-4 text-indigo-400" />
+                  How Your Business Money Flows
                 </CardTitle>
-                <CardDescription className="text-[10px]">
-                  Create rules to teach the brain how to classify expenses
-                </CardDescription>
+                <Button size="sm" variant="ghost" onClick={() => setShowBusinessFlow(!showBusinessFlow)}>
+                  {showBusinessFlow ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </Button>
               </div>
-              <Button 
-                size="sm" 
-                onClick={() => setShowAddRule(!showAddRule)}
-                className="bg-violet-600 hover:bg-violet-500"
-              >
-                <Plus className="h-4 w-4 mr-1" />
-                Add Rule
-              </Button>
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {/* Add Rule Form */}
+            </CardHeader>
+            {showBusinessFlow && (
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="bg-emerald-950/30 rounded-lg p-4 border border-emerald-900/50">
+                    <div className="flex items-center gap-2 mb-2">
+                      <ArrowDownLeft className="h-4 w-4 text-emerald-400" />
+                      <span className="text-xs font-black uppercase text-emerald-400">POS Sales</span>
+                    </div>
+                    <p className="text-[10px] text-slate-400">Daily sales come in from all shops. This is your revenue source.</p>
+                  </div>
+                  <div className="bg-amber-950/30 rounded-lg p-4 border border-amber-900/50">
+                    <div className="flex items-center gap-2 mb-2">
+                      <ArrowLeftRight className="h-4 w-4 text-amber-400" />
+                      <span className="text-xs font-black uppercase text-amber-400">Internal Transfers</span>
+                    </div>
+                    <p className="text-[10px] text-slate-400">POS → Invest/Savings/EOD/Blackbox. This is NOT an expense - money just moved.</p>
+                  </div>
+                  <div className="bg-sky-950/30 rounded-lg p-4 border border-sky-900/50">
+                    <div className="flex items-center gap-2 mb-2">
+                      <ArrowUpRight className="h-4 w-4 text-sky-400" />
+                      <span className="text-xs font-black uppercase text-sky-400">Operations</span>
+                    </div>
+                    <p className="text-[10px] text-slate-400">Central hub where rent, utilities, salaries are paid from. TRUE overhead lives here.</p>
+                  </div>
+                </div>
+                <div className="mt-4 p-3 bg-slate-900/40 rounded-lg border border-slate-800">
+                  <p className="text-[10px] font-black text-slate-300 mb-2">KEY DISTINCTION:</p>
+                  <div className="grid grid-cols-2 gap-4 text-[10px]">
+                    <div className="text-emerald-400">✓ Real Expense: Rent paid from Operations, Stock purchased, Transport costs</div>
+                    <div className="text-slate-500">✗ Internal: POS deposits to Invest, EOD cash to Savings</div>
+                  </div>
+                </div>
+              </CardContent>
+            )}
+          </Card>
+
+          {/* Teach from Examples */}
+          <Card className="bg-slate-950/60 border-violet-500/20">
+            <CardHeader className="pb-2">
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="text-sm font-black uppercase flex items-center gap-2">
+                    <GraduationCap className="h-4 w-4 text-violet-400" />
+                    Teach from Examples
+                  </CardTitle>
+                  <CardDescription className="text-[10px]">
+                    Click any expense below to teach the brain how to classify it
+                  </CardDescription>
+                </div>
+                <Button 
+                  size="sm" 
+                  onClick={() => {
+                    setTeachMode(!teachMode);
+                    if (!teachMode) loadTeachData();
+                  }}
+                  className={cn(
+                    "bg-violet-600 hover:bg-violet-500",
+                    teachMode && "bg-rose-600 hover:bg-rose-500"
+                  )}
+                >
+                  {teachMode ? <X className="h-4 w-4 mr-1" /> : <GraduationCap className="h-4 w-4 mr-1" />}
+                  {teachMode ? "Exit Teach Mode" : "Start Teaching"}
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {/* Pattern Suggestions */}
+              {patternSuggestions.length > 0 && !selectedExpense && (
+                <div className="bg-indigo-950/30 rounded-lg p-3 border border-indigo-900/50">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Sparkles className="h-4 w-4 text-indigo-400" />
+                    <span className="text-xs font-black uppercase text-indigo-400">Brain Suggestions</span>
+                  </div>
+                  <div className="space-y-1">
+                    {patternSuggestions.map((suggestion, i) => (
+                      <p key={i} className="text-[10px] text-slate-300">{suggestion}</p>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Selected Expense for Teaching */}
+              {selectedExpense && (
+                <div className="bg-violet-950/30 rounded-lg p-4 border border-violet-900/50 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <HelpCircle className="h-4 w-4 text-violet-400" />
+                      <span className="text-sm font-black text-violet-300">Teaching: "{selectedExpense.title}"</span>
+                    </div>
+                    <Button size="sm" variant="ghost" onClick={() => setSelectedExpense(null)}>
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                  <div className="bg-slate-900/60 rounded p-3 border border-slate-800">
+                    <div className="text-[10px] text-slate-500 mb-1">Current classification: <span className={cn(
+                      "font-black",
+                      selectedExpense.isFiltered ? "text-amber-400" : "text-emerald-400"
+                    )}>{selectedExpense.isFiltered ? "INTERNAL TRANSFER (filtered)" : selectedExpense.classification}</span></div>
+                    <div className="text-lg font-black text-white">${selectedExpense.amount.toFixed(2)}</div>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-black uppercase text-slate-400">Pattern to Match</label>
+                      <Input
+                        value={newRule.pattern}
+                        onChange={(e) => setNewRule({...newRule, pattern: e.target.value})}
+                        placeholder="e.g. groceries for home"
+                        className="border-violet-900/50"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-black uppercase text-slate-400">Classify As</label>
+                      <select
+                        value={newRule.action}
+                        onChange={(e) => setNewRule({...newRule, action: e.target.value})}
+                        className="w-full bg-slate-900 border border-slate-800 text-white px-3 py-2 rounded-md"
+                      >
+                        <option value="personal">Personal/Household</option>
+                        <option value="overhead">Overhead (Rent/Utilities)</option>
+                        <option value="stock">Stock/Inventory</option>
+                        <option value="filter">Internal Transfer (Filter)</option>
+                        <option value="operational">Operational Expense</option>
+                        <option value="classify">Custom Category</option>
+                      </select>
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-black uppercase text-slate-400">Custom Category</label>
+                      <Input
+                        value={newRule.category}
+                        onChange={(e) => setNewRule({...newRule, category: e.target.value})}
+                        placeholder="optional"
+                        className="border-violet-900/50"
+                      />
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button size="sm" onClick={applyTeachingFromExample} className="bg-emerald-600 hover:bg-emerald-500">
+                      <Save className="h-4 w-4 mr-1" />
+                      Teach This Rule
+                    </Button>
+                    <Button size="sm" variant="ghost" onClick={() => setSelectedExpense(null)}>
+                      Cancel
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {/* Expense Examples List */}
+              {teachMode && (
+                <div className="space-y-2 max-h-[400px] overflow-y-auto">
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-4">
+                    <div className="bg-slate-900/60 rounded-lg p-2 border border-slate-800 text-center">
+                      <div className="text-lg font-black text-white">{expenseExamples.length}</div>
+                      <div className="text-[8px] text-slate-500 uppercase">Total</div>
+                    </div>
+                    <div className="bg-amber-950/30 rounded-lg p-2 border border-amber-900/50 text-center">
+                      <div className="text-lg font-black text-amber-400">{expenseExamples.filter(e => e.isFiltered).length}</div>
+                      <div className="text-[8px] text-amber-500 uppercase">Filtered</div>
+                    </div>
+                    <div className="bg-rose-950/30 rounded-lg p-2 border border-rose-900/50 text-center">
+                      <div className="text-lg font-black text-rose-400">{expenseExamples.filter(e => e.classification === 'personal').length}</div>
+                      <div className="text-[8px] text-rose-500 uppercase">Personal</div>
+                    </div>
+                    <div className="bg-emerald-950/30 rounded-lg p-2 border border-emerald-900/50 text-center">
+                      <div className="text-lg font-black text-emerald-400">{expenseExamples.filter(e => e.classification === 'other').length}</div>
+                      <div className="text-[8px] text-emerald-500 uppercase">Unclassified</div>
+                    </div>
+                  </div>
+                  {expenseExamples.slice(0, 30).map(expense => (
+                    <button
+                      key={expense.id}
+                      onClick={() => selectExpenseForTeaching(expense)}
+                      className={cn(
+                        "w-full flex items-center justify-between p-3 rounded-lg border transition-all hover:scale-[1.01]",
+                        expense.isFiltered ? "bg-slate-900/40 border-slate-800/50 hover:border-amber-500/50" :
+                        expense.classification === 'personal' ? "bg-rose-950/20 border-rose-900/50 hover:border-rose-500/50" :
+                        "bg-slate-900/60 border-slate-800 hover:border-violet-500/50"
+                      )}
+                    >
+                      <div className="flex items-center gap-2">
+                        <Badge className={cn(
+                          "text-[8px]",
+                          expense.isFiltered ? "bg-amber-500/30 text-amber-400" :
+                          expense.classification === 'personal' ? "bg-rose-500/30 text-rose-400" :
+                          expense.classification === 'other' ? "bg-violet-500/30 text-violet-400" :
+                          "bg-emerald-500/30 text-emerald-400"
+                        )}>
+                          {expense.isFiltered ? "FILTERED" : expense.classification.toUpperCase()}
+                        </Badge>
+                        <span className="text-xs text-white truncate max-w-[200px]">{expense.title}</span>
+                      </div>
+                      <span className="text-sm font-black text-white ml-2">${expense.amount.toFixed(2)}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {!teachMode && !selectedExpense && (
+                <div className="text-center py-8 text-slate-500">
+                  <GraduationCap className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                  <p className="text-sm">Click "Start Teaching" to see examples and teach the brain</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Manual Rule Creation */}
+          <Card className="bg-slate-950/60 border-slate-700/50">
+            <CardHeader className="pb-2">
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="text-sm font-black uppercase flex items-center gap-2">
+                    <Plus className="h-4 w-4 text-slate-400" />
+                    Manual Rule Creation
+                  </CardTitle>
+                  <CardDescription className="text-[10px]">
+                    Create rules manually without selecting from examples
+                  </CardDescription>
+                </div>
+                <Button 
+                  size="sm" 
+                  onClick={() => setShowAddRule(!showAddRule)}
+                  className="bg-slate-600 hover:bg-slate-500"
+                >
+                  {showAddRule ? <X className="h-4 w-4" /> : <Plus className="h-4 w-4 mr-1" />}
+                  {showAddRule ? "Cancel" : "Add Rule"}
+                </Button>
+              </div>
+            </CardHeader>
             {showAddRule && (
-              <div className="bg-violet-950/30 rounded-lg p-4 border border-violet-900/50 space-y-3">
-                <h4 className="text-sm font-black text-violet-300">Create New Rule</h4>
+              <CardContent className="space-y-3">
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                   <div className="space-y-1">
                     <label className="text-[10px] font-black uppercase text-slate-400">Pattern to Match</label>
@@ -791,7 +1064,7 @@ export function MoneyAuditBrain({ shops }: Props) {
                       value={newRule.pattern}
                       onChange={(e) => setNewRule({...newRule, pattern: e.target.value})}
                       placeholder="e.g. groceries for home"
-                      className="border-violet-900/50"
+                      className="border-slate-800"
                     />
                   </div>
                   <div className="space-y-1">
@@ -815,29 +1088,34 @@ export function MoneyAuditBrain({ shops }: Props) {
                       value={newRule.category}
                       onChange={(e) => setNewRule({...newRule, category: e.target.value})}
                       placeholder="e.g. travel, marketing"
-                      className="border-violet-900/50"
+                      className="border-slate-800"
                     />
                   </div>
                 </div>
                 <div className="flex gap-2">
                   <Button size="sm" onClick={saveRule} className="bg-emerald-600 hover:bg-emerald-500">
                     <Save className="h-4 w-4 mr-1" />
-                    Teach This Rule
+                    Create Rule
                   </Button>
                   <Button size="sm" variant="ghost" onClick={() => setShowAddRule(false)}>
                     Cancel
                   </Button>
                 </div>
-              </div>
+              </CardContent>
             )}
+          </Card>
 
-            {/* Existing Rules */}
-            <div className="space-y-2">
-              <h4 className="text-xs font-black uppercase text-slate-400">Your Rules ({rules.length})</h4>
+          {/* Existing Rules */}
+          <Card className="bg-slate-950/60 border-slate-800">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-black uppercase text-slate-400">
+                Learned Rules ({rules.length})
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2">
               {rules.length === 0 ? (
-                <div className="text-center py-8 text-slate-500">
-                  <GraduationCap className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                  <p className="text-sm">No rules yet. Teach the brain how you want expenses classified.</p>
+                <div className="text-center py-6 text-slate-600">
+                  <p className="text-sm">No rules yet. The brain is learning from your teaching.</p>
                 </div>
               ) : (
                 rules.map(rule => (
@@ -853,7 +1131,7 @@ export function MoneyAuditBrain({ shops }: Props) {
                             rule.action === 'filter' ? "bg-amber-500/30 text-amber-400" :
                             "bg-emerald-500/30 text-emerald-400"
                           )}>{rule.action === 'classify' ? rule.category || 'custom' : rule.action}</Badge>
-                          <span className="text-[10px] text-slate-500">{rule.times_triggered || 0} times triggered</span>
+                          <span className="text-[10px] text-slate-500">{rule.times_triggered || 0}x triggered</span>
                         </div>
                         <p className="text-sm font-mono text-white mt-1">"{rule.match_pattern}"</p>
                       </div>
@@ -864,35 +1142,33 @@ export function MoneyAuditBrain({ shops }: Props) {
                   </div>
                 ))
               )}
-            </div>
+            </CardContent>
+          </Card>
 
-            {/* Quick Start Suggestions */}
-            <div className="bg-indigo-950/30 rounded-lg p-4 border border-indigo-900/50">
-              <h4 className="text-xs font-black uppercase text-indigo-400 mb-3 flex items-center gap-2">
-                <Sparkles className="h-4 w-4" />
-                Teaching Guide
-              </h4>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+          {/* Quick Reference */}
+          <Card className="bg-slate-900/40 border-slate-800">
+            <CardContent className="p-4">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-[10px]">
                 <div>
-                  <p className="font-black text-rose-400 mb-1">→ Mark as PERSONAL:</p>
-                  <p className="text-slate-400">"groceries for home", "抽钱", "family food"</p>
+                  <p className="font-black text-rose-400 mb-1">PERSONAL:</p>
+                  <p className="text-slate-400">"groceries for home", "抽钱", "family"</p>
                 </div>
                 <div>
-                  <p className="font-black text-sky-400 mb-1">→ Mark as OVERHEAD:</p>
-                  <p className="text-slate-400">"rent", "electricity", "water bill", "salary"</p>
+                  <p className="font-black text-sky-400 mb-1">OVERHEAD:</p>
+                  <p className="text-slate-400">"rent", "electric", "water", "salary"</p>
                 </div>
                 <div>
-                  <p className="font-black text-violet-400 mb-1">→ Mark as STOCK:</p>
+                  <p className="font-black text-violet-400 mb-1">STOCK:</p>
                   <p className="text-slate-400">"inventory", "bulk order", "wholesale"</p>
                 </div>
                 <div>
-                  <p className="font-black text-amber-400 mb-1">→ Filter (Internal Transfer):</p>
+                  <p className="font-black text-amber-400 mb-1">FILTER:</p>
                   <p className="text-slate-400">"invest", "perfume deposit", "savings"</p>
                 </div>
               </div>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        </div>
       )}
 
       {/* Expand Tab */}
