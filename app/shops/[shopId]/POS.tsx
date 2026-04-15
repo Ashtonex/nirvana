@@ -458,17 +458,15 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
             alert("Please enter a valid cash amount.");
             return;
         }
-        startTransition(async () => {
-            try {
-                const result = await openCashRegister(shopId, expectedOpeningCash, val);
-                console.log("[/POS] Register opened:", result);
-                setIsCashRegisterModalOpen(false);
-                router.refresh();
-            } catch (e: any) {
-                console.error("[/POS] Failed to open register:", e);
-                alert(e?.message || "Failed to open register. Check console for details.");
-            }
-        });
+        try {
+            const result = await openCashRegister(shopId, expectedOpeningCash, val);
+            console.log("[/POS] Register opened:", result);
+            setIsCashRegisterModalOpen(false);
+            setTimeout(() => window.location.reload(), 100);
+        } catch (e: any) {
+            console.error("[/POS] Failed to open register:", e);
+            alert(e?.message || "Failed to open register. Check console for details.");
+        }
     };
 
     const handleRecordExpense = async () => {
