@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { requirePrivilegedActor } from "@/lib/apiAuth";
 import { supabaseAdmin } from "@/lib/supabase";
 import { Badge, Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui";
-import { ExpenseAuditPanel } from "@/components/ExpenseAuditPanel";
+import { ExpenseDetailPanel } from "@/components/ExpenseDetailPanel";
 
 function currency(value: number) {
   return `$${value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -27,85 +27,92 @@ type ExpenseRow = {
   shopId: string;
   category: string;
   kind: string;
-  isOverhead: boolean;
-  isPersonal: boolean;
-  hasOpsMatch: boolean;
-  isAbnormal: boolean;
-  reason: string;
-  comparedTo: number;
+  expenseType: "overhead" | "stock" | "transport" | "groceries" | "personal" | "internal_transfer" | "operational" | "other";
+  isFiltered: boolean;
+  filterReason: string;
 };
 
-const BUSINESS_OVERHEAD_KEYWORDS = [
-  "rent", "utilities", "electric", "electricity", "water", "internet", "wifi",
-  "rates", "municipal", "insurance", "security", "cleaning", "maintenance",
-  "repair", "overhead", "salary", "wages", "staff", "payroll", "transport",
-  "fuel", "petrol", "diesel", "delivery", "logistics"
+const INTERNAL_TRANSFER_KEYWORDS = [
+  "invest", "savings", "perfume deposit", "overhead contribution",
+  "groceries to invest", "stockvel", "perfume invest", "deposit to"
 ];
 
 const PERSONAL_KEYWORDS = [
-  "personal", "抽钱", "withdrawal", "own", "my", "me", "family", "home",
-  "lunch", "dinner", "breakfast", "food for home", "groceries for home",
-  "car", "fuel personal", "phone personal"
+  "personal", "抽钱", "withdrawal", "my", "own", "family",
+  "food for home", "groceries for home", "home groceries",
+  "lunch personal", "dinner personal"
 ];
 
-const ABNORMAL_THRESHOLD_MULTIPLIER = 2.5;
+const OVERHEAD_KEYWORDS = [
+  "rent", "utilities", "electric", "electricity", "water", "rates",
+  "municipal", "insurance", "security", "salary", "wages", "payroll",
+  "site rent", "premises", "internet", "wifi"
+];
 
-function isBusinessOverhead(description: string, category: string): boolean {
-  const text = `${description} ${category}`.toLowerCase();
-  return BUSINESS_OVERHEAD_KEYWORDS.some(kw => text.includes(kw));
-}
+const STOCK_KEYWORDS = [
+  "stock", "inventory", "purchases", "bulk order", "wholesale",
+  "restock", "procurement", "supplier"
+];
 
-function isPersonalExpense(description: string, category: string): boolean {
-  const text = `${description} ${category}`.toLowerCase();
-  return PERSONAL_KEYWORDS.some(kw => text.includes(kw));
-}
+const TRANSPORT_KEYWORDS = [
+  "transport", "petrol", "fuel", "diesel", "uber", "delivery",
+  "logistics", "courier", "freight"
+];
 
-function detectAbnormalExpense(
-  rows: ExpenseRow[],
-  currentRow: ExpenseRow,
-  windowDays = 30
-): { isAbnormal: boolean; reason: string; comparedTo: number } {
-  const currentDate = new Date(currentRow.dateStr);
-  const windowStart = new Date(currentDate);
-  windowStart.setDate(windowStart.getDate() - windowDays);
+const GROCERY_KEYWORDS = [
+  "groceries", "grocery", "supermarket", "market", "provisions",
+  "food items", "sundries"
+];
 
-  const sameCategoryRows = rows.filter(r => {
-    const rDate = new Date(r.dateStr);
-    return rDate >= windowStart &&
-           rDate <= currentDate &&
-           r.category === currentRow.category &&
-           r.id !== currentRow.id;
-  });
+const OPERATIONAL_KEYWORDS = [
+  "airtime", "data", "internet", "phone", "advertising", "marketing",
+  "stationery", "printing", "bank charges", "commission"
+];
 
-  if (sameCategoryRows.length === 0) {
-    return { isAbnormal: false, reason: "No historical data for comparison", comparedTo: 0 };
+function classifyExpense(title: string, category: string, source: string): { 
+  type: ExpenseRow["expenseType"]; 
+  isFiltered: boolean; 
+  filterReason: string;
+} {
+  const text = `${title} ${category}`.toLowerCase();
+
+  if (source === "Invest") {
+    return { type: "internal_transfer", isFiltered: true, filterReason: "Invest withdrawal - not a business expense" };
   }
 
-  const amounts = sameCategoryRows.map(r => r.amount);
-  const avg = amounts.reduce((a, b) => a + b, 0) / amounts.length;
-  const max = Math.max(...amounts);
-  const threshold = Math.max(avg * ABNORMAL_THRESHOLD_MULTIPLIER, max * 1.5);
-
-  if (currentRow.amount > threshold) {
-    return {
-      isAbnormal: true,
-      reason: `${currentRow.amount > avg * 3 ? "Significantly" : "Above"} average (${currency(avg)}) for this category`,
-      comparedTo: avg
-    };
+  if (INTERNAL_TRANSFER_KEYWORDS.some(kw => text.includes(kw))) {
+    return { type: "internal_transfer", isFiltered: true, filterReason: "Internal transfer between accounts" };
   }
 
-  if (currentRow.amount > 500) {
-    const highValueCount = sameCategoryRows.filter(r => r.amount > 500).length;
-    if (highValueCount === 0) {
-      return {
-        isAbnormal: true,
-        reason: `High value (${currency(currentRow.amount)}) but no similar expenses in last ${windowDays} days`,
-        comparedTo: avg
-      };
-    }
+  if (PERSONAL_KEYWORDS.some(kw => text.includes(kw))) {
+    return { type: "personal", isFiltered: false, filterReason: "Personal/household expense" };
   }
 
-  return { isAbnormal: false, reason: "", comparedTo: avg };
+  if (OVERHEAD_KEYWORDS.some(kw => text.includes(kw))) {
+    return { type: "overhead", isFiltered: false, filterReason: "Business overhead" };
+  }
+
+  if (STOCK_KEYWORDS.some(kw => text.includes(kw))) {
+    return { type: "stock", isFiltered: false, filterReason: "Stock/inventory purchase" };
+  }
+
+  if (TRANSPORT_KEYWORDS.some(kw => text.includes(kw))) {
+    return { type: "transport", isFiltered: false, filterReason: "Transport/logistics" };
+  }
+
+  if (GROCERY_KEYWORDS.some(kw => text.includes(kw))) {
+    return { type: "groceries", isFiltered: false, filterReason: "Groceries (may be personal)" };
+  }
+
+  if (OPERATIONAL_KEYWORDS.some(kw => text.includes(kw))) {
+    return { type: "operational", isFiltered: false, filterReason: "Operational expense" };
+  }
+
+  if (category === "Perfume" || text.includes("perfume")) {
+    return { type: "internal_transfer", isFiltered: true, filterReason: "Perfume deposit to Invest" };
+  }
+
+  return { type: "other", isFiltered: false, filterReason: "" };
 }
 
 export default async function ExpensesPage() {
@@ -122,56 +129,61 @@ export default async function ExpensesPage() {
   const defaultStartDate = toLocalDateString(thirtyDaysAgo);
   const defaultEndDate = toLocalDateString(now);
 
-  const [posRes, opsRes, investRes] = await Promise.all([
+  const [posRes, opsRes, investRes, salesRes] = await Promise.all([
     supabaseAdmin.from("ledger_entries").select("*").eq("type", "expense").order("date", { ascending: false }).limit(2000),
     supabaseAdmin.from("operations_ledger").select("*").lt("amount", 0).order("created_at", { ascending: false }).limit(2000),
     supabaseAdmin.from("invest_deposits").select("*").gt("withdrawn_amount", 0).order("withdrawn_at", { ascending: false }).limit(1000),
+    supabaseAdmin.from("sales").select("total_with_tax, date").gte("date", thirtyDaysAgo.toISOString()).lte("date", now.toISOString()),
   ]);
 
   const posExpenseCategories = new Set(["POS Expense", "Perfume", "Overhead", "Tithe", "Groceries"]);
-  const opsExpenseKinds = new Set(["overhead_payment", "stock_orders", "transport", "peer_payout", "other_expense", "rent", "utilities", "salaries", "misc"]);
+  const opsExpenseKinds = new Set(["overhead_payment", "stock_orders", "transport", "peer_payout", "other_expense", "rent", "utilities", "salaries", "misc", "salary", "wages", "electric", "water", "internet"]);
 
   const posRows: ExpenseRow[] = (posRes.data || [])
     .filter((row: Record<string, unknown>) => posExpenseCategories.has(String(row.category || "")))
-    .map((row: Record<string, unknown>) => ({
-      id: `pos-${row.id}`,
-      source: "POS" as const,
-      amount: Math.abs(Number(row.amount || 0)),
-      date: String(row.date || row.created_at || ''),
-      dateStr: toLocalDateString(row.date || row.created_at),
-      title: String(row.description || row.category || "POS Expense"),
-      subtitle: String(row.category || "Expense"),
-      shopId: String(row.shop_id || row.shopId || ""),
-      category: String(row.category || "POS Expense"),
-      kind: String(row.category || "POS Expense"),
-      isOverhead: isBusinessOverhead(String(row.description || ""), String(row.category || "")),
-      isPersonal: isPersonalExpense(String(row.description || ""), String(row.category || "")),
-      hasOpsMatch: false,
-      isAbnormal: false,
-      reason: '',
-      comparedTo: 0,
-    }));
+    .map((row: Record<string, unknown>) => {
+      const title = String(row.description || row.category || "POS Expense");
+      const category = String(row.category || "POS Expense");
+      const classification = classifyExpense(title, category, "POS");
+      return {
+        id: `pos-${row.id}`,
+        source: "POS" as const,
+        amount: Math.abs(Number(row.amount || 0)),
+        date: String(row.date || row.created_at || ''),
+        dateStr: toLocalDateString(row.date || row.created_at),
+        title,
+        subtitle: category,
+        shopId: String(row.shop_id || row.shopId || ""),
+        category,
+        kind: category,
+        expenseType: classification.type,
+        isFiltered: classification.isFiltered,
+        filterReason: classification.filterReason,
+      };
+    });
 
   const opsRows: ExpenseRow[] = (opsRes.data || [])
     .filter((row: Record<string, unknown>) => opsExpenseKinds.has(String(row.kind || "")))
-    .map((row: Record<string, unknown>) => ({
-      id: `ops-${row.id}`,
-      source: "Operations" as const,
-      amount: Math.abs(Number(row.amount || 0)),
-      date: String(row.effective_date || row.created_at || ''),
-      dateStr: toLocalDateString(row.effective_date || row.created_at),
-      title: String(row.title || row.kind || "Operations Expense"),
-      subtitle: String(row.kind || "Expense"),
-      shopId: String(row.shop_id || ""),
-      category: String(row.kind || "Expense"),
-      kind: String(row.kind || "Expense"),
-      isOverhead: isBusinessOverhead(String(row.title || ""), String(row.kind || "")),
-      isPersonal: isPersonalExpense(String(row.title || ""), String(row.kind || "")),
-      hasOpsMatch: false,
-      isAbnormal: false,
-      reason: '',
-      comparedTo: 0,
-    }));
+    .map((row: Record<string, unknown>) => {
+      const title = String(row.title || row.kind || "Operations Expense");
+      const kind = String(row.kind || "Expense");
+      const classification = classifyExpense(title, kind, "Operations");
+      return {
+        id: `ops-${row.id}`,
+        source: "Operations" as const,
+        amount: Math.abs(Number(row.amount || 0)),
+        date: String(row.effective_date || row.created_at || ''),
+        dateStr: toLocalDateString(row.effective_date || row.created_at),
+        title,
+        subtitle: kind,
+        shopId: String(row.shop_id || ""),
+        category: kind,
+        kind,
+        expenseType: classification.type,
+        isFiltered: classification.isFiltered,
+        filterReason: classification.filterReason,
+      };
+    });
 
   const investRows: ExpenseRow[] = (investRes.data || []).map((row: Record<string, unknown>) => ({
     id: `invest-${row.id}`,
@@ -184,193 +196,174 @@ export default async function ExpensesPage() {
     shopId: String(row.shop_id || ""),
     category: "Invest Withdrawal",
     kind: "invest_withdrawal",
-    isOverhead: false,
-    isPersonal: true,
-    hasOpsMatch: false,
-    isAbnormal: false,
-    reason: '',
-    comparedTo: 0,
+    expenseType: "internal_transfer" as const,
+    isFiltered: true,
+    filterReason: "Invest withdrawal - internal transfer",
   }));
 
   const allRows: ExpenseRow[] = [...posRows, ...opsRows, ...investRows];
 
-  const abnormalAnalysis = allRows.map(row => ({
-    ...row,
-    ...detectAbnormalExpense(allRows, row),
-  }));
+  const realBusinessExpenses = allRows.filter(r => !r.isFiltered);
+  const internalTransfers = allRows.filter(r => r.expenseType === "internal_transfer");
+  const personalExpenses = allRows.filter(r => r.expenseType === "personal");
+  const overheadExpenses = allRows.filter(r => r.expenseType === "overhead");
+  const stockExpenses = allRows.filter(r => r.expenseType === "stock");
+  const transportExpenses = allRows.filter(r => r.expenseType === "transport");
+  const groceryExpenses = allRows.filter(r => r.expenseType === "groceries");
+  const operationalExpenses = allRows.filter(r => r.expenseType === "operational");
+  const otherExpenses = allRows.filter(r => r.expenseType === "other");
 
-  const flaggedRows = abnormalAnalysis.filter(r => r.isAbnormal);
-  const businessExpenses = abnormalAnalysis.filter(r => r.isOverhead && !r.isPersonal);
-  const personalExpenses = abnormalAnalysis.filter(r => r.isPersonal);
-  const cleanExpenses = abnormalAnalysis.filter(r => !r.isOverhead && !r.isPersonal && !r.isAbnormal);
+  const totalSales = (salesRes.data || []).reduce((sum: number, s: any) => sum + Number(s.total_with_tax || 0), 0);
+  const totalAllExpenses = allRows.reduce((sum: number, r: ExpenseRow) => sum + r.amount, 0);
+  const totalRealExpenses = realBusinessExpenses.reduce((sum: number, r: ExpenseRow) => sum + r.amount, 0);
+  const totalFiltered = internalTransfers.reduce((sum: number, r: ExpenseRow) => sum + r.amount, 0);
 
-  const totals = {
-    all: abnormalAnalysis.reduce((sum: number, row: ExpenseRow) => sum + row.amount, 0),
-    flagged: flaggedRows.reduce((sum: number, row: ExpenseRow) => sum + row.amount, 0),
-    business: businessExpenses.reduce((sum: number, row: ExpenseRow) => sum + row.amount, 0),
-    personal: personalExpenses.reduce((sum: number, row: ExpenseRow) => sum + row.amount, 0),
+  const profitLoss = totalSales - totalRealExpenses;
+  const expenseRatio = totalSales > 0 ? (totalRealExpenses / totalSales * 100) : 0;
+
+  const summary = {
+    totalSales,
+    totalAllExpenses,
+    totalRealExpenses,
+    totalFiltered,
+    internalTransfers: internalTransfers.reduce((s, r) => s + r.amount, 0),
+    personal: personalExpenses.reduce((s, r) => s + r.amount, 0),
+    overhead: overheadExpenses.reduce((s, r) => s + r.amount, 0),
+    stock: stockExpenses.reduce((s, r) => s + r.amount, 0),
+    transport: transportExpenses.reduce((s, r) => s + r.amount, 0),
+    groceries: groceryExpenses.reduce((s, r) => s + r.amount, 0),
+    operational: operationalExpenses.reduce((s, r) => s + r.amount, 0),
+    other: otherExpenses.reduce((s, r) => s + r.amount, 0),
+    profitLoss,
+    expenseRatio,
   };
-
-  const flaggedByCategory: Record<string, { count: number; total: number; items: ExpenseRow[] }> = {};
-  flaggedRows.forEach((row: ExpenseRow) => {
-    const key = row.category;
-    if (!flaggedByCategory[key]) {
-      flaggedByCategory[key] = { count: 0, total: 0, items: [] };
-    }
-    flaggedByCategory[key].count++;
-    flaggedByCategory[key].total += row.amount;
-    flaggedByCategory[key].items.push(row);
-  });
 
   return (
     <div className="space-y-8 pb-32 pt-8">
       <div className="space-y-2 text-center max-w-4xl mx-auto">
         <h1 className="text-5xl font-black tracking-tighter uppercase italic text-white leading-none">Expenses</h1>
         <p className="text-slate-400 font-bold tracking-widest uppercase text-xs italic">
-          POS + Operations + Invest outflows • With AI Anomaly Detection
+          Real business expenses vs internal transfers
         </p>
       </div>
 
       <div className="max-w-6xl mx-auto px-4 space-y-6">
+        {/* Main Summary Cards */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <Card className="bg-slate-950/60 border-slate-800">
+          <Card className="bg-emerald-950/40 border-emerald-500/30">
             <CardHeader className="pb-2">
-              <CardDescription className="text-[10px] font-black uppercase tracking-widest text-slate-500">Total 30 Days</CardDescription>
-              <CardTitle className="text-2xl font-black italic text-white">{currency(totals.all)}</CardTitle>
+              <CardDescription className="text-[10px] font-black uppercase tracking-widest text-emerald-400">Total Sales (30d)</CardDescription>
+              <CardTitle className="text-3xl font-black italic text-emerald-400">{currency(summary.totalSales)}</CardTitle>
             </CardHeader>
           </Card>
-          <Card className="bg-slate-950/60 border-amber-800/50">
+          <Card className="bg-rose-950/40 border-rose-500/30">
             <CardHeader className="pb-2">
-              <CardDescription className="text-[10px] font-black uppercase tracking-widest text-amber-500">Flagged Abnormal</CardDescription>
-              <CardTitle className="text-2xl font-black italic text-amber-400">{currency(totals.flagged)}</CardTitle>
+              <CardDescription className="text-[10px] font-black uppercase tracking-widest text-rose-400">Real Expenses</CardDescription>
+              <CardTitle className="text-3xl font-black italic text-rose-400">{currency(summary.totalRealExpenses)}</CardTitle>
             </CardHeader>
           </Card>
-          <Card className="bg-slate-950/60 border-emerald-800/50">
+          <Card className={summary.profitLoss >= 0 ? "bg-emerald-950/40 border-emerald-500/30" : "bg-rose-950/40 border-rose-500/30"}>
             <CardHeader className="pb-2">
-              <CardDescription className="text-[10px] font-black uppercase tracking-widest text-emerald-500">Business Overhead</CardDescription>
-              <CardTitle className="text-2xl font-black italic text-emerald-400">{currency(totals.business)}</CardTitle>
+              <CardDescription className="text-[10px] font-black uppercase tracking-widest text-emerald-400">Profit/Loss</CardDescription>
+              <CardTitle className={`text-3xl font-black italic ${summary.profitLoss >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
+                {summary.profitLoss >= 0 ? "+" : ""}{currency(summary.profitLoss)}
+              </CardTitle>
             </CardHeader>
           </Card>
-          <Card className="bg-slate-950/60 border-rose-800/50">
+          <Card className="bg-slate-950/60 border-slate-700/50">
             <CardHeader className="pb-2">
-              <CardDescription className="text-[10px] font-black uppercase tracking-widest text-rose-500">Personal/Other</CardDescription>
-              <CardTitle className="text-2xl font-black italic text-rose-400">{currency(totals.personal)}</CardTitle>
+              <CardDescription className="text-[10px] font-black uppercase tracking-widest text-slate-400">Expense Ratio</CardDescription>
+              <CardTitle className={`text-3xl font-black italic ${summary.expenseRatio > 50 ? "text-rose-400" : summary.expenseRatio > 30 ? "text-amber-400" : "text-emerald-400"}`}>
+                {summary.expenseRatio.toFixed(1)}%
+              </CardTitle>
             </CardHeader>
           </Card>
         </div>
 
-        {flaggedRows.length > 0 && (
-          <Card className="bg-gradient-to-br from-amber-950/40 to-slate-950 border-amber-800/40">
-            <CardHeader>
-              <CardTitle className="text-lg font-black uppercase italic flex items-center gap-2">
-                <Badge className="bg-amber-500/20 text-amber-400 border-amber-500/30 animate-pulse">!</Badge>
-                Flagged Abnormal Expenses ({flaggedRows.length})
-              </CardTitle>
-              <CardDescription className="text-[10px] font-bold uppercase italic">
-                Expenses that exceed normal patterns for their category
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {Object.entries(flaggedByCategory).map(([category, data]) => (
-                <div key={category} className="space-y-2">
-                  <div className="flex items-center justify-between text-sm border-b border-amber-900/30 pb-2">
-                    <span className="font-black text-amber-400 uppercase">{category}</span>
-                    <span className="text-amber-300 font-mono">{data.count} items • {currency(data.total)}</span>
-                  </div>
-                  {data.items.map((row: ExpenseRow & { reason: string }) => (
-                    <div key={row.id} className="flex items-center justify-between gap-4 rounded-lg border border-amber-900/30 bg-amber-950/20 p-4">
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <Badge className="bg-amber-500/20 text-amber-400 border-amber-500/30">{row.source}</Badge>
-                          {row.shopId && <Badge className="bg-slate-800/60 text-slate-400 border-slate-700">{row.shopId}</Badge>}
-                          <Badge className="bg-rose-500/20 text-rose-400 border-rose-500/30">ABNORMAL</Badge>
-                        </div>
-                        <div className="mt-2 text-sm font-black text-white">{row.title}</div>
-                        <div className="text-[10px] text-amber-500/80 max-w-md">{row.reason}</div>
-                        <div className="text-[10px] uppercase tracking-widest text-slate-600 mt-1">
-                          {row.dateStr}
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <div className="text-2xl font-black italic text-amber-400">{currency(row.amount)}</div>
-                        <div className="text-[10px] text-slate-500">vs avg {currency(row.comparedTo)}</div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ))}
-            </CardContent>
-          </Card>
-        )}
+        {/* What Was Filtered */}
+        <Card className="bg-gradient-to-br from-slate-950/80 to-slate-900/80 border-slate-700/50">
+          <CardHeader>
+            <CardTitle className="text-lg font-black uppercase italic flex items-center gap-2">
+              <Badge className="bg-slate-500/20 text-slate-400 border-slate-500/30">FILTERED</Badge>
+              These are NOT real expenses - money just moved between accounts
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="bg-slate-900/60 rounded-lg p-4 border border-slate-800">
+                <div className="text-[10px] font-black uppercase text-slate-500 mb-1">Internal Transfers</div>
+                <div className="text-2xl font-black text-slate-400">{currency(summary.internalTransfers)}</div>
+                <div className="text-[10px] text-slate-600 mt-1">{internalTransfers.length} items</div>
+              </div>
+              <div className="bg-rose-900/20 rounded-lg p-4 border border-rose-900/50">
+                <div className="text-[10px] font-black uppercase text-rose-400 mb-1">Personal/Household</div>
+                <div className="text-2xl font-black text-rose-400">{currency(summary.personal)}</div>
+                <div className="text-[10px] text-rose-600 mt-1">{personalExpenses.length} items</div>
+              </div>
+              <div className="bg-slate-900/60 rounded-lg p-4 border border-slate-800 col-span-2">
+                <div className="text-[10px] font-black uppercase text-slate-500 mb-1">Total Filtered</div>
+                <div className="text-3xl font-black text-slate-400">{currency(summary.internalTransfers + summary.personal)}</div>
+                <div className="text-[10px] text-slate-600 mt-1">These don't count against your business</div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
-        <ExpenseAuditPanel 
-          expenses={abnormalAnalysis} 
+        {/* REAL Business Expenses Breakdown */}
+        <Card className="bg-gradient-to-br from-emerald-950/30 to-slate-950/80 border-emerald-500/30">
+          <CardHeader>
+            <CardTitle className="text-lg font-black uppercase italic flex items-center gap-2">
+              <Badge className="bg-emerald-500/20 text-emerald-400 border-emerald-500/30">REAL</Badge>
+              TRUE Business Expenses ({realBusinessExpenses.length} items)
+            </CardTitle>
+            <CardDescription className="text-[10px] font-bold uppercase italic">
+              This is what your business actually spent
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="bg-sky-950/40 rounded-lg p-4 border border-sky-900/50">
+                <div className="text-[10px] font-black uppercase text-sky-400 mb-1">Overhead</div>
+                <div className="text-2xl font-black text-sky-400">{currency(summary.overhead)}</div>
+                <div className="text-[10px] text-sky-600 mt-1">{overheadExpenses.length} items</div>
+              </div>
+              <div className="bg-violet-950/40 rounded-lg p-4 border border-violet-900/50">
+                <div className="text-[10px] font-black uppercase text-violet-400 mb-1">Stock/Inventory</div>
+                <div className="text-2xl font-black text-violet-400">{currency(summary.stock)}</div>
+                <div className="text-[10px] text-violet-600 mt-1">{stockExpenses.length} items</div>
+              </div>
+              <div className="bg-amber-950/40 rounded-lg p-4 border border-amber-900/50">
+                <div className="text-[10px] font-black uppercase text-amber-400 mb-1">Transport</div>
+                <div className="text-2xl font-black text-amber-400">{currency(summary.transport)}</div>
+                <div className="text-[10px] text-amber-600 mt-1">{transportExpenses.length} items</div>
+              </div>
+              <div className="bg-rose-950/40 rounded-lg p-4 border border-rose-900/50">
+                <div className="text-[10px] font-black uppercase text-rose-400 mb-1">Groceries</div>
+                <div className="text-2xl font-black text-rose-400">{currency(summary.groceries)}</div>
+                <div className="text-[10px] text-rose-600 mt-1">{groceryExpenses.length} items</div>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="bg-emerald-950/40 rounded-lg p-4 border border-emerald-900/50">
+                <div className="text-[10px] font-black uppercase text-emerald-400 mb-1">Operational</div>
+                <div className="text-xl font-black text-emerald-400">{currency(summary.operational)}</div>
+                <div className="text-[10px] text-emerald-600 mt-1">{operationalExpenses.length} items</div>
+              </div>
+              <div className="bg-slate-900/60 rounded-lg p-4 border border-slate-800">
+                <div className="text-[10px] font-black uppercase text-slate-400 mb-1">Other</div>
+                <div className="text-xl font-black text-slate-400">{currency(summary.other)}</div>
+                <div className="text-[10px] text-slate-600 mt-1">{otherExpenses.length} items</div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Detailed Expense Panel */}
+        <ExpenseDetailPanel 
+          expenses={allRows}
           defaultStartDate={defaultStartDate}
           defaultEndDate={defaultEndDate}
         />
-
-        <Card className="bg-slate-950/60 border-slate-800">
-          <CardHeader>
-            <CardTitle className="text-lg font-black uppercase italic">Full Expense Ledger</CardTitle>
-            <CardDescription className="text-[10px] font-bold uppercase italic">
-              All expenses from POS, Operations, and Invest • Sorted by date
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            {abnormalAnalysis.length === 0 ? (
-              <div className="text-center py-12 text-slate-600 italic">No expenses recorded yet.</div>
-            ) : (
-              <div className="space-y-2 max-h-[60vh] overflow-y-auto pr-2">
-                {abnormalAnalysis.map((row: ExpenseRow & { isAbnormal: boolean; reason: string }) => (
-                  <div 
-                    key={row.id} 
-                    className={`flex items-center justify-between gap-4 rounded-lg border p-4 transition-colors ${
-                      row.isAbnormal 
-                        ? 'border-amber-800/50 bg-amber-950/10' 
-                        : row.isPersonal 
-                          ? 'border-rose-800/30 bg-rose-950/10'
-                          : row.isOverhead
-                            ? 'border-emerald-800/30 bg-emerald-950/10'
-                            : 'border-slate-800 bg-slate-900/40'
-                    }`}
-                  >
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <Badge className={`${row.source === 'POS' ? 'bg-sky-500/20 text-sky-400 border-sky-500/30' : row.source === 'Operations' ? 'bg-amber-500/20 text-amber-400 border-amber-500/30' : 'bg-sky-500/20 text-sky-400 border-sky-500/30'}`}>
-                          {row.source}
-                        </Badge>
-                        {row.shopId && <Badge className="bg-slate-800/60 text-slate-400 border-slate-700">{row.shopId}</Badge>}
-                        {row.isOverhead && !row.isPersonal && (
-                          <Badge className="bg-emerald-500/20 text-emerald-400 border-emerald-500/30">Business</Badge>
-                        )}
-                        {row.isPersonal && (
-                          <Badge className="bg-rose-500/20 text-rose-400 border-rose-500/30">Personal</Badge>
-                        )}
-                        {row.isAbnormal && (
-                          <Badge className="bg-amber-500/20 text-amber-400 border-amber-500/30 animate-pulse">!</Badge>
-                        )}
-                      </div>
-                      <div className="mt-1 text-sm font-black text-white">{row.title}</div>
-                      <div className="text-[10px] uppercase tracking-widest text-slate-600">
-                        {row.subtitle} • {row.dateStr}
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <div className={`text-xl font-black italic ${
-                        row.isAbnormal ? 'text-amber-400' : row.isPersonal ? 'text-rose-300' : 'text-rose-300'
-                      }`}>
-                        {currency(row.amount)}
-                      </div>
-                      {row.isAbnormal && (
-                        <div className="text-[9px] text-amber-600 max-w-[150px] truncate">{row.reason}</div>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
       </div>
     </div>
   );
