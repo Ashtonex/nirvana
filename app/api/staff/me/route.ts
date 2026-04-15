@@ -6,10 +6,12 @@ import { supabaseAdmin } from "@/lib/supabase";
 export async function GET() {
   try {
     const jar = await cookies();
-
     const token = jar.get("nirvana_staff")?.value;
+    const ownerToken = jar.get("nirvana_owner")?.value;
+
+    console.log("[Staff /me] Checking auth, has nirvana_staff:", !!token, "has nirvana_owner:", !!ownerToken);
+
     if (!token) {
-      const ownerToken = jar.get("nirvana_owner")?.value;
       if (ownerToken) {
         return NextResponse.json({
           staff: {
@@ -23,11 +25,12 @@ export async function GET() {
           },
         });
       }
-
+      console.log("[Staff /me] No nirvana_staff cookie, returning 401");
       return NextResponse.json({ staff: null }, { status: 401 });
     }
 
     const tokenHash = createHash("sha256").update(token).digest("hex");
+    console.log("[Staff /me] Token hash:", tokenHash.substring(0, 16) + "...");
 
     const { data: session, error: sessionError } = await supabaseAdmin
       .from("staff_sessions")
@@ -41,14 +44,18 @@ export async function GET() {
     }
 
     if (!session) {
+      console.log("[Staff /me] No session found for token hash");
       return NextResponse.json({ staff: null }, { status: 401 });
     }
 
     if (session.expires_at && new Date(session.expires_at).getTime() < Date.now()) {
+      console.log("[Staff /me] Session expired");
       return NextResponse.json({ staff: null }, { status: 401 });
     }
 
     const employeeId = String(session.employee_id || "");
+    console.log("[Staff /me] Looking up employee:", employeeId);
+
     const { data: staff, error: staffError } = await supabaseAdmin
       .from("employees")
       .select("id,name,surname,shop_id,role,is_active,active")
@@ -61,9 +68,11 @@ export async function GET() {
     }
 
     if (!staff) {
+      console.log("[Staff /me] Employee not found:", employeeId);
       return NextResponse.json({ staff: null }, { status: 401 });
     }
 
+    console.log("[Staff /me] Staff found:", staff.shop_id, staff.role);
     return NextResponse.json({ staff: staff || null });
   } catch (e: any) {
     console.error("[Staff /me] Unexpected error:", e);

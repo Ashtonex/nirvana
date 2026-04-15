@@ -79,26 +79,34 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: insert.error.message }, { status: 500 });
     }
 
-    const cookieOptions = {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax" as const,
-      path: "/",
-      maxAge: 14 * 24 * 60 * 60,
-    };
+    console.log("[Staff Login] Session created for:", email, "shop:", shopId, "tokenHash:", tokenHash.substring(0, 16) + "...");
 
+    const isProduction = process.env.NODE_ENV === "production";
+    
     const response = NextResponse.json({
       success: true,
       shopId,
       role: employeeRecord.role,
+      tokenPrefix: token.substring(0, 8),
     });
 
     response.cookies.set("nirvana_owner", "", {
-      ...cookieOptions,
+      httpOnly: true,
+      secure: isProduction,
+      sameSite: "lax",
+      path: "/",
       maxAge: 0,
     });
 
-    response.cookies.set("nirvana_staff", token, cookieOptions);
+    response.cookies.set("nirvana_staff", token, {
+      httpOnly: true,
+      secure: isProduction,
+      sameSite: "lax",
+      path: "/",
+      maxAge: 14 * 24 * 60 * 60,
+    });
+
+    console.log("[Staff Login] Cookie set, secure:", isProduction);
 
     return response;
   } catch (e: any) {

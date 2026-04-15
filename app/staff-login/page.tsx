@@ -16,7 +16,6 @@ export default function StaffLoginPage() {
   const [isOfflineMode, setIsOfflineMode] = useState(false);
   const { login: offlineLogin } = useOfflineAuth();
 
-  // Check online status
   useEffect(() => {
     isOnline().then(online => setIsOfflineMode(!online));
     
@@ -38,12 +37,10 @@ export default function StaffLoginPage() {
     
     const online = await isOnline();
     
-    // If offline, try local auth first
     if (!online) {
       try {
         const result = await offlineLogin(pin);
         if (result.success && result.session) {
-          // Navigate to shop or mobile menu
           const shopId = result.session.shopId;
           window.location.href = shopId ? `/shops/${shopId}` : "/mobile-menu";
           return;
@@ -58,7 +55,6 @@ export default function StaffLoginPage() {
       }
     }
     
-    // Online login - use API
     try {
       const res = await fetch("/api/staff/login", {
         method: "POST",
@@ -66,12 +62,21 @@ export default function StaffLoginPage() {
         body: JSON.stringify({ workEmail, pin }),
       });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error || "Failed to log in");
+      
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to log in");
+      }
 
+      console.log("[Staff Login] Success, shopId:", data.shopId, "token:", data.tokenPrefix);
+      
       const shopId = data.shopId as string | undefined;
-      // Hard navigation so providers re-hydrate with new cookie.
+      
+      await new Promise(resolve => setTimeout(resolve, 50));
+      
+      console.log("[Staff Login] Navigating to:", `/shops/${shopId}`);
       window.location.href = shopId ? `/shops/${shopId}` : "/mobile-menu";
     } catch (e: any) {
+      console.error("[Staff Login] Error:", e);
       setError(e?.message || "Failed to log in");
     } finally {
       setLoading(false);
@@ -81,7 +86,6 @@ export default function StaffLoginPage() {
   return (
     <div className="min-h-[100svh] flex items-center justify-center p-4 bg-slate-950">
       <div className="w-full max-w-md">
-        {/* Offline indicator */}
         {isOfflineMode && (
           <div className="mb-4 flex items-center justify-center gap-2 bg-amber-500/20 text-amber-400 px-4 py-2 rounded-lg border border-amber-500/30">
             <WifiOff className="w-4 h-4" />
