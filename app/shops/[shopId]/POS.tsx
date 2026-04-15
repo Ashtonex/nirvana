@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useState, useTransition, useEffect } from "react";
-import { useRouter } from "next/navigation";
 import {
     Card,
     CardContent,
@@ -107,7 +106,6 @@ type LaybyQuote = {
 };
 
 export default function POS({ shopId, inventory, db }: { shopId: string, inventory: any[], db: any }) {
-    const router = useRouter();
     const [cart, setCart] = useState<{ item: any, quantity: number, price: number }[]>([]);
     const [searchTerm, setSearchTerm] = useState("");
     const [isPending, startTransition] = useTransition();
@@ -235,7 +233,7 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
     const today = new Date().toISOString().split('T')[0];
     const todaysSales = (db.sales || []).filter((s: any) => {
         const saleDate = s.date?.split('T')[0];
-        return saleDate === today && s.shop_id === shopId;
+        return saleDate === today && s.shopId === shopId;
     });
     const todaysTotalSales = todaysSales.reduce((sum: number, s: any) => sum + (s.totalWithTax || 0), 0);
 
@@ -306,7 +304,7 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
 
     // Identify Top 3 Best Sellers for this shop
     const itemSalesCount: Record<string, number> = {};
-    (db.sales || []).filter((s: any) => s.shop_id === shopId).forEach((s: any) => {
+    (db.sales || []).filter((s: any) => s.shopId === shopId).forEach((s: any) => {
         itemSalesCount[s.itemId] = (itemSalesCount[s.itemId] || 0) + Number(s.quantity || 0);
     });
     const topSellerIds = Object.entries(itemSalesCount)
@@ -316,10 +314,7 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
 
     const topSellers = inventoryState.filter(item => topSellerIds.includes(item.id));
     // Fallback if no sales yet: just show first 3
-    const activeInventory = inventoryState.filter((item: any) => Number(item.quantity || 0) > 0);
-    const defaultDisplayItems = topSellers.length >= 1
-        ? topSellers.filter((item: any) => Number(item.quantity || 0) > 0)
-        : activeInventory.slice(0, 3);
+    const defaultDisplayItems = topSellers.length >= 1 ? topSellers : inventoryState.slice(0, 3);
 
     // Calculate Cash Drawer Math
     const ledger = db.ledger || [];
@@ -327,7 +322,7 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
     const CASH_OUT_CATEGORIES = new Set(["POS Expense", "Operations Transfer", "Perfume", "Overhead", "Tithe", "Groceries"]);
 
     // 1. Did we open today?
-    const todaysOpening = ledger.find((l: any) => l.category === 'Cash Drawer Opening' && l.shop_id === shopId && String(l.date).startsWith(todayStr));
+    const todaysOpening = ledger.find((l: any) => l.category === 'Cash Drawer Opening' && l.shopId === shopId && String(l.date).startsWith(todayStr));
     const hasOpenedRegister = !!todaysOpening;
 
     // Helper functions for keyword matching (must be defined early for carry-over calc)
@@ -344,7 +339,7 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
     let carryOverBaseline = 0;
 
     // Find the very last opening before today
-    const pastOpenings = ledger.filter((l: any) => l.category === 'Cash Drawer Opening' && l.shop_id === shopId && !String(l.date).startsWith(todayStr));
+    const pastOpenings = ledger.filter((l: any) => l.category === 'Cash Drawer Opening' && l.shopId === shopId && !String(l.date).startsWith(todayStr));
     const lastOpening = pastOpenings.sort((a: any) => new Date(a.date).getTime() - new Date(todayStr).getTime())[0]; // Simplified sort to find recent
 
     if (lastOpening) {
@@ -352,13 +347,13 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
         carryOverBaseline = Number(lastOpening.amount);
 
         // Sales after the last opening, but before today started
-        const salesSinceLastOpen = (db.sales || []).filter((s: any) => s.shop_id === shopId && s.paymentMethod === 'cash' && new Date(s.date).getTime() >= lastOpenDate && !String(s.date).startsWith(todayStr));
+        const salesSinceLastOpen = (db.sales || []).filter((s: any) => s.shopId === shopId && s.paymentMethod === 'cash' && new Date(s.date).getTime() >= lastOpenDate && !String(s.date).startsWith(todayStr));
         carryOverSales = salesSinceLastOpen.reduce((sum: number, s: any) => sum + Number(s.totalWithTax || 0), 0);
 
         // POS Expenses after last opening, before today (includes keyword-matched Groceries/Tithe)
         const expensesSinceLastOpen = ledger.filter((l: any) =>
             (CASH_OUT_CATEGORIES.has(String(l.category || "")) || isGroceriesExpense(l) || isTitheExpense(l)) &&
-            l.shop_id === shopId &&
+            l.shopId === shopId &&
             new Date(l.date).getTime() >= lastOpenDate &&
             !String(l.date).startsWith(todayStr)
         );
@@ -370,20 +365,20 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
     // 3. Current Live Drawer (Today's Opening + Today's Cash Sales - Today's Expenses)
 
     const todaysCashSales = (db.sales || []).filter((s: any) =>
-        s.shop_id === shopId &&
+        s.shopId === shopId &&
         s.paymentMethod === 'cash' &&
         String(s.date).startsWith(todayStr)
     ).reduce((sum: number, s: any) => sum + Number(s.totalWithTax || 0), 0);
 
     const todaysPosExpenses = ledger.filter((l: any) =>
         ['POS Expense', 'Perfume', 'Overhead', 'Tithe', 'Groceries'].includes(l.category) &&
-        l.shop_id === shopId &&
+        l.shopId === shopId &&
         String(l.date).startsWith(todayStr)
     ).reduce((sum: number, l: any) => sum + Number(l.amount || 0), 0);
 
     // Tithe expenses (cumulative all-time)
     const cumulativeTithe = ledger.filter((l: any) =>
-        l.shop_id === shopId
+        l.shopId === shopId
     ).reduce((sum: number, l: any) => {
         if (isTitheExpense(l)) return sum + Number(l.amount || 0);
         if (l.category === 'Tithe Withdrawal') return sum - Number(l.amount || 0);
@@ -398,13 +393,13 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
 
     const currentMonthGroceries = ledger.filter((l: any) =>
         isGroceriesExpense(l) &&
-        l.shop_id === shopId &&
+        l.shopId === shopId &&
         String(l.date).startsWith(currentMonth)
     ).reduce((sum: number, l: any) => sum + Number(l.amount || 0), 0);
 
     const previousMonthGroceries = ledger.filter((l: any) =>
         isGroceriesExpense(l) &&
-        l.shop_id === shopId &&
+        l.shopId === shopId &&
         String(l.date).startsWith(previousMonth)
     ).reduce((sum: number, l: any) => sum + Number(l.amount || 0), 0);
 
@@ -413,7 +408,7 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
     const todaysOpsPosts = ledger.filter((l: any) =>
         l.category === 'Operations Transfer' &&
         !['POS Expense', 'Perfume', 'Overhead'].includes(l.category) &&
-        l.shop_id === shopId &&
+        l.shopId === shopId &&
         String(l.date).startsWith(todayStr)
     ).reduce((sum: number, l: any) => sum + Number(l.amount || 0), 0);
 
@@ -458,15 +453,14 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
             alert("Please enter a valid cash amount.");
             return;
         }
-        try {
-            const result = await openCashRegister(shopId, expectedOpeningCash, val);
-            console.log("[/POS] Register opened:", result);
-            setIsCashRegisterModalOpen(false);
-            setTimeout(() => window.location.reload(), 100);
-        } catch (e: any) {
-            console.error("[/POS] Failed to open register:", e);
-            alert(e?.message || "Failed to open register. Check console for details.");
-        }
+        startTransition(async () => {
+            try {
+                await openCashRegister(shopId, expectedOpeningCash, val);
+                setIsCashRegisterModalOpen(false);
+            } catch (e) {
+                alert("Failed to open register.");
+            }
+        });
     };
 
     const handleRecordExpense = async () => {
@@ -1292,25 +1286,9 @@ Generated via NIRVANA POS`;
     const filteredInventory = inventoryState.filter((item: any) => {
         const matchesSearch = item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
             item.category.toLowerCase().includes(searchTerm.toLowerCase());
-        return matchesSearch && Number(item.quantity || 0) > 0;
+        // Show ALL inventory - no allocation filter (showing global master stock)
+        return matchesSearch;
     });
-
-    const purgeZeroInventory = async () => {
-        if (!confirm("Delete every inventory item that is at 0 units or below?")) return;
-        try {
-            const res = await fetch("/api/inventory/purge-zero", {
-                method: "POST",
-                credentials: "include",
-            });
-            const data = await res.json().catch(() => ({}));
-            if (!res.ok) throw new Error(data?.error || "Failed to delete zero stock");
-            setInventoryState((prev) => prev.filter((item: any) => Number(item.quantity || 0) > 0));
-            setIsManagerToolsOpen(false);
-            alert(`Deleted ${Number(data?.deletedCount || 0)} zero-stock item(s).`);
-        } catch (e: any) {
-            alert(e?.message || "Failed to delete zero-stock items.");
-        }
-    };
 
     return (
         <div className="grid gap-4 md:gap-6 md:grid-cols-12 grid-cols-1">
@@ -1671,21 +1649,6 @@ Generated via NIRVANA POS`;
                             }}
                         >
                             <ArrowRightLeft className="mr-2 h-4 w-4" /> Cash Transfers
-                        </Button>
-                        <Button
-                            className="w-full bg-rose-900 hover:bg-rose-800 border border-rose-500/30 text-rose-300 text-[10px] font-black uppercase italic tracking-widest"
-                            onClick={purgeZeroInventory}
-                        >
-                            <Trash2 className="mr-2 h-4 w-4" /> Delete Zero Stock
-                        </Button>
-                        <Button
-                            className="w-full bg-slate-800 hover:bg-slate-700 text-[10px] font-black uppercase italic tracking-widest"
-                            onClick={() => {
-                                setIsManagerToolsOpen(false);
-                                window.location.href = "/expenses";
-                            }}
-                        >
-                            <Receipt className="mr-2 h-4 w-4" /> Expenses Page
                         </Button>
                         <div className="text-[10px] font-bold uppercase text-slate-400">
                             If you cannot see these pages, your staff role must be Manager/Admin/Owner.
@@ -2917,7 +2880,7 @@ Generated via NIRVANA POS`;
                     {(() => {
                         const allExpenses = ledger.filter((l: any) =>
                             ['POS Expense', 'Perfume', 'Overhead'].includes(l.category) &&
-                            l.shop_id === shopId
+                            l.shopId === shopId
                         ).sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
                         if (allExpenses.length === 0) {
