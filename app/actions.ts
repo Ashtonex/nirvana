@@ -961,8 +961,10 @@ export async function openCashRegister(shopId: string, expectedAmount: number, a
     const id = Math.random().toString(36).substring(2, 9);
     const actor = await getActorFromCookies().catch(() => null);
 
+    const employeeId = actor?.id || "SYSTEM";
+
     // Log the actual opening amount as an asset
-    await supabaseAdmin.from('ledger_entries').insert([{
+    const { error: ledgerError } = await supabaseAdmin.from('ledger_entries').insert([{
         id,
         shop_id: shopId,
         type: 'asset',
@@ -970,13 +972,18 @@ export async function openCashRegister(shopId: string, expectedAmount: number, a
         amount: actualAmount,
         date: timestamp,
         description: `Register Opened - Expected: $${expectedAmount.toFixed(2)} | Actual: $${actualAmount.toFixed(2)}`,
-        employee_id: actor?.id || "SYSTEM"
+        employee_id: employeeId
     }]);
+
+    if (ledgerError) {
+        console.error("[/openCashRegister] Ledger insert error:", ledgerError);
+        throw new Error("Failed to record opening balance: " + ledgerError.message);
+    }
 
     // If there's a discrepancy, log it as an adjustment
     const discrepancy = actualAmount - expectedAmount;
     if (Math.abs(discrepancy) > 0.01) {
-        await supabaseAdmin.from('ledger_entries').insert([{
+        const { error: adjError } = await supabaseAdmin.from('ledger_entries').insert([{
             id: Math.random().toString(36).substring(2, 9),
             shop_id: shopId,
             type: discrepancy < 0 ? 'expense' : 'income',
@@ -984,22 +991,29 @@ export async function openCashRegister(shopId: string, expectedAmount: number, a
             amount: Math.abs(discrepancy),
             date: timestamp,
             description: `Register ${discrepancy < 0 ? 'Short' : 'Over'} by $${Math.abs(discrepancy).toFixed(2)}`,
-            employee_id: actor?.id || "SYSTEM"
+            employee_id: employeeId
         }]);
+
+        if (adjError) {
+            console.error("[/openCashRegister] Adjustment insert error:", adjError);
+        }
     }
 
-    // Audit trail (best-effort)
+    // Audit trail
     try {
         await supabaseAdmin.from("audit_log").insert({
             id: Math.random().toString(36).substring(2, 9),
             timestamp,
-            employee_id: actor?.id || "SYSTEM",
+            employee_id: employeeId,
             action: "CASH_DRAWER_OPENED",
             details: `${shopId}: opening $${Number(actualAmount).toFixed(2)} (expected $${Number(expectedAmount).toFixed(2)}) by ${actor?.name || "SYSTEM"}`
         });
-    } catch { }
+    } catch (e) {
+        console.error("[/openCashRegister] Audit log error:", e);
+    }
 
     revalidatePath(`/shops/${shopId}`);
+    return { success: true, id, amount: actualAmount };
 }
 
 export async function getCashDrawerOpening(shopId: string, dateYYYYMMDD: string) {

@@ -458,10 +458,12 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
         }
         startTransition(async () => {
             try {
-                await openCashRegister(shopId, expectedOpeningCash, val);
+                const result = await openCashRegister(shopId, expectedOpeningCash, val);
+                console.log("[/POS] Register opened:", result);
                 setIsCashRegisterModalOpen(false);
-            } catch (e) {
-                alert("Failed to open register.");
+            } catch (e: any) {
+                console.error("[/POS] Failed to open register:", e);
+                alert(e?.message || "Failed to open register. Check console for details.");
             }
         });
     };
