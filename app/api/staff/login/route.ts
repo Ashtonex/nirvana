@@ -11,86 +11,98 @@ function normalizeShopKey(value: unknown): string {
 }
 
 export async function POST(req: Request) {
-  const { workEmail, pin } = await req.json();
-  if (!workEmail || !pin) {
-    return NextResponse.json({ error: "Missing workEmail or pin" }, { status: 400 });
+  try {
+    const { workEmail, pin } = await req.json();
+    if (!workEmail || !pin) {
+      return NextResponse.json({ error: "Missing workEmail or pin" }, { status: 400 });
+    }
+
+    const email = String(workEmail).trim().toLowerCase();
+
+    const { data: employee, error } = await supabaseAdmin
+      .from("employees")
+      .select("*")
+      .ilike("email", email)
+      .maybeSingle();
+
+    if (error) {
+      console.error("[Staff Login] DB error:", error);
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+
+    if (!employee) {
+      return NextResponse.json({ error: "Employee not found" }, { status: 404 });
+    }
+
+    const employeeRecord = employee as Record<string, unknown>;
+    const active = employeeRecord.is_active ?? employeeRecord.active ?? true;
+    if (!active) {
+      return NextResponse.json({ error: "Employee inactive" }, { status: 403 });
+    }
+
+    const shopId = String(employeeRecord.shop_id || "");
+    const normalizedShopId = normalizeShopKey(shopId);
+    const pinString = String(pin).trim();
+    
+    const SHOP_PINS: Record<string, string> = {
+      kipasa: process.env.NIRVANA_PIN_KIPASA || "1234",
+      dubdub: process.env.NIRVANA_PIN_DUBDUB || "5678",
+      tradecenter: process.env.NIRVANA_PIN_TRADECENTER || "0000",
+    };
+
+    if (!normalizedShopId) {
+      console.error("[Staff Login] Employee has no shop_id:", employee.id, email);
+      return NextResponse.json({ error: "Employee shop not configured" }, { status: 400 });
+    }
+
+    if (!SHOP_PINS[normalizedShopId]) {
+      console.error("[Staff Login] Shop not in PIN config:", normalizedShopId, "employee:", email);
+      return NextResponse.json({ error: "Employee shop not configured" }, { status: 400 });
+    }
+
+    if (pinString !== SHOP_PINS[normalizedShopId]) {
+      return NextResponse.json({ error: "Invalid device PIN" }, { status: 401 });
+    }
+
+    const token = randomBytes(32).toString("hex");
+    const tokenHash = createHash("sha256").update(token).digest("hex");
+    const expiresAt = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString();
+
+    const insert = await supabaseAdmin.from("staff_sessions").insert({
+      employee_id: employee.id,
+      token_hash: tokenHash,
+      expires_at: expiresAt,
+    });
+
+    if (insert.error) {
+      console.error("[Staff Login] Session insert error:", insert.error);
+      return NextResponse.json({ error: insert.error.message }, { status: 500 });
+    }
+
+    const cookieOptions = {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax" as const,
+      path: "/",
+      maxAge: 14 * 24 * 60 * 60,
+    };
+
+    const response = NextResponse.json({
+      success: true,
+      shopId,
+      role: employeeRecord.role,
+    });
+
+    response.cookies.set("nirvana_owner", "", {
+      ...cookieOptions,
+      maxAge: 0,
+    });
+
+    response.cookies.set("nirvana_staff", token, cookieOptions);
+
+    return response;
+  } catch (e: any) {
+    console.error("[Staff Login] Unexpected error:", e);
+    return NextResponse.json({ error: e.message || "Login failed" }, { status: 500 });
   }
-
-  const email = String(workEmail).trim().toLowerCase();
-
-  const { data: employee, error } = await supabaseAdmin
-    .from("employees")
-    .select("*")
-    .ilike("email", email)
-    .maybeSingle();
-
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
-  }
-
-  if (!employee) {
-    return NextResponse.json({ error: "Employee not found" }, { status: 404 });
-  }
-
-  const employeeRecord = employee as Record<string, unknown>;
-  const active = employeeRecord.is_active ?? employeeRecord.active ?? true;
-  if (!active) {
-    return NextResponse.json({ error: "Employee inactive" }, { status: 403 });
-  }
-
-  const shopId = String(employeeRecord.shop_id || "");
-  const normalizedShopId = normalizeShopKey(shopId);
-  const pinString = String(pin).trim();
-  const SHOP_PINS: Record<string, string> = {
-    kipasa: process.env.NIRVANA_PIN_KIPASA || "1234",
-    dubdub: process.env.NIRVANA_PIN_DUBDUB || "5678",
-    tradecenter: process.env.NIRVANA_PIN_TRADECENTER || "0000",
-  };
-
-  if (!normalizedShopId || !SHOP_PINS[normalizedShopId]) {
-    return NextResponse.json({ error: "Employee shop not configured" }, { status: 400 });
-  }
-
-  if (pinString !== SHOP_PINS[normalizedShopId]) {
-    return NextResponse.json({ error: "Invalid device PIN" }, { status: 401 });
-  }
-
-  // Create staff session
-  const token = randomBytes(32).toString("hex");
-  const tokenHash = createHash("sha256").update(token).digest("hex");
-  const expiresAt = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString();
-
-  const insert = await supabaseAdmin.from("staff_sessions").insert({
-    employee_id: employee.id,
-    token_hash: tokenHash,
-    expires_at: expiresAt,
-  });
-
-  if (insert.error) {
-    return NextResponse.json({ error: insert.error.message }, { status: 500 });
-  }
-
-  // Avoid auth conflicts: if this browser previously had an owner cookie, clear it so staff auth can be detected.
-  // (AccessGate relies on /api/staff/me which should prefer staff sessions.)
-  (await cookies()).set("nirvana_owner", "", {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
-    path: "/",
-    maxAge: 0,
-  });
-
-  (await cookies()).set("nirvana_staff", token, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
-    path: "/",
-    maxAge: 14 * 24 * 60 * 60,
-  });
-
-  return NextResponse.json({
-    success: true,
-    shopId,
-    role: employeeRecord.role,
-  });
 }
