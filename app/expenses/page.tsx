@@ -30,49 +30,66 @@ type ExpenseRow = {
   expenseType: "overhead" | "stock" | "transport" | "groceries" | "personal" | "internal_transfer" | "operational" | "other";
   isFiltered: boolean;
   filterReason: string;
+  ruleApplied?: string;
 };
 
-const INTERNAL_TRANSFER_KEYWORDS = [
+type BrainRule = {
+  id: string;
+  rule_type: string;
+  match_pattern: string;
+  match_field: string;
+  action: string;
+  category?: string;
+  priority: number;
+};
+
+const DEFAULT_INTERNAL_TRANSFER_KEYWORDS = [
   "invest", "savings", "perfume deposit", "overhead contribution",
-  "groceries to invest", "stockvel", "perfume invest", "deposit to"
+  "groceries to invest", "stockvel", "perfume invest", "deposit to", "eod", "blackbox"
 ];
 
-const PERSONAL_KEYWORDS = [
+const DEFAULT_PERSONAL_KEYWORDS = [
   "personal", "抽钱", "withdrawal", "my", "own", "family",
   "food for home", "groceries for home", "home groceries",
   "lunch personal", "dinner personal"
 ];
 
-const OVERHEAD_KEYWORDS = [
+const DEFAULT_OVERHEAD_KEYWORDS = [
   "rent", "utilities", "electric", "electricity", "water", "rates",
   "municipal", "insurance", "security", "salary", "wages", "payroll",
   "site rent", "premises", "internet", "wifi"
 ];
 
-const STOCK_KEYWORDS = [
+const DEFAULT_STOCK_KEYWORDS = [
   "stock", "inventory", "purchases", "bulk order", "wholesale",
   "restock", "procurement", "supplier"
 ];
 
-const TRANSPORT_KEYWORDS = [
+const DEFAULT_TRANSPORT_KEYWORDS = [
   "transport", "petrol", "fuel", "diesel", "uber", "delivery",
   "logistics", "courier", "freight"
 ];
 
-const GROCERY_KEYWORDS = [
+const DEFAULT_GROCERY_KEYWORDS = [
   "groceries", "grocery", "supermarket", "market", "provisions",
   "food items", "sundries"
 ];
 
-const OPERATIONAL_KEYWORDS = [
+const DEFAULT_OPERATIONAL_KEYWORDS = [
   "airtime", "data", "internet", "phone", "advertising", "marketing",
   "stationery", "printing", "bank charges", "commission"
 ];
 
-function classifyExpense(title: string, category: string, source: string): { 
+function classifyExpense(
+  title: string, 
+  category: string, 
+  source: string, 
+  rules: BrainRule[]
+): { 
   type: ExpenseRow["expenseType"]; 
   isFiltered: boolean; 
   filterReason: string;
+  ruleApplied?: string;
 } {
   const text = `${title} ${category}`.toLowerCase();
 
@@ -80,31 +97,88 @@ function classifyExpense(title: string, category: string, source: string): {
     return { type: "internal_transfer", isFiltered: true, filterReason: "Invest withdrawal - not a business expense" };
   }
 
-  if (INTERNAL_TRANSFER_KEYWORDS.some(kw => text.includes(kw))) {
+  if (rules.length > 0) {
+    const sortedRules = [...rules].sort((a, b) => b.priority - a.priority);
+    
+    for (const rule of sortedRules) {
+      const pattern = rule.match_pattern.toLowerCase();
+      const field = rule.match_field === "category" ? category.toLowerCase() : text;
+      
+      if (field.includes(pattern) || pattern.includes(field)) {
+        switch (rule.action) {
+          case "personal":
+            return { 
+              type: "personal", 
+              isFiltered: false, 
+              filterReason: `Learned: Personal expense (rule: "${rule.match_pattern}")`,
+              ruleApplied: rule.id
+            };
+          case "overhead":
+            return { 
+              type: "overhead", 
+              isFiltered: false, 
+              filterReason: `Learned: Business overhead (rule: "${rule.match_pattern}")`,
+              ruleApplied: rule.id
+            };
+          case "stock":
+            return { 
+              type: "stock", 
+              isFiltered: false, 
+              filterReason: `Learned: Stock/inventory (rule: "${rule.match_pattern}")`,
+              ruleApplied: rule.id
+            };
+          case "filter":
+          case "ignore":
+            return { 
+              type: "internal_transfer", 
+              isFiltered: true, 
+              filterReason: `Learned: Filter as transfer (rule: "${rule.match_pattern}")`,
+              ruleApplied: rule.id
+            };
+          case "operational":
+            return { 
+              type: "operational", 
+              isFiltered: false, 
+              filterReason: `Learned: Operational (rule: "${rule.match_pattern}")`,
+              ruleApplied: rule.id
+            };
+          case "classify":
+            return { 
+              type: (rule.category as ExpenseRow["expenseType"]) || "other", 
+              isFiltered: false, 
+              filterReason: `Learned: ${rule.category || "custom"} (rule: "${rule.match_pattern}")`,
+              ruleApplied: rule.id
+            };
+        }
+      }
+    }
+  }
+
+  if (DEFAULT_INTERNAL_TRANSFER_KEYWORDS.some(kw => text.includes(kw))) {
     return { type: "internal_transfer", isFiltered: true, filterReason: "Internal transfer between accounts" };
   }
 
-  if (PERSONAL_KEYWORDS.some(kw => text.includes(kw))) {
+  if (DEFAULT_PERSONAL_KEYWORDS.some(kw => text.includes(kw))) {
     return { type: "personal", isFiltered: false, filterReason: "Personal/household expense" };
   }
 
-  if (OVERHEAD_KEYWORDS.some(kw => text.includes(kw))) {
+  if (DEFAULT_OVERHEAD_KEYWORDS.some(kw => text.includes(kw))) {
     return { type: "overhead", isFiltered: false, filterReason: "Business overhead" };
   }
 
-  if (STOCK_KEYWORDS.some(kw => text.includes(kw))) {
+  if (DEFAULT_STOCK_KEYWORDS.some(kw => text.includes(kw))) {
     return { type: "stock", isFiltered: false, filterReason: "Stock/inventory purchase" };
   }
 
-  if (TRANSPORT_KEYWORDS.some(kw => text.includes(kw))) {
+  if (DEFAULT_TRANSPORT_KEYWORDS.some(kw => text.includes(kw))) {
     return { type: "transport", isFiltered: false, filterReason: "Transport/logistics" };
   }
 
-  if (GROCERY_KEYWORDS.some(kw => text.includes(kw))) {
+  if (DEFAULT_GROCERY_KEYWORDS.some(kw => text.includes(kw))) {
     return { type: "groceries", isFiltered: false, filterReason: "Groceries (may be personal)" };
   }
 
-  if (OPERATIONAL_KEYWORDS.some(kw => text.includes(kw))) {
+  if (DEFAULT_OPERATIONAL_KEYWORDS.some(kw => text.includes(kw))) {
     return { type: "operational", isFiltered: false, filterReason: "Operational expense" };
   }
 
@@ -129,12 +203,15 @@ export default async function ExpensesPage() {
   const defaultStartDate = toLocalDateString(thirtyDaysAgo);
   const defaultEndDate = toLocalDateString(now);
 
-  const [posRes, opsRes, investRes, salesRes] = await Promise.all([
+  const [posRes, opsRes, investRes, salesRes, rulesRes] = await Promise.all([
     supabaseAdmin.from("ledger_entries").select("*").eq("type", "expense").order("date", { ascending: false }).limit(2000),
     supabaseAdmin.from("operations_ledger").select("*").lt("amount", 0).order("created_at", { ascending: false }).limit(2000),
     supabaseAdmin.from("invest_deposits").select("*").gt("withdrawn_amount", 0).order("withdrawn_at", { ascending: false }).limit(1000),
     supabaseAdmin.from("sales").select("total_with_tax, date").gte("date", thirtyDaysAgo.toISOString()).lte("date", now.toISOString()),
+    supabaseAdmin.from("brain_learning_rules").select("*").eq("is_active", true).order("priority", { ascending: false }),
   ]);
+
+  const rules: BrainRule[] = rulesRes.data || [];
 
   const posExpenseCategories = new Set(["POS Expense", "Perfume", "Overhead", "Tithe", "Groceries"]);
   const opsExpenseKinds = new Set(["overhead_payment", "stock_orders", "transport", "peer_payout", "other_expense", "rent", "utilities", "salaries", "misc", "salary", "wages", "electric", "water", "internet"]);
@@ -144,7 +221,7 @@ export default async function ExpensesPage() {
     .map((row: Record<string, unknown>) => {
       const title = String(row.description || row.category || "POS Expense");
       const category = String(row.category || "POS Expense");
-      const classification = classifyExpense(title, category, "POS");
+      const classification = classifyExpense(title, category, "POS", rules);
       return {
         id: `pos-${row.id}`,
         source: "POS" as const,
@@ -159,6 +236,7 @@ export default async function ExpensesPage() {
         expenseType: classification.type,
         isFiltered: classification.isFiltered,
         filterReason: classification.filterReason,
+        ruleApplied: classification.ruleApplied,
       };
     });
 
@@ -167,7 +245,7 @@ export default async function ExpensesPage() {
     .map((row: Record<string, unknown>) => {
       const title = String(row.title || row.kind || "Operations Expense");
       const kind = String(row.kind || "Expense");
-      const classification = classifyExpense(title, kind, "Operations");
+      const classification = classifyExpense(title, kind, "Operations", rules);
       return {
         id: `ops-${row.id}`,
         source: "Operations" as const,
@@ -182,6 +260,7 @@ export default async function ExpensesPage() {
         expenseType: classification.type,
         isFiltered: classification.isFiltered,
         filterReason: classification.filterReason,
+        ruleApplied: classification.ruleApplied,
       };
     });
 
@@ -238,12 +317,22 @@ export default async function ExpensesPage() {
     expenseRatio,
   };
 
+  const rulesAppliedCount = allRows.filter(r => r.ruleApplied).length;
+
   return (
     <div className="space-y-8 pb-32 pt-8">
       <div className="space-y-2 text-center max-w-4xl mx-auto">
-        <h1 className="text-5xl font-black tracking-tighter uppercase italic text-white leading-none">Expenses</h1>
+        <div className="flex items-center justify-center gap-4">
+          <h1 className="text-5xl font-black tracking-tighter uppercase italic text-white leading-none">Expenses</h1>
+          {rules.length > 0 && (
+            <Badge className="bg-violet-500/20 text-violet-400 border-violet-500/30">
+              {rules.length} Rules Active
+            </Badge>
+          )}
+        </div>
         <p className="text-slate-400 font-bold tracking-widest uppercase text-xs italic">
           Real business expenses vs internal transfers
+          {rulesAppliedCount > 0 && ` • ${rulesAppliedCount} expenses classified by your rules`}
         </p>
       </div>
 

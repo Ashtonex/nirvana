@@ -19,6 +19,7 @@ type ExpenseRow = {
   expenseType: "overhead" | "stock" | "transport" | "groceries" | "personal" | "internal_transfer" | "operational" | "other";
   isFiltered: boolean;
   filterReason: string;
+  ruleApplied?: string;
 };
 
 type Props = {
@@ -239,9 +240,17 @@ export function ExpenseDetailPanel({ expenses, defaultStartDate, defaultEndDate 
                                 FILTERED
                               </Badge>
                             )}
+                            {expense.ruleApplied && (
+                              <Badge className="bg-violet-500/30 text-violet-400 border-violet-500/50 text-[8px]">
+                                LEARNED
+                              </Badge>
+                            )}
                           </div>
                           <div className="text-sm font-bold text-white mt-1 truncate">{expense.title}</div>
                           <div className="text-[10px] text-slate-500 uppercase">{expense.dateStr}</div>
+                          {expense.ruleApplied && (
+                            <div className="text-[10px] text-violet-400/70 italic mt-1">{expense.filterReason}</div>
+                          )}
                         </div>
                         <div className="text-right ml-4">
                           <div className={cn("text-lg font-black", expense.isFiltered ? "text-slate-500 line-through" : "text-rose-300")}>
