@@ -15,6 +15,18 @@ export async function GET() {
     const { data: invRow } = await supabaseAdmin.from('inventory_items').select('*').limit(1);
     const { data: depRow } = await supabaseAdmin.from('invest_deposits').select('*').limit(1);
 
+    let rpcError: any = null;
+    try {
+      // Test the Pulse Metrics RPC
+      const { error: rpcTest } = await supabaseAdmin.rpc('get_oracle_pulse_metrics', { 
+         p_days: 7, 
+         p_shop_id: shops?.[0]?.id || '' 
+      });
+      rpcError = rpcTest;
+    } catch (err: any) {
+      rpcError = err.message || err;
+    }
+
     return NextResponse.json({
       timestamp: new Date().toISOString(),
       schemaProbe: {

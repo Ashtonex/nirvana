@@ -247,6 +247,7 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
     // Cash Register Logic
     const [isCashRegisterModalOpen, setIsCashRegisterModalOpen] = useState(false);
     const [cashRegisterAmount, setCashRegisterAmount] = useState("");
+    const [hasDismissedRegisterModal, setHasDismissedRegisterModal] = useState(false);
 
     // Printer Connection State
     const [printerTransport, setPrinterTransport] = useState<'usb' | 'bluetooth'>('usb');
@@ -441,11 +442,11 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
 
     // Trigger open modal on load if missing
     React.useEffect(() => {
-        if (!hasOpenedRegister && !isCashRegisterModalOpen) {
+        if (!hasOpenedRegister && !isCashRegisterModalOpen && !hasDismissedRegisterModal) {
             setIsCashRegisterModalOpen(true);
             setCashRegisterAmount(expectedOpeningCash.toFixed(2));
         }
-    }, [hasOpenedRegister, isCashRegisterModalOpen, expectedOpeningCash]);
+    }, [hasOpenedRegister, isCashRegisterModalOpen, expectedOpeningCash, hasDismissedRegisterModal]);
 
     const handleOpenRegister = async () => {
         const val = parseFloat(cashRegisterAmount);
@@ -2390,7 +2391,10 @@ Generated via NIRVANA POS`;
                 isOpen={isCashRegisterModalOpen}
                 onClose={() => {
                     if (!hasOpenedRegister) {
-                        alert("You must open the register to proceed.");
+                        if (confirm("You must open the register to proceed. Close anyway?")) {
+                            setHasDismissedRegisterModal(true);
+                            setIsCashRegisterModalOpen(false);
+                        }
                     } else {
                         setIsCashRegisterModalOpen(false);
                     }
