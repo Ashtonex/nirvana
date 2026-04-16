@@ -74,11 +74,11 @@ export async function runMoneyAudit(daysBack = 30): Promise<MoneyAuditResult> {
     inventoryData,
     shopsData
   ] = await Promise.all([
-    supabaseAdmin.from('sales').select('*').gte('date', periodStart).lte('date', periodEnd),
-    supabaseAdmin.from('ledger_entries').select('*').gte('date', periodStart).lte('date', periodEnd),
-    supabaseAdmin.from('operations_ledger').select('*').gte('created_at', periodStart).lte('created_at', periodEnd),
+    supabaseAdmin.from('sales').select('*').gte('date', periodStart).lte('date', periodEnd).order('date', { ascending: false }).limit(20000),
+    supabaseAdmin.from('ledger_entries').select('*').gte('date', periodStart).lte('date', periodEnd).order('date', { ascending: false }).limit(20000),
+    supabaseAdmin.from('operations_ledger').select('*').gte('created_at', periodStart).lte('created_at', periodEnd).order('created_at', { ascending: false }).limit(20000),
     supabaseAdmin.from('operations_state').select('*').eq('id', 1).single(),
-    supabaseAdmin.from('inventory_items').select('*'),
+    supabaseAdmin.from('inventory_items').select('*').limit(10000),
     supabaseAdmin.from('shops').select('*')
   ]);
 

@@ -16,20 +16,17 @@ export type OperationsLedgerKind =
 export type OverheadCategory = "rent" | "salaries" | "utilities" | "misc";
 
 export async function getOperationsComputedBalance(month?: string) {
-  let query = supabaseAdmin
-    .from("operations_ledger")
-    .select("amount");
-    
-  if (month) {
-    // Filter by month using the effective_date (if present) or created_at
-    query = query.gte("created_at", `${month}-01T00:00:00Z`)
-                 .lt("created_at", new Date(new Date(`${month}-01T00:00:00Z`).setMonth(new Date(`${month}-01`).getMonth() + 1)).toISOString());
-  }
+  // Call our new high-speed database function for total accuracy
+  const { data, error } = await supabaseAdmin.rpc('get_operations_computed_balance', { 
+    month_text: month || null 
+  });
 
-  const { data, error } = await query;
-  if (error) throw new Error(error.message);
-  const sum = (data || []).reduce((acc: number, row: any) => acc + Number(row.amount || 0), 0);
-  return sum;
+  if (error) {
+    console.error('[getOperationsComputedBalance] RPC Error:', error);
+    throw new Error(error.message);
+  }
+  
+  return Number(data || 0);
 }
 
 export async function getOperationsState() {

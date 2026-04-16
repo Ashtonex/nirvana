@@ -266,6 +266,67 @@ export async function getDashboardData(daysLimit = 60) {
     }
 }
 
+export async function getShopDashboardData(shopId: string, daysLimit = 60) {
+    const hasSupabase = Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY);
+    if (!hasSupabase) {
+        return { inventory: [], sales: [], shops: [], quotations: [], employees: [], shipments: [], ledger: [], auditLog: [], transfers: [], emails: [], settings: {} };
+    }
+
+    try {
+        const dateThreshold = new Date(Date.now() - daysLimit * 24 * 60 * 60 * 1000).toISOString();
+
+        // 1. Fetch only data scoped to this specific shop (Efficiency Upgrade)
+        const [invRes, allocRes, salesRes, shopRes, quotesRes, empRes, settingsRes, ledgerRes] = await Promise.all([
+            supabaseAdmin.from('inventory_items').select('*').limit(5000),
+            supabaseAdmin.from('inventory_allocations').select('*').eq('shop_id', shopId),
+            supabaseAdmin.from('sales').select('*').eq('shop_id', shopId).gte('date', dateThreshold).order('date', { ascending: false }).limit(5000),
+            supabaseAdmin.from('shops').select('*').eq('id', shopId).single(),
+            supabaseAdmin.from('quotations').select('*').eq('shop_id', shopId).limit(2000),
+            supabaseAdmin.from('employees').select('*').eq('shop_id', shopId),
+            supabaseAdmin.from('oracle_settings').select('*').single(),
+            supabaseAdmin.from('ledger_entries').select('*').eq('shop_id', shopId).gte('date', dateThreshold).order('date', { ascending: false }).limit(5000),
+        ]);
+
+        const inventory = invRes.data || [];
+        const allocations = allocRes.data || [];
+        const ledgerRows = ledgerRes.data || [];
+
+        return {
+            inventory: inventory.map((i: any) => ({
+                id: i.id,
+                name: i.name,
+                category: i.category,
+                quantity: Number(i.quantity || 0),
+                landedCost: Number(i.landed_cost || 0),
+                allocations: allocations.filter((a: any) => a.item_id === i.id).map((a: any) => ({
+                    shopId: a.shop_id,
+                    quantity: Number(a.quantity || 0)
+                }))
+            })),
+            sales: (salesRes.data || []).map((s: any) => ({
+                id: s.id, shopId: s.shop_id, itemId: s.item_id, itemName: s.item_name,
+                quantity: Number(s.quantity || 0), unitPrice: Number(s.unit_price || 0),
+                totalWithTax: Number(s.total_with_tax || 0), totalBeforeTax: Number(s.total_before_tax || 0),
+                tax: Number(s.tax || 0), date: s.date, employeeId: s.employee_id
+            })),
+            shops: shopRes.data ? [shopRes.data] : [],
+            quotations: (quotesRes.data || []).map((q: any) => ({
+                id: q.id, shopId: q.shop_id, clientName: q.client_name, status: q.status,
+                totalWithTax: Number(q.total_with_tax || 0), date: q.date,
+                paidAmount: q.paid_amount ?? getLaybyPaidAmountFromLedger(ledgerRows, q.id)
+            })),
+            employees: (empRes.data || []).map((e: any) => ({
+                id: e.id, name: `${e.name} ${e.surname}`, active: e.is_active || e.active
+            })),
+            ledger: ledgerRows,
+            settings: settingsRes.data || {}
+        };
+    } catch (error) {
+        console.error('[getShopDashboardData] Error:', error);
+        return { inventory: [], sales: [], shops: [], quotations: [], employees: [], shipments: [], ledger: [], auditLog: [], transfers: [], emails: [], settings: {} };
+    }
+}
+
 export async function updateGlobalExpenses(expenses: Database['globalExpenses']) {
     await supabase.from('oracle_settings').update({ global_expenses: expenses }).eq('id', 1);
     await supabase.from('audit_log').insert({
@@ -2472,21 +2533,21 @@ export async function getMonthlyReportData(
     // Fetch all relevant data for the month (+ previous month for comparison)
     const [salesRes, ledgerRes, shopRes, settingsRes, prevSalesRes, prevPeriodSalesRes, prevPeriodLedgerRes] = await Promise.all([
         shopIds.length
-            ? supabaseAdmin.from("sales").select("*").in("shop_id", shopIds).gte("date", startOfMonth).lte("date", endOfMonth)
+            ? supabaseAdmin.from("sales").select("*").in("shop_id", shopIds).gte("date", startOfMonth).lte("date", endOfMonth).order('date', { ascending: false }).limit(20000)
             : Promise.resolve({ data: [] } as any),
         shopIds.length
-            ? supabaseAdmin.from("ledger_entries").select("*").in("shop_id", shopIds).gte("date", startOfMonth).lte("date", endOfMonth)
+            ? supabaseAdmin.from("ledger_entries").select("*").in("shop_id", shopIds).gte("date", startOfMonth).lte("date", endOfMonth).order('date', { ascending: false }).limit(20000)
             : Promise.resolve({ data: [] } as any),
         isGlobal ? Promise.resolve({ data: null } as any) : supabaseAdmin.from("shops").select("*").eq("id", shopId).single(),
         supabaseAdmin.from("oracle_settings").select("*").single(),
         shopIds.length
-            ? supabaseAdmin.from("sales").select("client_name").in("shop_id", shopIds).lt("date", startOfMonth)
+            ? supabaseAdmin.from("sales").select("client_name").in("shop_id", shopIds).lt("date", startOfMonth).limit(10000)
             : Promise.resolve({ data: [] } as any),
         shopIds.length
-            ? supabaseAdmin.from("sales").select("*").in("shop_id", shopIds).gte("date", prevMonthStart).lte("date", prevMonthEnd)
+            ? supabaseAdmin.from("sales").select("*").in("shop_id", shopIds).gte("date", prevMonthStart).lte("date", prevMonthEnd).order('date', { ascending: false }).limit(20000)
             : Promise.resolve({ data: [] } as any),
         shopIds.length
-            ? supabaseAdmin.from("ledger_entries").select("*").in("shop_id", shopIds).gte("date", prevMonthStart).lte("date", prevMonthEnd)
+            ? supabaseAdmin.from("ledger_entries").select("*").in("shop_id", shopIds).gte("date", prevMonthStart).lte("date", prevMonthEnd).order('date', { ascending: false }).limit(20000)
             : Promise.resolve({ data: [] } as any)
     ]);
 
@@ -2942,15 +3003,15 @@ export async function getQuarterlyReportData(
     // Fetch all relevant data for the quarter
     const [salesRes, ledgerRes, shopRes, settingsRes, prevSalesRes] = await Promise.all([
         shopIds.length
-            ? supabaseAdmin.from("sales").select("*").in("shop_id", shopIds).gte("date", startOfQuarter).lte("date", endOfQuarter)
+            ? supabaseAdmin.from("sales").select("*").in("shop_id", shopIds).gte("date", startOfQuarter).lte("date", endOfQuarter).order('date', { ascending: false }).limit(20000)
             : Promise.resolve({ data: [] } as any),
         shopIds.length
-            ? supabaseAdmin.from("ledger_entries").select("*").in("shop_id", shopIds).gte("date", startOfQuarter).lte("date", endOfQuarter)
+            ? supabaseAdmin.from("ledger_entries").select("*").in("shop_id", shopIds).gte("date", startOfQuarter).lte("date", endOfQuarter).order('date', { ascending: false }).limit(20000)
             : Promise.resolve({ data: [] } as any),
         isGlobal ? Promise.resolve({ data: null } as any) : supabaseAdmin.from("shops").select("*").eq("id", shopId).single(),
         supabaseAdmin.from("oracle_settings").select("*").single(),
         shopIds.length
-            ? supabaseAdmin.from("sales").select("client_name").in("shop_id", shopIds).lt("date", startOfQuarter)
+            ? supabaseAdmin.from("sales").select("client_name").in("shop_id", shopIds).lt("date", startOfQuarter).limit(10000)
             : Promise.resolve({ data: [] } as any)
     ]);
 
