@@ -571,9 +571,11 @@ export interface StaffMetric {
 }
 
 export async function getStaffLeaderboard(): Promise<StaffMetric[]> {
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+    
     const { data: employees } = await supabaseAdmin.from('employees').select('*');
-    const { data: sales } = await supabaseAdmin.from('sales').select('employee_id, total_with_tax');
-    const { data: quotations } = await supabaseAdmin.from('quotations').select('employee_id, status');
+    const { data: sales } = await supabaseAdmin.from('sales').select('employee_id, total_with_tax, date').gte('date', thirtyDaysAgo);
+    const { data: quotations } = await supabaseAdmin.from('quotations').select('employee_id, status, date').gte('date', thirtyDaysAgo);
 
     const stats = (employees || []).map((emp: any) => {
         const empSales = (sales || []).filter((s: any) => s.employee_id === emp.id);
