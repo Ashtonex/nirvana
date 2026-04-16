@@ -1362,27 +1362,27 @@ export async function getOracleMasterPulse(daysLimit = 60) {
     };
 
     return {
-        totalUnits: metrics.totalUnits,
-        categoryBreakdown: metrics.categoryBreakdown,
+        totalUnits: Number(metrics.totalUnits || 0),
+        categoryBreakdown: metrics.categoryBreakdown || {},
         finances: { 
-            revenue: metrics.finances.revenue, 
-            tax: metrics.finances.tax, 
-            grossProfit: metrics.finances.grossProfit, 
-            netIncome: metrics.finances.grossProfit, 
+            revenue: Number(metrics.finances?.revenue || 0), 
+            tax: Number(metrics.finances?.tax || 0), 
+            grossProfit: Number(metrics.finances?.grossProfit || 0), 
+            netIncome: Number(metrics.finances?.grossProfit || 0), 
             monthlyBurn: 0 
         },
         shopPerformance: (shops || []).map((s: any) => {
             const perf = (metrics.shopPerformance || []).find((p: any) => p.id === s.id) || { revenue: 0, deposits: 0 };
             const overheadTarget = calculateShopOverheadTarget(s.id);
-            const coverageAmount = Number(perf.revenue) + Number(perf.deposits);
+            const coverageAmount = Number(perf.revenue || 0) + Number(perf.deposits || 0);
             const progress = overheadTarget > 0 ? (coverageAmount / overheadTarget) * 100 : 100;
             
             return {
                 id: s.id,
                 name: s.name,
-                revenue: Number(perf.revenue),
+                revenue: Number(perf.revenue || 0),
                 expenses: overheadTarget,
-                deposits: Number(perf.deposits),
+                deposits: Number(perf.deposits || 0),
                 progress
             };
         }),
