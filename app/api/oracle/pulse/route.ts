@@ -11,7 +11,7 @@ export async function GET() {
   } catch {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
-
+  try {
     const { data: metrics, error: rpcError } = await supabaseAdmin.rpc('get_oracle_pulse_metrics', { 
         days_limit_int: 60 
     });
