@@ -1,6 +1,6 @@
 export const dynamic = 'force-dynamic';
 
-import { getDashboardData, deleteQuotation, finalizeQuotation } from "../../actions";
+import { getShopDashboardData, deleteQuotation, finalizeQuotation } from "../../actions";
 import Link from "next/link";
 import POS from "./POS";
 import {
@@ -28,21 +28,22 @@ import {
 
 export default async function ShopPage({ params }: { params: { shopId: string } }) {
     const { shopId } = await params;
-    const db = await getDashboardData();
+    // Fetch only the data scoped to this specific shop to dramatically reduce payload
+    const db = await getShopDashboardData(shopId);
     const shop = db.shops.find((s: any) => s.id === shopId);
 
     if (!shop) return <div>Shop not found</div>;
 
-    const shopSales = db.sales.filter((s: any) => s.shopId === shopId);
-    const shopQuotes = (db.quotations || []).filter((q: any) => q.shopId === shopId && q.status === 'pending');
-    const shopLaybys = (db.quotations || []).filter((q: any) => q.shopId === shopId && q.status === 'layby');
+    const shopSales = db.sales; // Already scoped by shopId
+    const shopQuotes = (db.quotations || []).filter((q: any) => q.status === 'pending'); // Already scoped by shopId
+    const shopLaybys = (db.quotations || []).filter((q: any) => q.status === 'layby');
     const laybyOutstanding = shopLaybys.reduce((sum: number, q: any) => {
         const total = Number(q.totalWithTax || 0);
         const paid = Number(q.paidAmount || 0);
         return sum + Math.max(0, total - paid);
     }, 0);
     const laybyCollected = shopLaybys.reduce((sum: number, q: any) => sum + Number(q.paidAmount || 0), 0);
-    const shopEmployees = (db.employees || []).filter((e: any) => e.shopId === shopId && e.active);
+    const shopEmployees = (db.employees || []).filter((e: any) => e.active);
 
     const totalRev = shopSales.reduce((sum: number, s: any) => sum + s.totalWithTax, 0);
     const inventoryCount = db.inventory.reduce((sum: number, item: any) => {

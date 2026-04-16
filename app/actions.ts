@@ -1282,74 +1282,46 @@ export async function recordTitheWithdrawal(
 
 
 export async function getOracleMasterPulse(daysLimit = 60) {
-    const dateThreshold = new Date(Date.now() - daysLimit * 24 * 60 * 60 * 1000).toISOString();
-
-    const { data: settings } = await supabaseAdmin.from('oracle_settings').select('*').single();
-    const { data: inventory } = await supabaseAdmin.from('inventory_items').select('*, inventory_allocations(*)');
-    const { data: sales } = await supabaseAdmin.from('sales').select('*').gte('date', dateThreshold);
     const { data: shops } = await supabaseAdmin.from('shops').select('*');
-    const { data: ledger } = await supabaseAdmin.from('ledger_entries').select('*').gte('date', dateThreshold);
-    const { data: investDeposits } = await supabaseAdmin.from('invest_deposits').select('*').gte('created_at', dateThreshold);
-    if (!inventory || !sales || !shops || !settings) return null;
+    const { data: settings } = await supabaseAdmin.from('oracle_settings').select('*').single();
+    
+    // Call our new high-speed database function
+    const { data: metrics, error } = await supabaseAdmin.rpc('get_oracle_pulse_metrics', { 
+        days_limit_int: daysLimit 
+    });
 
-    const totalRevenue = sales.reduce((sum: number, s: any) => sum + Number(s.total_with_tax), 0);
-    const totalTax = sales.reduce((sum: number, s: any) => sum + Number(s.tax), 0);
-    const grossProfit =
-        sales.reduce((sum: number, s: any) => sum + Number(s.total_before_tax), 0) -
-        sales.reduce((sum: number, s: any) => {
-            const item = inventory.find((i: any) => i.id === s.item_id);
-            return sum + (item ? Number(item.landed_cost) * s.quantity : 0);
-        }, 0);
-
-    const categoryBreakdown = (inventory || []).reduce((acc: Record<string, number>, item: any) => {
-        const category = item.category || "Uncategorized";
-        acc[category] = (acc[category] || 0) + Number(item.quantity || 0);
-        return acc;
-    }, {});
+    if (error || !metrics || !shops || !settings) {
+        console.error('[getOracleMasterPulse] RPC Error or missing data:', error);
+        return null;
+    }
 
     const calculateShopOverheadTarget = (shopId: string) => {
         const shopExpenses = shops?.find((s: any) => s.id === shopId)?.expenses || {};
         return Object.values(shopExpenses).reduce((acc: number, val: any) => acc + Number(val || 0), 0);
     };
 
-    const calculateShopExpenses = (shopId: string) => {
-        const structuredExpenses = Object.values(
-            shops?.find((s: any) => s.id === shopId)?.expenses || {}
-        ).reduce((acc: number, val: any) => acc + Number(val || 0), 0);
-        
-        const ledgerExpenses = (ledger || [])
-            .filter((l: any) => l.shop_id === shopId && l.type === 'expense')
-            .reduce((acc: number, l: any) => acc + Number(l.amount || 0), 0);
-        
-        return structuredExpenses + ledgerExpenses;
-    };
-
-    const calculateShopInvestDeposits = (shopId: string) => {
-        return (investDeposits || [])
-            .filter((d: any) => d.shop_id === shopId)
-            .reduce((acc: number, d: any) => acc + Number(d.amount || 0), 0);
-    };
-
     return {
-        totalUnits: inventory.reduce((sum: number, i: any) => sum + i.quantity, 0),
-        categoryBreakdown,
-        finances: { revenue: totalRevenue, tax: totalTax, grossProfit, netIncome: grossProfit, monthlyBurn: 0 },
+        totalUnits: metrics.totalUnits,
+        categoryBreakdown: metrics.categoryBreakdown,
+        finances: { 
+            revenue: metrics.finances.revenue, 
+            tax: metrics.finances.tax, 
+            grossProfit: metrics.finances.grossProfit, 
+            netIncome: metrics.finances.grossProfit, 
+            monthlyBurn: 0 
+        },
         shopPerformance: (shops || []).map((s: any) => {
-            const shopRevenue = (sales || [])
-                .filter((sa: any) => sa.shop_id === s.id)
-                .reduce((acc: number, sa: any) => acc + Number(sa.total_with_tax), 0);
-            
+            const perf = (metrics.shopPerformance || []).find((p: any) => p.id === s.id) || { revenue: 0, deposits: 0 };
             const overheadTarget = calculateShopOverheadTarget(s.id);
-            const perfumeDeposits = calculateShopInvestDeposits(s.id);
-            const coverageAmount = shopRevenue + perfumeDeposits;
+            const coverageAmount = Number(perf.revenue) + Number(perf.deposits);
             const progress = overheadTarget > 0 ? (coverageAmount / overheadTarget) * 100 : 100;
             
             return {
                 id: s.id,
                 name: s.name,
-                revenue: shopRevenue,
+                revenue: Number(perf.revenue),
                 expenses: overheadTarget,
-                deposits: perfumeDeposits,
+                deposits: Number(perf.deposits),
                 progress
             };
         }),

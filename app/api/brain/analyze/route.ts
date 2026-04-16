@@ -57,18 +57,18 @@ export async function POST(request: Request) {
     const startDate = new Date(now);
     startDate.setDate(startDate.getDate() - daysBack);
 
-    const [rulesRes, expensesRes, oracleRes] = await Promise.all([
+    const [rulesRes, expensesRes, brainSummaryRes] = await Promise.all([
       supabaseAdmin
         .from("brain_learning_rules")
         .select("*")
         .eq("is_active", true)
         .order("priority", { ascending: false }),
       getExpenses(startDate, now),
-      supabaseAdmin.from("sales").select("*").gte("date", startDate.toISOString()).lte("date", now.toISOString()),
+      supabaseAdmin.rpc('get_brain_summary', { days_back_int: daysBack }),
     ]);
 
     const rules = rulesRes.data || [];
-    const oracleData = oracleRes.data || [];
+    const brainSummary = brainSummaryRes.data || { totalSales: 0 };
     const expenses = expensesRes;
 
     const classifiedExpenses = expenses.map((expense) =>
@@ -111,7 +111,7 @@ export async function POST(request: Request) {
       dailyPatterns: getDailyPatterns(realBusinessExpenses),
       anomalyAlerts: detectAnomalies(classifiedExpenses, realBusinessExpenses),
       learnedRulesCount: rules.length,
-      oracleInsights: generateOracleInsights(oracleData, classifiedExpenses, realBusinessExpenses),
+      oracleInsights: generateOracleInsights(brainSummary.totalSales, classifiedExpenses, realBusinessExpenses),
     };
 
     return NextResponse.json(analysis);
@@ -128,13 +128,17 @@ async function getExpenses(startDate: Date, endDate: Date) {
       .select("*")
       .eq("type", "expense")
       .gte("date", startDate.toISOString())
-      .lte("date", endDate.toISOString()),
+      .lte("date", endDate.toISOString())
+      .order("date", { ascending: false })
+      .limit(10000),
     supabaseAdmin
       .from("operations_ledger")
       .select("*")
       .lt("amount", 0)
       .gte("created_at", startDate.toISOString())
-      .lte("created_at", endDate.toISOString()),
+      .lte("created_at", endDate.toISOString())
+      .order("created_at", { ascending: false })
+      .limit(5000),
   ]);
 
   const posExpenses = (posRes.data || []).map((row: any) => ({
@@ -379,10 +383,10 @@ function detectAnomalies(allExpenses: any[], businessExpenses: any[]) {
   return alerts;
 }
 
-function generateOracleInsights(sales: any[], allExpenses: any[], businessExpenses: any[]) {
+function generateOracleInsights(totalSales: number, allExpenses: any[], businessExpenses: any[]) {
   const insights: string[] = [];
 
-  const totalSales = sales.reduce((sum: number, s: any) => sum + Number(s.total_with_tax || 0), 0);
+  // totalSales is now passed directly as a number from RPC
   const totalExpenses = businessExpenses.reduce((sum: number, e: any) => sum + e.amount, 0);
   const personalTotal = allExpenses.filter((e) => e.isPersonal).reduce((sum: number, e: any) => sum + e.amount, 0);
   const internalTotal = allExpenses.filter((e) => e.isInternalTransfer).reduce((sum: number, e: any) => sum + e.amount, 0);

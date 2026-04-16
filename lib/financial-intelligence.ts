@@ -186,8 +186,8 @@ export async function runEnhancedMoneyAudit(daysBack = 30): Promise<{
   const periodEnd = now.toISOString();
 
   const [salesData, ledgerData, opsLedgerData, opsStateData, inventoryData, shopsData, historicalData] = await Promise.all([
-    supabaseAdmin.from('sales').select('*').gte('date', periodStart).lte('date', periodEnd),
-    supabaseAdmin.from('ledger_entries').select('*').gte('date', periodStart).lte('date', periodEnd),
+    supabaseAdmin.from('sales').select('*').gte('date', periodStart).lte('date', periodEnd).order('date', { ascending: false }).limit(20000),
+    supabaseAdmin.from('ledger_entries').select('*').gte('date', periodStart).lte('date', periodEnd).order('date', { ascending: false }).limit(20000),
     supabaseAdmin.from('operations_ledger').select('*').gte('created_at', periodStart).lte('created_at', periodEnd),
     supabaseAdmin.from('operations_state').select('*').eq('id', 1).single(),
     supabaseAdmin.from('inventory_items').select('*'),
@@ -509,8 +509,8 @@ export async function analyzeRealExpenses(daysBack = 30): Promise<RealExpenseAna
   const periodEnd = now.toISOString();
 
   const [ledgerData, opsLedgerData] = await Promise.all([
-    supabaseAdmin.from('ledger_entries').select('*').eq('type', 'expense').gte('date', periodStart).lte('date', periodEnd),
-    supabaseAdmin.from('operations_ledger').select('*').lt('amount', 0).gte('created_at', periodStart).lte('created_at', periodEnd),
+    supabaseAdmin.from('ledger_entries').select('*').eq('type', 'expense').gte('date', periodStart).lte('date', periodEnd).order('date', { ascending: false }).limit(20000),
+    supabaseAdmin.from('operations_ledger').select('*').lt('amount', 0).gte('created_at', periodStart).lte('created_at', periodEnd).order('created_at', { ascending: false }).limit(20000),
   ]);
 
   const ledger = ledgerData.data || [];

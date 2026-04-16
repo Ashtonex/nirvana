@@ -139,14 +139,14 @@ export async function GET(req: Request) {
 
     // Parallel Fetching
     const [salesRes, ledgerRes, lowStockRes, allInventoryRes, thirtyDaySalesRes, sevenDaySalesRes, opsLedgerRes, investDepositsRes] = await Promise.all([
-      supabaseAdmin.from("sales").select("id, total_with_tax, total_before_tax, tax, discount_applied, payment_method, date, item_name, quantity").eq("shop_id", shopId).gte("date", since).lte("date", until).then((r: any) => r, (e: any) => ({ data: [] })),
-      supabaseAdmin.from("ledger_entries").select("id,category,amount,date,description,employee_id").eq("shop_id", shopId).gte("date", since).lte("date", until).then((r: any) => r, (e: any) => ({ data: [] })),
+      supabaseAdmin.from("sales").select("id, total_with_tax, total_before_tax, tax, discount_applied, payment_method, date, item_name, quantity").eq("shop_id", shopId).gte("date", since).lte("date", until).order('date', { ascending: false }).limit(5000).then((r: any) => r, (e: any) => ({ data: [] })),
+      supabaseAdmin.from("ledger_entries").select("id,category,amount,date,description,employee_id").eq("shop_id", shopId).gte("date", since).lte("date", until).order('date', { ascending: false }).limit(5000).then((r: any) => r, (e: any) => ({ data: [] })),
       supabaseAdmin.from("inventory_allocations").select("item_id, quantity").eq("shop_id", shopId).lte("quantity", 5).order("quantity", { ascending: true }).limit(15).then((r: any) => r, (e: any) => ({ data: [] })),
       supabaseAdmin.from("inventory_items").select("id, name, category, landed_cost, price").limit(1000).then((r: any) => r, (e: any) => ({ data: [] })),
       supabaseAdmin.from("sales").select("item_id, quantity").eq("shop_id", shopId).gte("date", new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()).limit(2000).then((r: any) => r, (e: any) => ({ data: [] })),
-      supabaseAdmin.from("sales").select("item_name, total_with_tax, date").eq("shop_id", shopId).gte("date", since7).lte("date", until).then((r: any) => r, (e: any) => ({ data: [] })),
+      supabaseAdmin.from("sales").select("item_name, total_with_tax, date").eq("shop_id", shopId).gte("date", since7).lte("date", until).order('date', { ascending: false }).limit(10000).then((r: any) => r, (e: any) => ({ data: [] })),
       supabaseAdmin.from("operations_ledger").select("amount, created_at, notes, shop_id, effective_date").eq("shop_id", shopId).gte("effective_date", date ? `${date}T00:00:00` : since).lte("effective_date", date ? `${date}T23:59:59` : until).then((r: any) => r, (e: any) => ({ data: [] })),
-      supabaseAdmin.from("invest_deposits").select("amount, created_at, shop_id, deposited_by").eq("shop_id", shopId).gte("created_at", since).lte("created_at", until).then((r: any) => r, (e: any) => ({ data: [] })),
+      supabaseAdmin.from("invest_deposits").select("amount, created_at, shop_id, deposited_by").eq("shop_id", shopId).gte("created_at", since).lte("created_at", until).order('created_at', { ascending: false }).limit(5000).then((r: any) => r, (e: any) => ({ data: [] })),
     ]);
 
     const sales = salesRes.data || [];
@@ -180,8 +180,8 @@ export async function GET(req: Request) {
 
       const monthStart = new Date(todayDate.getUTCFullYear(), todayDate.getUTCMonth(), 1).toISOString();
       const [wSalesRes, wLedgerRes, shopRes, settingsRes, mtdSalesRes, opsLedgerRes] = await Promise.all([
-        supabaseAdmin.from("sales").select("id, total_with_tax, total_before_tax, tax, discount_applied, quantity, item_id, item_name, date, payment_method, employee_id").eq("shop_id", shopId).gte("date", wWeekStart).lte("date", wUntil).then((r: any) => r, () => ({ data: [] as any[] })),
-        supabaseAdmin.from("ledger_entries").select("*").eq("shop_id", shopId).gte("date", wWeekStart).lte("date", wUntil).then((r: any) => r, () => ({ data: [] as any[] })),
+        supabaseAdmin.from("sales").select("id, total_with_tax, total_before_tax, tax, discount_applied, quantity, item_id, item_name, date, payment_method, employee_id").eq("shop_id", shopId).gte("date", wWeekStart).lte("date", wUntil).order('date', { ascending: false }).limit(5000).then((r: any) => r, () => ({ data: [] as any[] })),
+        supabaseAdmin.from("ledger_entries").select("*").eq("shop_id", shopId).gte("date", wWeekStart).lte("date", wUntil).order('date', { ascending: false }).limit(5000).then((r: any) => r, () => ({ data: [] as any[] })),
         supabaseAdmin.from("shops").select("*").eq("id", shopId).single().then((r: any) => r, () => ({ data: null })),
         supabaseAdmin.from("oracle_settings").select("*").single().then((r: any) => r, () => ({ data: null })),
         supabaseAdmin.from("sales").select("total_with_tax").eq("shop_id", shopId).gte("date", monthStart).lte("date", wUntil).limit(3000).then((r: any) => r, () => ({ data: [] as any[] })),

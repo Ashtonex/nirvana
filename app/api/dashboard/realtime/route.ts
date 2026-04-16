@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase";
 
 export const dynamic = "force-dynamic";
-export const revalidate = 0;
+export const revalidate = 5;
 
 export async function GET() {
   const last24h = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();

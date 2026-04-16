@@ -53,74 +53,40 @@ export interface ReorderSuggestion {
 
 // 1. BEST SELLERS Logic
 export async function getBestSellers(daysBack = 30): Promise<SalesMetric[]> {
-    const cutoffDate = new Date();
-    cutoffDate.setDate(cutoffDate.getDate() - daysBack);
-
-    const { data: sales } = await supabaseAdmin
-        .from('sales')
-        .select('*')
-        .gte('date', cutoffDate.toISOString());
-
-    const { data: inventory } = await supabaseAdmin.from('inventory_items').select('id, name, landed_cost');
-
-    const invMap = new Map((inventory || []).map((i: any) => [i.id, i]));
-    const salesMap = new Map<string, SalesMetric>();
-
-    (sales || []).forEach((sale: any) => {
-        const existing = salesMap.get(sale.item_id) || {
-            itemId: sale.item_id,
-            itemName: sale.item_name,
-            totalQuantity: 0,
-            totalRevenue: 0,
-            grossMargin: 0
-        };
-
-        existing.totalQuantity += sale.quantity;
-        existing.totalRevenue += sale.total_with_tax;
-
-        const item = invMap.get(sale.item_id) as any;
-        if (item) {
-            const cost = (item.landed_cost || 0) * sale.quantity;
-            existing.grossMargin += (sale.total_before_tax - cost);
-        }
-
-        salesMap.set(sale.item_id, existing);
+    const { data, error } = await supabaseAdmin.rpc('get_best_selling_items', { 
+        days_back_int: daysBack, 
+        top_n: 10 
     });
 
-    return Array.from(salesMap.values())
-        .sort((a, b) => b.totalRevenue - a.totalRevenue)
-        .slice(0, 10);
+    if (error || !data) {
+        console.error('[getBestSellers] RPC Error:', error);
+        return [];
+    }
+
+    return (data as any[]).map(item => ({
+        itemId: item.item_id,
+        itemName: item.item_name,
+        totalQuantity: Number(item.total_quantity),
+        totalRevenue: Number(item.total_revenue),
+        grossMargin: Number(item.gross_margin)
+    }));
 }
 
 // 2. PERFORMANCE TRENDS
 export async function getPerformanceTrends() {
-    const now = new Date();
-    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const thirtyDaysAgo = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000);
-    const sixtyDaysAgo = new Date(today.getTime() - 60 * 24 * 60 * 60 * 1000);
-
-    const { data: sales } = await supabaseAdmin.from('sales').select('total_with_tax, date');
-
-    let currentPeriodRevenue = 0;
-    let previousPeriodRevenue = 0;
-
-    (sales || []).forEach((sale: any) => {
-        const saleDate = new Date(sale.date);
-        if (saleDate >= thirtyDaysAgo && saleDate < today) {
-            currentPeriodRevenue += sale.total_with_tax;
-        } else if (saleDate >= sixtyDaysAgo && saleDate < thirtyDaysAgo) {
-            previousPeriodRevenue += sale.total_with_tax;
-        }
+    const { data, error } = await supabaseAdmin.rpc('get_financial_trends', { 
+        days_back_int: 30 
     });
 
-    const growth = previousPeriodRevenue > 0
-        ? ((currentPeriodRevenue - previousPeriodRevenue) / previousPeriodRevenue) * 100
-        : 100;
+    if (error || !data) {
+        console.error('[getPerformanceTrends] RPC Error:', error);
+        return { currentPeriodRevenue: 0, previousPeriodRevenue: 0, growth: 0 };
+    }
 
     return {
-        currentPeriodRevenue,
-        previousPeriodRevenue,
-        growth
+        currentPeriodRevenue: Number(data.currentPeriodRevenue),
+        previousPeriodRevenue: Number(data.previousPeriodRevenue),
+        growth: Number(data.growth)
     };
 }
 

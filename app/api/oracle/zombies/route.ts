@@ -13,7 +13,7 @@ export async function GET() {
 
   try {
     const { data: settings } = await supabaseAdmin.from('oracle_settings').select('zombie_days').single();
-    const { data: inventory } = await supabaseAdmin.from('inventory_items').select('*');
+    const { data: inventory } = await supabaseAdmin.from('inventory_items').select('*').limit(20000);
     
     if (!inventory) return NextResponse.json([]);
 

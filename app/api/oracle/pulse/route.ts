@@ -15,10 +15,11 @@ export async function GET() {
   try {
     const { data: settings } = await supabaseAdmin.from('oracle_settings').select('*').single();
     const { data: inventory } = await supabaseAdmin.from('inventory_items').select('*, inventory_allocations(*)');
-    const { data: sales } = await supabaseAdmin.from('sales').select('*');
+    // Using explicit 20000 limits to ensure we pick up fresh activity beyond the default 1000 row limits
+    const { data: sales } = await supabaseAdmin.from('sales').select('*').order('date', { ascending: false }).limit(20000);
     const { data: shops } = await supabaseAdmin.from('shops').select('*');
-    const { data: ledger } = await supabaseAdmin.from('ledger_entries').select('*');
-    const { data: investDeposits } = await supabaseAdmin.from('invest_deposits').select('*');
+    const { data: ledger } = await supabaseAdmin.from('ledger_entries').select('*').order('date', { ascending: false }).limit(20000);
+    const { data: investDeposits } = await supabaseAdmin.from('invest_deposits').select('*').order('created_at', { ascending: false }).limit(20000);
 
     if (!inventory || !sales || !shops || !settings) {
       return NextResponse.json({ error: "Missing data" }, { status: 500 });
