@@ -323,7 +323,11 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
     const CASH_OUT_CATEGORIES = new Set(["POS Expense", "Operations Transfer", "Perfume", "Overhead", "Tithe", "Groceries"]);
 
     // 1. Did we open today?
-    const todaysOpening = ledger.find((l: any) => l.category === 'Cash Drawer Opening' && l.shopId === shopId && String(l.date).startsWith(todayStr));
+    const todaysOpening = ledger.find((l: any) => 
+        l.category === 'Cash Drawer Opening' && 
+        l.shopId === shopId && 
+        String(l.date || "").includes(todayStr)
+    );
     const hasOpenedRegister = !!todaysOpening;
 
     // Helper functions for keyword matching (must be defined early for carry-over calc)
@@ -341,7 +345,7 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
 
     // Find the very last opening before today
     const pastOpenings = ledger.filter((l: any) => l.category === 'Cash Drawer Opening' && l.shopId === shopId && !String(l.date).startsWith(todayStr));
-    const lastOpening = pastOpenings.sort((a: any) => new Date(a.date).getTime() - new Date(todayStr).getTime())[0]; // Simplified sort to find recent
+    const lastOpening = pastOpenings.sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime())[0]; 
 
     if (lastOpening) {
         const lastOpenDate = new Date(lastOpening.date).getTime();

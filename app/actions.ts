@@ -294,8 +294,8 @@ export async function getShopDashboardData(shopId: string, daysLimit = 60) {
         return {
             inventory: inventory.map((i: any) => ({
                 id: i.id,
-                name: i.name,
-                category: i.category,
+                name: i.name || "Unknown Product",
+                category: i.category || "General",
                 quantity: Number(i.quantity || 0),
                 landedCost: Number(i.landed_cost || 0),
                 allocations: allocations.filter((a: any) => a.item_id === i.id).map((a: any) => ({
@@ -304,22 +304,50 @@ export async function getShopDashboardData(shopId: string, daysLimit = 60) {
                 }))
             })),
             sales: (salesRes.data || []).map((s: any) => ({
-                id: s.id, shopId: s.shop_id, itemId: s.item_id, itemName: s.item_name,
+                id: s.id, shopId: s.shop_id, itemId: s.item_id, itemName: s.item_name || "Unknown Item",
                 quantity: Number(s.quantity || 0), unitPrice: Number(s.unit_price || 0),
                 totalWithTax: Number(s.total_with_tax || 0), totalBeforeTax: Number(s.total_before_tax || 0),
-                tax: Number(s.tax || 0), date: s.date, employeeId: s.employee_id
+                tax: Number(s.tax || 0), date: s.date || new Date().toISOString(), employeeId: s.employee_id,
+                paymentMethod: s.payment_method || 'cash',
+                clientName: s.client_name || 'General Walk-in'
             })),
-            shops: shopRes.data ? [shopRes.data] : [],
+            shops: shopRes.data ? [{
+                id: shopRes.data.id, 
+                name: shopRes.data.name || "Unnamed Shop",
+                expenses: shopRes.data.expenses || { rent: 0, salaries: 0, utilities: 0, misc: 0 }
+            }] : [],
             quotations: (quotesRes.data || []).map((q: any) => ({
-                id: q.id, shopId: q.shop_id, clientName: q.client_name, status: q.status,
-                totalWithTax: Number(q.total_with_tax || 0), date: q.date,
-                paidAmount: q.paid_amount ?? getLaybyPaidAmountFromLedger(ledgerRows, q.id)
+                id: q.id, 
+                shopId: q.shop_id, 
+                clientName: q.client_name || "Guest", 
+                status: q.status || 'pending',
+                totalWithTax: Number(q.total_with_tax || 0), 
+                date: q.date || new Date().toISOString(),
+                paidAmount: Number(q.paid_amount ?? getLaybyPaidAmountFromLedger(ledgerRows, q.id) ?? 0)
             })),
             employees: (empRes.data || []).map((e: any) => ({
-                id: e.id, name: `${e.name} ${e.surname}`, active: e.is_active || e.active
+                id: e.id, 
+                name: `${e.name || ""} ${e.surname || ""}`.trim(), 
+                active: Boolean(e.is_active ?? e.active ?? true),
+                shopId: e.shop_id,
+                role: e.role || "sales"
             })),
-            ledger: ledgerRows,
-            settings: settingsRes.data || {}
+            ledger: (ledgerRows || []).map((l: any) => ({
+                id: l.id, 
+                type: l.type || 'expense', 
+                category: l.category || 'General', 
+                amount: Number(l.amount || 0),
+                date: l.date || new Date().toISOString(), 
+                description: l.description || "", 
+                shopId: l.shop_id
+            })),
+            settings: {
+                taxRate: Number(settingsRes.data?.tax_rate || 0.155),
+                taxThreshold: Number(settingsRes.data?.tax_threshold || 100),
+                taxMode: settingsRes.data?.tax_mode || 'all',
+                zombieDays: Number(settingsRes.data?.zombie_days || 60),
+                currencySymbol: settingsRes.data?.currency_symbol || "$"
+            }
         };
     } catch (error) {
         console.error('[getShopDashboardData] Error:', error);
