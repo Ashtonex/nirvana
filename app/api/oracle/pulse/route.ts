@@ -13,7 +13,8 @@ export async function GET() {
   }
   try {
     const { data: metrics, error: rpcError } = await supabaseAdmin.rpc('get_oracle_pulse_metrics', { 
-        days_limit_int: 60 
+        p_days: 60,
+        p_shop_id: "" 
     });
 
     const { data: shops } = await supabaseAdmin.from('shops').select('*');

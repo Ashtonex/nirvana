@@ -1376,7 +1376,8 @@ export async function getOracleMasterPulse(daysLimit = 60) {
     
     // Call our new high-speed database function
     const { data: metrics, error } = await supabaseAdmin.rpc('get_oracle_pulse_metrics', { 
-        days_limit_int: daysLimit 
+        p_days: daysLimit,
+        p_shop_id: ""
     });
 
     if (error || !metrics || !shops || !settings) {
