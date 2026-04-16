@@ -10,20 +10,21 @@ export async function GET() {
     // Test basic connection
     const { data: shops, error: shopsError } = await supabaseAdmin.from('shops').select('id, name').limit(1);
     
-    // Call the RPC with raw output
-    const { data: metrics, error: rpcError } = await supabaseAdmin.rpc('get_oracle_pulse_metrics', { 
-        days_limit_int: 60 
-    });
+    // Probe column names
+    const { data: saleRow } = await supabaseAdmin.from('sales').select('*').limit(1);
+    const { data: invRow } = await supabaseAdmin.from('inventory_items').select('*').limit(1);
+    const { data: depRow } = await supabaseAdmin.from('invest_deposits').select('*').limit(1);
 
     return NextResponse.json({
       timestamp: new Date().toISOString(),
-      connectionTest: shopsError ? "FAILED" : "OK",
-      shopsError: shopsError || null,
+      schemaProbe: {
+        salesColumns: saleRow && saleRow[0] ? Object.keys(saleRow[0]) : "EMPTY",
+        inventoryColumns: invRow && invRow[0] ? Object.keys(invRow[0]) : "EMPTY",
+        depositColumns: depRow && depRow[0] ? Object.keys(depRow[0]) : "EMPTY"
+      },
       rpcStatus: rpcError ? "ERROR" : "SUCCESS",
       rpcError: rpcError || null,
-      rawMetrics: metrics || null,
       environment: {
-        nodeVersion: process.version,
         hasSupabaseUrl: !!process.env.NEXT_PUBLIC_SUPABASE_URL,
         hasServiceRole: !!process.env.SUPABASE_SERVICE_ROLE_KEY
       }
