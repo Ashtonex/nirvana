@@ -319,7 +319,7 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
 
     // Calculate Cash Drawer Math
     const ledger = db.ledger || [];
-    const todayStr = new Date().toISOString().split('T')[0];
+    const todayStr = new Date().toLocaleDateString('en-CA'); // Local Date (YYYY-MM-DD)
     const CASH_OUT_CATEGORIES = new Set(["POS Expense", "Operations Transfer", "Perfume", "Overhead", "Tithe", "Groceries"]);
 
     // 1. Did we open today?

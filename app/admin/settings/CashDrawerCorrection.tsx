@@ -1,13 +1,15 @@
 "use client";
 
 import { useEffect, useMemo, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { Button, Card, CardContent, CardDescription, CardHeader, CardTitle, Input, Badge } from "@/components/ui";
 import { getCashDrawerOpening, updateCashDrawerOpening } from "../../actions";
 import { Coins, ShieldCheck, Save } from "lucide-react";
 
 export function CashDrawerCorrection({ shops }: { shops: { id: string; name: string }[] }) {
+  const router = useRouter();
   const [shopId, setShopId] = useState<string>(shops?.[0]?.id || "");
-  const [date, setDate] = useState<string>(() => new Date().toISOString().split("T")[0]);
+  const [date, setDate] = useState<string>(() => new Date().toLocaleDateString('en-CA'));
   const [newAmount, setNewAmount] = useState<string>("");
   const [reason, setReason] = useState<string>("");
   const [current, setCurrent] = useState<any | null>(null);
@@ -75,7 +77,7 @@ export function CashDrawerCorrection({ shops }: { shops: { id: string; name: str
               value={date}
               onChange={(e) => setDate(e.target.value)}
               className="bg-slate-900 border-slate-800 font-bold"
-              max={new Date().toISOString().split("T")[0]}
+              max={new Date().toLocaleDateString('en-CA')}
             />
           </div>
         </div>
@@ -128,6 +130,7 @@ export function CashDrawerCorrection({ shops }: { shops: { id: string; name: str
                 });
                 const res = await getCashDrawerOpening(shopId, date);
                 setCurrent(res?.entry || null);
+                router.refresh();
                 alert("Opening balance updated and logged.");
               } catch (e: any) {
                 setError(e?.message || "Failed to update opening");
