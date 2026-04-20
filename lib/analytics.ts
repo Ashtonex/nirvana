@@ -53,40 +53,120 @@ export interface ReorderSuggestion {
 
 // 1. BEST SELLERS Logic
 export async function getBestSellers(daysBack = 30): Promise<SalesMetric[]> {
-    const { data, error } = await supabaseAdmin.rpc('get_best_selling_items', { 
-        days_back_int: daysBack, 
-        top_n: 10 
-    });
+    const cutoff = new Date(Date.now() - daysBack * 24 * 60 * 60 * 1000).toISOString();
 
-    if (error || !data) {
-        console.error('[getBestSellers] RPC Error:', error);
+    // Get sales data with inventory info
+    const { data: salesData, error: salesError } = await supabaseAdmin
+        .from('sales')
+        .select('item_id, quantity, total_with_tax, total_before_tax')
+        .gte('date', cutoff);
+
+    if (salesError) {
+        console.error('[getBestSellers] Sales query error:', salesError);
         return [];
     }
 
-    return (data as any[]).map(item => ({
-        itemId: item.item_id,
-        itemName: item.item_name,
-        totalQuantity: Number(item.total_quantity),
-        totalRevenue: Number(item.total_revenue),
-        grossMargin: Number(item.gross_margin)
-    }));
+    // Get inventory data for costs
+    const { data: inventoryData, error: invError } = await supabaseAdmin
+        .from('inventory_items')
+        .select('id, name, landed_cost');
+
+    if (invError) {
+        console.error('[getBestSellers] Inventory query error:', invError);
+        return [];
+    }
+
+    // Create maps for quick lookup
+    const invMap = new Map((inventoryData || []).map(item => [item.id, {
+        name: item.name || 'Unknown Item',
+        cost: Number(item.landed_cost || 0)
+    }]));
+
+    // Aggregate sales by item
+    const itemSales = new Map<string, {
+        quantity: number;
+        revenue: number;
+        cost: number;
+    }>();
+
+    (salesData || []).forEach(sale => {
+        const itemId = sale.item_id;
+        const quantity = Number(sale.quantity || 0);
+        const revenue = Number(sale.total_with_tax || 0);
+        const itemInfo = invMap.get(itemId);
+
+        if (!itemInfo) return; // Skip items not in inventory
+
+        const existing = itemSales.get(itemId) || { quantity: 0, revenue: 0, cost: 0 };
+        existing.quantity += quantity;
+        existing.revenue += revenue;
+        existing.cost += itemInfo.cost * quantity;
+
+        itemSales.set(itemId, existing);
+    });
+
+    // Convert to array and calculate margins
+    const bestSellers = Array.from(itemSales.entries())
+        .map(([itemId, sales]) => {
+            const itemInfo = invMap.get(itemId)!;
+            const grossMargin = sales.revenue - sales.cost;
+            const marginPercent = sales.revenue > 0 ? (grossMargin / sales.revenue) * 100 : 0;
+
+            return {
+                itemId,
+                itemName: itemInfo.name,
+                totalQuantity: sales.quantity,
+                totalRevenue: sales.revenue,
+                grossMargin: marginPercent
+            };
+        })
+        .sort((a, b) => b.totalQuantity - a.totalQuantity)
+        .slice(0, 10);
+
+    return bestSellers;
 }
 
 // 2. PERFORMANCE TRENDS
 export async function getPerformanceTrends() {
-    const { data, error } = await supabaseAdmin.rpc('get_financial_trends', { 
-        days_back_int: 30 
-    });
+    const now = new Date();
+    const currentPeriodStart = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString();
+    const previousPeriodStart = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000).toISOString();
+    const previousPeriodEnd = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString();
 
-    if (error || !data) {
-        console.error('[getPerformanceTrends] RPC Error:', error);
+    // Get current period sales
+    const { data: currentSales, error: currentError } = await supabaseAdmin
+        .from('sales')
+        .select('total_with_tax')
+        .gte('date', currentPeriodStart);
+
+    if (currentError) {
+        console.error('[getPerformanceTrends] Current period query error:', currentError);
         return { currentPeriodRevenue: 0, previousPeriodRevenue: 0, growth: 0 };
     }
 
+    // Get previous period sales
+    const { data: previousSales, error: previousError } = await supabaseAdmin
+        .from('sales')
+        .select('total_with_tax')
+        .gte('date', previousPeriodStart)
+        .lt('date', previousPeriodEnd);
+
+    if (previousError) {
+        console.error('[getPerformanceTrends] Previous period query error:', previousError);
+        return { currentPeriodRevenue: 0, previousPeriodRevenue: 0, growth: 0 };
+    }
+
+    const currentPeriodRevenue = (currentSales || []).reduce((sum, sale) => sum + Number(sale.total_with_tax || 0), 0);
+    const previousPeriodRevenue = (previousSales || []).reduce((sum, sale) => sum + Number(sale.total_with_tax || 0), 0);
+
+    const growth = previousPeriodRevenue > 0
+        ? ((currentPeriodRevenue - previousPeriodRevenue) / previousPeriodRevenue) * 100
+        : (currentPeriodRevenue > 0 ? 100 : 0);
+
     return {
-        currentPeriodRevenue: Number(data.currentPeriodRevenue),
-        previousPeriodRevenue: Number(data.previousPeriodRevenue),
-        growth: Number(data.growth)
+        currentPeriodRevenue,
+        previousPeriodRevenue,
+        growth
     };
 }
 

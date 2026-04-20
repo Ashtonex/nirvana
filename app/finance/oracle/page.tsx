@@ -35,18 +35,33 @@ export default function OraclePage() {
     const [pulse, setPulse] = useState<any>(null);
     const [zombies, setZombies] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
+        async function fetchJson(url: string) {
+            const res = await fetch(url, { cache: "no-store", credentials: "include" });
+            const data = await res.json().catch(() => null);
+            if (!res.ok) {
+                const message = data?.error ? `${res.status} ${res.statusText}: ${data.error}` : `${res.status} ${res.statusText}`;
+                throw new Error(message);
+            }
+            if (data?.error) {
+                throw new Error(data.error);
+            }
+            return data;
+        }
+
         async function load() {
             try {
                 const [p, z] = await Promise.all([
-                    fetch("/api/oracle/pulse", { cache: "no-store", credentials: "include" }).then(r => r.json()),
-                    fetch("/api/oracle/zombies", { cache: "no-store", credentials: "include" }).then(r => r.json())
+                    fetchJson("/api/oracle/pulse"),
+                    fetchJson("/api/oracle/zombies")
                 ]);
                 setPulse(p);
-                setZombies(z || []);
-            } catch (e) {
+                setZombies(Array.isArray(z) ? z : []);
+            } catch (e: any) {
                 console.error("Oracle load failed:", e);
+                setError(e?.message ?? String(e));
             } finally {
                 setLoading(false);
             }
@@ -61,8 +76,18 @@ export default function OraclePage() {
     );
 
     if (!pulse || pulse.error) return (
-        <div className="min-h-screen flex items-center justify-center text-slate-500">
-            Oracle is consulting the void...
+        <div className="min-h-screen flex flex-col items-center justify-center text-slate-500 px-6 text-center gap-4">
+            <div className="text-xl font-black uppercase">Oracle is consulting the void...</div>
+            <div className="max-w-2xl text-sm text-slate-400">
+                The Oracle API returned an error or invalid response.
+                Please check the returned status and payload below.
+            </div>
+            {(error || pulse?.error) && (
+                <div className="w-full max-w-2xl rounded-2xl border border-rose-500/30 bg-rose-950/70 p-4 text-left text-[12px] font-mono text-rose-200">
+                    <div className="font-black uppercase text-rose-300 mb-2">Error Details</div>
+                    <pre className="whitespace-pre-wrap break-words">{error || pulse?.error}</pre>
+                </div>
+            )}
         </div>
     );
 

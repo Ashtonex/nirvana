@@ -110,3 +110,20 @@ CREATE POLICY "Allow all operations on invest_deposits" ON invest_deposits FOR A
 
 -- Initialize operations_state if not exists
 INSERT INTO operations_state (id, actual_balance) VALUES (1, 0) ON CONFLICT (id) DO NOTHING;
+
+-- Brain Learning Rules Table (for AI expense classification)
+CREATE TABLE IF NOT EXISTS brain_learning_rules (
+  id TEXT PRIMARY KEY,
+  rule_type TEXT NOT NULL DEFAULT 'expense_classification',
+  match_pattern TEXT NOT NULL,
+  match_field TEXT NOT NULL DEFAULT 'title' CHECK (match_field IN ('title', 'category')),
+  action TEXT NOT NULL DEFAULT 'overhead' CHECK (action IN ('overhead', 'personal', 'stock', 'operational', 'filter', 'classify')),
+  category TEXT,
+  priority INTEGER DEFAULT 10,
+  is_active BOOLEAN DEFAULT true,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+ALTER TABLE brain_learning_rules ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow all operations on brain_learning_rules" ON brain_learning_rules FOR ALL USING (true) WITH CHECK (true);

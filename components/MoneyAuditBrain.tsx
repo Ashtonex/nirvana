@@ -230,13 +230,18 @@ export function MoneyAuditBrain({ shops }: Props) {
           priority: 50
         })
       });
-      if (res.ok) {
-        setShowAddRule(false);
-        setNewRule({ pattern: "", action: "classify", category: "", type: "expense_filter" });
-        loadBrainData();
+      const result = await res.json();
+      if (!res.ok) {
+        console.error('Failed to save rule:', result);
+        alert(`Unable to save rule: ${result.error || 'unknown error'}`);
+        return;
       }
+      setShowAddRule(false);
+      setNewRule({ pattern: "", action: "classify", category: "", type: "expense_filter" });
+      loadBrainData();
     } catch (e) {
       console.error('Failed to save rule:', e);
+      alert('Unable to save rule: network or server error. Check console for details.');
     }
   };
 

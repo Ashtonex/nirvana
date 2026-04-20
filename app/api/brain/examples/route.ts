@@ -72,8 +72,16 @@ export async function GET() {
     ]);
 
     const existingPatterns = new Set(
-      (rulesRes.data || []).map((r: any) => r.match_pattern.toLowerCase())
+      ((rulesRes?.data && !rulesRes.error) ? rulesRes.data : []).map((r: any) => r.match_pattern.toLowerCase())
     );
+
+    const migrationWarning = rulesRes?.error && /does not exist/i.test(rulesRes.error.message)
+      ? "Brain learning table is not initialized. Run the migration SQL in your Supabase dashboard."
+      : undefined;
+
+    if (migrationWarning) {
+      console.warn(migrationWarning);
+    }
 
     const posExamples = (posRes.data || []).map((row: any) => {
       const title = String(row.description || row.category || "POS Expense");

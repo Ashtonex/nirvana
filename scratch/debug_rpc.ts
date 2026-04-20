@@ -3,7 +3,8 @@ import { supabaseAdmin } from '../lib/supabase';
 async function testRpc() {
     console.log("Testing get_oracle_pulse_metrics RPC...");
     const { data, error } = await supabaseAdmin.rpc('get_oracle_pulse_metrics', { 
-        days_limit_int: 60 
+        p_days: 7,
+        p_shop_id: ""
     });
 
     if (error) {

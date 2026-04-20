@@ -67,8 +67,12 @@ export async function POST(request: Request) {
       supabaseAdmin.rpc('get_brain_summary', { days_back_int: daysBack }),
     ]);
 
-    const rules = rulesRes.data || [];
+    const rules = (rulesRes?.data && !rulesRes.error) ? rulesRes.data : [];
     const brainSummary = brainSummaryRes.data || { totalSales: 0 };
+
+    if (rulesRes?.error && /does not exist/i.test(rulesRes.error.message)) {
+      console.warn('Brain learning table is not initialized. Please run the migration SQL in Supabase.');
+    }
     const expenses = expensesRes;
 
     const classifiedExpenses = expenses.map((expense) =>

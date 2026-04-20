@@ -298,3 +298,99 @@ export const TabsTrigger = ({ value, children, className, _active, _onClick }: a
         </button>
     );
 };
+
+// --- SELECT COMPONENTS ---
+
+interface SelectProps {
+    value?: string;
+    onValueChange?: (value: string) => void;
+    children: React.ReactNode;
+}
+
+export const Select = ({ value, onValueChange, children }: SelectProps) => {
+    const [isOpen, setIsOpen] = React.useState(false);
+    const [selectedValue, setSelectedValue] = React.useState(value || "");
+
+    React.useEffect(() => {
+        setSelectedValue(value || "");
+    }, [value]);
+
+    const handleSelect = (newValue: string) => {
+        setSelectedValue(newValue);
+        onValueChange?.(newValue);
+        setIsOpen(false);
+    };
+
+    return (
+        <div className="relative">
+            {React.Children.map(children, (child) => {
+                if (React.isValidElement(child) && child.type === SelectTrigger) {
+                    return React.cloneElement(child, {
+                        onClick: () => setIsOpen(!isOpen),
+                        children: React.Children.map(child.props.children, (grandChild) => {
+                            if (React.isValidElement(grandChild) && grandChild.type === SelectValue) {
+                                return React.cloneElement(grandChild, {
+                                    children: selectedValue || grandChild.props.placeholder
+                                });
+                            }
+                            return grandChild;
+                        })
+                    });
+                }
+                if (React.isValidElement(child) && child.type === SelectContent) {
+                    return isOpen ? React.cloneElement(child, {
+                        onSelect: handleSelect
+                    }) : null;
+                }
+                return child;
+            })}
+        </div>
+    );
+};
+
+export const SelectTrigger = React.forwardRef<
+    HTMLButtonElement,
+    React.ButtonHTMLAttributes<HTMLButtonElement>
+>(({ className, children, ...props }, ref) => (
+    <button
+        ref={ref}
+        className={cn(
+            "flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50",
+            className
+        )}
+        {...props}
+    />
+));
+
+export const SelectValue = ({ placeholder, children }: { placeholder?: string; children?: React.ReactNode }) => (
+    <span className="truncate">{children || placeholder}</span>
+);
+
+export const SelectContent = ({ children, onSelect }: { children: React.ReactNode; onSelect?: (value: string) => void }) => (
+    <div className="absolute top-full z-50 min-w-[8rem] overflow-hidden rounded-md border bg-popover p-1 text-popover-foreground shadow-md">
+        {React.Children.map(children, (child) => {
+            if (React.isValidElement(child) && child.type === SelectItem) {
+                return React.cloneElement(child, {
+                    onClick: () => onSelect?.(child.props.value)
+                });
+            }
+            return child;
+        })}
+    </div>
+);
+
+export const SelectItem = React.forwardRef<
+    HTMLDivElement,
+    React.HTMLAttributes<HTMLDivElement> & { value: string }
+>(({ className, children, ...props }, ref) => (
+    <div
+        ref={ref}
+        className={cn(
+            "relative flex w-full cursor-default select-none items-center rounded-sm py-1.5 pl-8 pr-2 text-sm outline-none focus:bg-accent focus:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
+            className
+        )}
+        {...props}
+    >
+        {children}
+    </div>
+));

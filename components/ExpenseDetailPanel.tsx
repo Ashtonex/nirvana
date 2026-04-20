@@ -1,9 +1,9 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { Badge, Card, CardContent, CardHeader, CardTitle } from "@/components/ui";
+import { Badge, Card, CardContent, CardHeader, CardTitle } from "@/components/ui/index";
 import { DollarSign, Filter, X, ChevronDown, ChevronUp, Search } from "lucide-react";
-import { cn } from "@/components/ui";
+import { cn } from "@/components/ui/index";
 
 type ExpenseRow = {
   id: string;

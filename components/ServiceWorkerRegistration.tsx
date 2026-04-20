@@ -7,35 +7,49 @@ export function ServiceWorkerRegistration() {
     const [isInstalled, setIsInstalled] = useState(false);
 
     useEffect(() => {
-        // Check if already installed
-        if (window.matchMedia('(display-mode: standalone)').matches) {
-            setIsInstalled(true);
-        }
+        // Only register service worker in production
+        if (process.env.NODE_ENV === 'production') {
+            // Check if already installed
+            if (window.matchMedia('(display-mode: standalone)').matches) {
+                setIsInstalled(true);
+            }
 
-        if ('serviceWorker' in navigator) {
-            // Register immediately
-            navigator.serviceWorker
-                .register('/sw.js')
-                .then((registration) => {
-                    console.log('SW registered: ', registration);
-                    // Force update if a new worker is found
-                    registration.onupdatefound = () => {
-                        const installingWorker = registration.installing;
-                        if (installingWorker) {
-                            installingWorker.onstatechange = () => {
-                                if (installingWorker.state === 'installed') {
-                                    if (navigator.serviceWorker.controller) {
-                                        console.log('New content available; auto-refreshing...');
-                                        window.location.reload();
+            if ('serviceWorker' in navigator) {
+                // Register immediately
+                navigator.serviceWorker
+                    .register('/sw.js')
+                    .then((registration) => {
+                        console.log('SW registered: ', registration);
+                        // Force update if a new worker is found
+                        registration.onupdatefound = () => {
+                            const installingWorker = registration.installing;
+                            if (installingWorker) {
+                                installingWorker.onstatechange = () => {
+                                    if (installingWorker.state === 'installed') {
+                                        if (navigator.serviceWorker.controller) {
+                                            console.log('New content available; auto-refreshing...');
+                                            window.location.reload();
+                                        }
                                     }
-                                }
-                            };
-                        }
-                    };
-                })
-                .catch((registrationError) => {
-                    console.error('SW registration failed: ', registrationError);
+                                };
+                            }
+                        };
+                    })
+                    .catch((registrationError) => {
+                        console.error('SW registration failed: ', registrationError);
+                    });
+            }
+        } else {
+            // Unregister service worker in development
+            if ('serviceWorker' in navigator) {
+                navigator.serviceWorker.getRegistrations().then((registrations) => {
+                    for (const registration of registrations) {
+                        registration.unregister().then(() => {
+                            console.log('SW unregistered in development mode');
+                        });
+                    }
                 });
+            }
         }
 
         // Listen for install prompt

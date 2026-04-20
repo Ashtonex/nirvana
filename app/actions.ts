@@ -462,6 +462,27 @@ export async function recordSale(sale: any) {
     // Support backlog sales with custom date
     const timestamp = sale.date ? new Date(sale.date).toISOString() : new Date().toISOString();
 
+    // PREVENTION: Check for duplicate sale (same client, same total, same day)
+    const today = new Date(timestamp).toISOString().split('T')[0];
+    const { data: existingSale } = await supabaseAdmin
+        .from("sales")
+        .select("*")
+        .eq("shop_id", sale.shopId)
+        .eq("client_name", sale.clientName)
+        .eq("total_with_tax", totalWithTax)
+        .gte("date", `${today}T00:00:00.000Z`)
+        .lt("date", `${today}T23:59:59.999Z`)
+        .order("date", { ascending: false })
+        .limit(1);
+
+    if (existingSale && existingSale.length > 0) {
+        const timeDiff = new Date(timestamp).getTime() - new Date(existingSale[0].date).getTime();
+        // If same sale recorded within 5 minutes, it's likely a duplicate
+        if (timeDiff < 5 * 60 * 1000) {
+            throw new Error(`Duplicate sale detected: Same client ${sale.clientName} with total $${totalWithTax.toFixed(2)} was recorded ${Math.floor(timeDiff / 1000)} seconds ago`);
+        }
+    }
+
     const { error: saleError } = await supabaseAdmin.from('sales').insert({
         id: saleId, shop_id: sale.shopId, item_id: sale.itemId, item_name: sale.itemName,
         quantity: sale.quantity, unit_price: sale.unitPrice, total_before_tax: subtotalAfterDiscount,
@@ -1050,6 +1071,21 @@ export async function openCashRegister(shopId: string, expectedAmount: number, a
     const id = Math.random().toString(36).substring(2, 9);
     const actor = await getActorFromCookies().catch(() => null);
 
+    // PREVENTION: Check if register already opened today
+    const today = new Date().toISOString().split('T')[0];
+    const { data: existingOpening } = await supabaseAdmin
+        .from("ledger_entries")
+        .select("*")
+        .eq("shop_id", shopId)
+        .eq("category", "Cash Drawer Opening")
+        .gte("date", `${today}T00:00:00.000Z`)
+        .lt("date", `${today}T23:59:59.999Z`)
+        .maybeSingle();
+
+    if (existingOpening) {
+        throw new Error(`Register already opened today at ${new Date(existingOpening.date).toLocaleTimeString()} by ${existingOpening.description?.split('by')?.[1]?.trim() || 'unknown'}`);
+    }
+
     // Log the actual opening amount as an asset
     await supabaseAdmin.from('ledger_entries').insert([{
         id,
@@ -1371,54 +1407,111 @@ export async function recordTitheWithdrawal(
 
 
 export async function getOracleMasterPulse(daysLimit = 60) {
-    const { data: shops } = await supabaseAdmin.from('shops').select('*');
-    const { data: settings } = await supabaseAdmin.from('oracle_settings').select('*').single();
-    
-    // Call our new high-speed database function
-    const { data: metrics, error } = await supabaseAdmin.rpc('get_oracle_pulse_metrics', { 
-        p_days: daysLimit,
-        p_shop_id: ""
-    });
+    try {
+        const sixtyDaysAgo = new Date();
+        sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - daysLimit);
+        const dateStr = sixtyDaysAgo.toISOString();
 
-    if (error || !metrics || !shops || !settings) {
-        console.error('[getOracleMasterPulse] RPC Error or missing data:', error);
+        // Oracle ONLY calculates from POS ledger (ledger_entries), not operations_ledger
+        // Operations page can talk to Oracle but Oracle doesn't count ops expenses
+        const [salesRes, ledgerRes, opsRes, shopsRes, settingsRes] = await Promise.all([
+            supabaseAdmin.from('sales').select('total_with_tax, quantity, item_name, shop_id, date').gte('date', dateStr),
+            supabaseAdmin.from('ledger_entries').select('amount, type, category, shop_id, date').gte('date', dateStr),
+            supabaseAdmin.from('operations_ledger').select('amount, kind, shop_id, effective_date').gte('created_at', dateStr),
+            supabaseAdmin.from('shops').select('*'),
+            supabaseAdmin.from('oracle_settings').select('*').single()
+        ]);
+
+        if (salesRes.error) {
+            console.error('[getOracleMasterPulse] Sales fetch error:', salesRes.error);
+            return null;
+        }
+        if (ledgerRes.error) {
+            console.error('[getOracleMasterPulse] Ledger fetch error:', ledgerRes.error);
+            return null;
+        }
+        if (opsRes.error) {
+            console.error('[getOracleMasterPulse] Operations fetch error:', opsRes.error);
+            // Non-fatal; ops is for visibility only
+        }
+        if (!shopsRes.data) {
+            console.error('[getOracleMasterPulse] Shops not found');
+            return null;
+        }
+        if (!settingsRes.data) {
+            console.error('[getOracleMasterPulse] Oracle settings not found');
+            return null;
+        }
+
+        const sales = salesRes.data || [];
+        const ledger = ledgerRes.data || [];
+        const operations = opsRes.data || [];
+        const shops = shopsRes.data || [];
+
+        // Aggregations
+        let totalRevenue = 0;
+        let totalUnits = 0;
+        const categoryBreakdown: Record<string, number> = {};
+        const shopPerformance: any[] = [];
+
+        // Calculate Global Stats from Sales
+        sales.forEach(s => {
+            totalRevenue += Number(s.total_with_tax || 0);
+            totalUnits += Number(s.quantity || 1);
+            const cat = s.item_name?.split(' ')?.[0] || "General";
+            categoryBreakdown[cat] = (categoryBreakdown[cat] || 0) + Number(s.total_with_tax || 0);
+        });
+
+        // ORACLE BURN RATE: POS expenses ONLY (ledger_entries, not operations_ledger)
+        const totalExpenses = ledger
+            .filter(l => l.type === 'expense')
+            .reduce((sum, l) => sum + Number(l.amount || 0), 0);
+
+        // Process Shop Performance: deposits come from operations (for visibility)
+        shops.forEach(shop => {
+            const shopSales = sales.filter(s => s.shop_id === shop.id);
+            const shopRevenue = shopSales.reduce((sum, s) => sum + Number(s.total_with_tax || 0), 0);
+            
+            // Deposits from operations (for display) but not counted in burn rate
+            const shopDeposits = operations
+                .filter(o => o.shop_id === shop.id && (o.kind === 'eod_deposit' || o.kind === 'overhead_contribution'))
+                .reduce((sum, o) => sum + Number(o.amount || 0), 0);
+
+            const shopExpenses = shop.expenses || {};
+            const overheadTarget = Object.values(shopExpenses).reduce((acc: number, val: any) => acc + Number(val || 0), 0);
+            
+            const coverageAmount = shopRevenue + shopDeposits;
+            const progress = overheadTarget > 0 ? (coverageAmount / (overheadTarget * 2)) * 100 : 100;
+
+            shopPerformance.push({
+                id: shop.id,
+                name: shop.name,
+                revenue: shopRevenue,
+                expenses: overheadTarget * 2,
+                deposits: shopDeposits,
+                progress: Math.min(100, progress)
+            });
+        });
+
+        return {
+            totalUnits,
+            categoryBreakdown,
+            finances: { 
+                revenue: totalRevenue, 
+                tax: totalRevenue * 0.155,
+                grossProfit: totalRevenue - (totalRevenue * 0.6),
+                netIncome: totalRevenue - totalExpenses,
+                monthlyBurn: totalExpenses / (daysLimit / 30)
+            },
+            shopPerformance,
+            deadCapital: 0,
+            zombieCount: 0,
+            recentEmails: []
+        };
+    } catch (e: any) {
+        console.error('[getOracleMasterPulse] Exception:', e?.message || e);
         return null;
     }
-
-    const calculateShopOverheadTarget = (shopId: string) => {
-        const shopExpenses = shops?.find((s: any) => s.id === shopId)?.expenses || {};
-        return Object.values(shopExpenses).reduce((acc: number, val: any) => acc + Number(val || 0), 0);
-    };
-
-    return {
-        totalUnits: Number(metrics.totalUnits || 0),
-        categoryBreakdown: metrics.categoryBreakdown || {},
-        finances: { 
-            revenue: Number(metrics.finances?.revenue || 0), 
-            tax: Number(metrics.finances?.tax || 0), 
-            grossProfit: Number(metrics.finances?.grossProfit || 0), 
-            netIncome: Number(metrics.finances?.grossProfit || 0), 
-            monthlyBurn: 0 
-        },
-        shopPerformance: (shops || []).map((s: any) => {
-            const perf = (metrics.shopPerformance || []).find((p: any) => p.id === s.id) || { revenue: 0, deposits: 0 };
-            const overheadTarget = calculateShopOverheadTarget(s.id);
-            const coverageAmount = Number(perf.revenue || 0) + Number(perf.deposits || 0);
-            const progress = overheadTarget > 0 ? (coverageAmount / overheadTarget) * 100 : 100;
-            
-            return {
-                id: s.id,
-                name: s.name,
-                revenue: Number(perf.revenue || 0),
-                expenses: overheadTarget,
-                deposits: Number(perf.deposits || 0),
-                progress
-            };
-        }),
-        deadCapital: 0,
-        zombieCount: 0,
-        recentEmails: []
-    };
 }
 
 export async function getZombieStockReport() {
@@ -1710,34 +1803,63 @@ export async function postDrawerToOperations(input: { shopId: string; amount: nu
         throw new Error("Forbidden");
     }
 
-    const timestamp = new Date().toISOString();
-    const dayStamp = timestamp.split("T")[0];
+    // PREVENTION: Check if already routed to operations today
+    const today = new Date().toISOString().split('T')[0];
+    const { data: existingRouting } = await supabaseAdmin
+        .from("operations_ledger")
+        .select("*")
+        .eq("shop_id", shopId)
+        .eq("amount", amount)
+        .eq("kind", kind)
+        .like("notes", "%Auto-routed from POS expense%")
+        .gte("created_at", `${today}T00:00:00.000Z`)
+        .lt("created_at", `${today}T23:59:59.999Z`)
+        .maybeSingle();
 
-    const drawerLedgerId = Math.random().toString(36).substring(2, 9);
-    await supabaseAdmin.from("ledger_entries").insert([{
-        id: drawerLedgerId,
-        shop_id: shopId,
-        type: "transfer",
-        category: "Operations Transfer",
-        amount,
-        date: timestamp,
-        description: `Posted to Operations (${kind === "overhead_contribution" ? "Overhead" : "EOD"})${notes ? ` | ${notes}` : ""}`,
-        employee_id: actor.id
-    }]);
+    if (existingRouting) {
+        throw new Error(`This expense of $${amount.toFixed(2)} was already routed to operations today at ${new Date(existingRouting.created_at).toLocaleTimeString()}`);
+    }
 
-    await createOperationsLedgerEntry({
-        amount,
-        kind,
-        shopId,
-        title: `Drawer → Operations (${shopId})`,
-        notes: notes || null,
-        effectiveDate: dayStamp,
-        employeeId: actor.kind === "staff" ? actor.id : null,
-        metadata: {
-            source: "pos",
-            drawerLedgerId
+    // PREVENTION: Add error handling
+    try {
+        const timestamp = new Date().toISOString();
+        const dayStamp = timestamp.split("T")[0];
+
+        const drawerLedgerId = Math.random().toString(36).substring(2, 9);
+        
+        const { error: ledgerError } = await supabaseAdmin.from("ledger_entries").insert([{
+            id: drawerLedgerId,
+            shop_id: shopId,
+            type: "transfer",
+            category: "Operations Transfer",
+            amount,
+            date: timestamp,
+            description: `Posted to Operations (${kind === "overhead_contribution" ? "Overhead" : "EOD"})${notes ? ` | ${notes}` : ""}`,
+            employee_id: actor.id
+        }]);
+
+        if (ledgerError) {
+            throw new Error(`Failed to record ledger entry: ${ledgerError.message}`);
         }
-    });
+
+        await createOperationsLedgerEntry({
+            amount,
+            kind,
+            shopId,
+            title: `Drawer -> Operations (${shopId})`,
+            notes: notes || null,
+            effectiveDate: dayStamp,
+            employeeId: actor.kind === "staff" ? actor.id : null,
+            metadata: {
+                source: "pos",
+                drawerLedgerId
+            }
+        });
+
+    } catch (error: any) {
+        console.error('Drawer posting failed:', error);
+        throw new Error(`Failed to post drawer to operations: ${error.message}`);
+    }
 
     // Revalidate the key surfaces
     revalidatePath(`/shops/${shopId}`);
