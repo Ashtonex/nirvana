@@ -337,34 +337,79 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
     const isGroceriesExpense = (l: any) => l.category === 'Groceries' || groceriesKeywords.some(kw => String(l.description || "").toLowerCase().includes(kw));
 
     // 2. What was yesterday's exact closing?
-    // Last Opening + All Cash Sales since then - All POS Expenses since then
+    // Yesterday's Opening + Yesterday's Cash Sales - Yesterday's POS Expenses
     let expectedOpeningCash = 0;
     let carryOverSales = 0;
     let carryOverExpenses = 0;
     let carryOverBaseline = 0;
 
-    // Find the very last opening before today
-    const pastOpenings = ledger.filter((l: any) => l.category === 'Cash Drawer Opening' && l.shopId === shopId && !String(l.date).startsWith(todayStr));
-    const lastOpening = pastOpenings.sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime())[0]; 
+    // Get yesterday's date in the same format as todayStr
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    const yesterdayStr = yesterday.toLocaleDateString('en-CA'); // YYYY-MM-DD
 
-    if (lastOpening) {
-        const lastOpenDate = new Date(lastOpening.date).getTime();
-        carryOverBaseline = Number(lastOpening.amount);
+    // Find yesterday's opening (not "very last opening")
+    const yesterdayOpening = ledger.find((l: any) => 
+        l.category === 'Cash Drawer Opening' && 
+        l.shopId === shopId && 
+        String(l.date || "").includes(yesterdayStr)
+    );
 
-        // Sales after the last opening, but before today started
-        const salesSinceLastOpen = (db.sales || []).filter((s: any) => s.shopId === shopId && s.paymentMethod === 'cash' && new Date(s.date).getTime() >= lastOpenDate && !String(s.date).startsWith(todayStr));
-        carryOverSales = salesSinceLastOpen.reduce((sum: number, s: any) => sum + Number(s.totalWithTax || 0), 0);
+    if (yesterdayOpening) {
+        carryOverBaseline = Number(yesterdayOpening.amount);
 
-        // POS Expenses after last opening, before today (includes keyword-matched Groceries/Tithe)
-        const expensesSinceLastOpen = ledger.filter((l: any) =>
+        // Only look at yesterday's sales (not all sales since last opening)
+        const yesterdaySales = (db.sales || []).filter((s: any) => 
+            s.shopId === shopId && 
+            s.paymentMethod === 'cash' && 
+            String(s.date).includes(yesterdayStr)
+        );
+        carryOverSales = yesterdaySales.reduce((sum: number, s: any) => sum + Number(s.totalWithTax || 0), 0);
+
+        // Only look at yesterday's expenses (not all expenses since last opening)
+        const yesterdayExpenses = ledger.filter((l: any) =>
             (CASH_OUT_CATEGORIES.has(String(l.category || "")) || isGroceriesExpense(l) || isTitheExpense(l)) &&
             l.shopId === shopId &&
-            new Date(l.date).getTime() >= lastOpenDate &&
-            !String(l.date).startsWith(todayStr)
+            String(l.date).includes(yesterdayStr)
         );
-        carryOverExpenses = expensesSinceLastOpen.reduce((sum: number, l: any) => sum + Number(l.amount || 0), 0);
+        carryOverExpenses = yesterdayExpenses.reduce((sum: number, l: any) => sum + Number(l.amount || 0), 0);
 
         expectedOpeningCash = carryOverBaseline + carryOverSales - carryOverExpenses;
+    } else {
+        // If no yesterday opening, try to find the most recent opening and calculate from there
+        const pastOpenings = ledger.filter((l: any) => 
+            l.category === 'Cash Drawer Opening' && 
+            l.shopId === shopId && 
+            !String(l.date).startsWith(todayStr)
+        );
+        
+        if (pastOpenings.length > 0) {
+            const lastOpening = pastOpenings.sort((a: any, b: any) => 
+                new Date(b.date).getTime() - new Date(a.date).getTime()
+            )[0];
+            
+            const lastOpenDate = new Date(lastOpening.date);
+            const lastOpenDateStr = lastOpenDate.toLocaleDateString('en-CA');
+            
+            carryOverBaseline = Number(lastOpening.amount);
+
+            // Only include sales/expenses from that specific day
+            const lastDaySales = (db.sales || []).filter((s: any) => 
+                s.shopId === shopId && 
+                s.paymentMethod === 'cash' && 
+                String(s.date).includes(lastOpenDateStr)
+            );
+            carryOverSales = lastDaySales.reduce((sum: number, s: any) => sum + Number(s.totalWithTax || 0), 0);
+
+            const lastDayExpenses = ledger.filter((l: any) =>
+                (CASH_OUT_CATEGORIES.has(String(l.category || "")) || isGroceriesExpense(l) || isTitheExpense(l)) &&
+                l.shopId === shopId &&
+                String(l.date).includes(lastOpenDateStr)
+            );
+            carryOverExpenses = lastDayExpenses.reduce((sum: number, l: any) => sum + Number(l.amount || 0), 0);
+
+            expectedOpeningCash = carryOverBaseline + carryOverSales - carryOverExpenses;
+        }
     }
 
     // 3. Current Live Drawer (Today's Opening + Today's Cash Sales - Today's Expenses)
