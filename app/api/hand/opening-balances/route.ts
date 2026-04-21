@@ -4,28 +4,34 @@ import { NextResponse } from 'next/server';
 import { promises as fs } from 'fs';
 import path from 'path';
 
-export async function GET(request: Request) {
+type OpeningBalanceRow = {
+  shop_id: 'kipasa' | 'dubdub' | 'tradecenter';
+  opening_balance: number | null;
+};
+
+type OpeningBalances = Record<'kipasa' | 'dubdub' | 'tradecenter', number>;
+
+export async function GET() {
   const authError = await enforceOwnerOnly();
   if (authError) return authError;
   
   try {
     const dbPath = path.join(process.cwd(), 'lib', 'db.json');
-    const content = await fs.readFile(dbPath, 'utf-8');
-    const db = JSON.parse(content);
+    await fs.readFile(dbPath, 'utf-8');
 
     // Get balances from database
     const { data: balanceData } = await supabaseAdmin
       .from('shop_settings')
       .select('shop_id, opening_balance');
 
-    const balances = {
+    const balances: OpeningBalances = {
       kipasa: 0,
       dubdub: 0,
       tradecenter: 0
     };
 
     if (balanceData) {
-      balanceData.forEach(b => {
+      (balanceData as OpeningBalanceRow[]).forEach((b: OpeningBalanceRow) => {
         balances[b.shop_id] = b.opening_balance || 0;
       });
     }
@@ -34,7 +40,7 @@ export async function GET(request: Request) {
       success: true,
       balances
     });
-  } catch (error: any) {
+  } catch {
     return NextResponse.json({
       success: true,
       balances: {
@@ -78,7 +84,8 @@ export async function POST(request: Request) {
       success: true,
       message: `${shop} opening balance set to $${amount.toFixed(2)}`
     });
-  } catch (error: any) {
-    return NextResponse.json({ success: false, message: error.message }, { status: 500 });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    return NextResponse.json({ success: false, message }, { status: 500 });
   }
 }
