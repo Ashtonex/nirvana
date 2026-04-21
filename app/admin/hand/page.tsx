@@ -331,14 +331,13 @@ export default function TheHandPage() {
       return;
     }
 
-    if (!confirm(`POST PAST SALE? You are about to inject a ${currency(saleForm.quantity * saleForm.unitPrice * 1.155)} sale into the ledger for ${saleForm.shopId.toUpperCase()} on ${saleForm.date}. Continue?`)) {
+    if (!confirm(`POST PAST SALE? You are about to inject a ${currency(saleForm.quantity * saleForm.unitPrice)} sale into the ledger for ${saleForm.shopId.toUpperCase()} on ${saleForm.date}. Continue?`)) {
       return;
     }
 
     try {
-      const subtotal = saleForm.quantity * saleForm.unitPrice;
-      const tax = subtotal * 0.155;
-      const totalWithTax = subtotal + tax;
+      const totalAmount = saleForm.quantity * saleForm.unitPrice;
+      const tax = 0; // Hand overrides should be direct amounts unless user wants tax added
 
       const response = await fetch('/api/hand/add-sale', {
         method: 'POST',
@@ -350,9 +349,9 @@ export default function TheHandPage() {
           itemName: saleForm.itemName,
           quantity: saleForm.quantity,
           unitPrice: saleForm.unitPrice,
-          totalBeforeTax: subtotal,
+          totalBeforeTax: totalAmount,
           tax,
-          totalWithTax,
+          totalWithTax: totalAmount,
           date: new Date(`${saleForm.date}T12:00:00Z`).toISOString(),
           employeeId: saleForm.employeeId,
           overwrite: true,
@@ -473,429 +472,270 @@ export default function TheHandPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(220,38,38,0.2),_transparent_28%),radial-gradient(circle_at_bottom_right,_rgba(14,165,233,0.16),_transparent_22%),linear-gradient(180deg,#020617,#0f172a)] p-4 text-white md:p-8">
-      <div className="mx-auto max-w-7xl space-y-6">
-        <div className="rounded-[32px] border border-white/10 bg-slate-950/60 p-6 shadow-[0_35px_120px_rgba(0,0,0,0.45)] backdrop-blur-xl">
-          <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
-            <div>
-              <p className="text-[11px] font-black uppercase tracking-[0.45em] text-rose-300">The Hand</p>
-              <h1 className="mt-3 text-4xl font-black md:text-6xl">God-Tier Command And Correction Layer</h1>
-              <p className="mt-4 max-w-3xl text-base text-slate-300 md:text-lg">
-                The Hand sees every shop, every drawer, every vault, every warning signal, and every correction path.
-                It audits the system, predicts pressure, and lets you intervene from one page without surrendering precision.
-              </p>
-            </div>
-
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-              <button
-                onClick={() => loadControlRoom(true)}
-                disabled={busy}
-                className="group relative overflow-hidden rounded-2xl border border-rose-400/30 bg-rose-500/10 px-5 py-4 text-left transition-all hover:bg-rose-500/20 disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                <div className="flex items-center gap-2 text-rose-200">
-                  <ShieldCheck className="h-4 w-4 transition-transform group-hover:scale-110" />
-                  <span className="text-xs font-black uppercase tracking-[0.2em]">Run System Audit</span>
-                </div>
-                <p className="mt-2 text-xs leading-relaxed text-slate-400">Sweep business units for live risk signals.</p>
-              </button>
-              <button
-                onClick={() => loadControlRoom()}
-                disabled={busy}
-                className="group relative overflow-hidden rounded-2xl border border-sky-400/30 bg-sky-500/10 px-5 py-4 text-left transition-all hover:bg-sky-500/20 disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                <div className="flex items-center gap-2 text-sky-200">
-                  <RefreshCcw className={`h-4 w-4 transition-transform group-hover:rotate-180 ${busy ? 'animate-spin' : ''}`} />
-                  <span className="text-xs font-black uppercase tracking-[0.2em]">Refresh Intelligence</span>
-                </div>
-                <p className="mt-2 text-xs leading-relaxed text-slate-400">Sync latest balances and shop pulses.</p>
-              </button>
-              <button
-                onClick={() => runBackupAction('backup')}
-                disabled={backupBusy}
-                className="group relative overflow-hidden rounded-2xl border border-emerald-400/30 bg-emerald-500/10 px-5 py-4 text-left transition-all hover:bg-emerald-500/20 disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                <div className="flex items-center gap-2 text-emerald-200">
-                  <Database className={`h-4 w-4 ${backupBusy ? 'animate-pulse' : ''}`} />
-                  <span className="text-xs font-black uppercase tracking-[0.2em]">Full Backup</span>
-                </div>
-                <p className="mt-2 text-xs leading-relaxed text-slate-400">Secure current state to cloud vault.</p>
-              </button>
-              <button
-                onClick={() => { if(confirm("FORCE SYSTEM SYNC?")) loadControlRoom(); }}
-                className="group relative overflow-hidden rounded-2xl border border-amber-400/30 bg-amber-500/10 px-5 py-4 text-left transition-all hover:bg-amber-500/20"
-              >
-                <div className="flex items-center gap-2 text-amber-200">
-                  <Sparkles className="h-4 w-4" />
-                  <span className="text-xs font-black uppercase tracking-[0.2em]">Matrix Sync</span>
-                </div>
-                <p className="mt-2 text-xs leading-relaxed text-slate-400">Force alignment across all storefronts.</p>
-              </button>
-            </div>
+    <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(220,38,38,0.15),_transparent_28%),radial-gradient(circle_at_bottom_right,_rgba(14,165,233,0.12),_transparent_22%),linear-gradient(180deg,#020617,#0f172a)] p-4 text-white md:p-6">
+      <div className="mx-auto w-full max-w-[1800px] space-y-6">
+        <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between px-2">
+          <div>
+            <p className="text-[11px] font-black uppercase tracking-[0.45em] text-rose-300">The Hand</p>
+            <h1 className="mt-3 text-4xl font-black md:text-5xl lg:text-6xl tracking-tighter">God-Tier Command Layer</h1>
+            <p className="mt-4 max-w-3xl text-sm md:text-base text-slate-400">
+              The Hand sees every shop, every drawer, every vault, every warning signal, and every correction path.
+            </p>
           </div>
 
-          <div className="mt-6 grid gap-4 md:grid-cols-4">
-            <MetricCard
-              label="Clearance"
-              value={controlRoom?.owner.clearance || 'LEVEL_5'}
-              hint={`Locked to ${OWNER_EMAIL}`}
-              tone="text-rose-300"
-            />
-            <MetricCard
-              label="Tracked Cash"
-              value={currency(controlRoom?.money.totalTrackedCash || 0)}
-              hint="Drawers + operations + invest"
-              tone="text-emerald-300"
-            />
-            <MetricCard
-              label="Profit 30D"
-              value={currency(controlRoom?.money.profit30d || 0)}
-              hint={`Margin ${(controlRoom?.money.profitMargin || 0).toFixed(1)}%`}
-              tone={(controlRoom?.money.profit30d || 0) >= 0 ? 'text-sky-300' : 'text-rose-300'}
-            />
-            <MetricCard
-              label="Top Shop"
-              value={controlRoom?.brain.topShop || 'Unknown'}
-              hint={controlRoom?.brain.insight || 'Awaiting analysis'}
-              tone="text-amber-300"
-            />
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <button
+              onClick={() => loadControlRoom(true)}
+              disabled={busy}
+              className="group relative overflow-hidden rounded-2xl border border-rose-400/30 bg-rose-500/10 px-5 py-4 text-left transition-all hover:bg-rose-500/20 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <div className="flex items-center gap-2 text-rose-200">
+                <ShieldCheck className="h-4 w-4 transition-transform group-hover:scale-110" />
+                <span className="text-xs font-black uppercase tracking-[0.2em]">System Audit</span>
+              </div>
+              <p className="mt-2 text-[10px] leading-relaxed text-slate-400">Sweep for live risks.</p>
+            </button>
+            <button
+              onClick={() => loadControlRoom()}
+              disabled={busy}
+              className="group relative overflow-hidden rounded-2xl border border-sky-400/30 bg-sky-500/10 px-5 py-4 text-left transition-all hover:bg-sky-500/20 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <div className="flex items-center gap-2 text-sky-200">
+                <RefreshCcw className={`h-4 w-4 transition-transform group-hover:rotate-180 ${busy ? 'animate-spin' : ''}`} />
+                <span className="text-xs font-black uppercase tracking-[0.2em]">Sync Intelligence</span>
+              </div>
+              <p className="mt-2 text-[10px] leading-relaxed text-slate-400">Refresh all matrices.</p>
+            </button>
+            <button
+              onClick={() => runBackupAction('backup')}
+              disabled={backupBusy}
+              className="group relative overflow-hidden rounded-2xl border border-emerald-400/30 bg-emerald-500/10 px-5 py-4 text-left transition-all hover:bg-emerald-500/20 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <div className="flex items-center gap-2 text-emerald-200">
+                <Database className={`h-4 w-4 ${backupBusy ? 'animate-pulse' : ''}`} />
+                <span className="text-xs font-black uppercase tracking-[0.2em]">Cloud Backup</span>
+              </div>
+              <p className="mt-2 text-[10px] leading-relaxed text-slate-400">Secure current state.</p>
+            </button>
+            <button
+              onClick={() => { if (confirm("FORCE SYSTEM SYNC?")) loadControlRoom(); }}
+              className="group relative overflow-hidden rounded-2xl border border-amber-400/30 bg-amber-500/10 px-5 py-4 text-left transition-all hover:bg-amber-500/20"
+            >
+              <div className="flex items-center gap-2 text-amber-200">
+                <Sparkles className="h-4 w-4" />
+                <span className="text-xs font-black uppercase tracking-[0.2em]">Matrix Sync</span>
+              </div>
+              <p className="mt-2 text-[10px] leading-relaxed text-slate-400">Align storefronts.</p>
+            </button>
           </div>
         </div>
 
-        <div className="grid gap-6 xl:grid-cols-[1.75fr_1fr]">
+        <div className="grid gap-4 md:grid-cols-4 px-2">
+          <MetricCard
+            label="Clearance"
+            value={controlRoom?.owner.clearance || 'LEVEL_5'}
+            hint={`Locked to ${OWNER_EMAIL}`}
+            tone="text-rose-300"
+          />
+          <MetricCard
+            label="Tracked Cash"
+            value={currency(controlRoom?.money.totalTrackedCash || 0)}
+            hint="Drawers + vault + invest"
+            tone="text-emerald-300"
+          />
+          <MetricCard
+            label="Profit 30D"
+            value={currency(controlRoom?.money.profit30d || 0)}
+            hint={`Margin ${(controlRoom?.money.profitMargin || 0).toFixed(1)}%`}
+            tone={(controlRoom?.money.profit30d || 0) >= 0 ? 'text-sky-300' : 'text-rose-300'}
+          />
+          <MetricCard
+            label="Top Shop"
+            value={controlRoom?.brain.topShop || 'Unknown'}
+            hint={controlRoom?.brain.insight || 'Awaiting analysis'}
+            tone="text-amber-300"
+          />
+        </div>
+
+        <div className="grid gap-6 xl:grid-cols-[1fr_400px]">
           <div className="space-y-6">
-            <WindowCard eyebrow="Threat Grid" title="Live Risks And Countermoves" icon={AlertTriangle}>
-              <div className="grid gap-4 lg:grid-cols-2">
-                {(controlRoom?.risks || []).length === 0 ? (
-                  <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/10 p-4 text-emerald-100">
-                    No active risks detected. The Hand has the field under control.
-                  </div>
-                ) : (
-                  controlRoom?.risks.map((risk) => (
-                    <div
-                      key={`${risk.title}-${risk.message}`}
-                      className={`rounded-2xl border p-4 ${
-                        risk.severity === 'critical'
-                          ? 'border-rose-500/30 bg-rose-500/10'
-                          : risk.severity === 'warning'
-                          ? 'border-amber-500/30 bg-amber-500/10'
-                          : 'border-sky-500/30 bg-sky-500/10'
-                      }`}
-                    >
-                      <p className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-300">{risk.severity}</p>
-                      <h3 className="mt-2 text-lg font-bold text-white">{risk.title}</h3>
-                      <p className="mt-2 text-sm text-slate-200">{risk.message}</p>
-                    </div>
-                  ))
-                )}
-              </div>
-
-              <div className="mt-5 rounded-2xl border border-white/10 bg-white/[0.03] p-4">
-                <div className="flex items-center gap-2 text-slate-100">
-                  <Sparkles className="h-4 w-4 text-amber-300" />
-                  <p className="text-sm font-bold uppercase tracking-[0.22em]">Anticipation Engine</p>
-                </div>
-                <div className="mt-4 space-y-3">
-                  {(controlRoom?.forecasts || []).map((forecast) => (
-                    <div key={forecast} className="rounded-2xl border border-white/10 bg-slate-950/70 p-4 text-sm text-slate-300">
-                      {forecast}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </WindowCard>
-
             <WindowCard eyebrow="Shop Pulse" title="Storefront Health Windows" icon={Building2}>
-              <div className="grid gap-4 xl:grid-cols-3">
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                 {controlRoom?.shops.map((shop) => (
-                  <div key={shop.id} className="rounded-3xl border border-white/10 bg-white/[0.03] p-4">
+                  <div key={shop.id} className="rounded-3xl border border-white/10 bg-slate-900/40 p-5">
                     <div className="flex items-start justify-between gap-3">
                       <div>
                         <h3 className="text-xl font-black text-white">{shop.name}</h3>
-                        <p className="mt-1 text-sm text-slate-400">Expected drawer {currency(shop.expectedDrawerCash)}</p>
+                        <p className="mt-1 text-xs text-slate-500 uppercase tracking-widest font-bold">Expected drawer {currency(shop.expectedDrawerCash)}</p>
                       </div>
                       <span className={`rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-[0.2em] ${statusTone(shop.status)}`}>
                         {shop.status}
                       </span>
                     </div>
 
-                    <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
+                    <div className="mt-6 grid grid-cols-2 gap-3 text-sm">
                       <div className="rounded-2xl border border-white/10 bg-slate-950/50 p-3">
-                        <p className="text-slate-500">Sales 30D</p>
-                        <p className="mt-1 text-lg font-bold text-emerald-300">{currency(shop.sales30d)}</p>
+                        <p className="text-[10px] uppercase font-bold text-slate-500">Sales 30D</p>
+                        <p className="mt-1 text-lg font-black text-emerald-300">{currency(shop.sales30d)}</p>
                       </div>
                       <div className="rounded-2xl border border-white/10 bg-slate-950/50 p-3">
-                        <p className="text-slate-500">Expenses 30D</p>
-                        <p className="mt-1 text-lg font-bold text-rose-300">{currency(shop.expenses30d)}</p>
-                      </div>
-                      <div className="rounded-2xl border border-white/10 bg-slate-950/50 p-3">
-                        <p className="text-slate-500">Live Staff</p>
-                        <p className="mt-1 text-lg font-bold text-sky-300">{shop.activeStaff}</p>
-                      </div>
-                      <div className="rounded-2xl border border-white/10 bg-slate-950/50 p-3">
-                        <p className="text-slate-500">Tx 7D</p>
-                        <p className="mt-1 text-lg font-bold text-white">{shop.transactions7d}</p>
+                        <p className="text-[10px] uppercase font-bold text-slate-500">Expenses 30D</p>
+                        <p className="mt-1 text-lg font-black text-rose-300">{currency(shop.expenses30d)}</p>
                       </div>
                     </div>
 
-                    <div className="mt-4 space-y-2 rounded-2xl border border-white/10 bg-slate-950/50 p-3 text-sm text-slate-300">
+                    <div className="mt-4 space-y-2 rounded-2xl border border-white/10 bg-slate-950/50 p-3 text-xs text-slate-400 font-mono">
                       <p>Last sale: {timeLabel(shop.lastSaleAt)}</p>
-                      <p>Last ledger move: {timeLabel(shop.lastLedgerAt)}</p>
-                      <p>Low stock: {shop.lowStockCount} | Zero stock: {shop.zeroStockCount} | Dead stock: {shop.deadStockCount}</p>
+                      <p>Tx 7D: {shop.transactions7d}</p>
+                      <p>Stock: {shop.lowStockCount} Low | {shop.zeroStockCount} Zero</p>
                     </div>
 
                     <div className="mt-4 space-y-2">
-                      {shop.issues.length === 0 ? (
-                        <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/10 p-3 text-sm text-emerald-100">
-                          No direct faults detected in this shop window.
+                      {shop.issues.map((issue) => (
+                        <div key={issue} className="rounded-2xl border border-amber-500/20 bg-amber-500/10 p-3 text-xs text-amber-200/80">
+                          {issue}
                         </div>
-                      ) : (
-                        shop.issues.map((issue) => (
-                          <div key={issue} className="rounded-2xl border border-amber-500/20 bg-amber-500/10 p-3 text-sm text-amber-100">
-                            {issue}
-                          </div>
-                        ))
-                      )}
+                      ))}
                     </div>
                   </div>
                 ))}
               </div>
             </WindowCard>
 
-            <WindowCard eyebrow="Vault And Brain" title="Operations, Money Brain, And Ledger Discipline" icon={Brain}>
-              <div className="grid gap-4 lg:grid-cols-2">
-                <div className="space-y-4">
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    <MetricCard
-                      label="Overheads Gathered"
-                      value={currency(controlRoom?.money.overheadContributed30d || 0)}
-                      hint="Positive ops contributions in the last 30 days"
-                      tone="text-emerald-300"
-                    />
-                    <MetricCard
-                      label="Overheads Paid"
-                      value={currency(controlRoom?.money.overheadPaid30d || 0)}
-                      hint="Actual vault drawdowns for overhead pressure"
-                      tone="text-rose-300"
-                    />
-                    <MetricCard
-                      label="Operations Vault"
-                      value={currency(controlRoom?.money.operationsActualBalance || 0)}
-                      hint={`Computed ${currency(controlRoom?.money.operationsComputedBalance || 0)}`}
-                      tone="text-sky-300"
-                    />
-                    <MetricCard
-                      label="Invest Reserve"
-                      value={currency(controlRoom?.money.investAvailable || 0)}
-                      hint="Withdrawable perfume capital still in play"
-                      tone="text-violet-300"
-                    />
-                  </div>
-
-                  <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
-                    <p className="text-[11px] font-black uppercase tracking-[0.3em] text-slate-500">Money Brain</p>
-                    <p className="mt-3 text-lg font-semibold text-white">{controlRoom?.brain.insight}</p>
-                    <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                      <div className="rounded-2xl border border-white/10 bg-slate-950/60 p-3 text-sm text-slate-300">
-                        Revenue trend: <span className="font-bold text-white">{controlRoom?.brain.revenueTrend}</span>
-                      </div>
-                      <div className="rounded-2xl border border-white/10 bg-slate-950/60 p-3 text-sm text-slate-300">
-                        Expense trend: <span className="font-bold text-white">{controlRoom?.brain.expenseTrend}</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
-                  <div className="flex items-center gap-2 text-slate-100">
-                    <Wallet className="h-4 w-4 text-emerald-300" />
-                    <p className="text-sm font-bold uppercase tracking-[0.22em]">Recent Operations</p>
-                  </div>
-                  <div className="mt-4 space-y-3">
-                    {(controlRoom?.recentOperations || []).map((entry) => (
-                      <div key={entry.id} className="rounded-2xl border border-white/10 bg-slate-950/70 p-3">
-                        <div className="flex items-center justify-between gap-3">
-                          <div>
-                            <p className="font-semibold text-white">{entry.title}</p>
-                            <p className="text-xs uppercase tracking-[0.2em] text-slate-500">{entry.shopId || 'global'} • {entry.kind || 'operation'}</p>
-                          </div>
-                          <p className={`text-lg font-black ${entry.amount >= 0 ? 'text-emerald-300' : 'text-rose-300'}`}>
-                            {currency(entry.amount)}
-                          </p>
-                        </div>
-                        <p className="mt-2 text-sm text-slate-400">{entry.notes || 'No notes attached.'}</p>
-                        <p className="mt-2 text-xs text-slate-500">{timeLabel(entry.when)}</p>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            </WindowCard>
-
-            <WindowCard eyebrow="Correction Layer" title="Opening Balance Override And Ledger Recovery" icon={Wrench}>
-              <div className="grid gap-6 xl:grid-cols-2">
-                <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
-                  <p className="text-sm font-bold uppercase tracking-[0.22em] text-slate-100">Opening Balances</p>
-                  <div className="mt-4 space-y-3">
+            <WindowCard eyebrow="Correction Layer" title="Manual Overrides" icon={Wrench}>
+              <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+                <div className="rounded-2xl border border-white/10 bg-slate-900/40 p-4">
+                  <p className="text-xs font-black uppercase tracking-[0.22em] text-slate-500 mb-4">Opening Balances</p>
+                  <div className="space-y-3">
                     {SHOPS.map((shop) => (
-                      <div key={shop.id} className="rounded-2xl border border-white/10 bg-slate-950/70 p-4">
-                        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                          <div>
-                            <p className="text-lg font-bold text-white">{shop.name}</p>
-                            <p className="text-sm text-slate-400">Fix opening balance at the source and force the dashboard to respect it.</p>
-                          </div>
-                          <div className="flex w-full gap-2 md:w-auto">
-                            <input
-                              type="number"
-                              value={openingBalances[shop.id]}
-                              onChange={(event) =>
-                                setOpeningBalances((prev) => ({
-                                  ...prev,
-                                  [shop.id]: Number(event.target.value || 0),
-                                }))
-                              }
-                              className="w-full rounded-2xl border border-white/10 bg-slate-900 px-4 py-3 text-white outline-none transition focus:border-sky-400/50 md:w-44"
-                            />
-                            <button
-                              onClick={() => updateOpeningBalance(shop.id)}
-                              className="rounded-2xl border border-sky-400/30 bg-sky-500/10 px-4 py-3 font-bold text-sky-200 transition hover:bg-sky-500/20"
-                            >
-                              Commit
-                            </button>
-                          </div>
+                      <div key={shop.id} className="flex flex-col gap-2">
+                        <label className="text-[10px] font-black uppercase text-slate-400">{shop.name}</label>
+                        <div className="flex gap-2">
+                          <input
+                            type="number"
+                            value={openingBalances[shop.id]}
+                            onChange={(event) =>
+                              setOpeningBalances((prev) => ({
+                                ...prev,
+                                [shop.id]: Number(event.target.value || 0),
+                              }))
+                            }
+                            className="w-full rounded-xl border border-white/10 bg-slate-950 px-3 py-2 text-sm text-white outline-none focus:border-sky-500/50"
+                          />
+                          <button
+                            onClick={() => updateOpeningBalance(shop.id)}
+                            className="rounded-xl border border-sky-400/30 bg-sky-500/10 px-3 py-2 text-xs font-black text-sky-200 hover:bg-sky-500/20"
+                          >
+                            Set
+                          </button>
                         </div>
                       </div>
                     ))}
                   </div>
                 </div>
 
-                <div className="space-y-6">
-                  <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
-                    <p className="text-sm font-bold uppercase tracking-[0.22em] text-slate-100">Record Past Sale</p>
-                    <div className="mt-4 grid gap-3">
-                      <div className="grid gap-3 md:grid-cols-2">
-                        <select
-                          value={saleForm.shopId}
-                          onChange={(event) => setSaleForm((prev) => ({ ...prev, shopId: event.target.value as SaleForm['shopId'] }))}
-                          className="rounded-2xl border border-white/10 bg-slate-900 px-4 py-3 text-white outline-none"
-                        >
-                          {SHOPS.map((shop) => (
-                            <option key={shop.id} value={shop.id}>{shop.name}</option>
-                          ))}
-                        </select>
-                        <input
-                          type="date"
-                          value={saleForm.date}
-                          onChange={(event) => setSaleForm((prev) => ({ ...prev, date: event.target.value }))}
-                          className="rounded-2xl border border-white/10 bg-slate-900 px-4 py-3 text-white outline-none"
-                        />
-                      </div>
-                      <input
-                        type="text"
-                        placeholder="Client name"
-                        value={saleForm.clientName}
-                        onChange={(event) => setSaleForm((prev) => ({ ...prev, clientName: event.target.value }))}
-                        className="rounded-2xl border border-white/10 bg-slate-900 px-4 py-3 text-white outline-none"
-                      />
-                      <input
-                        type="text"
-                        placeholder="Item name"
-                        value={saleForm.itemName}
-                        onChange={(event) => setSaleForm((prev) => ({ ...prev, itemName: event.target.value }))}
-                        className="rounded-2xl border border-white/10 bg-slate-900 px-4 py-3 text-white outline-none"
-                      />
-                      <div className="grid gap-3 md:grid-cols-3">
-                        <input
-                          type="number"
-                          placeholder="Qty"
-                          value={saleForm.quantity}
-                          onChange={(event) => setSaleForm((prev) => ({ ...prev, quantity: Number(event.target.value || 0) }))}
-                          className="rounded-2xl border border-white/10 bg-slate-900 px-4 py-3 text-white outline-none"
-                        />
-                        <input
-                          type="number"
-                          placeholder="Unit price"
-                          value={saleForm.unitPrice}
-                          onChange={(event) => setSaleForm((prev) => ({ ...prev, unitPrice: Number(event.target.value || 0) }))}
-                          className="rounded-2xl border border-white/10 bg-slate-900 px-4 py-3 text-white outline-none"
-                        />
-                        <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3">
-                          <p className="text-[11px] font-black uppercase tracking-[0.2em] text-emerald-200">Projected Total</p>
-                          <p className="mt-1 text-xl font-black text-white">
-                            {currency(saleForm.quantity * saleForm.unitPrice * 1.155)}
-                          </p>
-                        </div>
-                      </div>
-                      <button
-                        onClick={handleRecordSale}
-                        className="rounded-2xl border border-emerald-400/30 bg-emerald-500/10 px-4 py-3 font-bold text-emerald-200 transition hover:bg-emerald-500/20"
-                      >
-                        Post Past Sale To Proper Ledgers
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
-                    <p className="text-sm font-bold uppercase tracking-[0.22em] text-slate-100">Record Past Expense</p>
-                    <div className="mt-4 grid gap-3">
-                      <div className="grid gap-3 md:grid-cols-2">
-                        <select
-                          value={expenseForm.shopId}
-                          onChange={(event) => setExpenseForm((prev) => ({ ...prev, shopId: event.target.value as ExpenseForm['shopId'] }))}
-                          className="rounded-2xl border border-white/10 bg-slate-900 px-4 py-3 text-white outline-none"
-                        >
-                          {SHOPS.map((shop) => (
-                            <option key={shop.id} value={shop.id}>{shop.name}</option>
-                          ))}
-                        </select>
-                        <input
-                          type="date"
-                          value={expenseForm.date}
-                          onChange={(event) => setExpenseForm((prev) => ({ ...prev, date: event.target.value }))}
-                          className="rounded-2xl border border-white/10 bg-slate-900 px-4 py-3 text-white outline-none"
-                        />
-                      </div>
-                      <select
-                        value={expenseForm.category}
-                        onChange={(event) => setExpenseForm((prev) => ({ ...prev, category: event.target.value }))}
-                        className="rounded-2xl border border-white/10 bg-slate-900 px-4 py-3 text-white outline-none"
-                      >
-                        <option value="rent">Rent contribution</option>
-                        <option value="salaries">Salaries contribution</option>
-                        <option value="utilities">Utilities</option>
-                        <option value="perfume">Perfume / Invest</option>
-                        <option value="groceries">Groceries</option>
-                        <option value="supplies">Supplies</option>
-                        <option value="misc">Miscellaneous</option>
-                      </select>
+                <div className="rounded-2xl border border-white/10 bg-slate-900/40 p-4">
+                  <p className="text-xs font-black uppercase tracking-[0.22em] text-slate-500 mb-4">Past Sale Injection</p>
+                  <div className="space-y-3">
+                    <select
+                      value={saleForm.shopId}
+                      onChange={(event) => setSaleForm((prev) => ({ ...prev, shopId: event.target.value as SaleForm['shopId'] }))}
+                      className="w-full rounded-xl border border-white/10 bg-slate-950 px-3 py-2 text-sm text-white"
+                    >
+                      {SHOPS.map((shop) => <option key={shop.id} value={shop.id}>{shop.name}</option>)}
+                    </select>
+                    <input
+                      type="date"
+                      value={saleForm.date}
+                      onChange={(event) => setSaleForm((prev) => ({ ...prev, date: event.target.value }))}
+                      className="w-full rounded-xl border border-white/10 bg-slate-950 px-3 py-2 text-sm text-white"
+                    />
+                    <input
+                      type="text"
+                      placeholder="Client"
+                      value={saleForm.clientName}
+                      onChange={(event) => setSaleForm((prev) => ({ ...prev, clientName: event.target.value }))}
+                      className="w-full rounded-xl border border-white/10 bg-slate-950 px-3 py-2 text-sm text-white"
+                    />
+                    <input
+                      type="text"
+                      placeholder="Item"
+                      value={saleForm.itemName}
+                      onChange={(event) => setSaleForm((prev) => ({ ...prev, itemName: event.target.value }))}
+                      className="w-full rounded-xl border border-white/10 bg-slate-950 px-3 py-2 text-sm text-white"
+                    />
+                    <div className="flex gap-2">
                       <input
                         type="number"
-                        placeholder="Amount"
-                        value={expenseForm.amount}
-                        onChange={(event) => setExpenseForm((prev) => ({ ...prev, amount: Number(event.target.value || 0) }))}
-                        className="rounded-2xl border border-white/10 bg-slate-900 px-4 py-3 text-white outline-none"
+                        placeholder="Qty"
+                        value={saleForm.quantity}
+                        onChange={(event) => setSaleForm((prev) => ({ ...prev, quantity: Number(event.target.value || 0) }))}
+                        className="w-full rounded-xl border border-white/10 bg-slate-950 px-3 py-2 text-sm text-white outline-none focus:border-sky-500/50"
                       />
                       <input
-                        type="text"
-                        placeholder="Description"
-                        value={expenseForm.description}
-                        onChange={(event) => setExpenseForm((prev) => ({ ...prev, description: event.target.value }))}
-                        className="rounded-2xl border border-white/10 bg-slate-900 px-4 py-3 text-white outline-none"
+                        type="number"
+                        placeholder="Price"
+                        value={saleForm.unitPrice}
+                        onChange={(event) => setSaleForm((prev) => ({ ...prev, unitPrice: Number(event.target.value || 0) }))}
+                        className="w-full rounded-xl border border-white/10 bg-slate-950 px-3 py-2 text-sm text-white outline-none focus:border-sky-500/50"
                       />
-                      <label className="flex items-center gap-3 rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3 text-sm text-slate-300">
-                        <input
-                          type="checkbox"
-                          checked={expenseForm.autoRoute}
-                          onChange={(event) => setExpenseForm((prev) => ({ ...prev, autoRoute: event.target.checked }))}
-                        />
-                        Auto-route this expense into Operations or Invest when the category calls for it.
-                      </label>
-                      <button
-                        onClick={handleRecordExpense}
-                        className="rounded-2xl border border-amber-400/30 bg-amber-500/10 px-4 py-3 font-bold text-amber-100 transition hover:bg-amber-500/20"
-                      >
-                        Post Past Expense To Proper Ledgers
-                      </button>
                     </div>
+                    <button
+                      onClick={handleRecordSale}
+                      className="w-full rounded-xl border border-emerald-400/30 bg-emerald-500/10 py-3 text-xs font-black uppercase tracking-widest text-emerald-200 hover:bg-emerald-500/20"
+                    >
+                      Post Sale
+                    </button>
+                  </div>
+                </div>
+
+                <div className="rounded-2xl border border-white/10 bg-slate-900/40 p-4">
+                  <p className="text-xs font-black uppercase tracking-[0.22em] text-slate-500 mb-4">Past Expense Injection</p>
+                  <div className="space-y-3">
+                    <select
+                      value={expenseForm.shopId}
+                      onChange={(event) => setExpenseForm((prev) => ({ ...prev, shopId: event.target.value as ExpenseForm['shopId'] }))}
+                      className="w-full rounded-xl border border-white/10 bg-slate-950 px-3 py-2 text-sm text-white"
+                    >
+                      {SHOPS.map((shop) => <option key={shop.id} value={shop.id}>{shop.name}</option>)}
+                    </select>
+                    <input
+                      type="date"
+                      value={expenseForm.date}
+                      onChange={(event) => setExpenseForm((prev) => ({ ...prev, date: event.target.value }))}
+                      className="w-full rounded-xl border border-white/10 bg-slate-950 px-3 py-2 text-sm text-white"
+                    />
+                    <select
+                      value={expenseForm.category}
+                      onChange={(event) => setExpenseForm((prev) => ({ ...prev, category: event.target.value }))}
+                      className="w-full rounded-xl border border-white/10 bg-slate-950 px-3 py-2 text-sm text-white"
+                    >
+                      <option value="rent">Rent</option>
+                      <option value="salaries">Salaries</option>
+                      <option value="utilities">Utilities</option>
+                      <option value="stock">Stock</option>
+                      <option value="misc">Miscellaneous</option>
+                    </select>
+                    <input
+                      type="number"
+                      placeholder="Amount"
+                      value={expenseForm.amount}
+                      onChange={(event) => setExpenseForm((prev) => ({ ...prev, amount: Number(event.target.value || 0) }))}
+                      className="w-full rounded-xl border border-white/10 bg-slate-950 px-3 py-2 text-sm text-white"
+                    />
+                    <input
+                      type="text"
+                      placeholder="Description"
+                      value={expenseForm.description}
+                      onChange={(event) => setExpenseForm((prev) => ({ ...prev, description: event.target.value }))}
+                      className="w-full rounded-xl border border-white/10 bg-slate-950 px-3 py-2 text-sm text-white"
+                    />
+                    <button
+                      onClick={handleRecordExpense}
+                      className="w-full rounded-xl border border-rose-400/30 bg-rose-500/10 py-3 text-xs font-black uppercase tracking-widest text-rose-200 hover:bg-rose-500/20"
+                    >
+                      Post Expense
+                    </button>
                   </div>
                 </div>
               </div>
