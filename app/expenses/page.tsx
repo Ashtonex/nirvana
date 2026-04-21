@@ -440,7 +440,12 @@ export default function ExpensesPage() {
                 <label className="text-xs font-black uppercase text-slate-400 mb-2 block">Classification</label>
                 <select
                   value={newRule.action}
-                  onChange={(e) => setNewRule({...newRule, action: e.target.value})}
+                  onChange={(e) =>
+                    setNewRule({
+                      ...newRule,
+                      action: e.target.value as "overhead" | "filter" | "personal" | "stock" | "operational"
+                    })
+                  }
                   className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   <option value="overhead">Business Overhead</option>
