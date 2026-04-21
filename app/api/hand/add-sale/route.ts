@@ -37,8 +37,8 @@ export async function POST(request: Request) {
       item_id: null, // Allow null item_id for manual recovery sales
       quantity,
       unit_price: unitPrice,
-      total_before_tax: totalBeforeTax,
-      tax,
+      total_before_tax: totalWithTax / 1.155, // Extract net from gross for ledger accuracy
+      tax: totalWithTax - (totalWithTax / 1.155), // Compute tax portion from final figure
       total_with_tax: totalWithTax,
       date,
       employee_id: employeeId,
