@@ -34,7 +34,7 @@ export async function POST(request: Request) {
       id: saleId,
       shop_id: shopId,
       item_name: itemName,
-      item_id: `manual_${saleId}`,
+      item_id: null, // Allow null item_id for manual recovery sales
       quantity,
       unit_price: unitPrice,
       total_before_tax: totalBeforeTax,
