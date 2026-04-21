@@ -1,5 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 
+let schedulerInitialized = false;
+
 function unauthorizedBasicAuth() {
   return new NextResponse("Authentication required", {
     status: 401,
@@ -64,6 +66,21 @@ function isAuthenticated(req: NextRequest) {
 }
 
 export function proxy(req: NextRequest) {
+  // Initialize backup scheduler on first request (only once per process)
+  if (!schedulerInitialized && process.env.NODE_ENV === 'production') {
+    schedulerInitialized = true;
+    
+    // Dynamically import and start the scheduler
+    Promise.resolve().then(async () => {
+      try {
+        const { startBackupScheduler } = await import('@/lib/backup-scheduler');
+        startBackupScheduler();
+      } catch (error) {
+        console.error('Failed to initialize backup scheduler:', error);
+      }
+    });
+  }
+
   const { pathname } = req.nextUrl;
 
   // Check if authenticated for non-public routes
