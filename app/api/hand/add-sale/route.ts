@@ -1,9 +1,13 @@
 import { supabaseAdmin } from '@/lib/supabase';
+import { enforceOwnerOnly } from '@/lib/auth-helpers';
 import { NextResponse } from 'next/server';
 import { promises as fs } from 'fs';
 import path from 'path';
 
 export async function POST(request: Request) {
+  const authError = await enforceOwnerOnly();
+  if (authError) return authError;
+
   try {
     const body = await request.json();
     const {
@@ -17,7 +21,6 @@ export async function POST(request: Request) {
       totalWithTax,
       date,
       employeeId,
-      overwrite
     } = body;
 
     if (!shopId || !clientName || !itemName || totalWithTax <= 0) {
@@ -80,9 +83,10 @@ export async function POST(request: Request) {
       message: `Sale added successfully (ID: ${saleId})`,
       saleId
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
     return NextResponse.json(
-      { success: false, message: error.message },
+      { success: false, message },
       { status: 500 }
     );
   }

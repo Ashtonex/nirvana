@@ -1,9 +1,13 @@
 import { supabaseAdmin } from '@/lib/supabase';
+import { enforceOwnerOnly } from '@/lib/auth-helpers';
 import { NextResponse } from 'next/server';
 import { promises as fs } from 'fs';
 import path from 'path';
 
 export async function POST(request: Request) {
+  const authError = await enforceOwnerOnly();
+  if (authError) return authError;
+
   try {
     const body = await request.json();
     const {
@@ -20,7 +24,7 @@ export async function POST(request: Request) {
     }
 
     const expenseId = Math.random().toString(36).substring(2, 9);
-    let results: any[] = [];
+    const results: string[] = [];
 
     // 1. Add to ledger_entries
     const { error: ledgerError } = await supabaseAdmin.from('ledger_entries').insert({
@@ -110,9 +114,10 @@ export async function POST(request: Request) {
       details: results,
       expenseId
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
     return NextResponse.json(
-      { success: false, message: error.message },
+      { success: false, message },
       { status: 500 }
     );
   }

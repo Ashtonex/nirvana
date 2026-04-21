@@ -1,15 +1,21 @@
 import { cookies } from 'next/headers';
 
+const OWNER_EMAIL = 'flectere@dev.com';
+
 /**
  * Check if request is from owner (uses owner cookie)
  */
 export async function isOwnerRequest(): Promise<boolean> {
   try {
     const cookieStore = await cookies();
+    const nirvanaOwner = cookieStore.get('nirvana_owner');
     const ownerCookie = cookieStore.get('owner_session');
     const ownerEmail = cookieStore.get('owner_email');
     
-    return !!(ownerCookie?.value && ownerEmail?.value === 'flectere@dev.com');
+    return !!(
+      nirvanaOwner?.value ||
+      (ownerCookie?.value && ownerEmail?.value === OWNER_EMAIL)
+    );
   } catch {
     return false;
   }

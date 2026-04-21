@@ -1,9 +1,13 @@
 import { supabaseAdmin } from '@/lib/supabase';
+import { enforceOwnerOnly } from '@/lib/auth-helpers';
 import { NextResponse } from 'next/server';
 import { promises as fs } from 'fs';
 import path from 'path';
 
-export async function POST(request: Request) {
+async function healthResponse() {
+  const authError = await enforceOwnerOnly();
+  if (authError) return authError;
+
   try {
     // Check Supabase
     const { data: supabaseOk } = await supabaseAdmin.from('employees').select('count').limit(1);
@@ -20,7 +24,16 @@ export async function POST(request: Request) {
       supabase: !!supabaseOk,
       localJson: localJsonOk
     });
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    return NextResponse.json({ error: message }, { status: 500 });
   }
+}
+
+export async function GET() {
+  return healthResponse();
+}
+
+export async function POST() {
+  return healthResponse();
 }

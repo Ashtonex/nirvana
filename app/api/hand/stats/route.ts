@@ -1,7 +1,11 @@
 import { supabaseAdmin } from '@/lib/supabase';
+import { enforceOwnerOnly } from '@/lib/auth-helpers';
 import { NextResponse } from 'next/server';
 
-export async function GET(request: Request) {
+export async function GET() {
+  const authError = await enforceOwnerOnly();
+  if (authError) return authError;
+
   try {
     // Get sales count
     const { count: salesCount } = await supabaseAdmin
@@ -31,7 +35,8 @@ export async function GET(request: Request) {
       cashEntries: cashEntries || 0,
       operationsCount: operationsCount || 0
     });
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }
