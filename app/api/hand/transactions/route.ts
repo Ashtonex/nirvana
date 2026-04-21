@@ -2,6 +2,16 @@ import { supabaseAdmin } from '@/lib/supabase';
 import { enforceOwnerOnly } from '@/lib/auth-helpers';
 import { NextResponse } from 'next/server';
 
+type LedgerRow = {
+  id: string;
+  date: string | null;
+  type: string | null;
+  amount: number | null;
+  shop_id: string | null;
+  description: string | null;
+  category: string | null;
+};
+
 export async function GET(request: Request) {
   const authError = await enforceOwnerOnly();
   if (authError) return authError;
@@ -17,7 +27,7 @@ export async function GET(request: Request) {
       .order('date', { ascending: false })
       .limit(limit);
 
-    const transactions = (ledgerData || []).map(t => ({
+    const transactions = ((ledgerData || []) as LedgerRow[]).map((t: LedgerRow) => ({
       id: t.id,
       date: t.date,
       type: t.type,
@@ -32,7 +42,8 @@ export async function GET(request: Request) {
       transactions,
       count: transactions.length
     });
-  } catch (error: any) {
-    return NextResponse.json({ success: false, message: error.message }, { status: 500 });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    return NextResponse.json({ success: false, message }, { status: 500 });
   }
 }
