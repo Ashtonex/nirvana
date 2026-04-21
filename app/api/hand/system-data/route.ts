@@ -2,7 +2,15 @@ import { supabaseAdmin } from '@/lib/supabase';
 import { enforceOwnerOnly } from '@/lib/auth-helpers';
 import { NextResponse } from 'next/server';
 
-export async function GET(request: Request) {
+type SalesRow = {
+  total_with_tax: number | null;
+};
+
+type ExpenseRow = {
+  amount: number | null;
+};
+
+export async function GET() {
   const authError = await enforceOwnerOnly();
   if (authError) return authError;
   
@@ -10,7 +18,7 @@ export async function GET(request: Request) {
     const [
       { data: salesData, count: salesCount },
       { data: expenseData, count: expenseCount },
-      { data: itemsData, count: itemsCount }
+      { count: itemsCount }
     ] = await Promise.all([
       supabaseAdmin.from('sales').select('*', { count: 'exact' }),
       supabaseAdmin.from('ledger_entries').select('*', { count: 'exact' }).eq('type', 'expense'),
@@ -18,8 +26,14 @@ export async function GET(request: Request) {
     ]);
 
     // Calculate totals
-    const totalSales = (salesData || []).reduce((sum, s) => sum + (s.total_with_tax || 0), 0);
-    const totalExpenses = (expenseData || []).reduce((sum, e) => sum + (e.amount || 0), 0);
+    const totalSales = ((salesData || []) as SalesRow[]).reduce(
+      (sum: number, s: SalesRow) => sum + Number(s.total_with_tax || 0),
+      0
+    );
+    const totalExpenses = ((expenseData || []) as ExpenseRow[]).reduce(
+      (sum: number, e: ExpenseRow) => sum + Number(e.amount || 0),
+      0
+    );
     const netBalance = totalSales - totalExpenses;
 
     return NextResponse.json({
@@ -33,7 +47,8 @@ export async function GET(request: Request) {
         totalExpenseCount: expenseCount || 0
       }
     });
-  } catch (error: any) {
-    return NextResponse.json({ success: false, message: error.message }, { status: 500 });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    return NextResponse.json({ success: false, message }, { status: 500 });
   }
 }
