@@ -5,6 +5,35 @@ import { runOracleValidation } from "@/lib/oracleValidation";
 
 export const dynamic = "force-dynamic";
 
+type SaleRow = {
+  total_with_tax: number | null;
+  quantity: number | null;
+  item_name: string | null;
+  shop_id: string | null;
+  date: string | null;
+};
+
+type LedgerRow = {
+  amount: number | null;
+  type: string | null;
+  category: string | null;
+  shop_id: string | null;
+  date: string | null;
+};
+
+type OperationRow = {
+  amount: number | null;
+  kind: string | null;
+  shop_id: string | null;
+  effective_date: string | null;
+};
+
+type ShopRow = {
+  id: string;
+  name: string;
+  expenses?: Record<string, number | string | null> | null;
+};
+
 export async function GET() {
   try {
     await requirePrivilegedActor();
@@ -30,19 +59,26 @@ export async function GET() {
       return NextResponse.json({ error: "Master pulse data unavailable" }, { status: 500 });
     }
 
-    const sales = salesRes.data || [];
-    const ledger = ledgerRes.data || [];
-    const operations = opsRes.data || [];
-    const shops = shopsRes.data || [];
+    const sales: SaleRow[] = salesRes.data || [];
+    const ledger: LedgerRow[] = ledgerRes.data || [];
+    const operations: OperationRow[] = opsRes.data || [];
+    const shops: ShopRow[] = shopsRes.data || [];
 
     // Aggregations
     let totalRevenue = 0;
     let totalUnits = 0;
     const categoryBreakdown: Record<string, number> = {};
-    const shopPerformance: any[] = [];
+    const shopPerformance: Array<{
+      id: string;
+      name: string;
+      revenue: number;
+      expenses: number;
+      deposits: number;
+      progress: number;
+    }> = [];
 
     // Calculate Global Stats
-    sales.forEach(s => {
+    sales.forEach((s: SaleRow) => {
       totalRevenue += Number(s.total_with_tax || 0);
       totalUnits += Number(s.quantity || 1);
       
@@ -52,20 +88,20 @@ export async function GET() {
     });
 
     const totalExpenses = ledger
-      .filter(l => l.type === 'expense')
-      .reduce((sum, l) => sum + Number(l.amount || 0), 0);
+      .filter((l: LedgerRow) => l.type === 'expense')
+      .reduce((sum: number, l: LedgerRow) => sum + Number(l.amount || 0), 0);
 
     // Process Shop Performance: deposits from operations (for visibility) but burn rate excludes ops
-    shops.forEach(shop => {
-      const shopSales = sales.filter(s => s.shop_id === shop.id);
-      const shopRevenue = shopSales.reduce((sum, s) => sum + Number(s.total_with_tax || 0), 0);
+    shops.forEach((shop: ShopRow) => {
+      const shopSales = sales.filter((s: SaleRow) => s.shop_id === shop.id);
+      const shopRevenue = shopSales.reduce((sum: number, s: SaleRow) => sum + Number(s.total_with_tax || 0), 0);
       
       const shopDeposits = operations
-        .filter(o => o.shop_id === shop.id && (o.kind === 'eod_deposit' || o.kind === 'overhead_contribution'))
-        .reduce((sum, o) => sum + Number(o.amount || 0), 0);
+        .filter((o: OperationRow) => o.shop_id === shop.id && (o.kind === 'eod_deposit' || o.kind === 'overhead_contribution'))
+        .reduce((sum: number, o: OperationRow) => sum + Number(o.amount || 0), 0);
 
       const shopExpenses = shop.expenses || {};
-      const overheadTarget = Object.values(shopExpenses).reduce((acc: number, val: any) => acc + Number(val || 0), 0);
+      const overheadTarget = Object.values(shopExpenses).reduce((acc: number, val) => acc + Number(val || 0), 0);
       
       const coverageAmount = shopRevenue + shopDeposits;
       const progress = overheadTarget > 0 ? (coverageAmount / (overheadTarget * 2)) * 100 : 100; // *2 because 60 days
@@ -97,8 +133,9 @@ export async function GET() {
       dataIntegrity: await runOracleValidation().catch(() => null)
     });
 
-  } catch (e: any) {
+  } catch (e: unknown) {
     console.error("Oracle pulse migration error:", e);
-    return NextResponse.json({ error: e.message }, { status: 500 });
+    const message = e instanceof Error ? e.message : "Unknown error";
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }
