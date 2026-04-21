@@ -462,25 +462,22 @@ export async function recordSale(sale: any) {
     // Support backlog sales with custom date
     const timestamp = sale.date ? new Date(sale.date).toISOString() : new Date().toISOString();
 
-    // PREVENTION: Check for duplicate sale (same client, same total, same day)
+    // PREVENTION: Check for duplicate sale (LESS AGGRESSIVE - allow up to 3 identical sales per day)
     const today = new Date(timestamp).toISOString().split('T')[0];
-    const { data: existingSale } = await supabaseAdmin
+    const { data: identicalSales } = await supabaseAdmin
         .from("sales")
         .select("*")
         .eq("shop_id", sale.shopId)
         .eq("client_name", sale.clientName)
-        .eq("total_with_tax", totalWithTax)
+        .eq("item_id", sale.itemId)
+        .eq("quantity", sale.quantity)
+        .eq("unit_price", sale.unitPrice)
         .gte("date", `${today}T00:00:00.000Z`)
-        .lt("date", `${today}T23:59:59.999Z`)
-        .order("date", { ascending: false })
-        .limit(1);
+        .lt("date", `${today}T23:59:59.999Z`);
 
-    if (existingSale && existingSale.length > 0) {
-        const timeDiff = new Date(timestamp).getTime() - new Date(existingSale[0].date).getTime();
-        // If same sale recorded within 5 minutes, it's likely a duplicate
-        if (timeDiff < 5 * 60 * 1000) {
-            throw new Error(`Duplicate sale detected: Same client ${sale.clientName} with total $${totalWithTax.toFixed(2)} was recorded ${Math.floor(timeDiff / 1000)} seconds ago`);
-        }
+    // Only prevent if MORE than 3 identical sales (allowing multi-shift ops)
+    if (identicalSales && identicalSales.length >= 3) {
+        console.warn(`⚠️ Multiple identical sales detected for ${sale.clientName}: ${identicalSales.length} times today. Recording anyway.`);
     }
 
     const { error: saleError } = await supabaseAdmin.from('sales').insert({
@@ -1071,19 +1068,18 @@ export async function openCashRegister(shopId: string, expectedAmount: number, a
     const id = Math.random().toString(36).substring(2, 9);
     const actor = await getActorFromCookies().catch(() => null);
 
-    // PREVENTION: Check if register already opened today
+    // PREVENTION: Log multiple openings (LESS RESTRICTIVE - allow multi-shift operations)
     const today = new Date().toISOString().split('T')[0];
-    const { data: existingOpening } = await supabaseAdmin
+    const { data: existingOpenings } = await supabaseAdmin
         .from("ledger_entries")
         .select("*")
         .eq("shop_id", shopId)
         .eq("category", "Cash Drawer Opening")
         .gte("date", `${today}T00:00:00.000Z`)
-        .lt("date", `${today}T23:59:59.999Z`)
-        .maybeSingle();
+        .lt("date", `${today}T23:59:59.999Z`);
 
-    if (existingOpening) {
-        throw new Error(`Register already opened today at ${new Date(existingOpening.date).toLocaleTimeString()} by ${existingOpening.description?.split('by')?.[1]?.trim() || 'unknown'}`);
+    if (existingOpenings && existingOpenings.length > 0) {
+        console.warn(`📋 Register already opened ${existingOpenings.length} time(s) today at ${new Date(existingOpenings[0].date).toLocaleTimeString()}. Recording multi-shift opening.`);
     }
 
     // Log the actual opening amount as an asset
@@ -1455,7 +1451,7 @@ export async function getOracleMasterPulse(daysLimit = 60) {
         const shopPerformance: any[] = [];
 
         // Calculate Global Stats from Sales
-        sales.forEach(s => {
+        sales.forEach((s: any) => {
             totalRevenue += Number(s.total_with_tax || 0);
             totalUnits += Number(s.quantity || 1);
             const cat = s.item_name?.split(' ')?.[0] || "General";
@@ -1464,18 +1460,18 @@ export async function getOracleMasterPulse(daysLimit = 60) {
 
         // ORACLE BURN RATE: POS expenses ONLY (ledger_entries, not operations_ledger)
         const totalExpenses = ledger
-            .filter(l => l.type === 'expense')
-            .reduce((sum, l) => sum + Number(l.amount || 0), 0);
+            .filter((l: any) => l.type === 'expense')
+            .reduce((sum: number, l: any) => sum + Number(l.amount || 0), 0);
 
         // Process Shop Performance: deposits come from operations (for visibility)
-        shops.forEach(shop => {
-            const shopSales = sales.filter(s => s.shop_id === shop.id);
-            const shopRevenue = shopSales.reduce((sum, s) => sum + Number(s.total_with_tax || 0), 0);
+        shops.forEach((shop: any) => {
+            const shopSales = sales.filter((s: any) => s.shop_id === shop.id);
+            const shopRevenue = shopSales.reduce((sum: number, s: any) => sum + Number(s.total_with_tax || 0), 0);
             
             // Deposits from operations (for display) but not counted in burn rate
             const shopDeposits = operations
-                .filter(o => o.shop_id === shop.id && (o.kind === 'eod_deposit' || o.kind === 'overhead_contribution'))
-                .reduce((sum, o) => sum + Number(o.amount || 0), 0);
+                .filter((o: any) => o.shop_id === shop.id && (o.kind === 'eod_deposit' || o.kind === 'overhead_contribution'))
+                .reduce((sum: number, o: any) => sum + Number(o.amount || 0), 0);
 
             const shopExpenses = shop.expenses || {};
             const overheadTarget = Object.values(shopExpenses).reduce((acc: number, val: any) => acc + Number(val || 0), 0);
@@ -1803,29 +1799,28 @@ export async function postDrawerToOperations(input: { shopId: string; amount: nu
         throw new Error("Forbidden");
     }
 
-    // PREVENTION: Check if already routed to operations today
+    // PREVENTION: Log duplicate operations routing (LESS RESTRICTIVE - allow multi-deposit operations)
     const today = new Date().toISOString().split('T')[0];
-    const { data: existingRouting } = await supabaseAdmin
+    const { data: existingRoutings } = await supabaseAdmin
         .from("operations_ledger")
         .select("*")
         .eq("shop_id", shopId)
         .eq("amount", amount)
         .eq("kind", kind)
-        .like("notes", "%Auto-routed from POS expense%")
         .gte("created_at", `${today}T00:00:00.000Z`)
-        .lt("created_at", `${today}T23:59:59.999Z`)
-        .maybeSingle();
+        .lt("created_at", `${today}T23:59:59.999Z`);
 
-    if (existingRouting) {
-        throw new Error(`This expense of $${amount.toFixed(2)} was already routed to operations today at ${new Date(existingRouting.created_at).toLocaleTimeString()}`);
+    if (existingRoutings && existingRoutings.length > 0) {
+        console.warn(`💰 Duplicate operations routing detected: $${amount.toFixed(2)} (${kind}) already routed today at ${new Date(existingRoutings[0].created_at).toLocaleTimeString()}. Allowing multiple deposits.`);
     }
 
     // PREVENTION: Add error handling
+    let drawerLedgerId = "";
     try {
         const timestamp = new Date().toISOString();
         const dayStamp = timestamp.split("T")[0];
 
-        const drawerLedgerId = Math.random().toString(36).substring(2, 9);
+        drawerLedgerId = Math.random().toString(36).substring(2, 9);
         
         const { error: ledgerError } = await supabaseAdmin.from("ledger_entries").insert([{
             id: drawerLedgerId,

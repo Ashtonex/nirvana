@@ -22,7 +22,8 @@ import {
     FileText,
     Wallet,
     HandCoins,
-    Cpu
+    Cpu,
+    Zap
 } from 'lucide-react';
 import { useAuth } from '@/components/AuthProvider';
 import { useStaff } from '@/components/StaffProvider';
@@ -58,6 +59,7 @@ const navItems = [
     { name: 'Logic', href: '/logic', icon: Cpu },
     { name: 'EOD Reports', href: '/admin/eod', icon: FileText },
     { name: 'Data Vault', href: '/admin/backups', icon: ShieldCheck },
+    { name: 'The Hand', href: '/admin/hand/master', icon: Zap },
 ];
 
 export default function Sidebar() {
