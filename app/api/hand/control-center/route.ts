@@ -115,14 +115,17 @@ export async function GET() {
       supabaseAdmin
         .from('sales')
         .select('shop_id, total_with_tax, total_before_tax, quantity, date')
+        .is('deleted_at', null)
         .gte('date', thirtyDaysAgo),
       supabaseAdmin
         .from('ledger_entries')
         .select('id, shop_id, amount, type, category, description, date')
+        .is('deleted_at', null)
         .gte('date', thirtyDaysAgo),
       supabaseAdmin
         .from('operations_ledger')
         .select('id, shop_id, amount, kind, title, notes, created_at, status')
+        .is('deleted_at', null)
         .gte('created_at', thirtyDaysAgo),
       supabaseAdmin
         .from('invest_deposits')

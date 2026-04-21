@@ -145,13 +145,13 @@ export async function getDashboardData(daysLimit = 60) {
 
         const { data: inventory } = await supabaseAdmin.from('inventory_items').select('*').limit(10000);
         const { data: allocations } = await supabaseAdmin.from('inventory_allocations').select('*').limit(10000);
-        const { data: sales } = await supabaseAdmin.from('sales').select('*').gte('date', dateThreshold).order('date', { ascending: false }).limit(20000);
+        const { data: sales } = await supabaseAdmin.from('sales').select('*').is('deleted_at', null).gte('date', dateThreshold).order('date', { ascending: false }).limit(20000);
         const { data: shops } = await supabaseAdmin.from('shops').select('*').limit(1000);
         const { data: quotations } = await supabaseAdmin.from('quotations').select('*').limit(10000);
         const { data: employees } = await supabaseAdmin.from('employees').select('*').limit(1000);
         const { data: shipments } = await supabaseAdmin.from('shipments').select('*').limit(5000);
         const { data: settings } = await supabaseAdmin.from('oracle_settings').select('*').single();
-        const { data: ledger } = await supabaseAdmin.from('ledger_entries').select('*').gte('date', dateThreshold).order('date', { ascending: false }).limit(20000);
+        const { data: ledger } = await supabaseAdmin.from('ledger_entries').select('*').is('deleted_at', null).gte('date', dateThreshold).order('date', { ascending: false }).limit(20000);
         const { data: auditLog } = await supabaseAdmin.from('audit_log').select('*').order('timestamp', { ascending: false }).limit(5000);
         const { data: transfers } = await supabaseAdmin.from('transfers').select('*').order('created_at', { ascending: false }).limit(5000);
         const { data: emails } = await supabaseAdmin.from('oracle_emails').select('*').limit(1000);
@@ -279,12 +279,12 @@ export async function getShopDashboardData(shopId: string, daysLimit = 60) {
         const [invRes, allocRes, salesRes, shopRes, quotesRes, empRes, settingsRes, ledgerRes] = await Promise.all([
             supabaseAdmin.from('inventory_items').select('*').limit(5000),
             supabaseAdmin.from('inventory_allocations').select('*').eq('shop_id', shopId),
-            supabaseAdmin.from('sales').select('*').eq('shop_id', shopId).gte('date', dateThreshold).order('date', { ascending: false }).limit(5000),
+            supabaseAdmin.from('sales').select('*').eq('shop_id', shopId).is('deleted_at', null).gte('date', dateThreshold).order('date', { ascending: false }).limit(5000),
             supabaseAdmin.from('shops').select('*').eq('id', shopId).single(),
             supabaseAdmin.from('quotations').select('*').eq('shop_id', shopId).limit(2000),
             supabaseAdmin.from('employees').select('*').eq('shop_id', shopId),
             supabaseAdmin.from('oracle_settings').select('*').single(),
-            supabaseAdmin.from('ledger_entries').select('*').eq('shop_id', shopId).gte('date', dateThreshold).order('date', { ascending: false }).limit(5000),
+            supabaseAdmin.from('ledger_entries').select('*').eq('shop_id', shopId).is('deleted_at', null).gte('date', dateThreshold).order('date', { ascending: false }).limit(5000),
         ]);
 
         const inventory = invRes.data || [];

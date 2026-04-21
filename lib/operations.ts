@@ -82,7 +82,8 @@ export async function createOperationsLedgerEntry(input: {
 export async function listOperationsLedgerEntries(limit = 50, month?: string) {
   let query = supabaseAdmin
     .from("operations_ledger")
-    .select("*");
+    .select("*")
+    .is("deleted_at", null);
     
   if (month) {
     query = query.gte("created_at", `${month}-01T00:00:00Z`)

@@ -161,21 +161,23 @@ function WindowCard({
   eyebrow,
   children,
   icon: Icon,
+  className = "",
 }: {
   title: string;
   eyebrow: string;
   children: React.ReactNode;
   icon: typeof Brain;
+  className?: string;
 }) {
   return (
-    <section className="rounded-3xl border border-white/10 bg-slate-950/65 p-5 shadow-[0_30px_80px_rgba(0,0,0,0.35)] backdrop-blur-xl">
-      <div className="mb-4 flex items-center justify-between gap-4">
+    <section className={`rounded-3xl border border-white/10 bg-slate-950/65 p-6 shadow-[0_30px_80px_rgba(0,0,0,0.35)] backdrop-blur-xl ${className}`}>
+      <div className="mb-6 flex items-center justify-between gap-4">
         <div>
-          <p className="text-[10px] font-black uppercase tracking-[0.35em] text-slate-500">{eyebrow}</p>
-          <h2 className="mt-2 text-xl font-black text-white">{title}</h2>
+          <p className="text-[10px] font-black uppercase tracking-[0.35em] text-rose-400/80">{eyebrow}</p>
+          <h2 className="mt-1 text-2xl font-black tracking-tight text-white">{title}</h2>
         </div>
-        <div className="rounded-2xl border border-white/10 bg-white/5 p-3 text-slate-200">
-          <Icon className="h-5 w-5" />
+        <div className="rounded-2xl border border-white/10 bg-white/5 p-3 text-slate-200 shadow-inner">
+          <Icon className="h-6 w-6 text-rose-400" />
         </div>
       </div>
       {children}
@@ -301,6 +303,9 @@ export default function TheHandPage() {
   }, [loadControlRoom]);
 
   const updateOpeningBalance = async (shop: 'kipasa' | 'dubdub' | 'tradecenter') => {
+    if (!confirm(`ARE YOU SURE? This will override the historical opening balance for ${shop.toUpperCase()} at the source. This cannot be undone automatically.`)) {
+      return;
+    }
     try {
       const response = await fetch('/api/hand/update-opening-balance', {
         method: 'POST',
@@ -323,6 +328,10 @@ export default function TheHandPage() {
   const handleRecordSale = async () => {
     if (!saleForm.clientName || !saleForm.itemName || saleForm.unitPrice <= 0) {
       addLog('warning', 'Past sale needs client, item, and valid price.');
+      return;
+    }
+
+    if (!confirm(`POST PAST SALE? You are about to inject a ${currency(saleForm.quantity * saleForm.unitPrice * 1.155)} sale into the ledger for ${saleForm.shopId.toUpperCase()} on ${saleForm.date}. Continue?`)) {
       return;
     }
 
@@ -372,6 +381,10 @@ export default function TheHandPage() {
   const handleRecordExpense = async () => {
     if (expenseForm.amount <= 0) {
       addLog('warning', 'Past expense needs a valid amount.');
+      return;
+    }
+
+    if (!confirm(`POST PAST EXPENSE? You are about to inject a ${currency(expenseForm.amount)} ${expenseForm.category} expense for ${expenseForm.shopId.toUpperCase()} on ${expenseForm.date}. Continue?`)) {
       return;
     }
 
@@ -473,28 +486,49 @@ export default function TheHandPage() {
               </p>
             </div>
 
-            <div className="grid gap-3 sm:grid-cols-2">
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
               <button
                 onClick={() => loadControlRoom(true)}
                 disabled={busy}
-                className="rounded-2xl border border-rose-400/30 bg-rose-500/10 px-5 py-3 text-left transition hover:bg-rose-500/20 disabled:cursor-not-allowed disabled:opacity-60"
+                className="group relative overflow-hidden rounded-2xl border border-rose-400/30 bg-rose-500/10 px-5 py-4 text-left transition-all hover:bg-rose-500/20 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 <div className="flex items-center gap-2 text-rose-200">
-                  <ShieldCheck className="h-4 w-4" />
-                  <span className="text-sm font-bold uppercase tracking-[0.2em]">Run Audit</span>
+                  <ShieldCheck className="h-4 w-4 transition-transform group-hover:scale-110" />
+                  <span className="text-xs font-black uppercase tracking-[0.2em]">Run System Audit</span>
                 </div>
-                <p className="mt-2 text-sm text-slate-300">Sweep the business and surface new risks.</p>
+                <p className="mt-2 text-xs leading-relaxed text-slate-400">Sweep business units for live risk signals.</p>
               </button>
               <button
                 onClick={() => loadControlRoom()}
                 disabled={busy}
-                className="rounded-2xl border border-sky-400/30 bg-sky-500/10 px-5 py-3 text-left transition hover:bg-sky-500/20 disabled:cursor-not-allowed disabled:opacity-60"
+                className="group relative overflow-hidden rounded-2xl border border-sky-400/30 bg-sky-500/10 px-5 py-4 text-left transition-all hover:bg-sky-500/20 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 <div className="flex items-center gap-2 text-sky-200">
-                  <RefreshCcw className={`h-4 w-4 ${busy ? 'animate-spin' : ''}`} />
-                  <span className="text-sm font-bold uppercase tracking-[0.2em]">Refresh Grid</span>
+                  <RefreshCcw className={`h-4 w-4 transition-transform group-hover:rotate-180 ${busy ? 'animate-spin' : ''}`} />
+                  <span className="text-xs font-black uppercase tracking-[0.2em]">Refresh Intelligence</span>
                 </div>
-                <p className="mt-2 text-sm text-slate-300">Reload intelligence, balances, and shop pulse.</p>
+                <p className="mt-2 text-xs leading-relaxed text-slate-400">Sync latest balances and shop pulses.</p>
+              </button>
+              <button
+                onClick={() => runBackupAction('backup')}
+                disabled={backupBusy}
+                className="group relative overflow-hidden rounded-2xl border border-emerald-400/30 bg-emerald-500/10 px-5 py-4 text-left transition-all hover:bg-emerald-500/20 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                <div className="flex items-center gap-2 text-emerald-200">
+                  <Database className={`h-4 w-4 ${backupBusy ? 'animate-pulse' : ''}`} />
+                  <span className="text-xs font-black uppercase tracking-[0.2em]">Full Backup</span>
+                </div>
+                <p className="mt-2 text-xs leading-relaxed text-slate-400">Secure current state to cloud vault.</p>
+              </button>
+              <button
+                onClick={() => { if(confirm("FORCE SYSTEM SYNC?")) loadControlRoom(); }}
+                className="group relative overflow-hidden rounded-2xl border border-amber-400/30 bg-amber-500/10 px-5 py-4 text-left transition-all hover:bg-amber-500/20"
+              >
+                <div className="flex items-center gap-2 text-amber-200">
+                  <Sparkles className="h-4 w-4" />
+                  <span className="text-xs font-black uppercase tracking-[0.2em]">Matrix Sync</span>
+                </div>
+                <p className="mt-2 text-xs leading-relaxed text-slate-400">Force alignment across all storefronts.</p>
               </button>
             </div>
           </div>

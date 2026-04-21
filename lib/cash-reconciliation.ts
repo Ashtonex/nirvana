@@ -20,7 +20,9 @@ export function buildCashReconciliation(input: {
   );
 
   const salesCash = sumNumbers(
-    (input.sales || []).map((sale) => sale.total_with_tax as number | string | null | undefined)
+    (input.sales || [])
+      .filter((sale) => (sale.payment_method || sale.paymentMethod) === "cash")
+      .map((sale) => sale.total_with_tax as number | string | null | undefined)
   );
 
   const drawerExpenses = sumNumbers(
