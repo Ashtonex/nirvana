@@ -59,7 +59,7 @@ const navItems = [
     { name: 'Logic', href: '/logic', icon: Cpu },
     { name: 'EOD Reports', href: '/admin/eod', icon: FileText },
     { name: 'Data Vault', href: '/admin/backups', icon: ShieldCheck },
-    { name: 'The Hand', href: '/admin/hand/master', icon: Zap },
+    { name: 'The Hand', href: '/admin/hand', icon: Zap },
 ];
 
 export default function Sidebar() {
