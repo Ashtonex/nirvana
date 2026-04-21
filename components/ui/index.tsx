@@ -325,12 +325,14 @@ export const Select = ({ value, onValueChange, children }: SelectProps) => {
         <div className="relative">
             {React.Children.map(children, (child) => {
                 if (React.isValidElement(child) && child.type === SelectTrigger) {
-                    return React.cloneElement(child, {
+                    const triggerChild = child as React.ReactElement<React.ButtonHTMLAttributes<HTMLButtonElement>>;
+                    return React.cloneElement(triggerChild, {
                         onClick: () => setIsOpen(!isOpen),
-                        children: React.Children.map(child.props.children, (grandChild) => {
+                        children: React.Children.map(triggerChild.props.children, (grandChild) => {
                             if (React.isValidElement(grandChild) && grandChild.type === SelectValue) {
-                                return React.cloneElement(grandChild, {
-                                    children: selectedValue || grandChild.props.placeholder
+                                const valueChild = grandChild as React.ReactElement<{ placeholder?: string; children?: React.ReactNode }>;
+                                return React.cloneElement(valueChild, {
+                                    children: selectedValue || valueChild.props.placeholder
                                 });
                             }
                             return grandChild;
@@ -338,7 +340,7 @@ export const Select = ({ value, onValueChange, children }: SelectProps) => {
                     });
                 }
                 if (React.isValidElement(child) && child.type === SelectContent) {
-                    return isOpen ? React.cloneElement(child, {
+                    return isOpen ? React.cloneElement(child as React.ReactElement<{ onSelect?: (value: string) => void }>, {
                         onSelect: handleSelect
                     }) : null;
                 }
@@ -361,6 +363,7 @@ export const SelectTrigger = React.forwardRef<
         {...props}
     />
 ));
+SelectTrigger.displayName = "SelectTrigger";
 
 export const SelectValue = ({ placeholder, children }: { placeholder?: string; children?: React.ReactNode }) => (
     <span className="truncate">{children || placeholder}</span>
@@ -370,8 +373,9 @@ export const SelectContent = ({ children, onSelect }: { children: React.ReactNod
     <div className="absolute top-full z-50 min-w-[8rem] overflow-hidden rounded-md border bg-popover p-1 text-popover-foreground shadow-md">
         {React.Children.map(children, (child) => {
             if (React.isValidElement(child) && child.type === SelectItem) {
-                return React.cloneElement(child, {
-                    onClick: () => onSelect?.(child.props.value)
+                const itemChild = child as React.ReactElement<React.HTMLAttributes<HTMLDivElement> & { value: string }>;
+                return React.cloneElement(itemChild, {
+                    onClick: () => onSelect?.(itemChild.props.value)
                 });
             }
             return child;
@@ -394,3 +398,4 @@ export const SelectItem = React.forwardRef<
         {children}
     </div>
 ));
+SelectItem.displayName = "SelectItem";

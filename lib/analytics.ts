@@ -1,5 +1,27 @@
 import { supabaseAdmin } from "@/lib/supabase";
 
+type InventoryLookupRow = {
+    id: string;
+    name?: string | null;
+    landed_cost?: number | null;
+};
+
+type SalesSummaryRow = {
+    item_id: string;
+    quantity?: number | null;
+    total_with_tax?: number | null;
+    total_before_tax?: number | null;
+    date?: string | null;
+};
+
+type InventoryRow = {
+    id: string;
+    name: string;
+    quantity: number;
+    landed_cost: number;
+    date_added?: string | null;
+};
+
 function toLocalDateString(date: Date | string | null | undefined): string {
     if (!date) return '';
     try {
@@ -77,7 +99,7 @@ export async function getBestSellers(daysBack = 30): Promise<SalesMetric[]> {
     }
 
     // Create maps for quick lookup
-    const invMap = new Map((inventoryData || []).map(item => [item.id, {
+    const invMap = new Map<string, { name: string; cost: number }>((inventoryData || []).map((item: InventoryLookupRow) => [item.id, {
         name: item.name || 'Unknown Item',
         cost: Number(item.landed_cost || 0)
     }]));
@@ -89,7 +111,7 @@ export async function getBestSellers(daysBack = 30): Promise<SalesMetric[]> {
         cost: number;
     }>();
 
-    (salesData || []).forEach(sale => {
+    (salesData || []).forEach((sale: SalesSummaryRow) => {
         const itemId = sale.item_id;
         const quantity = Number(sale.quantity || 0);
         const revenue = Number(sale.total_with_tax || 0);
@@ -156,8 +178,8 @@ export async function getPerformanceTrends() {
         return { currentPeriodRevenue: 0, previousPeriodRevenue: 0, growth: 0 };
     }
 
-    const currentPeriodRevenue = (currentSales || []).reduce((sum, sale) => sum + Number(sale.total_with_tax || 0), 0);
-    const previousPeriodRevenue = (previousSales || []).reduce((sum, sale) => sum + Number(sale.total_with_tax || 0), 0);
+    const currentPeriodRevenue = (currentSales || []).reduce((sum: number, sale: { total_with_tax?: number | null }) => sum + Number(sale.total_with_tax || 0), 0);
+    const previousPeriodRevenue = (previousSales || []).reduce((sum: number, sale: { total_with_tax?: number | null }) => sum + Number(sale.total_with_tax || 0), 0);
 
     const growth = previousPeriodRevenue > 0
         ? ((currentPeriodRevenue - previousPeriodRevenue) / previousPeriodRevenue) * 100
@@ -179,13 +201,13 @@ export async function getReorderSuggestions(): Promise<ReorderSuggestion[]> {
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
-    for (const item of (inventory || [])) {
-        const recentSales = (sales || []).filter((s: any) =>
+    for (const item of ((inventory || []) as InventoryRow[])) {
+        const recentSales = (sales || []).filter((s: SalesSummaryRow) =>
             s.item_id === item.id &&
-            new Date(s.date) >= thirtyDaysAgo
+            new Date(s.date || 0) >= thirtyDaysAgo
         );
 
-        const totalSold = recentSales.reduce((sum: number, s: any) => sum + s.quantity, 0);
+        const totalSold = recentSales.reduce((sum: number, s: SalesSummaryRow) => sum + Number(s.quantity || 0), 0);
         const dailyVelocity = totalSold / 30;
         const daysToZero = dailyVelocity > 0 ? item.quantity / dailyVelocity : (item.quantity === 0 ? 0 : Infinity);
 
@@ -210,19 +232,19 @@ export async function getReorderSuggestions(): Promise<ReorderSuggestion[]> {
 
 export async function getPremiumStockValue() {
     const { data: inventory } = await supabaseAdmin.from('inventory_items').select('landed_cost, quantity');
-    const totalCost = (inventory || []).reduce((sum: number, item: any) => sum + (Number(item.landed_cost || 0) * Number(item.quantity || 0)), 0);
+    const totalCost = (inventory || []).reduce((sum: number, item: { landed_cost?: number | null; quantity?: number | null }) => sum + (Number(item.landed_cost || 0) * Number(item.quantity || 0)), 0);
     return totalCost * 1.65;
 }
 
 export async function getBreakEvenStockValue() {
     const { data: inventory } = await supabaseAdmin.from('inventory_items').select('landed_cost, quantity');
-    const totalCost = (inventory || []).reduce((sum: number, item: any) => sum + (Number(item.landed_cost || 0) * Number(item.quantity || 0)), 0);
+    const totalCost = (inventory || []).reduce((sum: number, item: { landed_cost?: number | null; quantity?: number | null }) => sum + (Number(item.landed_cost || 0) * Number(item.quantity || 0)), 0);
     return totalCost * 1.35;
 }
 
 export async function getLeanStockValue() {
     const { data: inventory } = await supabaseAdmin.from('inventory_items').select('landed_cost, quantity');
-    const totalCost = (inventory || []).reduce((sum: number, item: any) => sum + (Number(item.landed_cost || 0) * Number(item.quantity || 0)), 0);
+    const totalCost = (inventory || []).reduce((sum: number, item: { landed_cost?: number | null; quantity?: number | null }) => sum + (Number(item.landed_cost || 0) * Number(item.quantity || 0)), 0);
     return totalCost * 1.25;
 }
 

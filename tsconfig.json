@@ -30,5 +30,10 @@
     ".next/dev/types/**/*.ts",
     "**/*.mts"
   ],
-  "exclude": ["node_modules", "scratch"]
+  "exclude": [
+    "node_modules",
+    "scratch",
+    "fix-cash-drawer-carryover.tsx",
+    "prevention-code-updates.ts"
+  ]
 }
