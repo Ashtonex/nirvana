@@ -2,7 +2,16 @@ import { supabaseAdmin } from '@/lib/supabase';
 import { enforceOwnerOnly } from '@/lib/auth-helpers';
 import { NextResponse } from 'next/server';
 
-export async function POST(request: Request) {
+type OperationRow = {
+  status: string | null;
+};
+
+type BalanceRow = {
+  shop_id: string | null;
+  total: number | null;
+};
+
+export async function POST() {
   const authError = await enforceOwnerOnly();
   if (authError) return authError;
   
@@ -22,8 +31,8 @@ export async function POST(request: Request) {
       .select('*', { count: 'exact' });
 
     const analysis = {
-      pendingTransfers: (operationsData || []).filter(o => o.status === 'pending').length,
-      balanceIssues: (balances || []).filter(b => b.total < 0).length,
+      pendingTransfers: ((operationsData || []) as OperationRow[]).filter((o: OperationRow) => o.status === 'pending').length,
+      balanceIssues: ((balances || []) as BalanceRow[]).filter((b: BalanceRow) => Number(b.total || 0) < 0).length,
       operationsCount: operationsCount || 0,
       lastAnalyzed: new Date().toISOString()
     };
@@ -32,7 +41,8 @@ export async function POST(request: Request) {
       success: true,
       analysis
     });
-  } catch (error: any) {
-    return NextResponse.json({ success: false, message: error.message }, { status: 500 });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    return NextResponse.json({ success: false, message }, { status: 500 });
   }
 }
