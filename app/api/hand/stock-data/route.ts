@@ -2,6 +2,18 @@ import { supabaseAdmin } from '@/lib/supabase';
 import { enforceOwnerOnly } from '@/lib/auth-helpers';
 import { NextResponse } from 'next/server';
 
+type InventoryRow = {
+  id: string;
+  name: string | null;
+  category: string | null;
+  quantity: number | null;
+  reorder_level: number | null;
+  shop_id: string | null;
+  last_sold: string | null;
+  landed_cost: number | null;
+  created_at: string | null;
+};
+
 export async function GET(request: Request) {
   const authError = await enforceOwnerOnly();
   if (authError) return authError;
@@ -27,20 +39,21 @@ export async function GET(request: Request) {
     if (error) throw error;
 
     // Filter by status if needed
-    let items = data || [];
+    let items: InventoryRow[] = (data || []) as InventoryRow[];
 
     if (status === 'low') {
-      items = items.filter(i => (i.quantity || 0) < (i.reorder_level || 5));
+      items = items.filter((i: InventoryRow) => Number(i.quantity || 0) < Number(i.reorder_level || 5));
     } else if (status === 'dead') {
-      items = items.filter(i => {
-        const daysInStock = Math.floor((new Date().getTime() - new Date(i.created_at).getTime()) / (1000 * 60 * 60 * 24));
-        return daysInStock > 60 && (i.quantity || 0) > 0;
+      items = items.filter((i: InventoryRow) => {
+        const createdAt = i.created_at ? new Date(i.created_at).getTime() : Date.now();
+        const daysInStock = Math.floor((new Date().getTime() - createdAt) / (1000 * 60 * 60 * 24));
+        return daysInStock > 60 && Number(i.quantity || 0) > 0;
       });
     }
 
     return NextResponse.json({
       success: true,
-      items: items.map(i => ({
+      items: items.map((i: InventoryRow) => ({
         id: i.id,
         name: i.name,
         category: i.category,
@@ -51,8 +64,9 @@ export async function GET(request: Request) {
         price: i.landed_cost || 0
       }))
     });
-  } catch (error: any) {
-    return NextResponse.json({ success: false, message: error.message }, { status: 500 });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    return NextResponse.json({ success: false, message }, { status: 500 });
   }
 }
 
@@ -61,7 +75,7 @@ export async function POST(request: Request) {
   if (authError) return authError;
   
   try {
-    const { itemId, quantity, shop } = await request.json();
+    const { itemId, quantity } = await request.json();
 
     const { error } = await supabaseAdmin
       .from('inventory_items')
@@ -74,7 +88,8 @@ export async function POST(request: Request) {
       success: true,
       message: `Stock updated: ${itemId} → ${quantity} units`
     });
-  } catch (error: any) {
-    return NextResponse.json({ success: false, message: error.message }, { status: 500 });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    return NextResponse.json({ success: false, message }, { status: 500 });
   }
 }
