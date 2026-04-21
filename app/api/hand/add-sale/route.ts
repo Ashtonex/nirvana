@@ -43,7 +43,7 @@ export async function POST(request: Request) {
       date,
       employee_id: employeeId,
       client_name: clientName,
-      payment_method: 'manual_recovery'
+      payment_method: 'cash'
     });
 
     if (supabaseError) {
@@ -69,7 +69,7 @@ export async function POST(request: Request) {
         date,
         employeeId,
         clientName,
-        paymentMethod: 'manual_recovery'
+        paymentMethod: 'cash'
       });
 
       await fs.writeFile(dbPath, JSON.stringify(db, null, 2));

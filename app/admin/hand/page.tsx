@@ -362,7 +362,7 @@ export default function TheHandPage() {
         throw new Error(result.message || 'Failed to record sale');
       }
 
-      addLog('success', `Past sale posted to ${saleForm.shopId} for ${currency(totalAmount)}.`);
+      addLog('success', `Past sale posted to ${saleForm.shopId} for ${currency(totalWithTax)}.`);
       setSaleForm((prev) => ({
         ...prev,
         clientName: '',
