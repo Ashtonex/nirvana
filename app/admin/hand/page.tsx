@@ -315,6 +315,12 @@ export default function TheHandPage() {
     boot();
   }, [loadControlRoom]);
 
+  const [pastOpeningForm, setPastOpeningForm] = useState({
+    shopId: 'kipasa' as SaleForm['shopId'],
+    date: new Date().toISOString().split('T')[0],
+    amount: 0,
+  });
+
   const updateOpeningBalance = async (shop: 'kipasa' | 'dubdub' | 'tradecenter') => {
     if (!confirm(`ARE YOU SURE? This will override the historical opening balance for ${shop.toUpperCase()} at the source. This cannot be undone automatically.`)) {
       return;
@@ -334,6 +340,41 @@ export default function TheHandPage() {
       await loadControlRoom();
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Failed to update opening balance';
+      addLog('error', message);
+    }
+  };
+
+  const handleRecordPastOpening = async () => {
+    if (pastOpeningForm.amount < 0) {
+      addLog('warning', 'Opening balance cannot be negative.');
+      return;
+    }
+
+    if (!confirm(`OVERRIDE PAST OPENING? You are about to inject or update a ${currency(pastOpeningForm.amount)} opening balance for ${pastOpeningForm.shopId.toUpperCase()} on ${pastOpeningForm.date}. This will directly affect audit variances for that day and subsequent ones. Continue?`)) {
+      return;
+    }
+
+    try {
+      const response = await fetch('/api/hand/update-opening-balance', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ 
+          shop: pastOpeningForm.shopId, 
+          amount: pastOpeningForm.amount,
+          date: new Date(`${pastOpeningForm.date}T12:00:00Z`).toISOString(),
+          isPast: true 
+        }),
+      });
+      const result = await response.json();
+      if (!response.ok || !result.success) {
+        throw new Error(result.message || 'Failed to record past opening');
+      }
+
+      addLog('success', `Past opening balance for ${pastOpeningForm.shopId} on ${pastOpeningForm.date} set to ${currency(pastOpeningForm.amount)}.`);
+      await loadControlRoom();
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Failed to record past opening';
       addLog('error', message);
     }
   };
@@ -664,6 +705,38 @@ export default function TheHandPage() {
                             </div>
                           </div>
                         ))}
+                      </div>
+                    </div>
+
+                    <div className="rounded-2xl border border-white/10 bg-slate-900/40 p-4">
+                      <p className="text-xs font-black uppercase tracking-[0.22em] text-slate-500 mb-4">Past Opening Override</p>
+                      <div className="space-y-3">
+                        <select
+                          value={pastOpeningForm.shopId}
+                          onChange={(event) => setPastOpeningForm((prev) => ({ ...prev, shopId: event.target.value as SaleForm['shopId'] }))}
+                          className="w-full rounded-xl border border-white/10 bg-slate-950 px-3 py-2 text-sm text-white"
+                        >
+                          {SHOPS.map((shop) => <option key={shop.id} value={shop.id}>{shop.name}</option>)}
+                        </select>
+                        <input
+                          type="date"
+                          value={pastOpeningForm.date}
+                          onChange={(event) => setPastOpeningForm((prev) => ({ ...prev, date: event.target.value }))}
+                          className="w-full rounded-xl border border-white/10 bg-slate-950 px-3 py-2 text-sm text-white"
+                        />
+                        <input
+                          type="number"
+                          placeholder="Amount"
+                          value={pastOpeningForm.amount}
+                          onChange={(event) => setPastOpeningForm((prev) => ({ ...prev, amount: Number(event.target.value || 0) }))}
+                          className="w-full rounded-xl border border-white/10 bg-slate-950 px-3 py-2 text-sm text-white outline-none focus:border-sky-500/50"
+                        />
+                        <button
+                          onClick={handleRecordPastOpening}
+                          className="w-full rounded-xl border border-sky-400/30 bg-sky-500/10 py-3 text-xs font-black uppercase tracking-widest text-sky-200 hover:bg-sky-500/20"
+                        >
+                          Set Past Opening
+                        </button>
                       </div>
                     </div>
 

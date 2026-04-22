@@ -9,13 +9,32 @@ export async function POST(request: Request) {
   if (authError) return authError;
   
   try {
-    const { shop, amount } = await request.json();
+    const { shop, amount, date, isPast } = await request.json();
 
     if (!shop || amount === undefined) {
       return NextResponse.json({ success: false, message: 'Missing shop or amount' }, { status: 400 });
     }
 
-    // Update database
+    if (isPast && date) {
+      // Logic for injecting a past opening balance into the ledger
+      const { error: ledgerError } = await supabaseAdmin.from('ledger_entries').upsert({
+        shop_id: shop,
+        amount: amount,
+        date: date,
+        category: 'Cash Drawer Opening',
+        type: 'asset',
+        description: `Manual Override via The Hand (Past Correction)`
+      }, { onConflict: 'shop_id,date,category' });
+
+      if (ledgerError) throw ledgerError;
+
+      return NextResponse.json({
+        success: true,
+        message: `Past opening for ${shop} on ${date.split('T')[0]} corrected to $${amount.toFixed(2)}`
+      });
+    }
+
+    // Standard logic for setting the "Global/Next" opening balance
     const { error: dbError } = await supabaseAdmin
       .from('shop_settings')
       .upsert({ shop_id: shop, opening_balance: amount });
