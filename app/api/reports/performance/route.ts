@@ -78,21 +78,7 @@ export async function GET(request: Request) {
     // Process sales
     sales.forEach((sale: any) => {
       const sid = sale.shopId || sale.shop_id; // Support both naming conventions
-      if (!sid) return;
-      
-      if (!performanceByShop[sid]) {
-        performanceByShop[sid] = {
-          shopId: sid,
-          shopName: sid,
-          revenue: 0,
-          salesCount: 0,
-          expenses: 0,
-          expenseCount: 0,
-          profit: 0,
-          items: [],
-          expenseBreakdown: {},
-        };
-      }
+      if (!sid || !performanceByShop[sid]) return;
 
       performanceByShop[sid].revenue += sale.totalWithTax || sale.total_with_tax || 0;
       performanceByShop[sid].salesCount += 1;
@@ -107,19 +93,7 @@ export async function GET(request: Request) {
     // Process expenses
     expenses.forEach((exp: any) => {
       const sid = exp.shop_id;
-      if (!performanceByShop[sid]) {
-        performanceByShop[sid] = {
-          shopId: sid,
-          shopName: sid,
-          revenue: 0,
-          salesCount: 0,
-          expenses: 0,
-          expenseCount: 0,
-          profit: 0,
-          items: [],
-          expenseBreakdown: {},
-        };
-      }
+      if (!sid || !performanceByShop[sid]) return;
 
       performanceByShop[sid].expenses += exp.amount || 0;
       performanceByShop[sid].expenseCount += 1;
@@ -132,19 +106,7 @@ export async function GET(request: Request) {
     // Process ledger expenses
     ledgerExpenses.forEach((exp: any) => {
       const sid = exp.shop_id;
-      if (!performanceByShop[sid]) {
-        performanceByShop[sid] = {
-          shopId: sid,
-          shopName: sid,
-          revenue: 0,
-          salesCount: 0,
-          expenses: 0,
-          expenseCount: 0,
-          profit: 0,
-          items: [],
-          expenseBreakdown: {},
-        };
-      }
+      if (!sid || !performanceByShop[sid]) return;
 
       performanceByShop[sid].expenses += exp.amount || 0;
       performanceByShop[sid].expenseCount += 1;
@@ -159,9 +121,10 @@ export async function GET(request: Request) {
 
       // Find best seller (highest selling item)
       if (shop.items.length > 0) {
-        shop.bestSeller = shop.items.reduce((prev: any, current: any) =>
+        const best = shop.items.reduce((prev: any, current: any) =>
           current.total > prev.total ? current : prev
         );
+        shop.bestSeller = [best.name, best.total];
       }
 
       // Find biggest overhead
