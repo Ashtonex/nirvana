@@ -78,7 +78,9 @@ export async function GET(request: Request) {
 
     // Process sales
     sales.forEach((sale: any) => {
-      const sid = sale.shopId;
+      const sid = sale.shopId || sale.shop_id; // Support both naming conventions
+      if (!sid) return;
+      
       if (!performanceByShop[sid]) {
         performanceByShop[sid] = {
           shopId: sid,
@@ -93,13 +95,13 @@ export async function GET(request: Request) {
         };
       }
 
-      performanceByShop[sid].revenue += sale.totalWithTax || 0;
+      performanceByShop[sid].revenue += sale.totalWithTax || sale.total_with_tax || 0;
       performanceByShop[sid].salesCount += 1;
       performanceByShop[sid].items.push({
-        name: sale.itemName,
+        name: sale.itemName || sale.item_name,
         quantity: sale.quantity,
-        unitPrice: sale.unitPrice,
-        total: sale.totalWithTax,
+        unitPrice: sale.unitPrice || sale.unit_price,
+        total: sale.totalWithTax || sale.total_with_tax,
       });
     });
 

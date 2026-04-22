@@ -5,6 +5,7 @@ import {
   AlertTriangle,
   ArrowUpRight,
   BadgeDollarSign,
+  BarChart3,
   Brain,
   Building2,
   CircleAlert,
@@ -20,6 +21,7 @@ import {
 
 import { MonthlyPerformanceTracker } from '@/components/MonthlyPerformanceTracker';
 import { InventoryHealth } from '@/components/InventoryHealth';
+import { cn } from '@/lib/utils';
 
 type ClearanceState = 'checking' | 'granted' | 'denied';
 type LogLevel = 'error' | 'warning' | 'info' | 'success';
@@ -208,7 +210,15 @@ function MetricCard({
   );
 }
 
+const TABS = [
+  { id: 'overview', label: 'Overview', icon: Building2 },
+  { id: 'performance', label: 'Performance', icon: BarChart3 },
+  { id: 'inventory', label: 'Inventory', icon: ShieldCheck },
+  { id: 'logs', label: 'Audit Logs', icon: Brain },
+] as const;
+
 export default function TheHandPage() {
+  const [activeTab, setActiveTab] = useState<typeof TABS[number]['id']>('overview');
   const [clearance, setClearance] = useState<ClearanceState>('checking');
   const [controlRoom, setControlRoom] = useState<ControlRoomResponse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -533,333 +543,338 @@ export default function TheHandPage() {
           </div>
         </div>
 
-        <div className="grid gap-4 md:grid-cols-4 px-2">
-          <MetricCard
-            label="Clearance"
-            value={controlRoom?.owner.clearance || 'LEVEL_5'}
-            hint={`Locked to ${OWNER_EMAIL}`}
-            tone="text-rose-300"
-          />
-          <MetricCard
-            label="Tracked Cash"
-            value={currency(controlRoom?.money.totalTrackedCash || 0)}
-            hint="Drawers + vault + invest"
-            tone="text-emerald-300"
-          />
-          <MetricCard
-            label="Profit 30D"
-            value={currency(controlRoom?.money.profit30d || 0)}
-            hint={`Margin ${(controlRoom?.money.profitMargin || 0).toFixed(1)}%`}
-            tone={(controlRoom?.money.profit30d || 0) >= 0 ? 'text-sky-300' : 'text-rose-300'}
-          />
-          <MetricCard
-            label="Top Shop"
-            value={controlRoom?.brain.topShop || 'Unknown'}
-            hint={controlRoom?.brain.insight || 'Awaiting analysis'}
-            tone="text-amber-300"
-          />
+        <div className="flex flex-wrap gap-2 px-2 mt-4">
+          {TABS.map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={cn(
+                "flex items-center gap-2 px-6 py-3 rounded-2xl text-xs font-black uppercase tracking-widest transition-all border",
+                activeTab === tab.id
+                  ? "bg-rose-500 border-rose-400 text-white shadow-lg shadow-rose-500/20"
+                  : "bg-white/5 border-white/10 text-slate-400 hover:bg-white/10"
+              )}
+            >
+              <tab.icon className="h-4 w-4" />
+              {tab.label}
+            </button>
+          ))}
         </div>
 
-        {/* Monthly Performance Tracker */}
-        <div className="mt-6">
-          <MonthlyPerformanceTracker />
-        </div>
+        {activeTab === 'overview' && (
+          <>
+            <div className="grid gap-4 md:grid-cols-4 px-2">
+              <MetricCard
+                label="Clearance"
+                value={controlRoom?.owner.clearance || 'LEVEL_5'}
+                hint={`Locked to ${OWNER_EMAIL}`}
+                tone="text-rose-300"
+              />
+              <MetricCard
+                label="Tracked Cash"
+                value={currency(controlRoom?.money.totalTrackedCash || 0)}
+                hint="Drawers + vault + invest"
+                tone="text-emerald-300"
+              />
+              <MetricCard
+                label="Profit 30D"
+                value={currency(controlRoom?.money.profit30d || 0)}
+                hint={`Margin ${(controlRoom?.money.profitMargin || 0).toFixed(1)}%`}
+                tone={(controlRoom?.money.profit30d || 0) >= 0 ? 'text-sky-300' : 'text-rose-300'}
+              />
+              <MetricCard
+                label="Top Shop"
+                value={controlRoom?.brain.topShop || 'Unknown'}
+                hint={controlRoom?.brain.insight || 'Awaiting analysis'}
+                tone="text-amber-300"
+              />
+            </div>
 
-        {/* Inventory Health */}
-        <div className="mt-6">
-          <InventoryHealth />
-        </div>
-
-        <div className="grid gap-6 xl:grid-cols-[1fr_400px]">
-          <div className="space-y-6">
-            <WindowCard eyebrow="Shop Pulse" title="Storefront Health Windows" icon={Building2}>
-              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                {controlRoom?.shops.map((shop) => (
-                  <div key={shop.id} className="rounded-3xl border border-white/10 bg-slate-900/40 p-5">
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <h3 className="text-xl font-black text-white">{shop.name}</h3>
-                        <p className="mt-1 text-xs text-slate-500 uppercase tracking-widest font-bold">Expected drawer {currency(shop.expectedDrawerCash)}</p>
-                      </div>
-                      <span className={`rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-[0.2em] ${statusTone(shop.status)}`}>
-                        {shop.status}
-                      </span>
-                    </div>
-
-                    <div className="mt-6 grid grid-cols-2 gap-3 text-sm">
-                      <div className="rounded-2xl border border-white/10 bg-slate-950/50 p-3">
-                        <p className="text-[10px] uppercase font-bold text-slate-500">Sales 30D</p>
-                        <p className="mt-1 text-lg font-black text-emerald-300">{currency(shop.sales30d)}</p>
-                      </div>
-                      <div className="rounded-2xl border border-white/10 bg-slate-950/50 p-3">
-                        <p className="text-[10px] uppercase font-bold text-slate-500">Expenses 30D</p>
-                        <p className="mt-1 text-lg font-black text-rose-300">{currency(shop.expenses30d)}</p>
-                      </div>
-                    </div>
-
-                    <div className="mt-4 space-y-2 rounded-2xl border border-white/10 bg-slate-950/50 p-3 text-xs text-slate-400 font-mono">
-                      <p>Last sale: {timeLabel(shop.lastSaleAt)}</p>
-                      <p>Tx 7D: {shop.transactions7d}</p>
-                      <p>Stock: {shop.lowStockCount} Low | {shop.zeroStockCount} Zero</p>
-                    </div>
-
-                    <div className="mt-4 space-y-2">
-                      {shop.issues.map((issue) => (
-                        <div key={issue} className="rounded-2xl border border-amber-500/20 bg-amber-500/10 p-3 text-xs text-amber-200/80">
-                          {issue}
+            <div className="grid gap-6 xl:grid-cols-[1fr_400px]">
+              <div className="space-y-6">
+                <WindowCard eyebrow="Shop Pulse" title="Storefront Health Windows" icon={Building2}>
+                  <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                    {controlRoom?.shops.map((shop) => (
+                      <div key={shop.id} className="rounded-3xl border border-white/10 bg-slate-900/40 p-5">
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <h3 className="text-xl font-black text-white">{shop.name}</h3>
+                            <p className="mt-1 text-xs text-slate-500 uppercase tracking-widest font-bold">Expected drawer {currency(shop.expectedDrawerCash)}</p>
+                          </div>
+                          <span className={`rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-[0.2em] ${statusTone(shop.status)}`}>
+                            {shop.status}
+                          </span>
                         </div>
-                      ))}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </WindowCard>
 
-            <WindowCard eyebrow="Correction Layer" title="Manual Overrides" icon={Wrench}>
-              <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-                <div className="rounded-2xl border border-white/10 bg-slate-900/40 p-4">
-                  <p className="text-xs font-black uppercase tracking-[0.22em] text-slate-500 mb-4">Opening Balances</p>
-                  <div className="space-y-3">
-                    {SHOPS.map((shop) => (
-                      <div key={shop.id} className="flex flex-col gap-2">
-                        <label className="text-[10px] font-black uppercase text-slate-400">{shop.name}</label>
-                        <div className="flex gap-2">
-                          <input
-                            type="number"
-                            value={openingBalances[shop.id]}
-                            onChange={(event) =>
-                              setOpeningBalances((prev) => ({
-                                ...prev,
-                                [shop.id]: Number(event.target.value || 0),
-                              }))
-                            }
-                            className="w-full rounded-xl border border-white/10 bg-slate-950 px-3 py-2 text-sm text-white outline-none focus:border-sky-500/50"
-                          />
-                          <button
-                            onClick={() => updateOpeningBalance(shop.id)}
-                            className="rounded-xl border border-sky-400/30 bg-sky-500/10 px-3 py-2 text-xs font-black text-sky-200 hover:bg-sky-500/20"
-                          >
-                            Set
-                          </button>
+                        <div className="mt-6 grid grid-cols-2 gap-3 text-sm">
+                          <div className="rounded-2xl border border-white/10 bg-slate-950/50 p-3">
+                            <p className="text-[10px] uppercase font-bold text-slate-500">Sales 30D</p>
+                            <p className="mt-1 text-lg font-black text-emerald-300">{currency(shop.sales30d)}</p>
+                          </div>
+                          <div className="rounded-2xl border border-white/10 bg-slate-950/50 p-3">
+                            <p className="text-[10px] uppercase font-bold text-slate-500">Expenses 30D</p>
+                            <p className="mt-1 text-lg font-black text-rose-300">{currency(shop.expenses30d)}</p>
+                          </div>
+                        </div>
+
+                        <div className="mt-4 space-y-2 rounded-2xl border border-white/10 bg-slate-950/50 p-3 text-xs text-slate-400 font-mono">
+                          <p>Last sale: {timeLabel(shop.lastSaleAt)}</p>
+                          <p>Tx 7D: {shop.transactions7d}</p>
+                          <p>Stock: {shop.lowStockCount} Low | {shop.zeroStockCount} Zero</p>
+                        </div>
+
+                        <div className="mt-4 space-y-2">
+                          {shop.issues.map((issue) => (
+                            <div key={issue} className="rounded-2xl border border-amber-500/20 bg-amber-500/10 p-3 text-xs text-amber-200/80">
+                              {issue}
+                            </div>
+                          ))}
                         </div>
                       </div>
                     ))}
                   </div>
-                </div>
+                </WindowCard>
 
-                <div className="rounded-2xl border border-white/10 bg-slate-900/40 p-4">
-                  <p className="text-xs font-black uppercase tracking-[0.22em] text-slate-500 mb-4">Past Sale Injection</p>
+                <WindowCard eyebrow="Correction Layer" title="Manual Overrides" icon={Wrench}>
+                  <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+                    <div className="rounded-2xl border border-white/10 bg-slate-900/40 p-4">
+                      <p className="text-xs font-black uppercase tracking-[0.22em] text-slate-500 mb-4">Opening Balances</p>
+                      <div className="space-y-3">
+                        {SHOPS.map((shop) => (
+                          <div key={shop.id} className="flex flex-col gap-2">
+                            <label className="text-[10px] font-black uppercase text-slate-400">{shop.name}</label>
+                            <div className="flex gap-2">
+                              <input
+                                type="number"
+                                value={openingBalances[shop.id]}
+                                onChange={(event) =>
+                                  setOpeningBalances((prev) => ({
+                                    ...prev,
+                                    [shop.id]: Number(event.target.value || 0),
+                                  }))
+                                }
+                                className="w-full rounded-xl border border-white/10 bg-slate-950 px-3 py-2 text-sm text-white outline-none focus:border-sky-500/50"
+                              />
+                              <button
+                                onClick={() => updateOpeningBalance(shop.id)}
+                                className="rounded-xl border border-sky-400/30 bg-sky-500/10 px-3 py-2 text-xs font-black text-sky-200 hover:bg-sky-500/20"
+                              >
+                                Set
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="rounded-2xl border border-white/10 bg-slate-900/40 p-4">
+                      <p className="text-xs font-black uppercase tracking-[0.22em] text-slate-500 mb-4">Past Sale Injection</p>
+                      <div className="space-y-3">
+                        <select
+                          value={saleForm.shopId}
+                          onChange={(event) => setSaleForm((prev) => ({ ...prev, shopId: event.target.value as SaleForm['shopId'] }))}
+                          className="w-full rounded-xl border border-white/10 bg-slate-950 px-3 py-2 text-sm text-white"
+                        >
+                          {SHOPS.map((shop) => <option key={shop.id} value={shop.id}>{shop.name}</option>)}
+                        </select>
+                        <input
+                          type="date"
+                          value={saleForm.date}
+                          onChange={(event) => setSaleForm((prev) => ({ ...prev, date: event.target.value }))}
+                          className="w-full rounded-xl border border-white/10 bg-slate-950 px-3 py-2 text-sm text-white"
+                        />
+                        <input
+                          type="text"
+                          placeholder="Client"
+                          value={saleForm.clientName}
+                          onChange={(event) => setSaleForm((prev) => ({ ...prev, clientName: event.target.value }))}
+                          className="w-full rounded-xl border border-white/10 bg-slate-950 px-3 py-2 text-sm text-white"
+                        />
+                        <input
+                          type="text"
+                          placeholder="Item"
+                          value={saleForm.itemName}
+                          onChange={(event) => setSaleForm((prev) => ({ ...prev, itemName: event.target.value }))}
+                          className="w-full rounded-xl border border-white/10 bg-slate-950 px-3 py-2 text-sm text-white"
+                        />
+                        <div className="flex gap-2">
+                          <input
+                            type="number"
+                            placeholder="Qty"
+                            value={saleForm.quantity}
+                            onChange={(event) => setSaleForm((prev) => ({ ...prev, quantity: Number(event.target.value || 0) }))}
+                            className="w-full rounded-xl border border-white/10 bg-slate-950 px-3 py-2 text-sm text-white outline-none focus:border-sky-500/50"
+                          />
+                          <input
+                            type="number"
+                            placeholder="Price"
+                            value={saleForm.unitPrice}
+                            onChange={(event) => setSaleForm((prev) => ({ ...prev, unitPrice: Number(event.target.value || 0) }))}
+                            className="w-full rounded-xl border border-white/10 bg-slate-950 px-3 py-2 text-sm text-white outline-none focus:border-sky-500/50"
+                          />
+                        </div>
+                        <button
+                          onClick={handleRecordSale}
+                          className="w-full rounded-xl border border-emerald-400/30 bg-emerald-500/10 py-3 text-xs font-black uppercase tracking-widest text-emerald-200 hover:bg-emerald-500/20"
+                        >
+                          Post Sale
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="rounded-2xl border border-white/10 bg-slate-900/40 p-4">
+                      <p className="text-xs font-black uppercase tracking-[0.22em] text-slate-500 mb-4">Past Expense Injection</p>
+                      <div className="space-y-3">
+                        <select
+                          value={expenseForm.shopId}
+                          onChange={(event) => setExpenseForm((prev) => ({ ...prev, shopId: event.target.value as ExpenseForm['shopId'] }))}
+                          className="w-full rounded-xl border border-white/10 bg-slate-950 px-3 py-2 text-sm text-white"
+                        >
+                          {SHOPS.map((shop) => <option key={shop.id} value={shop.id}>{shop.name}</option>)}
+                        </select>
+                        <input
+                          type="date"
+                          value={expenseForm.date}
+                          onChange={(event) => setExpenseForm((prev) => ({ ...prev, date: event.target.value }))}
+                          className="w-full rounded-xl border border-white/10 bg-slate-950 px-3 py-2 text-sm text-white"
+                        />
+                        <select
+                          value={expenseForm.category}
+                          onChange={(event) => setExpenseForm((prev) => ({ ...prev, category: event.target.value }))}
+                          className="w-full rounded-xl border border-white/10 bg-slate-950 px-3 py-2 text-sm text-white"
+                        >
+                          <option value="rent">Rent</option>
+                          <option value="salaries">Salaries</option>
+                          <option value="utilities">Utilities</option>
+                          <option value="stock">Stock</option>
+                          <option value="misc">Miscellaneous</option>
+                        </select>
+                        <input
+                          type="number"
+                          placeholder="Amount"
+                          value={expenseForm.amount}
+                          onChange={(event) => setExpenseForm((prev) => ({ ...prev, amount: Number(event.target.value || 0) }))}
+                          className="w-full rounded-xl border border-white/10 bg-slate-950 px-3 py-2 text-sm text-white"
+                        />
+                        <input
+                          type="text"
+                          placeholder="Description"
+                          value={expenseForm.description}
+                          onChange={(event) => setExpenseForm((prev) => ({ ...prev, description: event.target.value }))}
+                          className="w-full rounded-xl border border-white/10 bg-slate-950 px-3 py-2 text-sm text-white"
+                        />
+                        <button
+                          onClick={handleRecordExpense}
+                          className="w-full rounded-xl border border-rose-400/30 bg-rose-500/10 py-3 text-xs font-black uppercase tracking-widest text-rose-200 hover:bg-rose-500/20"
+                        >
+                          Post Expense
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </WindowCard>
+              </div>
+
+              <div className="space-y-6">
+                <WindowCard eyebrow="Threat Grid" title="Live Risks" icon={AlertTriangle}>
                   <div className="space-y-3">
-                    <select
-                      value={saleForm.shopId}
-                      onChange={(event) => setSaleForm((prev) => ({ ...prev, shopId: event.target.value as SaleForm['shopId'] }))}
-                      className="w-full rounded-xl border border-white/10 bg-slate-950 px-3 py-2 text-sm text-white"
-                    >
-                      {SHOPS.map((shop) => <option key={shop.id} value={shop.id}>{shop.name}</option>)}
-                    </select>
-                    <input
-                      type="date"
-                      value={saleForm.date}
-                      onChange={(event) => setSaleForm((prev) => ({ ...prev, date: event.target.value }))}
-                      className="w-full rounded-xl border border-white/10 bg-slate-950 px-3 py-2 text-sm text-white"
-                    />
-                    <input
-                      type="text"
-                      placeholder="Client"
-                      value={saleForm.clientName}
-                      onChange={(event) => setSaleForm((prev) => ({ ...prev, clientName: event.target.value }))}
-                      className="w-full rounded-xl border border-white/10 bg-slate-950 px-3 py-2 text-sm text-white"
-                    />
-                    <input
-                      type="text"
-                      placeholder="Item"
-                      value={saleForm.itemName}
-                      onChange={(event) => setSaleForm((prev) => ({ ...prev, itemName: event.target.value }))}
-                      className="w-full rounded-xl border border-white/10 bg-slate-950 px-3 py-2 text-sm text-white"
-                    />
-                    <div className="flex gap-2">
-                      <input
-                        type="number"
-                        placeholder="Qty"
-                        value={saleForm.quantity}
-                        onChange={(event) => setSaleForm((prev) => ({ ...prev, quantity: Number(event.target.value || 0) }))}
-                        className="w-full rounded-xl border border-white/10 bg-slate-950 px-3 py-2 text-sm text-white outline-none focus:border-sky-500/50"
-                      />
-                      <input
-                        type="number"
-                        placeholder="Price"
-                        value={saleForm.unitPrice}
-                        onChange={(event) => setSaleForm((prev) => ({ ...prev, unitPrice: Number(event.target.value || 0) }))}
-                        className="w-full rounded-xl border border-white/10 bg-slate-950 px-3 py-2 text-sm text-white outline-none focus:border-sky-500/50"
-                      />
-                    </div>
-                    <button
-                      onClick={handleRecordSale}
-                      className="w-full rounded-xl border border-emerald-400/30 bg-emerald-500/10 py-3 text-xs font-black uppercase tracking-widest text-emerald-200 hover:bg-emerald-500/20"
-                    >
-                      Post Sale
-                    </button>
+                    {(controlRoom?.risks || []).map((risk, idx) => (
+                      <div
+                        key={idx}
+                        className={`rounded-2xl border p-4 ${risk.severity === 'critical' ? 'border-rose-500/30 bg-rose-500/10' : 'border-amber-500/30 bg-amber-500/10'}`}
+                      >
+                        <h3 className="text-sm font-black text-white">{risk.title}</h3>
+                        <p className="mt-1 text-xs text-slate-400">{risk.message}</p>
+                      </div>
+                    ))}
                   </div>
-                </div>
+                </WindowCard>
 
-                <div className="rounded-2xl border border-white/10 bg-slate-900/40 p-4">
-                  <p className="text-xs font-black uppercase tracking-[0.22em] text-slate-500 mb-4">Past Expense Injection</p>
+                <WindowCard eyebrow="Transaction Sight" title="Recent Ledger Movement" icon={BadgeDollarSign}>
                   <div className="space-y-3">
-                    <select
-                      value={expenseForm.shopId}
-                      onChange={(event) => setExpenseForm((prev) => ({ ...prev, shopId: event.target.value as ExpenseForm['shopId'] }))}
-                      className="w-full rounded-xl border border-white/10 bg-slate-950 px-3 py-2 text-sm text-white"
-                    >
-                      {SHOPS.map((shop) => <option key={shop.id} value={shop.id}>{shop.name}</option>)}
-                    </select>
-                    <input
-                      type="date"
-                      value={expenseForm.date}
-                      onChange={(event) => setExpenseForm((prev) => ({ ...prev, date: event.target.value }))}
-                      className="w-full rounded-xl border border-white/10 bg-slate-950 px-3 py-2 text-sm text-white"
-                    />
-                    <select
-                      value={expenseForm.category}
-                      onChange={(event) => setExpenseForm((prev) => ({ ...prev, category: event.target.value }))}
-                      className="w-full rounded-xl border border-white/10 bg-slate-950 px-3 py-2 text-sm text-white"
-                    >
-                      <option value="rent">Rent</option>
-                      <option value="salaries">Salaries</option>
-                      <option value="utilities">Utilities</option>
-                      <option value="stock">Stock</option>
-                      <option value="misc">Miscellaneous</option>
-                    </select>
-                    <input
-                      type="number"
-                      placeholder="Amount"
-                      value={expenseForm.amount}
-                      onChange={(event) => setExpenseForm((prev) => ({ ...prev, amount: Number(event.target.value || 0) }))}
-                      className="w-full rounded-xl border border-white/10 bg-slate-950 px-3 py-2 text-sm text-white"
-                    />
-                    <input
-                      type="text"
-                      placeholder="Description"
-                      value={expenseForm.description}
-                      onChange={(event) => setExpenseForm((prev) => ({ ...prev, description: event.target.value }))}
-                      className="w-full rounded-xl border border-white/10 bg-slate-950 px-3 py-2 text-sm text-white"
-                    />
-                    <button
-                      onClick={handleRecordExpense}
-                      className="w-full rounded-xl border border-rose-400/30 bg-rose-500/10 py-3 text-xs font-black uppercase tracking-widest text-rose-200 hover:bg-rose-500/20"
-                    >
-                      Post Expense
-                    </button>
+                    {(controlRoom?.recentTransactions || []).map((entry) => (
+                      <div key={entry.id} className="flex flex-col gap-3 rounded-2xl border border-white/10 bg-white/[0.03] p-4 md:flex-row md:items-center md:justify-between">
+                        <div>
+                          <p className="text-lg font-semibold text-white">{entry.description}</p>
+                          <p className="mt-1 text-xs uppercase tracking-[0.2em] text-slate-500">
+                            {entry.shopId || 'global'} • {entry.category || entry.type || 'entry'} • {timeLabel(entry.when)}
+                          </p>
+                        </div>
+                        <div className="text-left md:text-right">
+                          <p className={`text-2xl font-black ${entry.amount >= 0 ? 'text-emerald-300' : 'text-rose-300'}`}>
+                            {currency(entry.amount)}
+                          </p>
+                          <p className="text-xs uppercase tracking-[0.2em] text-slate-500">{entry.source}</p>
+                        </div>
+                      </div>
+                    ))}
                   </div>
-                </div>
+                </WindowCard>
               </div>
-            </WindowCard>
+            </div>
+          </>
+        )}
 
-            <WindowCard eyebrow="Transaction Sight" title="Recent Ledger Movement" icon={BadgeDollarSign}>
-              <div className="space-y-3">
-                {(controlRoom?.recentTransactions || []).map((entry) => (
-                  <div key={entry.id} className="flex flex-col gap-3 rounded-2xl border border-white/10 bg-white/[0.03] p-4 md:flex-row md:items-center md:justify-between">
-                    <div>
-                      <p className="text-lg font-semibold text-white">{entry.description}</p>
-                      <p className="mt-1 text-xs uppercase tracking-[0.2em] text-slate-500">
-                        {entry.shopId || 'global'} • {entry.category || entry.type || 'entry'} • {timeLabel(entry.when)}
-                      </p>
-                    </div>
-                    <div className="text-left md:text-right">
-                      <p className={`text-2xl font-black ${entry.amount >= 0 ? 'text-emerald-300' : 'text-rose-300'}`}>
-                        {currency(entry.amount)}
-                      </p>
-                      <p className="text-xs uppercase tracking-[0.2em] text-slate-500">{entry.source}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </WindowCard>
+        {/* Monthly Performance Tracker Tab */}
+        {activeTab === 'performance' && (
+          <div className="mt-6 space-y-6">
+            <MonthlyPerformanceTracker />
           </div>
+        )}
 
-          <div className="space-y-6">
-            <WindowCard eyebrow="Control Integrity" title="System Status And Recovery" icon={Database}>
-              <div className="grid gap-4">
-                <MetricCard
-                  label="Supabase"
-                  value={controlRoom?.system.supabase ? 'ONLINE' : 'FAULT'}
-                  hint="Primary data plane"
-                  tone={controlRoom?.system.supabase ? 'text-emerald-300' : 'text-rose-300'}
-                />
-                <MetricCard
-                  label="Local JSON"
-                  value={controlRoom?.system.localJsonReady ? 'READY' : 'MISSING'}
-                  hint="Secondary backup plane"
-                  tone={controlRoom?.system.localJsonReady ? 'text-sky-300' : 'text-amber-300'}
-                />
-                <MetricCard
-                  label="Active Staff"
-                  value={String(controlRoom?.system.activeStaffCount || 0)}
-                  hint={`${controlRoom?.system.unreadMessagesCount || 0} unread messages`}
-                  tone="text-white"
-                />
-                <MetricCard
-                  label="Pending Requests"
-                  value={String(controlRoom?.system.pendingStockRequestsCount || 0)}
-                  hint="Unresolved stock pressure"
-                  tone="text-amber-300"
-                />
-              </div>
-
-              <div className="mt-5 grid gap-3">
-                <button
-                  onClick={() => runBackupAction('backup')}
-                  disabled={backupBusy}
-                  className="rounded-2xl border border-emerald-400/30 bg-emerald-500/10 px-4 py-3 text-left font-bold text-emerald-100 transition hover:bg-emerald-500/20 disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  Full Backup Snapshot
-                </button>
-                <button
-                  onClick={() => runBackupAction('restore')}
-                  disabled={backupBusy}
-                  className="rounded-2xl border border-violet-400/30 bg-violet-500/10 px-4 py-3 text-left font-bold text-violet-100 transition hover:bg-violet-500/20 disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  Restore From Backup
-                </button>
-              </div>
-            </WindowCard>
-
-            <WindowCard eyebrow="Operator Feed" title="Merciless Event Log" icon={CircleAlert}>
-              <div className="space-y-3">
-                {logs.length === 0 ? (
-                  <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4 text-sm text-slate-400">
-                    The Hand is quiet for now.
-                  </div>
-                ) : (
-                  logs.map((log) => (
-                    <div key={log.id} className={`rounded-2xl border p-3 text-sm ${logTone(log.level)}`}>
-                      <p className="text-[10px] font-black uppercase tracking-[0.25em] opacity-80">
-                        {log.timestamp} • {log.level}
-                      </p>
-                      <p className="mt-2">{log.message}</p>
-                    </div>
-                  ))
-                )}
-              </div>
-            </WindowCard>
-
-            <WindowCard eyebrow="Doctrine" title="What The Hand Is Watching" icon={ArrowUpRight}>
-              <div className="space-y-3 text-sm text-slate-300">
-                <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
-                  Shops that go silent, lose staff presence, or stop selling are treated as threat signals.
-                </div>
-                <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
-                  Overhead contributions and actual overhead payments are separated so the vault does not lie.
-                </div>
-                <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
-                  Opening balances, past sales, and past expenses can be corrected here so downstream dashboards reflect reality.
-                </div>
-                <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
-                  Any user who is not <span className="font-black text-white">{OWNER_EMAIL}</span> gets locked out. No shared admin shortcuts. No soft bypasses.
-                </div>
-              </div>
-            </WindowCard>
+        {/* Inventory Health Tab */}
+        {activeTab === 'inventory' && (
+          <div className="mt-6 space-y-6">
+            <InventoryHealth />
           </div>
-        </div>
+        )}
+
+        {/* Logs Tab */}
+        {activeTab === 'logs' && (
+          <div className="grid gap-6 xl:grid-cols-[1fr_400px] mt-6">
+            <div className="space-y-6">
+              <WindowCard eyebrow="Audit Log" title="System Logs" icon={Brain}>
+                <div className="h-[600px] overflow-y-auto space-y-2 pr-2 font-mono text-[10px]">
+                  {logs.map((log) => (
+                    <div key={log.id} className={`rounded-lg border p-2 ${logTone(log.level)}`}>
+                      <span className="opacity-50">[{log.timestamp}]</span> {log.message}
+                    </div>
+                  ))}
+                </div>
+              </WindowCard>
+            </div>
+
+            <div className="space-y-6">
+              <WindowCard eyebrow="Control Integrity" title="System Status And Recovery" icon={Database}>
+                <div className="grid gap-4">
+                  <MetricCard
+                    label="Supabase"
+                    value={controlRoom?.system.supabase ? 'ONLINE' : 'FAULT'}
+                    hint="Primary data plane"
+                    tone={controlRoom?.system.supabase ? 'text-emerald-300' : 'text-rose-300'}
+                  />
+                  <MetricCard
+                    label="Local JSON"
+                    value={controlRoom?.system.localJsonReady ? 'READY' : 'MISSING'}
+                    hint="Secondary backup plane"
+                    tone={controlRoom?.system.localJsonReady ? 'text-sky-300' : 'text-amber-300'}
+                  />
+                </div>
+
+                <div className="mt-5 grid gap-3">
+                  <button
+                    onClick={() => runBackupAction('backup')}
+                    disabled={backupBusy}
+                    className="rounded-2xl border border-emerald-400/30 bg-emerald-500/10 px-4 py-3 text-left font-bold text-emerald-100 transition hover:bg-emerald-500/20 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    Full Backup Snapshot
+                  </button>
+                </div>
+              </WindowCard>
+            </div>
+          </div>
+        )}
+
       </div>
     </div>
   );
