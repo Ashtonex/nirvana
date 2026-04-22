@@ -61,7 +61,7 @@ export async function POST(request: Request) {
     if (error) throw error;
 
     if (feedback_action === "approve" || feedback_action === "reject") {
-      await supabaseAdmin.rpc("increment_rule_trigger", { rule_id: created_rule_id }).catch(() => {});
+      await supabaseAdmin.rpc("increment_rule_trigger", { rule_id: created_rule_id });
     }
 
     return NextResponse.json({ feedback: data });

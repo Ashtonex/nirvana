@@ -51,8 +51,7 @@ export async function GET(request: Request) {
       .select("id, shop_id, amount, type, date")
       .eq("type", "expense")
       .gte("date", startDate)
-      .lte("date", endDate)
-      .catch(() => ({ data: null }));
+      .lte("date", endDate);
 
     const sales = Array.isArray(salesData) ? salesData : [];
     const expenses = Array.isArray(expensesData) ? expensesData : [];
