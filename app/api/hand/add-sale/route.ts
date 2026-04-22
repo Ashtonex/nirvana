@@ -50,6 +50,60 @@ export async function POST(request: Request) {
       throw new Error(`Supabase: ${supabaseError.message}`);
     }
 
+    // Try to decrement inventory/allocation for this sale so stock reflects the manual entry.
+    try {
+      // Resolve item id by exact name match (case-insensitive) if none provided
+      let resolvedItemId: string | null = null;
+      if (body.itemId) resolvedItemId = String(body.itemId);
+      if (!resolvedItemId && itemName) {
+        const { data: match } = await supabaseAdmin
+          .from('inventory_items')
+          .select('id')
+          .ilike('name', itemName)
+          .limit(1)
+          .maybeSingle();
+        if (match && (match as any).id) resolvedItemId = (match as any).id;
+      }
+
+      // If still not found, create an ad-hoc inventory item and allocation so we can decrement to 0
+      if (!resolvedItemId && itemName) {
+        const adhocId = `adhoc_${Math.random().toString(36).substring(2, 9)}`;
+        const timestamp = new Date().toISOString();
+        await supabaseAdmin.from('inventory_items').insert({
+          id: adhocId,
+          shipment_id: 'MANUAL-SALE-ADHOC',
+          name: itemName,
+          category: 'Quick Sale',
+          quantity: quantity, // create with just enough stock
+          acquisition_price: 0,
+          landed_cost: 0,
+          date_added: timestamp
+        });
+        await supabaseAdmin.from('inventory_allocations').insert({
+          item_id: adhocId,
+          shop_id: shopId,
+          quantity: quantity
+        });
+        resolvedItemId = adhocId;
+      }
+
+      if (resolvedItemId && !String(resolvedItemId).startsWith('service_')) {
+        try {
+          await supabaseAdmin.rpc('decrement_allocation', { item_id: resolvedItemId, shop_id: shopId, qty: quantity });
+        } catch (e) {
+          console.error('[add-sale] decrement_allocation failed:', e);
+        }
+
+        try {
+          await supabaseAdmin.rpc('decrement_inventory', { item_id: resolvedItemId, qty: quantity });
+        } catch (e) {
+          console.error('[add-sale] decrement_inventory failed:', e);
+        }
+      }
+    } catch (e) {
+      console.error('[add-sale] inventory decrement attempt failed:', e);
+    }
+
     // Add to local JSON
     try {
       const dbPath = path.join(process.cwd(), 'lib', 'db.json');

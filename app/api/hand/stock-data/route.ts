@@ -38,6 +38,21 @@ export async function GET(request: Request) {
 
     if (error) throw error;
 
+    // Fetch allocations for items to compute per-shop and total allocated quantities
+    const itemIds = (data || []).map((i: any) => i.id).filter(Boolean);
+    const { data: allocationsData } = itemIds.length > 0
+      ? await supabaseAdmin.from('inventory_allocations').select('item_id,shop_id,quantity').in('item_id', itemIds)
+      : { data: [] };
+
+    const allocations = (allocationsData || []).reduce((acc: any, a: any) => {
+      const id = a.item_id;
+      if (!acc[id]) acc[id] = { total: 0, byShop: {} };
+      const q = Number(a.quantity || 0);
+      acc[id].total += q;
+      acc[id].byShop[a.shop_id] = (acc[id].byShop[a.shop_id] || 0) + q;
+      return acc;
+    }, {} as Record<string, { total: number; byShop: Record<string, number> }>);
+
     // Filter by status if needed
     let items: InventoryRow[] = (data || []) as InventoryRow[];
 
@@ -61,7 +76,9 @@ export async function GET(request: Request) {
         shop: i.shop_id,
         reorderLevel: i.reorder_level || 5,
         lastSold: i.last_sold || 'Never',
-        price: i.landed_cost || 0
+        price: i.landed_cost || 0,
+        allocated: allocations[i.id]?.total || 0,
+        allocations: allocations[i.id]?.byShop || {}
       }))
     });
   } catch (error: unknown) {

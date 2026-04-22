@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useTransition, useEffect } from "react";
+import React, { useState, useTransition, useEffect, useMemo, useDeferredValue } from "react";
 import {
     Card,
     CardContent,
@@ -64,6 +64,22 @@ function cn(...inputs: ClassValue[]) {
     return twMerge(clsx(inputs));
 }
 
+// Optimized Search Input to prevent re-renders of the entire POS on every keystroke
+const SearchBar = React.memo(({ value, onChange }: { value: string, onChange: (e: React.ChangeEvent<HTMLInputElement>) => void }) => (
+    <div className="relative group">
+        <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+            <Search className="h-5 w-5 text-slate-500 group-focus-within:text-violet-400 transition-colors" />
+        </div>
+        <Input
+            placeholder="Search products, categories, or suppliers..."
+            className="pl-12 h-14 bg-slate-900/50 border-slate-800 text-base focus:bg-slate-900 focus:border-violet-500/50 transition-all rounded-2xl shadow-2xl"
+            value={value}
+            onChange={onChange}
+        />
+    </div>
+));
+SearchBar.displayName = "SearchBar";
+
 const Modal = ({ isOpen, onClose, title, children }: { isOpen: boolean, onClose: () => void, title: string, children: React.ReactNode }) => {
     if (!isOpen) return null;
     return (
@@ -108,6 +124,7 @@ type LaybyQuote = {
 export default function POS({ shopId, inventory, db }: { shopId: string, inventory: any[], db: any }) {
     const [cart, setCart] = useState<{ item: any, quantity: number, price: number }[]>([]);
     const [searchTerm, setSearchTerm] = useState("");
+    const deferredSearchTerm = useDeferredValue(searchTerm);
     const [isPending, startTransition] = useTransition();
 
     // Local inventory state so POS can immediately sell ad-hoc items without a page reload.
@@ -115,6 +132,17 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
     useEffect(() => {
         setInventoryState(inventory || []);
     }, [inventory]);
+
+    // Optimized search results using deferred value and memoization
+    const filteredInventory = useMemo(() => {
+        const query = deferredSearchTerm.toLowerCase().trim();
+        if (!query) return [];
+        
+        return inventoryState.filter((item: any) => {
+            return (item.name?.toLowerCase().includes(query) ||
+                item.category?.toLowerCase().includes(query));
+        });
+    }, [inventoryState, deferredSearchTerm]);
 
     // POS Modes
     const [posMode, setPosMode] = useState<'sale' | 'quote' | 'layby'>('sale');
@@ -1333,22 +1361,15 @@ Generated via NIRVANA POS`;
         }
     };
 
-    const filteredInventory = inventoryState.filter((item: any) => {
-        const matchesSearch = item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            item.category.toLowerCase().includes(searchTerm.toLowerCase());
-        // Show ALL inventory - no allocation filter (showing global master stock)
-        return matchesSearch;
-    });
+    // Search results are now memoized and deferred using useMemo and useDeferredValue at the top of the component
+    // const filteredInventory = ... was here
 
     return (
         <div className="grid gap-4 md:gap-6 md:grid-cols-12 grid-cols-1">
             <div className="md:col-span-8 col-span-1 space-y-4 md:space-y-6">
                 {/* Full-width Search Bar */}
                 <div className="relative w-full group">
-                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-500 group-focus-within:text-violet-400 transition-colors" />
-                    <Input
-                        placeholder="Search products, categories, or suppliers..."
-                        className="pl-12 h-14 bg-slate-900/50 border-slate-800 text-base focus:bg-slate-900 focus:border-violet-500/50 transition-all rounded-2xl shadow-2xl"
+                    <SearchBar
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
                     />

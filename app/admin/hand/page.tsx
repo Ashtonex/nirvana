@@ -18,6 +18,9 @@ import {
   Wrench,
 } from 'lucide-react';
 
+import { MonthlyPerformanceTracker } from '@/components/MonthlyPerformanceTracker';
+import { InventoryHealth } from '@/components/InventoryHealth';
+
 type ClearanceState = 'checking' | 'granted' | 'denied';
 type LogLevel = 'error' | 'warning' | 'info' | 'success';
 type ShopStatus = 'online' | 'watch' | 'offline';
@@ -555,6 +558,16 @@ export default function TheHandPage() {
             hint={controlRoom?.brain.insight || 'Awaiting analysis'}
             tone="text-amber-300"
           />
+        </div>
+
+        {/* Monthly Performance Tracker */}
+        <div className="mt-6">
+          <MonthlyPerformanceTracker />
+        </div>
+
+        {/* Inventory Health */}
+        <div className="mt-6">
+          <InventoryHealth />
         </div>
 
         <div className="grid gap-6 xl:grid-cols-[1fr_400px]">

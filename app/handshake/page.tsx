@@ -347,6 +347,8 @@ export default function HandshakePage() {
           </Card>
         ))}
       </div>
+
+      
     </div>
   );
 }
