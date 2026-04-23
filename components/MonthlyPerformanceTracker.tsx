@@ -16,6 +16,7 @@ interface PerformanceData {
   bestSeller?: [string, number];
   biggestOverhead?: [string, number];
   expenseBreakdown: { [key: string]: number };
+  groupedExpenses?: { [key: string]: number };
 }
 
 interface Totals {
@@ -34,6 +35,14 @@ export function MonthlyPerformanceTracker() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedShop, setSelectedShop] = useState<string>('all');
+  const [showDetailedExpenses, setShowDetailedExpenses] = useState<{ [key: string]: boolean }>({});
+
+  const toggleDetailedExpenses = (shopId: string) => {
+    setShowDetailedExpenses(prev => ({
+      ...prev,
+      [shopId]: !prev[shopId]
+    }));
+  };
 
   const fetchPerformance = useCallback(async () => {
     setLoading(true);
@@ -346,17 +355,41 @@ export function MonthlyPerformanceTracker() {
                       </div>
                     </div>
 
-                    {Object.keys(shop.expenseBreakdown).length > 0 && (
+                    {shop.groupedExpenses && Object.keys(shop.groupedExpenses).length > 0 && (
                       <div className="mt-4 p-3 bg-slate-800/50 rounded border border-slate-700">
-                        <p className="text-xs font-semibold text-slate-300 mb-2">Expense Breakdown</p>
-                        <div className="space-y-1">
-                          {Object.entries(shop.expenseBreakdown).map(([category, amount]: [string, any]) => (
-                            <div key={category} className="flex justify-between items-center text-xs">
-                              <span className="text-slate-400 truncate flex-1">{category}</span>
-                              <span className="text-slate-300 font-semibold ml-2">{formatCurrency(amount)}</span>
-                            </div>
-                          ))}
+                        <div className="flex justify-between items-center mb-2">
+                          <p className="text-xs font-semibold text-slate-300">
+                            {showDetailedExpenses[shop.shopId] ? 'Detailed Breakdown' : 'Categorized Expenses'}
+                          </p>
+                          <button 
+                            onClick={() => toggleDetailedExpenses(shop.shopId)}
+                            className="text-[10px] text-blue-400 hover:text-blue-300 transition-colors"
+                          >
+                            {showDetailedExpenses[shop.shopId] ? 'Show Categories' : 'Show Details'}
+                          </button>
                         </div>
+                        
+                        {!showDetailedExpenses[shop.shopId] ? (
+                          <div className="space-y-1">
+                            {Object.entries(shop.groupedExpenses)
+                              .filter(([, amount]) => (amount as number) > 0)
+                              .map(([category, amount]: [string, any]) => (
+                              <div key={category} className="flex justify-between items-center text-xs">
+                                <span className="text-slate-400 truncate flex-1">{category}</span>
+                                <span className="text-slate-300 font-semibold ml-2">{formatCurrency(amount)}</span>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="space-y-1">
+                            {Object.entries(shop.expenseBreakdown).map(([category, amount]: [string, any]) => (
+                              <div key={category} className="flex justify-between items-center text-xs">
+                                <span className="text-slate-400 truncate flex-1">{category}</span>
+                                <span className="text-slate-300 font-semibold ml-2">{formatCurrency(amount)}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>

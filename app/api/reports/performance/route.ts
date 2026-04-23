@@ -34,7 +34,7 @@ export async function GET(request: Request) {
     // Get sales data
     const { data: salesData } = await supabaseAdmin
       .from("sales")
-      .select("id, shopId, date, itemName, quantity, unitPrice, totalWithTax")
+      .select("id, shop_id, date, item_name, quantity, unit_price, total_with_tax")
       .gte("date", startDate)
       .lte("date", endDate);
 
@@ -72,6 +72,12 @@ export async function GET(request: Request) {
         profit: 0,
         items: [] as any[],
         expenseBreakdown: {} as { [key: string]: number },
+        groupedExpenses: {
+          Overheads: 0,
+          Transfers: 0,
+          "Personal Use": 0,
+          Other: 0,
+        } as { [key: string]: number },
       };
     });
 
@@ -90,17 +96,30 @@ export async function GET(request: Request) {
       });
     });
 
+    const categorizeExpense = (text: string) => {
+      const lower = text.toLowerCase();
+      if (/(rent|salary|salaries|utility|utilities|overhead)/i.test(lower)) return "Overheads";
+      if (/(invest|vault|transfer|operation|deposit|withdrawal|saving|savings|blackbox)/i.test(lower)) return "Transfers";
+      if (/(grocery|groceries|fuel|owner|drawing|personal)/i.test(lower)) return "Personal Use";
+      return "Other";
+    };
+
     // Process expenses
     expenses.forEach((exp: any) => {
       const sid = exp.shop_id;
       if (!sid || !performanceByShop[sid]) return;
 
-      performanceByShop[sid].expenses += exp.amount || 0;
+      const amount = exp.amount || 0;
+      performanceByShop[sid].expenses += amount;
       performanceByShop[sid].expenseCount += 1;
 
       const category = exp.overhead_category || exp.kind || "Other";
       performanceByShop[sid].expenseBreakdown[category] =
-        (performanceByShop[sid].expenseBreakdown[category] || 0) + (exp.amount || 0);
+        (performanceByShop[sid].expenseBreakdown[category] || 0) + amount;
+        
+      const textToCategorize = `${exp.kind || ''} ${exp.title || ''} ${exp.overhead_category || ''} ${exp.notes || ''}`;
+      const group = categorizeExpense(textToCategorize);
+      performanceByShop[sid].groupedExpenses[group] += amount;
     });
 
     // Process ledger expenses
@@ -108,10 +127,15 @@ export async function GET(request: Request) {
       const sid = exp.shop_id;
       if (!sid || !performanceByShop[sid]) return;
 
-      performanceByShop[sid].expenses += exp.amount || 0;
+      const amount = exp.amount || 0;
+      performanceByShop[sid].expenses += amount;
       performanceByShop[sid].expenseCount += 1;
       performanceByShop[sid].expenseBreakdown["Ledger Expenses"] =
-        (performanceByShop[sid].expenseBreakdown["Ledger Expenses"] || 0) + (exp.amount || 0);
+        (performanceByShop[sid].expenseBreakdown["Ledger Expenses"] || 0) + amount;
+        
+      const textToCategorize = `${exp.type || ''} ${exp.category || ''} ${exp.description || ''}`;
+      const group = categorizeExpense(textToCategorize);
+      performanceByShop[sid].groupedExpenses[group] += amount;
     });
 
     // Calculate profit and find best sellers
