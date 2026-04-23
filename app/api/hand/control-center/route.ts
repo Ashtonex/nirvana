@@ -102,6 +102,7 @@ export async function GET() {
       { data: salesData },
       { data: ledgerData },
       { data: operationsData },
+      { data: driftsData },
       { data: investData },
       { data: inventoryData },
       { data: openingBalanceData },
@@ -115,18 +116,20 @@ export async function GET() {
       supabaseAdmin
         .from('sales')
         .select('shop_id, total_with_tax, total_before_tax, quantity, date')
-        .is('deleted_at', null)
         .gte('date', thirtyDaysAgo),
       supabaseAdmin
         .from('ledger_entries')
         .select('id, shop_id, amount, type, category, description, date')
-        .is('deleted_at', null)
         .gte('date', thirtyDaysAgo),
       supabaseAdmin
         .from('operations_ledger')
         .select('id, shop_id, amount, kind, title, notes, created_at, status')
-        .is('deleted_at', null)
         .gte('created_at', thirtyDaysAgo),
+      supabaseAdmin
+        .from('operations_drifts')
+        .select('id, amount, reason, resolved_kind, resolved_shop, created_at')
+        .order('created_at', { ascending: false })
+        .limit(20),
       supabaseAdmin
         .from('invest_deposits')
         .select('shop_id, amount, withdrawn_amount'),
@@ -169,6 +172,7 @@ export async function GET() {
     const sales = (salesData || []) as SaleRow[];
     const ledger = (ledgerData || []) as LedgerRow[];
     const operations = (operationsData || []) as OperationsRow[];
+    const drifts = driftsData || [];
     const investDeposits = (investData || []) as InvestRow[];
     const inventory = (inventoryData || []) as InventoryRow[];
     const openingBalances = (openingBalanceData || []) as OpeningBalanceRow[];
@@ -408,6 +412,7 @@ export async function GET() {
       forecasts,
       recentTransactions,
       recentOperations,
+      drifts,
     });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Unknown error';

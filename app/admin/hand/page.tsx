@@ -111,6 +111,14 @@ type ControlRoomResponse = {
     title: string;
     notes: string;
   }>;
+  drifts: Array<{
+    id: string;
+    amount: number;
+    reason: string;
+    resolved_kind: string | null;
+    resolved_shop: string | null;
+    created_at: string;
+  }>;
 };
 
 type SaleForm = {
@@ -215,6 +223,7 @@ const TABS = [
   { id: 'performance', label: 'Performance', icon: BarChart3 },
   { id: 'inventory', label: 'Inventory', icon: ShieldCheck },
   { id: 'logs', label: 'Audit Logs', icon: Brain },
+  { id: 'rationalisation', label: 'Rationalisation', icon: AlertTriangle },
 ] as const;
 
 export default function TheHandPage() {
@@ -494,6 +503,33 @@ export default function TheHandPage() {
       addLog('error', message);
     } finally {
       setBackupBusy(false);
+    }
+  };
+
+  const handleRationalize = async () => {
+    if (!confirm('RESET VARIANCE TO ZERO? This will pull your Actual Vault Balance to perfectly align with the Computed Ledger. The current discrepancy will be logged as a permanent drift traceback. Continue?')) {
+      return;
+    }
+
+    try {
+      setBusy(true);
+      const response = await fetch('/api/hand/rationalize', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+      });
+      const result = await response.json();
+      if (!response.ok || !result.success) {
+        throw new Error(result.message || 'Failed to rationalize variance');
+      }
+
+      addLog('success', result.message || 'Variance reset completed successfully.');
+      await loadControlRoom();
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Failed to rationalize variance';
+      addLog('error', message);
+    } finally {
+      setBusy(false);
     }
   };
 
@@ -945,6 +981,91 @@ export default function TheHandPage() {
                 </div>
               </WindowCard>
             </div>
+          </div>
+        )}
+
+        {activeTab === 'rationalisation' && (
+          <div className="space-y-6 mt-6">
+            <WindowCard eyebrow="Operations Rationalisation" title="Variance Reset Engine" icon={AlertTriangle} className="border-amber-500/30">
+              <div className="grid gap-6 md:grid-cols-2">
+                <div className="rounded-3xl border border-white/10 bg-slate-900/40 p-6">
+                  <h3 className="text-xl font-black text-white">Current Variance</h3>
+                  <p className="mt-2 text-sm text-slate-400">
+                    The delta between what the Computed Ledger expects in the vault and what you've declared as the Actual Vault Balance.
+                  </p>
+                  <div className="mt-6 flex flex-col gap-4">
+                    <div className="flex items-center justify-between border-b border-white/5 pb-4">
+                      <span className="text-xs uppercase font-bold text-slate-500">Actual Balance</span>
+                      <span className="font-mono text-lg font-bold text-sky-300">{currency(controlRoom?.money.operationsActualBalance || 0)}</span>
+                    </div>
+                    <div className="flex items-center justify-between border-b border-white/5 pb-4">
+                      <span className="text-xs uppercase font-bold text-slate-500">Computed Ledger</span>
+                      <span className="font-mono text-lg font-bold text-slate-300">{currency(controlRoom?.money.operationsComputedBalance || 0)}</span>
+                    </div>
+                    <div className="flex items-center justify-between pt-2">
+                      <span className="text-sm uppercase font-black tracking-widest text-white">Operations Delta</span>
+                      <span className={`font-mono text-2xl font-black ${(controlRoom?.money.operationsDelta || 0) !== 0 ? 'text-rose-400' : 'text-emerald-400'}`}>
+                        {currency(controlRoom?.money.operationsDelta || 0)}
+                      </span>
+                    </div>
+                  </div>
+                  
+                  <div className="mt-8">
+                    <button
+                      onClick={handleRationalize}
+                      disabled={busy || (controlRoom?.money.operationsDelta === 0)}
+                      className="w-full group relative overflow-hidden rounded-2xl border border-rose-400/30 bg-rose-500/10 py-4 text-center transition-all hover:bg-rose-500/20 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <span className="text-sm font-black uppercase tracking-[0.2em] text-rose-200">
+                        {controlRoom?.money.operationsDelta === 0 ? 'Variance is 0' : 'Reset Variance to 0'}
+                      </span>
+                    </button>
+                    <p className="mt-3 text-center text-[10px] text-rose-400/70 uppercase tracking-wider">
+                      Requires Level 5 Clearance
+                    </p>
+                  </div>
+                </div>
+
+                <div className="rounded-3xl border border-white/10 bg-slate-900/40 p-6">
+                  <h3 className="text-xl font-black text-white">Traceback History</h3>
+                  <p className="mt-2 text-sm text-slate-400">
+                    A permanent audit trail of all manual variance resets and ledger adjustments.
+                  </p>
+                  
+                  <div className="mt-6 space-y-3 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
+                    {!controlRoom?.drifts || controlRoom.drifts.length === 0 ? (
+                      <div className="rounded-2xl border border-white/5 bg-white/5 p-6 text-center text-sm text-slate-500">
+                        No historical tracebacks found.
+                      </div>
+                    ) : (
+                      controlRoom.drifts.map((drift) => (
+                        <div key={drift.id} className="rounded-2xl border border-white/10 bg-slate-950/50 p-4">
+                          <div className="flex justify-between items-start">
+                            <span className="font-mono text-sm font-black text-amber-300">{currency(drift.amount)}</span>
+                            <span className="text-[10px] font-bold text-slate-500">{timeLabel(drift.created_at)}</span>
+                          </div>
+                          <p className="mt-2 text-xs text-slate-300 leading-relaxed">{drift.reason}</p>
+                          {(drift.resolved_kind || drift.resolved_shop) && (
+                            <div className="mt-3 flex gap-2">
+                              {drift.resolved_kind && (
+                                <span className="rounded-md bg-white/5 px-2 py-1 text-[9px] uppercase tracking-wider text-slate-400">
+                                  {drift.resolved_kind}
+                                </span>
+                              )}
+                              {drift.resolved_shop && (
+                                <span className="rounded-md bg-white/5 px-2 py-1 text-[9px] uppercase tracking-wider text-slate-400">
+                                  Shop: {drift.resolved_shop}
+                                </span>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              </div>
+            </WindowCard>
           </div>
         )}
 
