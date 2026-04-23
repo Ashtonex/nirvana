@@ -4,7 +4,31 @@ import { supabaseAdmin } from '@/lib/supabase';
 
 export const dynamic = 'force-dynamic';
 
-// GET: Fetch all expenses for a given month + their saved classifications
+// Accounting/system entries that are NOT real cash-out expenses — exclude from classification view
+const NON_CASH_CATEGORIES = new Set([
+  'Cash Drawer Opening',
+  'Cash Drawer Adjustment',
+  'Stock Adjustment',
+  'Operations Transfer',
+  'Inventory Acquisition',
+  'Shipping & Logistics',
+  'Lay-by Completed',
+  'Lay-by Pending',
+  'Lay-by Payment',
+  'Return',
+  'Refund',
+]);
+
+const keywordGroup = (text: string): string => {
+  const lower = text.toLowerCase();
+  if (/(rent|salary|salaries|utility|utilities|overhead)/.test(lower)) return 'Overheads';
+  if (/(stock|order|purchase|supplier|restock|supply|supplies)/.test(lower)) return 'Stock Orders';
+  if (/(invest|vault|transfer|saving|savings|blackbox|deposit|withdrawal)/.test(lower)) return 'Transfers';
+  if (/(grocery|groceries|fuel|owner|drawing|personal)/.test(lower)) return 'Personal Use';
+  return 'Other';
+};
+
+// GET: Fetch real POS-level expenses for a given month + their saved classifications
 export async function GET(request: Request) {
   const authError = await enforceOwnerOnly();
   if (authError) return authError;
@@ -14,93 +38,60 @@ export async function GET(request: Request) {
     const year = parseInt(searchParams.get('year') || new Date().getFullYear().toString());
     const month = parseInt(searchParams.get('month') || (new Date().getMonth() + 1).toString());
 
-    const startDate = new Date(year, month - 1, 1).toISOString();
-    const endDate = new Date(year, month, 0, 23, 59, 59).toISOString();
+    const startDate = new Date(year, month - 1, 1).toISOString().split('T')[0];
+    const endDate = new Date(year, month, 0).toISOString().split('T')[0];
 
-    // Fetch raw expenses from both sources
-    const [{ data: opsData }, { data: ledgerData }, { data: classifications }] = await Promise.all([
-      supabaseAdmin
-        .from('operations_ledger')
-        .select('id, shop_id, amount, kind, title, notes, created_at, overhead_category')
-        .gte('created_at', startDate)
-        .lte('created_at', endDate)
-        .order('created_at', { ascending: false }),
+    const [{ data: ledgerData }, { data: classifications }] = await Promise.all([
+      // Only shop-scoped expense entries from POS — NOT operations_ledger
       supabaseAdmin
         .from('ledger_entries')
         .select('id, shop_id, amount, type, category, description, date')
         .eq('type', 'expense')
-        .gte('date', startDate.split('T')[0])
-        .lte('date', endDate.split('T')[0])
+        .not('shop_id', 'is', null)
+        .gte('date', startDate)
+        .lte('date', endDate)
         .order('date', { ascending: false }),
       supabaseAdmin
         .from('expense_classifications')
         .select('expense_id, source, group_name, classified_at'),
     ]);
 
-    // Build a lookup map: `${source}:${id}` → group_name
     const classMap = new Map<string, string>();
     (classifications || []).forEach((c: any) => {
       classMap.set(`${c.source}:${c.expense_id}`, c.group_name);
     });
 
-    const keywordGroup = (text: string): string => {
-      const lower = text.toLowerCase();
-      if (/(rent|salary|salaries|utility|utilities|overhead)/.test(lower)) return 'Overheads';
-      if (/(invest|vault|transfer|operation|deposit|withdrawal|saving|savings|blackbox)/.test(lower)) return 'Transfers';
-      if (/(grocery|groceries|fuel|owner|drawing|personal)/.test(lower)) return 'Personal Use';
-      return 'Other';
-    };
+    // Filter out accounting noise — only show real cash-out expenses
+    const expenses = (ledgerData || [])
+      .filter((e: any) => !NON_CASH_CATEGORIES.has(e.category || ''))
+      .map((exp: any) => {
+        const key = `ledger_entries:${exp.id}`;
+        const savedGroup = classMap.get(key) || null;
+        const textForKeyword = `${exp.category || ''} ${exp.description || ''}`;
+        return {
+          id: exp.id,
+          source: 'ledger_entries' as const,
+          shopId: exp.shop_id,
+          amount: Number(exp.amount || 0),
+          description: exp.description || exp.category || 'Expense',
+          detail: exp.category || '',
+          date: exp.date,
+          savedGroup,
+          suggestedGroup: savedGroup || keywordGroup(textForKeyword),
+          isManuallyClassified: savedGroup !== null,
+        };
+      });
 
-    const opsExpenses = (opsData || []).map((exp: any) => {
-      const key = `operations_ledger:${exp.id}`;
-      const savedGroup = classMap.get(key) || null;
-      const textForKeyword = `${exp.kind || ''} ${exp.title || ''} ${exp.overhead_category || ''} ${exp.notes || ''}`;
-      return {
-        id: exp.id,
-        source: 'operations_ledger' as const,
-        shopId: exp.shop_id,
-        amount: Number(exp.amount || 0),
-        description: exp.title || exp.kind || exp.overhead_category || 'Operations entry',
-        detail: exp.notes || '',
-        date: exp.created_at,
-        savedGroup,
-        suggestedGroup: savedGroup || keywordGroup(textForKeyword),
-        isManuallyClassified: savedGroup !== null,
-      };
-    });
-
-    const ledgerExpenses = (ledgerData || []).map((exp: any) => {
-      const key = `ledger_entries:${exp.id}`;
-      const savedGroup = classMap.get(key) || null;
-      const textForKeyword = `${exp.type || ''} ${exp.category || ''} ${exp.description || ''}`;
-      return {
-        id: exp.id,
-        source: 'ledger_entries' as const,
-        shopId: exp.shop_id,
-        amount: Number(exp.amount || 0),
-        description: exp.description || exp.category || 'Ledger expense',
-        detail: exp.category || '',
-        date: exp.date,
-        savedGroup,
-        suggestedGroup: savedGroup || keywordGroup(textForKeyword),
-        isManuallyClassified: savedGroup !== null,
-      };
-    });
-
-    const allExpenses = [...opsExpenses, ...ledgerExpenses].sort(
-      (a, b) => new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime()
-    );
-
-    const classified = allExpenses.filter(e => e.isManuallyClassified).length;
+    const classified = expenses.filter(e => e.isManuallyClassified).length;
 
     return NextResponse.json({
       success: true,
       period: { year, month },
-      expenses: allExpenses,
+      expenses,
       stats: {
-        total: allExpenses.length,
+        total: expenses.length,
         classified,
-        unclassified: allExpenses.length - classified,
+        unclassified: expenses.length - classified,
       },
     });
   } catch (e: any) {
@@ -122,7 +113,7 @@ export async function POST(request: Request) {
     }
 
     const validSources = ['operations_ledger', 'ledger_entries'];
-    const validGroups = ['Overheads', 'Transfers', 'Personal Use', 'Other'];
+    const validGroups = ['Overheads', 'Stock Orders', 'Transfers', 'Personal Use', 'Other'];
 
     if (!validSources.includes(source)) {
       return NextResponse.json({ success: false, message: 'Invalid source' }, { status: 400 });
@@ -131,7 +122,6 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, message: 'Invalid group' }, { status: 400 });
     }
 
-    // Upsert: update if exists, insert if not
     const { error } = await supabaseAdmin
       .from('expense_classifications')
       .upsert(
@@ -161,7 +151,6 @@ export async function DELETE(request: Request) {
 
   try {
     const { expense_id, source } = await request.json();
-
     const { error } = await supabaseAdmin
       .from('expense_classifications')
       .delete()
@@ -169,7 +158,6 @@ export async function DELETE(request: Request) {
       .eq('source', source);
 
     if (error) throw new Error(error.message);
-
     return NextResponse.json({ success: true, message: 'Classification removed' });
   } catch (e: any) {
     return NextResponse.json({ success: false, message: e.message }, { status: 500 });

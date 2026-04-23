@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Tag, RefreshCcw, CheckCircle2, AlertCircle, Loader2, Filter } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-type ExpenseGroup = 'Overheads' | 'Transfers' | 'Personal Use' | 'Other';
+type ExpenseGroup = 'Overheads' | 'Stock Orders' | 'Transfers' | 'Personal Use' | 'Other';
 type ExpenseSource = 'operations_ledger' | 'ledger_entries';
 
 type Expense = {
@@ -22,20 +22,22 @@ type Expense = {
 
 type Stats = { total: number; classified: number; unclassified: number };
 
-const GROUPS: ExpenseGroup[] = ['Overheads', 'Transfers', 'Personal Use', 'Other'];
+const GROUPS: ExpenseGroup[] = ['Overheads', 'Stock Orders', 'Transfers', 'Personal Use', 'Other'];
 
 const GROUP_COLOURS: Record<ExpenseGroup, string> = {
-  Overheads:      'bg-rose-500/15 text-rose-300 border-rose-500/30',
-  Transfers:      'bg-sky-500/15 text-sky-300 border-sky-500/30',
-  'Personal Use': 'bg-amber-500/15 text-amber-300 border-amber-500/30',
-  Other:          'bg-slate-500/15 text-slate-300 border-slate-500/30',
+  Overheads:       'bg-rose-500/15 text-rose-300 border-rose-500/30',
+  'Stock Orders':  'bg-violet-500/15 text-violet-300 border-violet-500/30',
+  Transfers:       'bg-sky-500/15 text-sky-300 border-sky-500/30',
+  'Personal Use':  'bg-amber-500/15 text-amber-300 border-amber-500/30',
+  Other:           'bg-slate-500/15 text-slate-300 border-slate-500/30',
 };
 
 const GROUP_BADGE: Record<ExpenseGroup, string> = {
-  Overheads:      'border-rose-500/40 text-rose-300',
-  Transfers:      'border-sky-500/40 text-sky-300',
-  'Personal Use': 'border-amber-500/40 text-amber-300',
-  Other:          'border-slate-500/40 text-slate-400',
+  Overheads:       'border-rose-500/40 text-rose-300',
+  'Stock Orders':  'border-violet-500/40 text-violet-300',
+  Transfers:       'border-sky-500/40 text-sky-300',
+  'Personal Use':  'border-amber-500/40 text-amber-300',
+  Other:           'border-slate-500/40 text-slate-400',
 };
 
 function currency(n: number) {

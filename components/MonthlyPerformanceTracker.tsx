@@ -13,6 +13,7 @@ interface PerformanceData {
   expenses: number;
   expenseCount: number;
   profit: number;
+  trueOperatingProfit: number;
   bestSeller?: [string, number];
   biggestOverhead?: [string, number];
   expenseBreakdown: { [key: string]: number };
@@ -23,8 +24,15 @@ interface Totals {
   totalRevenue: number;
   totalExpenses: number;
   totalProfit: number;
+  totalTrueOperatingProfit: number;
+  totalOverheads: number;
+  totalStockOrders: number;
+  totalTransfers: number;
+  totalPersonalUse: number;
   totalSales: number;
   shopCount: number;
+  profitMargin: number;
+  trueOperatingMargin: number;
 }
 
 export function MonthlyPerformanceTracker() {
@@ -181,66 +189,65 @@ export function MonthlyPerformanceTracker() {
 
       {/* Summary Cards */}
       {totals && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-          <Card className="bg-slate-900/50 border-slate-800">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-xs font-medium text-slate-400">Total Revenue</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-emerald-400">{formatCurrency(totals.totalRevenue)}</div>
-              <p className="text-xs text-slate-500 mt-1">{totals.totalSales} sales</p>
-            </CardContent>
-          </Card>
+        <div className="space-y-4">
+          {/* Primary numbers */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/5 p-5">
+              <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Total Revenue</p>
+              <p className="mt-3 text-3xl font-black text-emerald-400">{formatCurrency(totals.totalRevenue)}</p>
+              <p className="mt-1 text-xs text-slate-500">{totals.totalSales} sales across {totals.shopCount} shops</p>
+            </div>
+            <div className="rounded-2xl border border-rose-500/20 bg-rose-500/5 p-5">
+              <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Operating Expenses</p>
+              <p className="mt-3 text-3xl font-black text-rose-400">{formatCurrency(totals.totalExpenses)}</p>
+              <p className="mt-1 text-xs text-slate-500">Overheads + Stock Orders + Other</p>
+            </div>
+            <div className={cn('rounded-2xl border p-5', totals.totalProfit >= 0 ? 'border-sky-500/20 bg-sky-500/5' : 'border-rose-500/30 bg-rose-500/10')}>
+              <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Net Profit</p>
+              <p className={cn('mt-3 text-3xl font-black', totals.totalProfit >= 0 ? 'text-sky-300' : 'text-rose-400')}>{formatCurrency(totals.totalProfit)}</p>
+              <p className="mt-1 text-xs text-slate-500">{totals.profitMargin?.toFixed(1) ?? '0.0'}% margin</p>
+            </div>
+          </div>
 
-          <Card className="bg-slate-900/50 border-slate-800">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-xs font-medium text-slate-400">Total Expenses</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-red-400">{formatCurrency(totals.totalExpenses)}</div>
-              <p className="text-xs text-slate-500 mt-1">{((totals.totalExpenses / totals.totalRevenue) * 100).toFixed(1)}% of revenue</p>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-slate-900/50 border-slate-800">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-xs font-medium text-slate-400">Net Profit</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className={cn('text-2xl font-bold', totals.totalProfit >= 0 ? 'text-emerald-400' : 'text-red-400')}>
-                {formatCurrency(totals.totalProfit)}
-              </div>
-              <p className="text-xs text-slate-500 mt-1">
-                {((totals.totalProfit / totals.totalRevenue) * 100).toFixed(1)}% margin
+          {/* True operating profit — excludes Transfers & Personal Use from expenses */}
+          <div className={cn('rounded-2xl border p-5 flex items-center justify-between', (totals.totalTrueOperatingProfit ?? 0) >= 0 ? 'border-emerald-500/20 bg-emerald-500/5' : 'border-rose-500/20 bg-rose-500/5')}>
+            <div>
+              <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">True Operating Profit <span className="text-slate-600">(Revenue − Overheads only)</span></p>
+              <p className={cn('mt-2 text-3xl font-black', (totals.totalTrueOperatingProfit ?? 0) >= 0 ? 'text-emerald-300' : 'text-rose-400')}>
+                {formatCurrency(totals.totalTrueOperatingProfit ?? 0)}
               </p>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-slate-900/50 border-slate-800">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-xs font-medium text-slate-400">Avg per Shop</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-blue-400">
-                {formatCurrency(totals.totalProfit / totals.shopCount)}
-              </div>
-              <p className="text-xs text-slate-500 mt-1">{totals.shopCount} shops</p>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-slate-900/50 border-slate-800">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-xs font-medium text-slate-400">Profit Margin</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className={cn('text-2xl font-bold', totals.totalProfit >= 0 ? 'text-emerald-400' : 'text-red-400')}>
-                {((totals.totalProfit / totals.totalRevenue) * 100).toFixed(1)}%
-              </div>
-              <p className="text-xs text-slate-500 mt-1">
-                {totals.totalProfit >= 0 ? <TrendingUp className="h-3 w-3 inline mr-1" /> : <TrendingDown className="h-3 w-3 inline mr-1" />}
+            </div>
+            <div className="text-right">
+              <p className="text-xs text-slate-500">Operating Margin</p>
+              <p className={cn('text-2xl font-black', (totals.trueOperatingMargin ?? 0) >= 0 ? 'text-emerald-400' : 'text-rose-400')}>
+                {(totals.trueOperatingMargin ?? 0).toFixed(1)}%
               </p>
-            </CardContent>
-          </Card>
+            </div>
+          </div>
+
+          {/* Expense breakdown strip */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <div className="rounded-xl border border-rose-500/20 bg-rose-500/5 p-3">
+              <p className="text-[9px] font-black uppercase tracking-widest text-rose-400/70">Overheads</p>
+              <p className="mt-1 text-lg font-black text-rose-300">{formatCurrency(totals.totalOverheads ?? 0)}</p>
+              <p className="text-[9px] text-slate-600">Rent · Salary · Utilities</p>
+            </div>
+            <div className="rounded-xl border border-violet-500/20 bg-violet-500/5 p-3">
+              <p className="text-[9px] font-black uppercase tracking-widest text-violet-400/70">Stock Orders</p>
+              <p className="mt-1 text-lg font-black text-violet-300">{formatCurrency(totals.totalStockOrders ?? 0)}</p>
+              <p className="text-[9px] text-slate-600">Cost of goods purchased</p>
+            </div>
+            <div className="rounded-xl border border-sky-500/20 bg-sky-500/5 p-3">
+              <p className="text-[9px] font-black uppercase tracking-widest text-sky-400/70">Transfers</p>
+              <p className="mt-1 text-lg font-black text-sky-300">{formatCurrency(totals.totalTransfers ?? 0)}</p>
+              <p className="text-[9px] text-slate-600">Not counted vs profit</p>
+            </div>
+            <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-3">
+              <p className="text-[9px] font-black uppercase tracking-widest text-amber-400/70">Personal Use</p>
+              <p className="mt-1 text-lg font-black text-amber-300">{formatCurrency(totals.totalPersonalUse ?? 0)}</p>
+              <p className="text-[9px] text-slate-600">Not counted vs profit</p>
+            </div>
+          </div>
         </div>
       )}
 
