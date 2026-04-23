@@ -21,6 +21,7 @@ import {
 
 import { MonthlyPerformanceTracker } from '@/components/MonthlyPerformanceTracker';
 import { InventoryHealth } from '@/components/InventoryHealth';
+import { ExpenseCategorisation } from '@/components/ExpenseCategorisation';
 import { cn } from '@/lib/utils';
 
 type ClearanceState = 'checking' | 'granted' | 'denied';
@@ -221,6 +222,7 @@ function MetricCard({
 const TABS = [
   { id: 'overview', label: 'Overview', icon: Building2 },
   { id: 'performance', label: 'Performance', icon: BarChart3 },
+  { id: 'expenses', label: 'Expense Categorisation', icon: BadgeDollarSign },
   { id: 'inventory', label: 'Inventory', icon: ShieldCheck },
   { id: 'logs', label: 'Audit Logs', icon: Brain },
   { id: 'rationalisation', label: 'Rationalisation', icon: AlertTriangle },
@@ -928,6 +930,13 @@ export default function TheHandPage() {
         {activeTab === 'performance' && (
           <div className="mt-6 space-y-6">
             <MonthlyPerformanceTracker />
+          </div>
+        )}
+
+        {/* Expense Categorisation Tab */}
+        {activeTab === 'expenses' && (
+          <div className="mt-6 space-y-6">
+            <ExpenseCategorisation />
           </div>
         )}
 

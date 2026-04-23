@@ -495,43 +495,74 @@ export async function recordSale(sale: any) {
 
     const isService = sale.itemId?.startsWith('service_');
 
-    if (!isService) {
-        // Use atomic DB functions to prevent race conditions from concurrent sales
-        try {
-            await supabaseAdmin.rpc('decrement_allocation', { 
-                item_id: sale.itemId, 
-                shop_id: sale.shopId, 
-                qty: sale.quantity 
+    if (!isService && sale.itemId) {
+        // Decrement shop-level allocation — direct select+update (no RPC dependency)
+        const { data: currentAlloc } = await supabaseAdmin
+            .from('inventory_allocations')
+            .select('quantity')
+            .eq('item_id', sale.itemId)
+            .eq('shop_id', sale.shopId)
+            .maybeSingle();
+
+        if (currentAlloc !== null && currentAlloc !== undefined) {
+            const newAllocQty = Math.max(0, Number((currentAlloc as any).quantity || 0) - sale.quantity);
+            const { error: allocUpdateErr } = await supabaseAdmin
+                .from('inventory_allocations')
+                .update({ quantity: newAllocQty })
+                .eq('item_id', sale.itemId)
+                .eq('shop_id', sale.shopId);
+            if (allocUpdateErr) {
+                console.error('[recordSale] Failed to decrement allocation:', allocUpdateErr.message);
+            }
+        } else {
+            // RPC fallback (if RPCs have been deployed)
+            const rpcResult = await supabaseAdmin.rpc('decrement_allocation', {
+                item_id: sale.itemId,
+                shop_id: sale.shopId,
+                qty: sale.quantity
             });
-        } catch (e) {
-            console.error('Failed to decrement allocation:', e);
+            if (rpcResult.error) {
+                console.error('[recordSale] RPC decrement_allocation failed:', rpcResult.error.message);
+            }
         }
 
-        try {
-            await supabaseAdmin.rpc('decrement_inventory', { 
-                item_id: sale.itemId, 
-                qty: sale.quantity 
-            });
-        } catch (e) {
-            console.error('Failed to decrement inventory:', e);
-        }
-
-        // Check if stock is depleted after the sale
-        const { data: item } = await supabaseAdmin
+        // Decrement global inventory item quantity directly
+        const { data: currentItem } = await supabaseAdmin
             .from('inventory_items')
             .select('quantity, name')
             .eq('id', sale.itemId)
-            .single();
-            
-        if (item && Number(item.quantity) <= 0) {
-            try {
-                await sendEmail({
-                    to: ORACLE_RECIPIENT,
-                    subject: `[ALERT] Stock Depleted: ${item.name}`,
-                    html: `<p>Product has 0 units remaining.</p>`
-                });
-            } catch (e) {
-                console.error('[Email] Stock depleted alert failed:', (e as any)?.message || e);
+            .maybeSingle();
+
+        if (currentItem !== null && currentItem !== undefined) {
+            const newItemQty = Math.max(0, Number((currentItem as any).quantity || 0) - sale.quantity);
+            const { error: itemUpdateErr } = await supabaseAdmin
+                .from('inventory_items')
+                .update({ quantity: newItemQty })
+                .eq('id', sale.itemId);
+            if (itemUpdateErr) {
+                console.error('[recordSale] Failed to decrement inventory_items:', itemUpdateErr.message);
+            }
+
+            // Alert if depleted after the update
+            if (newItemQty <= 0) {
+                try {
+                    await sendEmail({
+                        to: ORACLE_RECIPIENT,
+                        subject: `[ALERT] Stock Depleted: ${(currentItem as any).name}`,
+                        html: `<p>Product "${(currentItem as any).name}" has 0 units remaining after a sale at ${sale.shopId}.</p>`
+                    });
+                } catch (e) {
+                    console.error('[Email] Stock depleted alert failed:', (e as any)?.message || e);
+                }
+            }
+        } else {
+            // RPC fallback
+            const rpcResult = await supabaseAdmin.rpc('decrement_inventory', {
+                item_id: sale.itemId,
+                qty: sale.quantity
+            });
+            if (rpcResult.error) {
+                console.error('[recordSale] RPC decrement_inventory failed:', rpcResult.error.message);
             }
         }
     }

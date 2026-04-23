@@ -31,6 +31,15 @@ export async function GET(request: Request) {
     const { data: shops } = await supabaseAdmin.from("shops").select("id, name");
     const shopList = Array.isArray(shops) ? shops : [];
 
+    // Get saved expense classifications (learned groupings)
+    const { data: classificationsData } = await supabaseAdmin
+      .from("expense_classifications")
+      .select("expense_id, source, group_name");
+    const classMap = new Map<string, string>();
+    (classificationsData || []).forEach((c: any) => {
+      classMap.set(`${c.source}:${c.expense_id}`, c.group_name);
+    });
+
     // Get sales data
     const { data: salesData } = await supabaseAdmin
       .from("sales")
@@ -41,14 +50,14 @@ export async function GET(request: Request) {
     // Get operations ledger (expenses)
     const { data: expensesData } = await supabaseAdmin
       .from("operations_ledger")
-      .select("id, shop_id, amount, kind, title, overhead_category, created_at")
+      .select("id, shop_id, amount, kind, title, overhead_category, notes, created_at")
       .gte("created_at", `${startDate}T00:00:00`)
       .lte("created_at", `${endDate}T23:59:59`);
 
     // Get ledger entries (if they exist)
     const { data: ledgerData } = await supabaseAdmin
       .from("ledger_entries")
-      .select("id, shop_id, amount, type, date")
+      .select("id, shop_id, amount, type, category, description, date")
       .eq("type", "expense")
       .gte("date", startDate)
       .lte("date", endDate);
@@ -96,7 +105,11 @@ export async function GET(request: Request) {
       });
     });
 
-    const categorizeExpense = (text: string) => {
+    const categorizeExpense = (text: string, id: string, source: string) => {
+      // Check saved (learned) classification first
+      const saved = classMap.get(`${source}:${id}`);
+      if (saved) return saved;
+      // Fall back to keyword detection
       const lower = text.toLowerCase();
       if (/(rent|salary|salaries|utility|utilities|overhead)/i.test(lower)) return "Overheads";
       if (/(invest|vault|transfer|operation|deposit|withdrawal|saving|savings|blackbox)/i.test(lower)) return "Transfers";
@@ -118,7 +131,7 @@ export async function GET(request: Request) {
         (performanceByShop[sid].expenseBreakdown[category] || 0) + amount;
         
       const textToCategorize = `${exp.kind || ''} ${exp.title || ''} ${exp.overhead_category || ''} ${exp.notes || ''}`;
-      const group = categorizeExpense(textToCategorize);
+      const group = categorizeExpense(textToCategorize, exp.id, 'operations_ledger');
       performanceByShop[sid].groupedExpenses[group] += amount;
     });
 
@@ -134,7 +147,7 @@ export async function GET(request: Request) {
         (performanceByShop[sid].expenseBreakdown["Ledger Expenses"] || 0) + amount;
         
       const textToCategorize = `${exp.type || ''} ${exp.category || ''} ${exp.description || ''}`;
-      const group = categorizeExpense(textToCategorize);
+      const group = categorizeExpense(textToCategorize, exp.id, 'ledger_entries');
       performanceByShop[sid].groupedExpenses[group] += amount;
     });
 
