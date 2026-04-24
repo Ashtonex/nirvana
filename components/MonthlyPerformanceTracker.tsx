@@ -126,7 +126,7 @@ export function MonthlyPerformanceTracker() {
           <label className="text-xs font-medium text-slate-400 block mb-2">Year</label>
           <Select value={year.toString()} onValueChange={(v) => setYear(parseInt(v))}>
             <SelectTrigger className="bg-slate-900 border-slate-700">
-              <SelectValue />
+              <SelectValue placeholder="Select year" />
             </SelectTrigger>
             <SelectContent>
               {years.map((y) => (
@@ -140,7 +140,7 @@ export function MonthlyPerformanceTracker() {
           <label className="text-xs font-medium text-slate-400 block mb-2">Month</label>
           <Select value={month.toString()} onValueChange={(v) => setMonth(parseInt(v))}>
             <SelectTrigger className="bg-slate-900 border-slate-700">
-              <SelectValue />
+              <SelectValue placeholder="Select month" />
             </SelectTrigger>
             <SelectContent>
               {months.map((m, i) => (
@@ -150,22 +150,20 @@ export function MonthlyPerformanceTracker() {
           </Select>
         </div>
 
-        {performance.length > 1 && (
-          <div>
-            <label className="text-xs font-medium text-slate-400 block mb-2">Filter Shop</label>
-            <Select value={selectedShop} onValueChange={setSelectedShop}>
-              <SelectTrigger className="bg-slate-900 border-slate-700">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Shops</SelectItem>
-                {performance.map((p) => (
-                  <SelectItem key={p.shopId} value={p.shopId}>{p.shopName}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        )}
+        <div>
+          <label className="text-xs font-medium text-slate-400 block mb-2">Filter Shop</label>
+          <Select value={selectedShop} onValueChange={setSelectedShop}>
+            <SelectTrigger className="bg-slate-900 border-slate-700">
+              <SelectValue placeholder="All Shops" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Shops</SelectItem>
+              {performance.map((p) => (
+                <SelectItem key={p.shopId} value={p.shopId}>{p.shopName}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
 
         <div className="flex items-end">
           <Button onClick={fetchPerformance} disabled={loading} className="w-full bg-emerald-600 hover:bg-emerald-700">
@@ -251,7 +249,7 @@ export function MonthlyPerformanceTracker() {
         </div>
       )}
 
-      {/* Detailed Shop Performance */}
+      {/* Compressed Summary Cards */}
       {loading ? (
         <Card className="bg-slate-900/50 border-slate-800">
           <CardContent className="pt-6 text-center">
@@ -266,145 +264,197 @@ export function MonthlyPerformanceTracker() {
           </CardContent>
         </Card>
       ) : (
-        <div className="grid gap-6">
-          {displayData.map((shop) => (
-            <Card key={shop.shopId} className="bg-slate-900/50 border-slate-800 overflow-hidden">
-              <CardHeader className="bg-slate-800/30 pb-4">
-                <div className="flex items-start justify-between">
-                  <div>
-                    <CardTitle className="text-lg">{shop.shopName}</CardTitle>
-                    <CardDescription className="text-xs text-slate-400 mt-1">
-                      {shop.salesCount} transactions
-                    </CardDescription>
-                  </div>
-                  <div className={cn('px-3 py-1 rounded text-xs font-semibold', shop.profit >= 0 ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400')}>
-                    {shop.profit >= 0 ? '+' : ''}{formatCurrency(shop.profit)}
-                  </div>
-                </div>
-              </CardHeader>
-
-              <CardContent className="pt-6">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  {/* Revenue Section */}
-                  <div className="space-y-3">
-                    <h3 className="text-xs font-semibold text-slate-300 flex items-center gap-2">
-                      <DollarSign className="h-4 w-4 text-emerald-400" />
-                      Revenue
-                    </h3>
-                    <div className="space-y-2">
-                      <div className="flex justify-between">
-                        <span className="text-xs text-slate-400">Total</span>
-                        <span className="text-sm font-bold text-emerald-400">{formatCurrency(shop.revenue)}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-xs text-slate-400">Per Sale</span>
-                        <span className="text-sm text-slate-300">
-                          {formatCurrency(shop.salesCount > 0 ? shop.revenue / shop.salesCount : 0)}
-                        </span>
-                      </div>
+        <>
+          {/* Summary Cards Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {displayData.map((shop) => (
+              <Card 
+                key={shop.shopId} 
+                className={cn(
+                  "bg-slate-900/50 border-slate-800 cursor-pointer transition-all hover:border-slate-600 hover:bg-slate-800/50",
+                  selectedShop === shop.shopId && "border-rose-500/50 bg-rose-500/5"
+                )}
+                onClick={() => setSelectedShop(shop.shopId)}
+              >
+                <CardHeader className="pb-3">
+                  <div className="flex items-start justify-between">
+                    <CardTitle className="text-base">{shop.shopName}</CardTitle>
+                    <div className={cn('px-2 py-1 rounded text-xs font-semibold', shop.profit >= 0 ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400')}>
+                      {shop.profit >= 0 ? '+' : ''}{formatCurrency(shop.profit)}
                     </div>
-
-                    {shop.bestSeller && (
-                      <div className="mt-4 p-3 bg-slate-800/50 rounded border border-slate-700">
-                        <p className="text-xs font-semibold text-slate-300 mb-1">🏆 Best Seller</p>
-                        <p className="text-xs text-slate-400 truncate">{shop.bestSeller[0]}</p>
-                        <p className="text-xs font-bold text-emerald-400 mt-1">{formatCurrency(shop.bestSeller[1])}</p>
-                      </div>
-                    )}
                   </div>
-
-                  {/* Expenses Section */}
-                  <div className="space-y-3">
-                    <h3 className="text-xs font-semibold text-slate-300 flex items-center gap-2">
-                      <TrendingDown className="h-4 w-4 text-red-400" />
-                      Expenses
-                    </h3>
-                    <div className="space-y-2">
-                      <div className="flex justify-between">
-                        <span className="text-xs text-slate-400">Total</span>
-                        <span className="text-sm font-bold text-red-400">{formatCurrency(shop.expenses)}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-xs text-slate-400">% of Revenue</span>
-                        <span className="text-sm text-slate-300">
-                          {formatPercent(shop.expenses, shop.revenue)}
-                        </span>
-                      </div>
+                  <CardDescription className="text-xs text-slate-400">
+                    {shop.salesCount} transactions
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="pt-0">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <p className="text-[10px] uppercase font-bold text-slate-500">Revenue</p>
+                      <p className="text-sm font-bold text-emerald-400">{formatCurrency(shop.revenue)}</p>
                     </div>
-
-                    {shop.biggestOverhead && (
-                      <div className="mt-4 p-3 bg-slate-800/50 rounded border border-slate-700">
-                        <p className="text-xs font-semibold text-slate-300 mb-1">⚠️ Biggest Overhead</p>
-                        <p className="text-xs text-slate-400 truncate">{shop.biggestOverhead[0]}</p>
-                        <p className="text-xs font-bold text-red-400 mt-1">{formatCurrency(shop.biggestOverhead[1])}</p>
-                      </div>
-                    )}
+                    <div>
+                      <p className="text-[10px] uppercase font-bold text-slate-500">Expenses</p>
+                      <p className="text-sm font-bold text-rose-400">{formatCurrency(shop.expenses)}</p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] uppercase font-bold text-slate-500">Margin</p>
+                      <p className={cn('text-sm font-bold', shop.profit >= 0 ? 'text-emerald-400' : 'text-red-400')}>
+                        {formatPercent(shop.profit, shop.revenue)}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] uppercase font-bold text-slate-500">Avg/Sale</p>
+                      <p className="text-sm font-bold text-slate-300">
+                        {formatCurrency(shop.salesCount > 0 ? shop.revenue / shop.salesCount : 0)}
+                      </p>
+                    </div>
                   </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
 
-                  {/* Profit & Breakdown */}
-                  <div className="space-y-3">
-                    <h3 className="text-xs font-semibold text-slate-300 flex items-center gap-2">
-                      <TrendingUp className="h-4 w-4 text-blue-400" />
-                      Profitability
-                    </h3>
-                    <div className="space-y-2">
-                      <div className="flex justify-between">
-                        <span className="text-xs text-slate-400">Net Profit</span>
-                        <span className={cn('text-sm font-bold', shop.profit >= 0 ? 'text-emerald-400' : 'text-red-400')}>
-                          {formatCurrency(shop.profit)}
-                        </span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-xs text-slate-400">Margin</span>
-                        <span className={cn('text-sm font-bold', shop.profit >= 0 ? 'text-emerald-400' : 'text-red-400')}>
-                          {formatPercent(shop.profit, shop.revenue)}
-                        </span>
-                      </div>
+          {/* Detailed Drill-down for Single Shop */}
+          {selectedShop !== 'all' && displayData.length === 1 && (
+            <div className="mt-8 space-y-6">
+              <Card className="bg-slate-900/50 border-slate-800 overflow-hidden">
+                <CardHeader className="bg-slate-800/30">
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <CardTitle className="text-xl">{displayData[0].shopName} - Financial Statement</CardTitle>
+                      <CardDescription className="text-sm text-slate-400 mt-1">
+                        Detailed breakdown for {months[month - 1]} {year}
+                      </CardDescription>
                     </div>
-
-                    {shop.groupedExpenses && Object.keys(shop.groupedExpenses).length > 0 && (
-                      <div className="mt-4 p-3 bg-slate-800/50 rounded border border-slate-700">
-                        <div className="flex justify-between items-center mb-2">
-                          <p className="text-xs font-semibold text-slate-300">
-                            {showDetailedExpenses[shop.shopId] ? 'Detailed Breakdown' : 'Categorized Expenses'}
-                          </p>
-                          <button 
-                            onClick={() => toggleDetailedExpenses(shop.shopId)}
-                            className="text-[10px] text-blue-400 hover:text-blue-300 transition-colors"
-                          >
-                            {showDetailedExpenses[shop.shopId] ? 'Show Categories' : 'Show Details'}
-                          </button>
+                    <button 
+                      onClick={() => setSelectedShop('all')}
+                      className="text-xs text-slate-400 hover:text-white transition-colors"
+                    >
+                      Back to All Shops
+                    </button>
+                  </div>
+                </CardHeader>
+                <CardContent className="pt-6">
+                  <div className="space-y-6">
+                    {/* Income Statement */}
+                    <div className="rounded-xl border border-slate-700 bg-slate-950/50 p-5">
+                      <h3 className="text-sm font-bold text-slate-300 mb-4 flex items-center gap-2">
+                        <DollarSign className="h-4 w-4 text-emerald-400" />
+                        Income Statement
+                      </h3>
+                      <div className="space-y-2">
+                        <div className="flex justify-between py-2 border-b border-slate-800">
+                          <span className="text-sm text-slate-400">Gross Revenue</span>
+                          <span className="text-sm font-bold text-emerald-400">{formatCurrency(displayData[0].revenue)}</span>
                         </div>
                         
-                        {!showDetailedExpenses[shop.shopId] ? (
-                          <div className="space-y-1">
-                            {Object.entries(shop.groupedExpenses)
-                              .filter(([, amount]) => (amount as number) > 0)
-                              .map(([category, amount]: [string, any]) => (
-                              <div key={category} className="flex justify-between items-center text-xs">
-                                <span className="text-slate-400 truncate flex-1">{category}</span>
-                                <span className="text-slate-300 font-semibold ml-2">{formatCurrency(amount)}</span>
+                        {displayData[0].groupedExpenses && (
+                          <>
+                            <div className="py-2 border-b border-slate-800">
+                              <p className="text-xs font-bold text-slate-500 mb-2">Operating Expenses</p>
+                              {Object.entries(displayData[0].groupedExpenses)
+                                .filter(([cat]) => cat !== 'Transfers' && cat !== 'Personal Use')
+                                .map(([category, amount]: [string, any]) => (
+                                <div key={category} className="flex justify-between py-1">
+                                  <span className="text-xs text-slate-400">{category}</span>
+                                  <span className="text-xs font-bold text-rose-400">{formatCurrency(amount)}</span>
+                                </div>
+                              ))}
+                            </div>
+                            
+                            <div className="flex justify-between py-2 border-b border-slate-800">
+                              <span className="text-sm font-bold text-slate-300">Total Operating Expenses</span>
+                              <span className="text-sm font-bold text-rose-400">
+                                {formatCurrency(
+                                  Object.entries(displayData[0].groupedExpenses || {})
+                                    .filter(([cat]) => cat !== 'Transfers' && cat !== 'Personal Use')
+                                    .reduce((sum, [, amount]) => sum + (amount as number), 0)
+                                )}
+                              </span>
+                            </div>
+                            
+                            <div className="flex justify-between py-2 border-b border-slate-800">
+                              <span className="text-sm font-bold text-slate-300">Operating Profit</span>
+                              <span className={cn('text-sm font-bold', displayData[0].trueOperatingProfit >= 0 ? 'text-emerald-400' : 'text-rose-400')}>
+                                {formatCurrency(displayData[0].trueOperatingProfit || 0)}
+                              </span>
+                            </div>
+                            
+                            {displayData[0].groupedExpenses['Transfers'] > 0 && (
+                              <div className="flex justify-between py-2 border-b border-slate-800">
+                                <span className="text-xs text-slate-400">Transfers (non-operating)</span>
+                                <span className="text-xs font-bold text-sky-400">{formatCurrency(displayData[0].groupedExpenses['Transfers'])}</span>
                               </div>
-                            ))}
-                          </div>
-                        ) : (
-                          <div className="space-y-1">
-                            {Object.entries(shop.expenseBreakdown).map(([category, amount]: [string, any]) => (
-                              <div key={category} className="flex justify-between items-center text-xs">
-                                <span className="text-slate-400 truncate flex-1">{category}</span>
-                                <span className="text-slate-300 font-semibold ml-2">{formatCurrency(amount)}</span>
+                            )}
+                            
+                            {displayData[0].groupedExpenses['Personal Use'] > 0 && (
+                              <div className="flex justify-between py-2 border-b border-slate-800">
+                                <span className="text-xs text-slate-400">Personal Use (non-operating)</span>
+                                <span className="text-xs font-bold text-amber-400">{formatCurrency(displayData[0].groupedExpenses['Personal Use'])}</span>
                               </div>
-                            ))}
-                          </div>
+                            )}
+                          </>
                         )}
+                        
+                        <div className="flex justify-between py-3 border-t-2 border-slate-700 mt-4">
+                          <span className="text-base font-bold text-white">Net Profit</span>
+                          <span className={cn('text-base font-bold', displayData[0].profit >= 0 ? 'text-emerald-400' : 'text-rose-400')}>
+                            {formatCurrency(displayData[0].profit)}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Detailed Expense Breakdown */}
+                    {displayData[0].expenseBreakdown && Object.keys(displayData[0].expenseBreakdown).length > 0 && (
+                      <div className="rounded-xl border border-slate-700 bg-slate-950/50 p-5">
+                        <h3 className="text-sm font-bold text-slate-300 mb-4 flex items-center gap-2">
+                          <TrendingDown className="h-4 w-4 text-rose-400" />
+                          Detailed Expense Breakdown
+                        </h3>
+                        <div className="space-y-1">
+                          {Object.entries(displayData[0].expenseBreakdown)
+                            .sort(([, a], [, b]) => (b as number) - (a as number))
+                            .map(([category, amount]: [string, any]) => (
+                            <div key={category} className="flex justify-between items-center py-2 border-b border-slate-800 last:border-0">
+                              <span className="text-sm text-slate-400 truncate flex-1">{category}</span>
+                              <span className="text-sm font-bold text-slate-300 ml-4">{formatCurrency(amount)}</span>
+                            </div>
+                          ))}
+                        </div>
                       </div>
                     )}
+
+                    {/* Key Metrics */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      {displayData[0].bestSeller && (
+                        <div className="rounded-xl border border-slate-700 bg-slate-950/50 p-4">
+                          <p className="text-[10px] font-bold uppercase text-slate-500 mb-2">🏆 Best Seller</p>
+                          <p className="text-sm text-slate-300 truncate">{displayData[0].bestSeller[0]}</p>
+                          <p className="text-lg font-bold text-emerald-400 mt-1">{formatCurrency(displayData[0].bestSeller[1])}</p>
+                        </div>
+                      )}
+                      {displayData[0].biggestOverhead && (
+                        <div className="rounded-xl border border-slate-700 bg-slate-950/50 p-4">
+                          <p className="text-[10px] font-bold uppercase text-slate-500 mb-2">⚠️ Biggest Overhead</p>
+                          <p className="text-sm text-slate-300 truncate">{displayData[0].biggestOverhead[0]}</p>
+                          <p className="text-lg font-bold text-rose-400 mt-1">{formatCurrency(displayData[0].biggestOverhead[1])}</p>
+                        </div>
+                      )}
+                      <div className="rounded-xl border border-slate-700 bg-slate-950/50 p-4">
+                        <p className="text-[10px] font-bold uppercase text-slate-500 mb-2">📊 Profit Margin</p>
+                        <p className={cn('text-lg font-bold', displayData[0].profit >= 0 ? 'text-emerald-400' : 'text-rose-400')}>
+                          {formatPercent(displayData[0].profit, displayData[0].revenue)}
+                        </p>
+                      </div>
+                    </div>
                   </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+                </CardContent>
+              </Card>
+            </div>
+          )}
+        </>
       )}
     </div>
   );
