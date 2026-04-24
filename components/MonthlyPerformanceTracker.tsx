@@ -106,26 +106,28 @@ export function MonthlyPerformanceTracker() {
     const sourceData = selectedShop === 'all' ? performance : performance.filter(p => p.shopId === selectedShop);
     
     sourceData.forEach(shop => {
-      if (shop.expenseBreakdown) {
+      if (shop.expenseBreakdown && shop.groupedExpenses) {
+        // Use the API's categorization to determine which expenses belong to which category
+        // The API already categorizes expenses into groupedExpenses
+        // We need to reverse-map: for each expense in expenseBreakdown, find which group it belongs to
+        
+        // Since the API doesn't provide the mapping, we'll use the categorization logic
         Object.entries(shop.expenseBreakdown).forEach(([cat, amount]) => {
           const normalizedCat = cat.toLowerCase();
-          const normalizedTarget = category.toLowerCase();
           
-          // Map category to expense breakdown categories
-          let isMatch = false;
-          if (category === 'Overheads') {
-            isMatch = ['rent', 'salaries', 'utilities', 'electricity', 'water', 'internet', 'insurance', 'maintenance'].some(k => normalizedCat.includes(k));
-          } else if (category === 'Stock Orders') {
-            isMatch = normalizedCat.includes('stock') || normalizedCat.includes('inventory') || normalizedCat.includes('purchase');
-          } else if (category === 'Transfers') {
-            isMatch = normalizedCat.includes('transfer') || normalizedCat.includes('move');
-          } else if (category === 'Personal Use') {
-            isMatch = normalizedCat.includes('personal') || normalizedCat.includes('withdrawal') || normalizedCat.includes('owner');
-          } else {
-            isMatch = normalizedCat.includes(normalizedTarget);
+          // Use the same categorization logic as the API
+          let expenseGroup = 'Other';
+          if (/(rent|salary|salaries|utility|utilities|overhead|electricity|water|internet|insurance|maintenance)/.test(normalizedCat)) {
+            expenseGroup = 'Overheads';
+          } else if (/(stock|order|purchase|supplier|restock|supply|supplies|inventory)/.test(normalizedCat)) {
+            expenseGroup = 'Stock Orders';
+          } else if (/(invest|vault|transfer|saving|savings|blackbox|deposit|withdrawal|move)/.test(normalizedCat)) {
+            expenseGroup = 'Transfers';
+          } else if (/(grocery|groceries|fuel|owner|drawing|personal)/.test(normalizedCat)) {
+            expenseGroup = 'Personal Use';
           }
           
-          if (isMatch && amount > 0) {
+          if (expenseGroup === category && amount > 0) {
             allExpenses.push({ shop: shop.shopName, category: cat, amount: amount as number });
           }
         });
