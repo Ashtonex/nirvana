@@ -82,7 +82,7 @@ export async function GET(request: Request) {
         };
       });
 
-    const classified = expenses.filter(e => e.isManuallyClassified).length;
+    const classified = expenses.filter((e: any) => e.isManuallyClassified).length;
 
     return NextResponse.json({
       success: true,
