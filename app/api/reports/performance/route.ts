@@ -33,6 +33,7 @@ export async function GET(request: Request) {
     const year = parseInt(searchParams.get("year") || new Date().getFullYear().toString());
     const month = parseInt(searchParams.get("month") || (new Date().getMonth() + 1).toString());
     const shopId = searchParams.get("shopId") || null;
+    const view = searchParams.get("view") || "monthly"; // 'monthly' or 'ytd'
 
     if (month < 1 || month > 12 || year < 2000) {
       return NextResponse.json({ error: "Invalid month or year" }, { status: 400 });
@@ -40,13 +41,32 @@ export async function GET(request: Request) {
 
     const startDate = new Date(year, month - 1, 1).toISOString().split("T")[0];
     const endDate = new Date(year, month, 0).toISOString().split("T")[0];
+    
+    // For YTD view, start from January 1st of the selected year
+    const ytdStartDate = new Date(year, 0, 1).toISOString().split("T")[0];
+    
+    // For previous month comparison
+    const prevMonthDate = new Date(year, month - 2, 1);
+    const prevMonthStartDate = prevMonthDate.toISOString().split("T")[0];
+    const prevMonthEndDate = new Date(year, month - 1, 0).toISOString().split("T")[0];
 
-    // Fetch in parallel
+    // Determine date range based on view
+    const queryStartDate = view === "ytd" ? ytdStartDate : startDate;
+    
+    // Fetch year-wide data for trend charts
+    const yearStartDate = new Date(year, 0, 1).toISOString().split("T")[0];
+    const yearEndDate = new Date(year, 11, 31).toISOString().split("T")[0];
+    
+    // Fetch in parallel - current period, previous month for comparison, and year-wide data for trends
     const [
       { data: shops },
       { data: classificationsData },
       { data: salesData },
       { data: ledgerData },
+      { data: prevMonthSalesData },
+      { data: prevMonthLedgerData },
+      { data: yearSalesData },
+      { data: yearLedgerData },
     ] = await Promise.all([
       supabaseAdmin.from("shops").select("id, name"),
       // Load saved classifications — gracefully handle if table doesn't exist yet
@@ -54,7 +74,7 @@ export async function GET(request: Request) {
       supabaseAdmin
         .from("sales")
         .select("id, shop_id, date, item_name, quantity, unit_price, total_with_tax")
-        .gte("date", startDate)
+        .gte("date", queryStartDate)
         .lte("date", endDate),
       // Only pull genuine shop-level expense ledger entries (not ops_ledger)
       supabaseAdmin
@@ -62,15 +82,53 @@ export async function GET(request: Request) {
         .select("id, shop_id, amount, type, category, description, date")
         .eq("type", "expense")
         .not("shop_id", "is", null)         // Must be shop-scoped
-        .gte("date", startDate)
+        .gte("date", queryStartDate)
         .lte("date", endDate),
+      // Previous month data for comparison
+      supabaseAdmin
+        .from("sales")
+        .select("id, shop_id, date, item_name, quantity, unit_price, total_with_tax")
+        .gte("date", prevMonthStartDate)
+        .lte("date", prevMonthEndDate)
+        .then((r: any) => r).catch(() => ({ data: [] })),
+      supabaseAdmin
+        .from("ledger_entries")
+        .select("id, shop_id, amount, type, category, description, date")
+        .eq("type", "expense")
+        .not("shop_id", "is", null)
+        .gte("date", prevMonthStartDate)
+        .lte("date", prevMonthEndDate)
+        .then((r: any) => r).catch(() => ({ data: [] })),
+      // Year-wide data for trend charts
+      supabaseAdmin
+        .from("sales")
+        .select("id, shop_id, date, total_with_tax")
+        .gte("date", yearStartDate)
+        .lte("date", yearEndDate)
+        .then((r: any) => r).catch(() => ({ data: [] })),
+      supabaseAdmin
+        .from("ledger_entries")
+        .select("id, shop_id, amount, type, category, description, date")
+        .eq("type", "expense")
+        .not("shop_id", "is", null)
+        .gte("date", yearStartDate)
+        .lte("date", yearEndDate)
+        .then((r: any) => r).catch(() => ({ data: [] })),
     ]);
 
     const shopList = Array.isArray(shops) ? shops : [];
     const sales = Array.isArray(salesData) ? salesData : [];
+    const prevMonthSales = Array.isArray(prevMonthSalesData) ? prevMonthSalesData : [];
+    const yearSales = Array.isArray(yearSalesData) ? yearSalesData : [];
 
     // Filter to only real cash-out expenses (exclude accounting noise)
     const ledgerExpenses = (Array.isArray(ledgerData) ? ledgerData : []).filter(
+      (e: any) => !NON_CASH_CATEGORIES.has(e.category || "")
+    );
+    const prevMonthLedgerExpenses = (Array.isArray(prevMonthLedgerData) ? prevMonthLedgerData : []).filter(
+      (e: any) => !NON_CASH_CATEGORIES.has(e.category || "")
+    );
+    const yearLedgerExpenses = (Array.isArray(yearLedgerData) ? yearLedgerData : []).filter(
       (e: any) => !NON_CASH_CATEGORIES.has(e.category || "")
     );
 
@@ -161,11 +219,55 @@ export async function GET(request: Request) {
         (performanceByShop[sid].groupedExpenses[group] || 0) + amount;
     });
 
-    // Calculate profit figures
+    // Calculate previous month comparison data
+    const prevMonthPerformance: { [key: string]: any } = {};
+    shopList.forEach((shop) => {
+      prevMonthPerformance[shop.id] = {
+        revenue: 0,
+        expenses: 0,
+        profit: 0,
+      };
+    });
+
+    // Process previous month sales
+    prevMonthSales.forEach((sale: any) => {
+      const sid = sale.shop_id || sale.shopId;
+      if (!sid || !prevMonthPerformance[sid]) return;
+      const totalAmount = Number(sale.total_with_tax || sale.totalWithTax || 0);
+      prevMonthPerformance[sid].revenue += totalAmount;
+    });
+
+    // Process previous month expenses
+    prevMonthLedgerExpenses.forEach((exp: any) => {
+      const sid = exp.shop_id || exp.shopId;
+      if (!sid || !prevMonthPerformance[sid]) return;
+      const amount = Number(exp.amount || 0);
+      if (amount <= 0) return;
+      const textToCategorize = `${exp.category || ""} ${exp.description || ""}`;
+      const group = categorizeExpense(textToCategorize, exp.id, "ledger_entries");
+      const countsAgainstProfit = group !== "Transfers" && group !== "Personal Use";
+      if (countsAgainstProfit) {
+        prevMonthPerformance[sid].expenses += amount;
+      }
+    });
+
+    // Calculate previous month profits
+    Object.keys(prevMonthPerformance).forEach((sid) => {
+      prevMonthPerformance[sid].profit = prevMonthPerformance[sid].revenue - prevMonthPerformance[sid].expenses;
+    });
+
+    // Calculate profit figures and add comparison
     Object.keys(performanceByShop).forEach((sid) => {
       const shop = performanceByShop[sid];
+      const prev = prevMonthPerformance[sid] || { revenue: 0, expenses: 0, profit: 0 };
+      
       shop.profit = shop.revenue - shop.totalExpenses;
       shop.trueOperatingProfit = shop.revenue - shop.groupedExpenses.Overheads;
+      
+      // Month-over-month comparison
+      shop.revenueChange = prev.revenue > 0 ? ((shop.revenue - prev.revenue) / prev.revenue) * 100 : 0;
+      shop.expenseChange = prev.expenses > 0 ? ((shop.totalExpenses - prev.expenses) / prev.expenses) * 100 : 0;
+      shop.profitChange = prev.profit > 0 ? ((shop.profit - prev.profit) / Math.abs(prev.profit)) * 100 : 0;
 
       // Best seller
       if (shop.items.length > 0) {
@@ -201,10 +303,68 @@ export async function GET(request: Request) {
     const totalTransfers = result.reduce((s: number, sh: any) => s + (sh.groupedExpenses?.Transfers || 0), 0);
     const totalPersonal = result.reduce((s: number, sh: any) => s + (sh.groupedExpenses?.["Personal Use"] || 0), 0);
 
+    // Calculate totals comparison
+    const prevTotalRevenue = Object.values(prevMonthPerformance).reduce((s: number, sh: any) => s + sh.revenue, 0);
+    const prevTotalExpenses = Object.values(prevMonthPerformance).reduce((s: number, sh: any) => s + sh.expenses, 0);
+    const prevTotalProfit = Object.values(prevMonthPerformance).reduce((s: number, sh: any) => s + sh.profit, 0);
+
+    // Calculate monthly trends for the year
+    const monthlyTrends = Array.from({ length: 12 }, (_, i) => {
+      const monthStart = new Date(year, i, 1).toISOString().split("T")[0];
+      const monthEnd = new Date(year, i + 1, 0).toISOString().split("T")[0];
+      
+      const monthSales = yearSales.filter((s: any) => {
+        const d = s.date;
+        return d >= monthStart && d <= monthEnd;
+      });
+      
+      const monthExpenses = yearLedgerExpenses.filter((e: any) => {
+        const d = e.date;
+        return d >= monthStart && d <= monthEnd;
+      });
+      
+      const revenue = monthSales.reduce((sum: number, s: any) => sum + Number(s.total_with_tax || 0), 0);
+      const expenses = monthExpenses.reduce((sum: number, e: any) => sum + Number(e.amount || 0), 0);
+      
+      return {
+        month: i + 1,
+        monthName: new Date(year, i, 1).toLocaleString('default', { month: 'short' }),
+        revenue,
+        expenses,
+        profit: revenue - expenses,
+      };
+    });
+
+    // Calculate top performing items across all shops
+    const itemSales: { [key: string]: { name: string; quantity: number; total: number } } = {};
+    yearSales.forEach((sale: any) => {
+      const name = sale.item_name || 'Unknown';
+      if (!itemSales[name]) {
+        itemSales[name] = { name, quantity: 0, total: 0 };
+      }
+      itemSales[name].quantity += Number(sale.quantity || 0);
+      itemSales[name].total += Number(sale.total_with_tax || 0);
+    });
+    const topItems = Object.values(itemSales)
+      .sort((a, b) => b.total - a.total)
+      .slice(0, 10);
+
     return NextResponse.json({
       success: true,
-      period: { year, month, startDate, endDate },
+      period: { year, month, startDate, endDate, view },
       performance: result,
+      comparison: {
+        prevMonth: {
+          revenue: prevTotalRevenue,
+          expenses: prevTotalExpenses,
+          profit: prevTotalProfit,
+        },
+        change: {
+          revenue: prevTotalRevenue > 0 ? ((totalRevenue - prevTotalRevenue) / prevTotalRevenue) * 100 : 0,
+          expenses: prevTotalExpenses > 0 ? ((totalExpenses - prevTotalExpenses) / prevTotalExpenses) * 100 : 0,
+          profit: prevTotalProfit > 0 ? ((totalProfit - prevTotalProfit) / Math.abs(prevTotalProfit)) * 100 : 0,
+        },
+      },
       totals: {
         totalRevenue,
         totalExpenses,
@@ -219,6 +379,8 @@ export async function GET(request: Request) {
         profitMargin: totalRevenue > 0 ? ((totalProfit / totalRevenue) * 100) : 0,
         trueOperatingMargin: totalRevenue > 0 ? ((totalTrueProfit / totalRevenue) * 100) : 0,
       },
+      trends: monthlyTrends,
+      topItems,
     });
   } catch (e: any) {
     console.error("Performance endpoint error:", e);

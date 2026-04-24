@@ -18,6 +18,9 @@ interface PerformanceData {
   biggestOverhead?: [string, number];
   expenseBreakdown: { [key: string]: number };
   groupedExpenses?: { [key: string]: number };
+  revenueChange?: number;
+  expenseChange?: number;
+  profitChange?: number;
 }
 
 interface Totals {
@@ -35,21 +38,98 @@ interface Totals {
   trueOperatingMargin: number;
 }
 
+interface ComparisonData {
+  prevMonth: {
+    revenue: number;
+    expenses: number;
+    profit: number;
+  };
+  change: {
+    revenue: number;
+    expenses: number;
+    profit: number;
+  };
+}
+
+interface TrendData {
+  month: number;
+  monthName: string;
+  revenue: number;
+  expenses: number;
+  profit: number;
+}
+
+interface TopItem {
+  name: string;
+  quantity: number;
+  total: number;
+}
+
+interface AlertThresholds {
+  maxExpenseRatio: number; // Maximum expense as % of revenue
+  minProfitMargin: number; // Minimum profit margin %
+  enabled: boolean;
+}
+
 export function MonthlyPerformanceTracker() {
   const [year, setYear] = useState(new Date().getFullYear());
   const [month, setMonth] = useState(new Date().getMonth() + 1);
+  const [view, setView] = useState<'monthly' | 'ytd'>('monthly');
   const [performance, setPerformance] = useState<PerformanceData[]>([]);
   const [totals, setTotals] = useState<Totals | null>(null);
+  const [comparison, setComparison] = useState<ComparisonData | null>(null);
+  const [trends, setTrends] = useState<TrendData[]>([]);
+  const [topItems, setTopItems] = useState<TopItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedShop, setSelectedShop] = useState<string>('all');
   const [showDetailedExpenses, setShowDetailedExpenses] = useState<{ [key: string]: boolean }>({});
+  const [expandedCategory, setExpandedCategory] = useState<string | null>(null);
+  const [alerts, setAlerts] = useState<AlertThresholds>({ maxExpenseRatio: 80, minProfitMargin: 15, enabled: true });
 
   const toggleDetailedExpenses = (shopId: string) => {
     setShowDetailedExpenses(prev => ({
       ...prev,
       [shopId]: !prev[shopId]
     }));
+  };
+
+  const toggleCategoryExpansion = (category: string) => {
+    setExpandedCategory(prev => prev === category ? null : category);
+  };
+
+  const getCategoryExpenses = (category: string) => {
+    if (!totals) return [];
+    const allExpenses: { shop: string; category: string; amount: number }[] = [];
+    
+    displayData.forEach(shop => {
+      if (shop.expenseBreakdown) {
+        Object.entries(shop.expenseBreakdown).forEach(([cat, amount]) => {
+          const normalizedCat = cat.toLowerCase();
+          const normalizedTarget = category.toLowerCase();
+          
+          // Map category to expense breakdown categories
+          let isMatch = false;
+          if (category === 'Overheads') {
+            isMatch = ['rent', 'salaries', 'utilities', 'electricity', 'water', 'internet', 'insurance', 'maintenance'].some(k => normalizedCat.includes(k));
+          } else if (category === 'Stock Orders') {
+            isMatch = normalizedCat.includes('stock') || normalizedCat.includes('inventory') || normalizedCat.includes('purchase');
+          } else if (category === 'Transfers') {
+            isMatch = normalizedCat.includes('transfer') || normalizedCat.includes('move');
+          } else if (category === 'Personal Use') {
+            isMatch = normalizedCat.includes('personal') || normalizedCat.includes('withdrawal') || normalizedCat.includes('owner');
+          } else {
+            isMatch = normalizedCat.includes(normalizedTarget);
+          }
+          
+          if (isMatch && amount > 0) {
+            allExpenses.push({ shop: shop.shopName, category: cat, amount: amount as number });
+          }
+        });
+      }
+    });
+    
+    return allExpenses.sort((a, b) => b.amount - a.amount);
   };
 
   const fetchPerformance = useCallback(async () => {
@@ -59,6 +139,7 @@ export function MonthlyPerformanceTracker() {
       const params = new URLSearchParams({
         year: year.toString(),
         month: month.toString(),
+        view: view,
       });
 
       const res = await fetch(`/api/reports/performance?${params}`, {
@@ -72,18 +153,57 @@ export function MonthlyPerformanceTracker() {
       const data = await res.json();
       setPerformance(data.performance || []);
       setTotals(data.totals || null);
+      setComparison(data.comparison || null);
+      setTrends(data.trends || []);
+      setTopItems(data.topItems || []);
     } catch (e: any) {
       setError(e.message || 'Error loading performance data');
       setPerformance([]);
       setTotals(null);
+      setComparison(null);
+      setTrends([]);
+      setTopItems([]);
     } finally {
       setLoading(false);
     }
-  }, [year, month]);
+  }, [year, month, view]);
 
   useEffect(() => {
     fetchPerformance();
   }, [fetchPerformance]);
+
+  const exportToCSV = () => {
+    if (!performance.length || !totals) return;
+    
+    const headers = ['Shop', 'Revenue', 'Expenses', 'Profit', 'Sales Count', 'Margin'];
+    const rows = performance.map(p => [
+      p.shopName,
+      p.revenue.toFixed(2),
+      p.expenses.toFixed(2),
+      p.profit.toFixed(2),
+      p.salesCount,
+      ((p.profit / p.revenue) * 100).toFixed(1) + '%'
+    ]);
+    
+    const csvContent = [headers, ...rows].map(row => row.join(',')).join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `performance_${view}_${year}_${month}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const ChangeIndicator = ({ value }: { value: number }) => {
+    if (value === 0) return <span className="text-slate-500 text-xs">—</span>;
+    const isPositive = value > 0;
+    return (
+      <span className={cn('text-xs font-semibold flex items-center gap-1', isPositive ? 'text-emerald-400' : 'text-rose-400')}>
+        {isPositive ? '↑' : '↓'} {Math.abs(value).toFixed(1)}%
+      </span>
+    );
+  };
 
   const months = [
     'January', 'February', 'March', 'April', 'May', 'June',
@@ -121,12 +241,12 @@ export function MonthlyPerformanceTracker() {
       </div>
 
       {/* Controls */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
         <div>
           <label className="text-xs font-medium text-slate-400 block mb-2">Year</label>
           <Select value={year.toString()} onValueChange={(v) => setYear(parseInt(v))}>
             <SelectTrigger className="bg-slate-900 border-slate-700">
-              <SelectValue placeholder="Select year" />
+              <SelectValue>{year}</SelectValue>
             </SelectTrigger>
             <SelectContent>
               {years.map((y) => (
@@ -140,7 +260,7 @@ export function MonthlyPerformanceTracker() {
           <label className="text-xs font-medium text-slate-400 block mb-2">Month</label>
           <Select value={month.toString()} onValueChange={(v) => setMonth(parseInt(v))}>
             <SelectTrigger className="bg-slate-900 border-slate-700">
-              <SelectValue placeholder="Select month" />
+              <SelectValue>{months[month - 1]}</SelectValue>
             </SelectTrigger>
             <SelectContent>
               {months.map((m, i) => (
@@ -151,10 +271,23 @@ export function MonthlyPerformanceTracker() {
         </div>
 
         <div>
+          <label className="text-xs font-medium text-slate-400 block mb-2">View</label>
+          <Select value={view} onValueChange={(v: string) => setView(v as 'monthly' | 'ytd')}>
+            <SelectTrigger className="bg-slate-900 border-slate-700">
+              <SelectValue>{view === 'monthly' ? 'Monthly' : 'YTD'}</SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="monthly">Monthly</SelectItem>
+              <SelectItem value="ytd">Year to Date</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div>
           <label className="text-xs font-medium text-slate-400 block mb-2">Filter Shop</label>
           <Select value={selectedShop} onValueChange={setSelectedShop}>
             <SelectTrigger className="bg-slate-900 border-slate-700">
-              <SelectValue placeholder="All Shops" />
+              <SelectValue>{selectedShop === 'all' ? 'All Shops' : performance.find(p => p.shopId === selectedShop)?.shopName || 'All Shops'}</SelectValue>
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Shops</SelectItem>
@@ -165,10 +298,13 @@ export function MonthlyPerformanceTracker() {
           </Select>
         </div>
 
-        <div className="flex items-end">
-          <Button onClick={fetchPerformance} disabled={loading} className="w-full bg-emerald-600 hover:bg-emerald-700">
+        <div className="flex items-end gap-2">
+          <Button onClick={fetchPerformance} disabled={loading} className="flex-1 bg-emerald-600 hover:bg-emerald-700">
             {loading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
             Refresh
+          </Button>
+          <Button onClick={exportToCSV} disabled={!performance.length} variant="outline" className="bg-slate-900 border-slate-700 hover:bg-slate-800">
+            Export
           </Button>
         </div>
       </div>
@@ -188,20 +324,29 @@ export function MonthlyPerformanceTracker() {
       {/* Summary Cards */}
       {totals && (
         <div className="space-y-4">
-          {/* Primary numbers */}
+          {/* Primary numbers with MoM comparison */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/5 p-5">
-              <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Total Revenue</p>
+              <div className="flex items-center justify-between">
+                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Total Revenue</p>
+                {view === 'monthly' && comparison && <ChangeIndicator value={comparison.change.revenue} />}
+              </div>
               <p className="mt-3 text-3xl font-black text-emerald-400">{formatCurrency(totals.totalRevenue)}</p>
               <p className="mt-1 text-xs text-slate-500">{totals.totalSales} sales across {totals.shopCount} shops</p>
             </div>
             <div className="rounded-2xl border border-rose-500/20 bg-rose-500/5 p-5">
-              <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Operating Expenses</p>
+              <div className="flex items-center justify-between">
+                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Operating Expenses</p>
+                {view === 'monthly' && comparison && <ChangeIndicator value={comparison.change.expenses} />}
+              </div>
               <p className="mt-3 text-3xl font-black text-rose-400">{formatCurrency(totals.totalExpenses)}</p>
               <p className="mt-1 text-xs text-slate-500">Overheads + Stock Orders + Other</p>
             </div>
             <div className={cn('rounded-2xl border p-5', totals.totalProfit >= 0 ? 'border-sky-500/20 bg-sky-500/5' : 'border-rose-500/30 bg-rose-500/10')}>
-              <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Net Profit</p>
+              <div className="flex items-center justify-between">
+                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Net Profit</p>
+                {view === 'monthly' && comparison && <ChangeIndicator value={comparison.change.profit} />}
+              </div>
               <p className={cn('mt-3 text-3xl font-black', totals.totalProfit >= 0 ? 'text-sky-300' : 'text-rose-400')}>{formatCurrency(totals.totalProfit)}</p>
               <p className="mt-1 text-xs text-slate-500">{totals.profitMargin?.toFixed(1) ?? '0.0'}% margin</p>
             </div>
@@ -223,28 +368,267 @@ export function MonthlyPerformanceTracker() {
             </div>
           </div>
 
-          {/* Expense breakdown strip */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <div className="rounded-xl border border-rose-500/20 bg-rose-500/5 p-3">
-              <p className="text-[9px] font-black uppercase tracking-widest text-rose-400/70">Overheads</p>
-              <p className="mt-1 text-lg font-black text-rose-300">{formatCurrency(totals.totalOverheads ?? 0)}</p>
-              <p className="text-[9px] text-slate-600">Rent · Salary · Utilities</p>
+          {/* Trend Chart */}
+          {trends.length > 0 && (
+            <div className="rounded-xl border border-slate-700 bg-slate-950/50 p-5">
+              <h3 className="text-sm font-bold text-slate-300 mb-4 flex items-center gap-2">
+                <TrendingUp className="h-4 w-4 text-emerald-400" />
+                {year} Revenue & Expense Trends
+              </h3>
+              <div className="space-y-3">
+                <div className="flex items-end gap-1 h-32">
+                  {trends.map((trend) => {
+                    const maxVal = Math.max(...trends.map(t => Math.max(t.revenue, t.expenses)));
+                    const revenueHeight = maxVal > 0 ? (trend.revenue / maxVal) * 100 : 0;
+                    const expenseHeight = maxVal > 0 ? (trend.expenses / maxVal) * 100 : 0;
+                    return (
+                      <div key={trend.month} className="flex-1 flex flex-col items-center gap-1">
+                        <div className="w-full flex gap-0.5 items-end justify-center h-full">
+                          <div 
+                            className="w-3 bg-emerald-500/80 rounded-t transition-all hover:bg-emerald-400" 
+                            style={{ height: `${revenueHeight}%` }}
+                            title={`Revenue: ${formatCurrency(trend.revenue)}`}
+                          />
+                          <div 
+                            className="w-3 bg-rose-500/80 rounded-t transition-all hover:bg-rose-400" 
+                            style={{ height: `${expenseHeight}%` }}
+                            title={`Expenses: ${formatCurrency(trend.expenses)}`}
+                          />
+                        </div>
+                        <p className="text-[8px] text-slate-500 uppercase">{trend.monthName}</p>
+                      </div>
+                    );
+                  })}
+                </div>
+                <div className="flex items-center justify-center gap-6 text-xs">
+                  <div className="flex items-center gap-2">
+                    <div className="w-3 h-3 bg-emerald-500/80 rounded" />
+                    <span className="text-slate-400">Revenue</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-3 h-3 bg-rose-500/80 rounded" />
+                    <span className="text-slate-400">Expenses</span>
+                  </div>
+                </div>
+              </div>
             </div>
-            <div className="rounded-xl border border-violet-500/20 bg-violet-500/5 p-3">
-              <p className="text-[9px] font-black uppercase tracking-widest text-violet-400/70">Stock Orders</p>
-              <p className="mt-1 text-lg font-black text-violet-300">{formatCurrency(totals.totalStockOrders ?? 0)}</p>
-              <p className="text-[9px] text-slate-600">Cost of goods purchased</p>
+          )}
+
+          {/* Cash Flow Projection */}
+          {trends.length > 0 && view === 'monthly' && (
+            <div className="rounded-xl border border-slate-700 bg-slate-950/50 p-5">
+              <h3 className="text-sm font-bold text-slate-300 mb-4 flex items-center gap-2">
+                <Wallet className="h-4 w-4 text-sky-400" />
+                Cash Flow Projection (Next 3 Months)
+              </h3>
+              <div className="space-y-3">
+                {(() => {
+                  const recentMonths = trends.slice(-3);
+                  const avgRevenueGrowth = recentMonths.length > 1 
+                    ? ((recentMonths[recentMonths.length - 1].revenue - recentMonths[0].revenue) / Math.max(recentMonths[0].revenue, 1)) / (recentMonths.length - 1)
+                    : 0;
+                  const avgExpenseGrowth = recentMonths.length > 1
+                    ? ((recentMonths[recentMonths.length - 1].expenses - recentMonths[0].expenses) / Math.max(recentMonths[0].expenses, 1)) / (recentMonths.length - 1)
+                    : 0;
+                  
+                  const projections = [
+                    { month: month + 1, label: 'Next Month' },
+                    { month: month + 2, label: 'Month +2' },
+                    { month: month + 3, label: 'Month +3' },
+                  ].map(proj => {
+                    const baseRevenue = trends[month - 1]?.revenue || 0;
+                    const baseExpenses = trends[month - 1]?.expenses || 0;
+                    const projectedRevenue = baseRevenue * (1 + avgRevenueGrowth * (proj.month - month + 1));
+                    const projectedExpenses = baseExpenses * (1 + avgExpenseGrowth * (proj.month - month + 1));
+                    const projectedProfit = projectedRevenue - projectedExpenses;
+                    return { ...proj, revenue: projectedRevenue, expenses: projectedExpenses, profit: projectedProfit };
+                  });
+                  
+                  return (
+                    <div className="space-y-2">
+                      {projections.map((proj, idx) => {
+                    const projMonth = proj.month > 12 ? proj.month - 12 : proj.month;
+                    const projYear = proj.month > 12 ? year + 1 : year;
+                    const monthName = new Date(projYear, projMonth - 1, 1).toLocaleString('default', { month: 'short' });
+                    return (
+                      <div key={idx} className="flex items-center justify-between py-2 border-b border-slate-800 last:border-0">
+                        <span className="text-sm text-slate-400">{monthName} {projYear}</span>
+                        <div className="flex items-center gap-6">
+                          <span className="text-sm text-emerald-400">{formatCurrency(proj.revenue)}</span>
+                          <span className="text-sm text-rose-400">{formatCurrency(proj.expenses)}</span>
+                          <span className={cn('text-sm font-bold', proj.profit >= 0 ? 'text-sky-400' : 'text-rose-400')}>
+                            {formatCurrency(proj.profit)}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                    </div>
+                  );
+                })()}
+                <p className="text-[10px] text-slate-500 mt-2">*Based on recent 3-month trend analysis</p>
+              </div>
             </div>
-            <div className="rounded-xl border border-sky-500/20 bg-sky-500/5 p-3">
-              <p className="text-[9px] font-black uppercase tracking-widest text-sky-400/70">Transfers</p>
-              <p className="mt-1 text-lg font-black text-sky-300">{formatCurrency(totals.totalTransfers ?? 0)}</p>
-              <p className="text-[9px] text-slate-600">Not counted vs profit</p>
+          )}
+
+          {/* Alert Thresholds */}
+          {alerts.enabled && totals && (
+            <div className="rounded-xl border border-slate-700 bg-slate-950/50 p-5">
+              <h3 className="text-sm font-bold text-slate-300 mb-4 flex items-center gap-2">
+                <AlertCircle className="h-4 w-4 text-amber-400" />
+                Performance Alerts
+              </h3>
+              <div className="space-y-2">
+                {(() => {
+                  const expenseRatio = totals.totalRevenue > 0 ? (totals.totalExpenses / totals.totalRevenue) * 100 : 0;
+                  const profitMargin = totals.profitMargin;
+                  const alertsList = [];
+                  
+                  if (expenseRatio > alerts.maxExpenseRatio) {
+                    alertsList.push({
+                      type: 'warning',
+                      message: `Expenses at ${expenseRatio.toFixed(1)}% exceed threshold of ${alerts.maxExpenseRatio}%`
+                    });
+                  }
+                  
+                  if (profitMargin < alerts.minProfitMargin) {
+                    alertsList.push({
+                      type: 'error',
+                      message: `Profit margin at ${profitMargin.toFixed(1)}% below minimum of ${alerts.minProfitMargin}%`
+                    });
+                  }
+                  
+                  if (alertsList.length === 0) {
+                    return <p className="text-xs text-emerald-400">All metrics within healthy ranges ✓</p>;
+                  }
+                  
+                  return alertsList.map((alert, idx) => (
+                    <div key={idx} className={cn('flex items-center gap-2 text-xs p-2 rounded', alert.type === 'warning' ? 'bg-amber-500/10 text-amber-400' : 'bg-rose-500/10 text-rose-400')}>
+                      <AlertCircle className="h-4 w-4" />
+                      {alert.message}
+                    </div>
+                  ));
+                })()}
+              </div>
             </div>
-            <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-3">
-              <p className="text-[9px] font-black uppercase tracking-widest text-amber-400/70">Personal Use</p>
-              <p className="mt-1 text-lg font-black text-amber-300">{formatCurrency(totals.totalPersonalUse ?? 0)}</p>
-              <p className="text-[9px] text-slate-600">Not counted vs profit</p>
+          )}
+
+          {/* Top Performing Items */}
+          {topItems.length > 0 && (
+            <div className="rounded-xl border border-slate-700 bg-slate-950/50 p-5">
+              <h3 className="text-sm font-bold text-slate-300 mb-4 flex items-center gap-2">
+                <ShoppingCart className="h-4 w-4 text-violet-400" />
+                Top Performing Items ({year})
+              </h3>
+              <div className="space-y-2">
+                {topItems.slice(0, 5).map((item, idx) => (
+                  <div key={idx} className="flex items-center justify-between py-2 border-b border-slate-800 last:border-0">
+                    <div className="flex items-center gap-3">
+                      <span className={cn('w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold', idx === 0 ? 'bg-amber-500/20 text-amber-400' : idx === 1 ? 'bg-slate-500/20 text-slate-400' : idx === 2 ? 'bg-orange-500/20 text-orange-400' : 'bg-slate-800 text-slate-500')}>
+                        {idx + 1}
+                      </span>
+                      <span className="text-sm text-slate-300">{item.name}</span>
+                    </div>
+                    <div className="flex items-center gap-4">
+                      <span className="text-xs text-slate-500">{item.quantity} sold</span>
+                      <span className="text-sm font-bold text-emerald-400">{formatCurrency(item.total)}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
+          )}
+
+          {/* Expense breakdown strip with drill-down */}
+          <div className="space-y-3">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <div 
+                className={cn(
+                  "rounded-xl border border-rose-500/20 bg-rose-500/5 p-3 cursor-pointer transition-all hover:bg-rose-500/10",
+                  expandedCategory === 'Overheads' && "ring-2 ring-rose-500/50"
+                )}
+                onClick={() => toggleCategoryExpansion('Overheads')}
+              >
+                <div className="flex items-center justify-between">
+                  <p className="text-[9px] font-black uppercase tracking-widest text-rose-400/70">Overheads</p>
+                  <span className="text-[8px] text-rose-400/50">{expandedCategory === 'Overheads' ? '−' : '+'}</span>
+                </div>
+                <p className="mt-1 text-lg font-black text-rose-300">{formatCurrency(totals.totalOverheads ?? 0)}</p>
+                <p className="text-[9px] text-slate-600">Rent · Salary · Utilities</p>
+              </div>
+              <div 
+                className={cn(
+                  "rounded-xl border border-violet-500/20 bg-violet-500/5 p-3 cursor-pointer transition-all hover:bg-violet-500/10",
+                  expandedCategory === 'Stock Orders' && "ring-2 ring-violet-500/50"
+                )}
+                onClick={() => toggleCategoryExpansion('Stock Orders')}
+              >
+                <div className="flex items-center justify-between">
+                  <p className="text-[9px] font-black uppercase tracking-widest text-violet-400/70">Stock Orders</p>
+                  <span className="text-[8px] text-violet-400/50">{expandedCategory === 'Stock Orders' ? '−' : '+'}</span>
+                </div>
+                <p className="mt-1 text-lg font-black text-violet-300">{formatCurrency(totals.totalStockOrders ?? 0)}</p>
+                <p className="text-[9px] text-slate-600">Cost of goods purchased</p>
+              </div>
+              <div 
+                className={cn(
+                  "rounded-xl border border-sky-500/20 bg-sky-500/5 p-3 cursor-pointer transition-all hover:bg-sky-500/10",
+                  expandedCategory === 'Transfers' && "ring-2 ring-sky-500/50"
+                )}
+                onClick={() => toggleCategoryExpansion('Transfers')}
+              >
+                <div className="flex items-center justify-between">
+                  <p className="text-[9px] font-black uppercase tracking-widest text-sky-400/70">Transfers</p>
+                  <span className="text-[8px] text-sky-400/50">{expandedCategory === 'Transfers' ? '−' : '+'}</span>
+                </div>
+                <p className="mt-1 text-lg font-black text-sky-300">{formatCurrency(totals.totalTransfers ?? 0)}</p>
+                <p className="text-[9px] text-slate-600">Not counted vs profit</p>
+              </div>
+              <div 
+                className={cn(
+                  "rounded-xl border border-amber-500/20 bg-amber-500/5 p-3 cursor-pointer transition-all hover:bg-amber-500/10",
+                  expandedCategory === 'Personal Use' && "ring-2 ring-amber-500/50"
+                )}
+                onClick={() => toggleCategoryExpansion('Personal Use')}
+              >
+                <div className="flex items-center justify-between">
+                  <p className="text-[9px] font-black uppercase tracking-widest text-amber-400/70">Personal Use</p>
+                  <span className="text-[8px] text-amber-400/50">{expandedCategory === 'Personal Use' ? '−' : '+'}</span>
+                </div>
+                <p className="mt-1 text-lg font-black text-amber-300">{formatCurrency(totals.totalPersonalUse ?? 0)}</p>
+                <p className="text-[9px] text-slate-600">Not counted vs profit</p>
+              </div>
+            </div>
+
+            {/* Expanded category details */}
+            {expandedCategory && (
+              <div className="rounded-xl border border-slate-700 bg-slate-950/50 p-4 animate-in slide-down-from-top-2">
+                <div className="flex items-center justify-between mb-3">
+                  <h4 className="text-sm font-bold text-slate-300">{expandedCategory} - Individual Expenses</h4>
+                  <button 
+                    onClick={() => setExpandedCategory(null)}
+                    className="text-xs text-slate-500 hover:text-white transition-colors"
+                  >
+                    Close
+                  </button>
+                </div>
+                <div className="space-y-2 max-h-60 overflow-y-auto">
+                  {getCategoryExpenses(expandedCategory).length === 0 ? (
+                    <p className="text-xs text-slate-500">No expenses found in this category</p>
+                  ) : (
+                    getCategoryExpenses(expandedCategory).map((expense, idx) => (
+                      <div key={idx} className="flex justify-between items-center py-2 border-b border-slate-800 last:border-0">
+                        <div className="flex-1">
+                          <p className="text-xs text-slate-400">{expense.category}</p>
+                          <p className="text-[10px] text-slate-600">{expense.shop}</p>
+                        </div>
+                        <p className="text-sm font-bold text-slate-300 ml-4">{formatCurrency(expense.amount)}</p>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -290,16 +674,25 @@ export function MonthlyPerformanceTracker() {
                 <CardContent className="pt-0">
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <p className="text-[10px] uppercase font-bold text-slate-500">Revenue</p>
+                      <div className="flex items-center justify-between">
+                        <p className="text-[10px] uppercase font-bold text-slate-500">Revenue</p>
+                        {view === 'monthly' && shop.revenueChange !== undefined && <ChangeIndicator value={shop.revenueChange} />}
+                      </div>
                       <p className="text-sm font-bold text-emerald-400">{formatCurrency(shop.revenue)}</p>
                     </div>
                     <div>
-                      <p className="text-[10px] uppercase font-bold text-slate-500">Expenses</p>
+                      <div className="flex items-center justify-between">
+                        <p className="text-[10px] uppercase font-bold text-slate-500">Expenses</p>
+                        {view === 'monthly' && shop.expenseChange !== undefined && <ChangeIndicator value={shop.expenseChange} />}
+                      </div>
                       <p className="text-sm font-bold text-rose-400">{formatCurrency(shop.expenses)}</p>
                     </div>
                     <div>
-                      <p className="text-[10px] uppercase font-bold text-slate-500">Margin</p>
-                      <p className={cn('text-sm font-bold', shop.profit >= 0 ? 'text-emerald-400' : 'text-red-400')}>
+                      <div className="flex items-center justify-between">
+                        <p className="text-[10px] uppercase font-bold text-slate-500">Margin</p>
+                        {view === 'monthly' && shop.profitChange !== undefined && <ChangeIndicator value={shop.profitChange} />}
+                      </div>
+                      <p className={cn('text-sm font-bold', shop.profit >= 0 ? 'text-emerald-400' : 'text-rose-400')}>
                         {formatPercent(shop.profit, shop.revenue)}
                       </p>
                     </div>
