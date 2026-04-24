@@ -120,21 +120,22 @@ export async function GET(request: Request) {
 
     // Process sales
     sales.forEach((sale: any) => {
-      const sid = sale.shop_id;
+      const sid = sale.shop_id || sale.shopId;
       if (!sid || !performanceByShop[sid]) return;
-      performanceByShop[sid].revenue += Number(sale.total_with_tax || 0);
+      const totalAmount = Number(sale.total_with_tax || sale.totalWithTax || 0);
+      performanceByShop[sid].revenue += totalAmount;
       performanceByShop[sid].salesCount += 1;
       performanceByShop[sid].items.push({
-        name: sale.item_name,
+        name: sale.item_name || sale.itemName,
         quantity: sale.quantity,
-        unitPrice: sale.unit_price,
-        total: Number(sale.total_with_tax || 0),
+        unitPrice: sale.unit_price || sale.unitPrice,
+        total: totalAmount,
       });
     });
 
     // Process shop-level ledger expenses
     ledgerExpenses.forEach((exp: any) => {
-      const sid = exp.shop_id;
+      const sid = exp.shop_id || exp.shopId;
       if (!sid || !performanceByShop[sid]) return;
       const amount = Number(exp.amount || 0);
       if (amount <= 0) return;

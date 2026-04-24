@@ -564,14 +564,28 @@ export default function TheHandPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(220,38,38,0.15),_transparent_28%),radial-gradient(circle_at_bottom_right,_rgba(14,165,233,0.12),_transparent_22%),linear-gradient(180deg,#020617,#0f172a)] p-4 text-white md:p-6">
-      <div className="mx-auto w-full max-w-[1800px] space-y-6">
-        <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between px-2">
-          <div>
-            <p className="text-[11px] font-black uppercase tracking-[0.45em] text-rose-300">The Hand</p>
-            <h1 className="mt-3 text-4xl font-black md:text-5xl lg:text-6xl tracking-tighter">God-Tier Command Layer</h1>
-            <p className="mt-4 max-w-3xl text-sm md:text-base text-slate-400">
-              The Hand sees every shop, every drawer, every vault, every warning signal, and every correction path.
+    <div className="min-h-screen bg-[#020617] text-white selection:bg-rose-500/30">
+      {/* Dynamic Background Elements */}
+      <div className="fixed inset-0 pointer-events-none overflow-hidden z-0">
+        <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-rose-500/10 blur-[120px] rounded-full animate-pulse" />
+        <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-sky-500/10 blur-[120px] rounded-full" />
+        <div className="absolute top-[20%] right-[10%] w-[20%] h-[20%] bg-violet-500/5 blur-[80px] rounded-full animate-bounce-slow" />
+      </div>
+
+      <div className="relative z-10 p-4 md:p-8 lg:p-12 w-full max-w-[2400px] mx-auto space-y-12">
+        <div className="flex flex-col gap-8 lg:flex-row lg:items-end lg:justify-between">
+          <div className="space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="h-[2px] w-12 bg-rose-500 shadow-[0_0_15px_rgba(244,63,94,0.5)]" />
+              <p className="text-xs font-black uppercase tracking-[0.6em] text-rose-400">The Hand</p>
+            </div>
+            <h1 className="text-5xl md:text-7xl lg:text-8xl font-black tracking-tighter leading-none text-white">
+              God-Tier <br />
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-white via-white/80 to-white/40">Command Layer</span>
+            </h1>
+            <p className="max-w-3xl text-base md:text-xl text-slate-400 leading-relaxed font-medium">
+              Real-time synchronization across every storefront, drawer, and vault. <br className="hidden md:block" />
+              Intelligence driven analysis for high-clearance operations.
             </p>
           </div>
 
@@ -622,20 +636,23 @@ export default function TheHandPage() {
           </div>
         </div>
 
-        <div className="flex flex-wrap gap-2 px-2 mt-4">
+        <div className="flex flex-wrap gap-3 px-2 mt-8 p-1 bg-white/[0.02] rounded-[24px] border border-white/5 w-fit">
           {TABS.map((tab) => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
               className={cn(
-                "flex items-center gap-2 px-6 py-3 rounded-2xl text-xs font-black uppercase tracking-widest transition-all border",
+                "flex items-center gap-3 px-8 py-4 rounded-[18px] text-xs font-black uppercase tracking-[0.2em] transition-all duration-500 relative overflow-hidden group/tab",
                 activeTab === tab.id
-                  ? "bg-rose-500 border-rose-400 text-white shadow-lg shadow-rose-500/20"
-                  : "bg-white/5 border-white/10 text-slate-400 hover:bg-white/10"
+                  ? "bg-rose-500 text-white shadow-[0_10px_40px_rgba(244,63,94,0.3)] scale-105"
+                  : "text-slate-500 hover:text-slate-200 hover:bg-white/5"
               )}
             >
-              <tab.icon className="h-4 w-4" />
+              <tab.icon className={cn("h-4 w-4 transition-transform duration-500", activeTab === tab.id ? "scale-110" : "group-hover/tab:scale-110")} />
               {tab.label}
+              {activeTab === tab.id && (
+                <div className="absolute inset-0 bg-gradient-to-tr from-white/20 to-transparent pointer-events-none" />
+              )}
             </button>
           ))}
         </div>

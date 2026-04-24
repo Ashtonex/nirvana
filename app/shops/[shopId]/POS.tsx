@@ -123,6 +123,7 @@ type LaybyQuote = {
 
 export default function POS({ shopId, inventory, db }: { shopId: string, inventory: any[], db: any }) {
     const [cart, setCart] = useState<{ item: any, quantity: number, price: number }[]>([]);
+    const [lastCheckoutInventory, setLastCheckoutInventory] = useState<any[]>([]);
     const [searchTerm, setSearchTerm] = useState("");
     const deferredSearchTerm = useDeferredValue(searchTerm);
     const [isPending, startTransition] = useTransition();
@@ -1114,6 +1115,7 @@ Generated via NIRVANA POS`;
                 }
 
                 // Shared cleanup for all modes
+                setLastCheckoutInventory(inventoryState);
                 setCart([]);
                 setClientName("");
                 setClientEmail("");
@@ -1898,7 +1900,8 @@ Generated via NIRVANA POS`;
                     <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
                         {filteredInventory.map((item) => {
                             // Show GLOBAL master stock instead of shop allocation
-                            const qtyAtShop = item.quantity || 0;
+                            const checkoutItem = lastCheckoutInventory.find(i => i.id === item.id);
+                            const qtyAtShop = checkoutItem ? checkoutItem.quantity : (item.quantity || 0);
                             const totalNetworkStock = item.quantity || 0;
 
                             const dynamicOverhead = totalShopStock > 0 ? (shopExpenses as number) / totalShopStock : 0;

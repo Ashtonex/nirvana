@@ -61,11 +61,12 @@ export function ExpenseCategorisation() {
   const [filterClassified, setFilterClassified] = useState<'all' | 'classified' | 'unclassified'>('all');
   const [successToast, setSuccessToast] = useState<string | null>(null);
 
-  const months = [
-    'January','February','March','April','May','June',
-    'July','August','September','October','November','December',
-  ];
-  const years = Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - 2 + i);
+  const groupTotals = GROUPS.reduce((acc, group) => {
+    acc[group] = expenses
+      .filter(e => (e.savedGroup || e.suggestedGroup) === group)
+      .reduce((sum, e) => sum + e.amount, 0);
+    return acc;
+  }, {} as Record<ExpenseGroup, number>);
 
   const fetchExpenses = useCallback(async () => {
     setLoading(true);
@@ -155,6 +156,12 @@ export function ExpenseCategorisation() {
     setTimeout(() => setSuccessToast(null), 3000);
   };
 
+  const months = [
+    'January','February','March','April','May','June',
+    'July','August','September','October','November','December',
+  ];
+  const years = Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - 2 + i);
+
   const displayed = expenses.filter(e => {
     if (filterGroup !== 'all' && e.suggestedGroup !== filterGroup) return false;
     if (filterClassified === 'classified' && !e.isManuallyClassified) return false;
@@ -242,20 +249,72 @@ export function ExpenseCategorisation() {
         </button>
       </div>
 
-      {/* Stats bar */}
+      {/* Live Group Dashboard */}
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+        {GROUPS.map(group => (
+          <div key={group} className={cn(
+            "rounded-2xl border p-5 transition-all duration-300 relative overflow-hidden group/card",
+            GROUP_COLOURS[group]
+          )}>
+            <div className="relative z-10">
+              <p className="text-[10px] font-black uppercase tracking-[0.2em] opacity-70 mb-2">{group}</p>
+              <div className="flex items-baseline gap-1">
+                <span className="text-sm font-black opacity-50">$</span>
+                <p className="text-3xl font-black tracking-tighter tabular-nums">
+                  {Number(groupTotals[group] || 0).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                  <span className="text-lg opacity-60">.{Number(groupTotals[group] || 0).toFixed(2).split('.')[1]}</span>
+                </p>
+              </div>
+              <p className="mt-2 text-[9px] font-bold uppercase tracking-widest opacity-40">
+                {expenses.filter(e => (e.savedGroup || e.suggestedGroup) === group).length} entries
+              </p>
+            </div>
+            {/* Subtle background decoration */}
+            <div className="absolute -right-4 -bottom-4 opacity-5 group-hover/card:opacity-10 transition-opacity">
+              <Tag className="h-24 w-24 rotate-12" />
+            </div>
+          </div>
+        ))}
+      </div>
+
       {stats && (
-        <div className="grid grid-cols-3 gap-3">
-          <div className="rounded-2xl border border-white/10 bg-slate-950/50 p-4 text-center">
-            <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Total Expenses</p>
-            <p className="mt-2 text-2xl font-black text-white">{stats.total}</p>
+        <div className="grid grid-cols-3 gap-4">
+          <div className="rounded-2xl border border-white/10 bg-slate-950/40 p-5 relative overflow-hidden group/stat">
+            <p className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-2">Total Managed Volume</p>
+            <div className="flex items-baseline gap-1">
+              <span className="text-sm font-black text-slate-600">$</span>
+              <p className="text-2xl font-black text-white tabular-nums">
+                {expenses.reduce((s, e) => s + e.amount, 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+              </p>
+            </div>
+            <p className="text-[9px] text-slate-600 mt-2 uppercase font-black tracking-tighter">{stats.total} entries in scope</p>
+            <div className="absolute top-0 right-0 p-4 opacity-10 group-hover/stat:opacity-20 transition-opacity">
+              <Filter className="h-5 w-5 text-slate-400" />
+            </div>
           </div>
-          <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/5 p-4 text-center">
-            <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Classified</p>
-            <p className="mt-2 text-2xl font-black text-emerald-400">{stats.classified}</p>
+          
+          <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/5 p-5 relative overflow-hidden group/stat">
+            <p className="text-[10px] font-black uppercase tracking-widest text-emerald-500/60 mb-2">Owner Verified</p>
+            <div className="flex items-baseline gap-2">
+              <p className="text-3xl font-black text-emerald-400 tabular-nums">{stats.classified}</p>
+              <span className="text-[10px] font-black text-emerald-600 uppercase">Confirmed</span>
+            </div>
+            <p className="text-[9px] text-emerald-700/60 mt-2 uppercase font-black tracking-tighter">Manual Override Active</p>
+            <div className="absolute top-0 right-0 p-4 opacity-10 group-hover/stat:opacity-20 transition-opacity">
+              <CheckCircle2 className="h-5 w-5 text-emerald-400" />
+            </div>
           </div>
-          <div className="rounded-2xl border border-amber-500/20 bg-amber-500/5 p-4 text-center">
-            <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Auto-detected</p>
-            <p className="mt-2 text-2xl font-black text-amber-400">{stats.unclassified}</p>
+
+          <div className="rounded-2xl border border-amber-500/20 bg-amber-500/5 p-5 relative overflow-hidden group/stat">
+            <p className="text-[10px] font-black uppercase tracking-widest text-amber-500/60 mb-2">Auto-Detected</p>
+            <div className="flex items-baseline gap-2">
+              <p className="text-3xl font-black text-amber-400 tabular-nums">{stats.unclassified}</p>
+              <span className="text-[10px] font-black text-amber-600 uppercase">Awaiting Review</span>
+            </div>
+            <p className="text-[9px] text-amber-700/60 mt-2 uppercase font-black tracking-tighter">Using Keyword Intelligence</p>
+            <div className="absolute top-0 right-0 p-4 opacity-10 group-hover/stat:opacity-20 transition-opacity">
+              <Loader2 className="h-5 w-5 text-amber-400" />
+            </div>
           </div>
         </div>
       )}
