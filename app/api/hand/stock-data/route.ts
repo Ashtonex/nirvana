@@ -23,6 +23,8 @@ export async function GET(request: Request) {
     const shop = searchParams.get('shop') || 'all';
     const category = searchParams.get('category') || 'all';
     const status = searchParams.get('status') || 'all';
+    const year = parseInt(searchParams.get('year') || new Date().getFullYear().toString());
+    const month = parseInt(searchParams.get('month') || (new Date().getMonth() + 1).toString());
 
     let query = supabaseAdmin.from('inventory_items').select('*');
 
@@ -53,6 +55,25 @@ export async function GET(request: Request) {
       return acc;
     }, {} as Record<string, { total: number; byShop: Record<string, number> }>);
 
+    // Fetch sales data to calculate units sold per item
+    const startDate = new Date(year, month - 1, 1).toISOString().split('T')[0];
+    const endDate = new Date(year, month, 0).toISOString().split('T')[0];
+    
+    const { data: salesData } = itemIds.length > 0
+      ? await supabaseAdmin
+          .from('sales')
+          .select('item_id, quantity')
+          .in('item_id', itemIds)
+          .gte('date', startDate)
+          .lte('date', endDate)
+      : { data: [] };
+
+    const salesByItem = (salesData || []).reduce((acc: any, s: any) => {
+      const id = s.item_id;
+      acc[id] = (acc[id] || 0) + Number(s.quantity || 0);
+      return acc;
+    }, {} as Record<string, number>);
+
     // Filter by status if needed
     let items: InventoryRow[] = (data || []) as InventoryRow[];
 
@@ -78,7 +99,8 @@ export async function GET(request: Request) {
         lastSold: i.last_sold || 'Never',
         price: i.landed_cost || 0,
         allocated: allocations[i.id]?.total || 0,
-        allocations: allocations[i.id]?.byShop || {}
+        allocations: allocations[i.id]?.byShop || {},
+        totalSold: salesByItem[i.id] || 0
       }))
     });
   } catch (error: unknown) {

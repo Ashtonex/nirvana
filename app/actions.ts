@@ -515,14 +515,32 @@ export async function recordSale(sale: any) {
                 console.error('[recordSale] Failed to decrement allocation:', allocUpdateErr.message);
             }
         } else {
-            // RPC fallback (if RPCs have been deployed)
-            const rpcResult = await supabaseAdmin.rpc('decrement_allocation', {
-                item_id: sale.itemId,
-                shop_id: sale.shopId,
-                qty: sale.quantity
-            });
-            if (rpcResult.error) {
-                console.error('[recordSale] RPC decrement_allocation failed:', rpcResult.error.message);
+            // Allocation doesn't exist - create it first with master quantity, then decrement
+            const { data: masterItem } = await supabaseAdmin
+                .from('inventory_items')
+                .select('quantity')
+                .eq('id', sale.itemId)
+                .maybeSingle();
+            
+            if (masterItem) {
+                const masterQty = Number((masterItem as any).quantity || 0);
+                const initialAllocQty = Math.max(0, masterQty - sale.quantity);
+                
+                const { error: insertErr } = await supabaseAdmin
+                    .from('inventory_allocations')
+                    .insert({
+                        item_id: sale.itemId,
+                        shop_id: sale.shopId,
+                        quantity: initialAllocQty
+                    });
+                
+                if (insertErr) {
+                    console.error('[recordSale] Failed to create allocation:', insertErr.message);
+                } else {
+                    console.log('[recordSale] Created allocation for item', sale.itemId, 'at shop', sale.shopId, 'with quantity', initialAllocQty);
+                }
+            } else {
+                console.error('[recordSale] Master item not found for allocation creation:', sale.itemId);
             }
         }
 
