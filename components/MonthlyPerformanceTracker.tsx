@@ -99,10 +99,13 @@ export function MonthlyPerformanceTracker() {
   };
 
   const getCategoryExpenses = (category: string) => {
-    if (!totals) return [];
+    if (!performance.length) return [];
     const allExpenses: { shop: string; category: string; amount: number }[] = [];
     
-    displayData.forEach(shop => {
+    // Use all performance data for category drill-down, not filtered displayData
+    const sourceData = selectedShop === 'all' ? performance : performance.filter(p => p.shopId === selectedShop);
+    
+    sourceData.forEach(shop => {
       if (shop.expenseBreakdown) {
         Object.entries(shop.expenseBreakdown).forEach(([cat, amount]) => {
           const normalizedCat = cat.toLowerCase();
@@ -321,8 +324,8 @@ export function MonthlyPerformanceTracker() {
         </Card>
       )}
 
-      {/* Summary Cards */}
-      {totals && (
+      {/* Summary Cards - Only show when viewing all shops */}
+      {totals && selectedShop === 'all' && (
         <div className="space-y-4">
           {/* Primary numbers with MoM comparison */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -539,97 +542,162 @@ export function MonthlyPerformanceTracker() {
             </div>
           )}
 
-          {/* Expense breakdown strip with drill-down */}
-          <div className="space-y-3">
+          {/* Expense breakdown strip with drill-down - Only show when viewing all shops */}
+          {selectedShop === 'all' && (
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <div 
+                  className={cn(
+                    "rounded-xl border border-rose-500/20 bg-rose-500/5 p-3 cursor-pointer transition-all hover:bg-rose-500/10",
+                    expandedCategory === 'Overheads' && "ring-2 ring-rose-500/50"
+                  )}
+                  onClick={() => toggleCategoryExpansion('Overheads')}
+                >
+                  <div className="flex items-center justify-between">
+                    <p className="text-[9px] font-black uppercase tracking-widest text-rose-400/70">Overheads</p>
+                    <span className="text-[8px] text-rose-400/50">{expandedCategory === 'Overheads' ? '−' : '+'}</span>
+                  </div>
+                  <p className="mt-1 text-lg font-black text-rose-300">{formatCurrency(totals.totalOverheads ?? 0)}</p>
+                  <p className="text-[9px] text-slate-600">Rent · Salary · Utilities</p>
+                </div>
+                <div 
+                  className={cn(
+                    "rounded-xl border border-violet-500/20 bg-violet-500/5 p-3 cursor-pointer transition-all hover:bg-violet-500/10",
+                    expandedCategory === 'Stock Orders' && "ring-2 ring-violet-500/50"
+                  )}
+                  onClick={() => toggleCategoryExpansion('Stock Orders')}
+                >
+                  <div className="flex items-center justify-between">
+                    <p className="text-[9px] font-black uppercase tracking-widest text-violet-400/70">Stock Orders</p>
+                    <span className="text-[8px] text-violet-400/50">{expandedCategory === 'Stock Orders' ? '−' : '+'}</span>
+                  </div>
+                  <p className="mt-1 text-lg font-black text-violet-300">{formatCurrency(totals.totalStockOrders ?? 0)}</p>
+                  <p className="text-[9px] text-slate-600">Cost of goods purchased</p>
+                </div>
+                <div 
+                  className={cn(
+                    "rounded-xl border border-sky-500/20 bg-sky-500/5 p-3 cursor-pointer transition-all hover:bg-sky-500/10",
+                    expandedCategory === 'Transfers' && "ring-2 ring-sky-500/50"
+                  )}
+                  onClick={() => toggleCategoryExpansion('Transfers')}
+                >
+                  <div className="flex items-center justify-between">
+                    <p className="text-[9px] font-black uppercase tracking-widest text-sky-400/70">Transfers</p>
+                    <span className="text-[8px] text-sky-400/50">{expandedCategory === 'Transfers' ? '−' : '+'}</span>
+                  </div>
+                  <p className="mt-1 text-lg font-black text-sky-300">{formatCurrency(totals.totalTransfers ?? 0)}</p>
+                  <p className="text-[9px] text-slate-600">Not counted vs profit</p>
+                </div>
+                <div 
+                  className={cn(
+                    "rounded-xl border border-amber-500/20 bg-amber-500/5 p-3 cursor-pointer transition-all hover:bg-amber-500/10",
+                    expandedCategory === 'Personal Use' && "ring-2 ring-amber-500/50"
+                  )}
+                  onClick={() => toggleCategoryExpansion('Personal Use')}
+                >
+                  <div className="flex items-center justify-between">
+                    <p className="text-[9px] font-black uppercase tracking-widest text-amber-400/70">Personal Use</p>
+                    <span className="text-[8px] text-amber-400/50">{expandedCategory === 'Personal Use' ? '−' : '+'}</span>
+                  </div>
+                  <p className="mt-1 text-lg font-black text-amber-300">{formatCurrency(totals.totalPersonalUse ?? 0)}</p>
+                  <p className="text-[9px] text-slate-600">Not counted vs profit</p>
+                </div>
+              </div>
+
+              {/* Expanded category details */}
+              {expandedCategory && (
+                <div className="rounded-xl border border-slate-700 bg-slate-950/50 p-4 animate-in slide-down-from-top-2">
+                  <div className="flex items-center justify-between mb-3">
+                    <h4 className="text-sm font-bold text-slate-300">{expandedCategory} - Individual Expenses {selectedShop !== 'all' && `(for ${performance.find(p => p.shopId === selectedShop)?.shopName})`}</h4>
+                    <button 
+                      onClick={() => setExpandedCategory(null)}
+                      className="text-xs text-slate-500 hover:text-white transition-colors"
+                    >
+                      Close
+                    </button>
+                  </div>
+                  <div className="space-y-2 max-h-60 overflow-y-auto">
+                    {getCategoryExpenses(expandedCategory).length === 0 ? (
+                      <p className="text-xs text-slate-500">No expenses found in this category</p>
+                    ) : (
+                      getCategoryExpenses(expandedCategory).map((expense, idx) => (
+                        <div key={idx} className="flex justify-between items-center py-2 border-b border-slate-800 last:border-0">
+                          <div className="flex-1">
+                            <p className="text-xs text-slate-400">{expense.category}</p>
+                            <p className="text-[10px] text-slate-600">{expense.shop}</p>
+                          </div>
+                          <p className="text-sm font-bold text-slate-300 ml-4">{formatCurrency(expense.amount)}</p>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Shop-specific expense breakdown when a shop is selected */}
+      {selectedShop !== 'all' && displayData.length === 1 && (
+        <div className="space-y-4">
+          <div className="rounded-xl border border-slate-700 bg-slate-950/50 p-5">
+            <h3 className="text-sm font-bold text-slate-300 mb-4 flex items-center gap-2">
+              <TrendingDown className="h-4 w-4 text-rose-400" />
+              {displayData[0].shopName} - Expense Categories
+            </h3>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              <div 
-                className={cn(
-                  "rounded-xl border border-rose-500/20 bg-rose-500/5 p-3 cursor-pointer transition-all hover:bg-rose-500/10",
-                  expandedCategory === 'Overheads' && "ring-2 ring-rose-500/50"
-                )}
-                onClick={() => toggleCategoryExpansion('Overheads')}
-              >
-                <div className="flex items-center justify-between">
-                  <p className="text-[9px] font-black uppercase tracking-widest text-rose-400/70">Overheads</p>
-                  <span className="text-[8px] text-rose-400/50">{expandedCategory === 'Overheads' ? '−' : '+'}</span>
+              {displayData[0].groupedExpenses && Object.entries(displayData[0].groupedExpenses).map(([category, amount]) => (
+                <div 
+                  key={category}
+                  className={cn(
+                    "rounded-xl border p-3 cursor-pointer transition-all hover:bg-slate-800",
+                    expandedCategory === category && "ring-2 ring-emerald-500/50",
+                    category === 'Overheads' ? "border-rose-500/20 bg-rose-500/5" :
+                    category === 'Stock Orders' ? "border-violet-500/20 bg-violet-500/5" :
+                    category === 'Transfers' ? "border-sky-500/20 bg-sky-500/5" :
+                    category === 'Personal Use' ? "border-amber-500/20 bg-amber-500/5" : "border-slate-700 bg-slate-900/50"
+                  )}
+                  onClick={() => toggleCategoryExpansion(category)}
+                >
+                  <div className="flex items-center justify-between">
+                    <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">{category}</p>
+                    <span className="text-[8px] text-slate-500">{expandedCategory === category ? '−' : '+'}</span>
+                  </div>
+                  <p className="mt-1 text-lg font-black text-slate-300">{formatCurrency(amount as number)}</p>
                 </div>
-                <p className="mt-1 text-lg font-black text-rose-300">{formatCurrency(totals.totalOverheads ?? 0)}</p>
-                <p className="text-[9px] text-slate-600">Rent · Salary · Utilities</p>
+              ))}
+            </div>
+          </div>
+
+          {/* Expanded category details for selected shop */}
+          {expandedCategory && (
+            <div className="rounded-xl border border-slate-700 bg-slate-950/50 p-4 animate-in slide-down-from-top-2">
+              <div className="flex items-center justify-between mb-3">
+                <h4 className="text-sm font-bold text-slate-300">{expandedCategory} - Individual Expenses</h4>
+                <button 
+                  onClick={() => setExpandedCategory(null)}
+                  className="text-xs text-slate-500 hover:text-white transition-colors"
+                >
+                  Close
+                </button>
               </div>
-              <div 
-                className={cn(
-                  "rounded-xl border border-violet-500/20 bg-violet-500/5 p-3 cursor-pointer transition-all hover:bg-violet-500/10",
-                  expandedCategory === 'Stock Orders' && "ring-2 ring-violet-500/50"
+              <div className="space-y-2 max-h-60 overflow-y-auto">
+                {getCategoryExpenses(expandedCategory).length === 0 ? (
+                  <p className="text-xs text-slate-500">No expenses found in this category</p>
+                ) : (
+                  getCategoryExpenses(expandedCategory).map((expense, idx) => (
+                    <div key={idx} className="flex justify-between items-center py-2 border-b border-slate-800 last:border-0">
+                      <div className="flex-1">
+                        <p className="text-xs text-slate-400">{expense.category}</p>
+                      </div>
+                      <p className="text-sm font-bold text-slate-300 ml-4">{formatCurrency(expense.amount)}</p>
+                    </div>
+                  ))
                 )}
-                onClick={() => toggleCategoryExpansion('Stock Orders')}
-              >
-                <div className="flex items-center justify-between">
-                  <p className="text-[9px] font-black uppercase tracking-widest text-violet-400/70">Stock Orders</p>
-                  <span className="text-[8px] text-violet-400/50">{expandedCategory === 'Stock Orders' ? '−' : '+'}</span>
-                </div>
-                <p className="mt-1 text-lg font-black text-violet-300">{formatCurrency(totals.totalStockOrders ?? 0)}</p>
-                <p className="text-[9px] text-slate-600">Cost of goods purchased</p>
-              </div>
-              <div 
-                className={cn(
-                  "rounded-xl border border-sky-500/20 bg-sky-500/5 p-3 cursor-pointer transition-all hover:bg-sky-500/10",
-                  expandedCategory === 'Transfers' && "ring-2 ring-sky-500/50"
-                )}
-                onClick={() => toggleCategoryExpansion('Transfers')}
-              >
-                <div className="flex items-center justify-between">
-                  <p className="text-[9px] font-black uppercase tracking-widest text-sky-400/70">Transfers</p>
-                  <span className="text-[8px] text-sky-400/50">{expandedCategory === 'Transfers' ? '−' : '+'}</span>
-                </div>
-                <p className="mt-1 text-lg font-black text-sky-300">{formatCurrency(totals.totalTransfers ?? 0)}</p>
-                <p className="text-[9px] text-slate-600">Not counted vs profit</p>
-              </div>
-              <div 
-                className={cn(
-                  "rounded-xl border border-amber-500/20 bg-amber-500/5 p-3 cursor-pointer transition-all hover:bg-amber-500/10",
-                  expandedCategory === 'Personal Use' && "ring-2 ring-amber-500/50"
-                )}
-                onClick={() => toggleCategoryExpansion('Personal Use')}
-              >
-                <div className="flex items-center justify-between">
-                  <p className="text-[9px] font-black uppercase tracking-widest text-amber-400/70">Personal Use</p>
-                  <span className="text-[8px] text-amber-400/50">{expandedCategory === 'Personal Use' ? '−' : '+'}</span>
-                </div>
-                <p className="mt-1 text-lg font-black text-amber-300">{formatCurrency(totals.totalPersonalUse ?? 0)}</p>
-                <p className="text-[9px] text-slate-600">Not counted vs profit</p>
               </div>
             </div>
-
-            {/* Expanded category details */}
-            {expandedCategory && (
-              <div className="rounded-xl border border-slate-700 bg-slate-950/50 p-4 animate-in slide-down-from-top-2">
-                <div className="flex items-center justify-between mb-3">
-                  <h4 className="text-sm font-bold text-slate-300">{expandedCategory} - Individual Expenses</h4>
-                  <button 
-                    onClick={() => setExpandedCategory(null)}
-                    className="text-xs text-slate-500 hover:text-white transition-colors"
-                  >
-                    Close
-                  </button>
-                </div>
-                <div className="space-y-2 max-h-60 overflow-y-auto">
-                  {getCategoryExpenses(expandedCategory).length === 0 ? (
-                    <p className="text-xs text-slate-500">No expenses found in this category</p>
-                  ) : (
-                    getCategoryExpenses(expandedCategory).map((expense, idx) => (
-                      <div key={idx} className="flex justify-between items-center py-2 border-b border-slate-800 last:border-0">
-                        <div className="flex-1">
-                          <p className="text-xs text-slate-400">{expense.category}</p>
-                          <p className="text-[10px] text-slate-600">{expense.shop}</p>
-                        </div>
-                        <p className="text-sm font-bold text-slate-300 ml-4">{formatCurrency(expense.amount)}</p>
-                      </div>
-                    ))
-                  )}
-                </div>
-              </div>
-            )}
-          </div>
+          )}
         </div>
       )}
 
