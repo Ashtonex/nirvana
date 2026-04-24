@@ -50,7 +50,7 @@ export async function GET(request: Request) {
     ] = await Promise.all([
       supabaseAdmin.from("shops").select("id, name"),
       // Load saved classifications — gracefully handle if table doesn't exist yet
-      supabaseAdmin.from("expense_classifications").select("expense_id, source, group_name").then(r => r).catch(() => ({ data: [] })),
+      supabaseAdmin.from("expense_classifications").select("expense_id, source, group_name").then((r: any) => r).catch(() => ({ data: [] })),
       supabaseAdmin
         .from("sales")
         .select("id, shop_id, date, item_name, quantity, unit_price, total_with_tax")
