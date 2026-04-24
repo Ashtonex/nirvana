@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, Button, Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui';
-import { BarChart3, TrendingUp, TrendingDown, DollarSign, ShoppingCart, AlertCircle, Loader2 } from 'lucide-react';
+import { BarChart3, TrendingUp, TrendingDown, DollarSign, ShoppingCart, AlertCircle, Loader2, Wallet } from 'lucide-react';
 import { cn } from '@/components/ui';
 
 interface PerformanceData {
