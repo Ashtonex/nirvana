@@ -154,6 +154,11 @@ export async function GET() {
         .eq('read', false)
         .gte('created_at', twentyFourHoursAgo),
       supabaseAdmin
+        .from('stock_requests')
+        .select('id')
+        .eq('status', 'pending')
+        .gte('created_at', twentyFourHoursAgo),
+      supabaseAdmin
         .from('oracle_settings')
         .select('*')
         .single(),
