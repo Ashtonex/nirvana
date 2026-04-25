@@ -23,6 +23,7 @@ import { MonthlyPerformanceTracker } from '@/components/MonthlyPerformanceTracke
 import { InventoryHealth } from '@/components/InventoryHealth';
 import { ExpenseCategorisation } from '@/components/ExpenseCategorisation';
 import { cn } from '@/lib/utils';
+import { updateCashDrawerClosing } from '@/app/actions';
 
 type ClearanceState = 'checking' | 'granted' | 'denied';
 type LogLevel = 'error' | 'warning' | 'info' | 'success';
