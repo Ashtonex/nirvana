@@ -120,6 +120,13 @@ type ControlRoomResponse = {
     resolved_shop: string | null;
     created_at: string;
   }>;
+  settings: {
+    taxRate: number;
+    taxThreshold: number;
+    taxMode: string;
+    zombieDays: number;
+    currencySymbol: string;
+  };
 };
 
 type SaleForm = {
@@ -258,6 +265,11 @@ export default function TheHandPage() {
     description: '',
     autoRoute: true,
   });
+  const [intelForm, setIntelForm] = useState({
+    taxRate: 15.5,
+    taxThreshold: 100,
+    zombieDays: 60,
+  });
 
   const addLog = (level: LogLevel, message: string) => {
     setLogs((prev) => [
@@ -287,6 +299,11 @@ export default function TheHandPage() {
 
       setControlRoom(result);
       setOpeningBalances(result.openingBalances);
+      setIntelForm({
+        taxRate: Number(result.settings.taxRate) * 100,
+        taxThreshold: result.settings.taxThreshold,
+        zombieDays: result.settings.zombieDays,
+      });
       if (withAuditLog) {
         addLog('success', `System audit complete. ${result.risks.length} active warnings surfaced.`);
       }
@@ -529,6 +546,29 @@ export default function TheHandPage() {
       await loadControlRoom();
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Failed to rationalize variance';
+      addLog('error', message);
+    } finally {
+      setBusy(false);
+    }
+  };
+  
+  const handleUpdateIntelligence = async () => {
+    try {
+      setBusy(true);
+      const response = await fetch('/api/hand/update-settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(intelForm),
+      });
+      const result = await response.json();
+      if (!response.ok || !result.success) {
+        throw new Error(result.message || 'Failed to update settings');
+      }
+      addLog('success', 'Global intelligence constants synchronized.');
+      await loadControlRoom();
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Failed to update settings';
       addLog('error', message);
     } finally {
       setBusy(false);
@@ -791,6 +831,91 @@ export default function TheHandPage() {
                           className="w-full rounded-xl border border-sky-400/30 bg-sky-500/10 py-3 text-xs font-black uppercase tracking-widest text-sky-200 hover:bg-sky-500/20"
                         >
                           Set Past Opening
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="rounded-2xl border border-white/10 bg-slate-900/40 p-4">
+                      <p className="text-xs font-black uppercase tracking-[0.22em] text-slate-500 mb-4">Past Closing Override</p>
+                      <div className="space-y-3">
+                        <select
+                          value={pastOpeningForm.shopId}
+                          onChange={(event) => setPastOpeningForm((prev) => ({ ...prev, shopId: event.target.value as SaleForm['shopId'] }))}
+                          className="w-full rounded-xl border border-white/10 bg-slate-950 px-3 py-2 text-sm text-white"
+                        >
+                          {SHOPS.map((shop) => <option key={shop.id} value={shop.id}>{shop.name}</option>)}
+                        </select>
+                        <input
+                          type="date"
+                          value={pastOpeningForm.date}
+                          onChange={(event) => setPastOpeningForm((prev) => ({ ...prev, date: event.target.value }))}
+                          className="w-full rounded-xl border border-white/10 bg-slate-950 px-3 py-2 text-sm text-white"
+                        />
+                        <input
+                          type="number"
+                          placeholder="Closing Amount"
+                          value={newAmount}
+                          onChange={(event) => setNewAmount(event.target.value)}
+                          className="w-full rounded-xl border border-white/10 bg-slate-950 px-3 py-2 text-sm text-white outline-none focus:border-rose-500/50"
+                        />
+                        <button
+                          onClick={async () => {
+                            if (!confirm("OVERRIDE PAST CLOSING?")) return;
+                            try {
+                              await updateCashDrawerClosing({ 
+                                shopId: pastOpeningForm.shopId, 
+                                dateYYYYMMDD: pastOpeningForm.date, 
+                                newAmount: Number(newAmount) 
+                              });
+                              addLog('success', `Past closing balance for ${pastOpeningForm.shopId} on ${pastOpeningForm.date} set to ${currency(Number(newAmount))}.`);
+                              await loadControlRoom();
+                            } catch (e: any) {
+                              addLog('error', e.message);
+                            }
+                          }}
+                          className="w-full rounded-xl border border-rose-400/30 bg-rose-500/10 py-3 text-xs font-black uppercase tracking-widest text-rose-200 hover:bg-rose-500/20"
+                        >
+                          Set Past Closing
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="rounded-2xl border border-white/10 bg-slate-900/40 p-4">
+                      <p className="text-xs font-black uppercase tracking-[0.22em] text-slate-500 mb-4">Intelligence Constants</p>
+                      <div className="space-y-3">
+                        <div>
+                          <label className="text-[10px] font-black uppercase text-slate-500">Tax Rate (%)</label>
+                          <input
+                            type="number"
+                            step="0.1"
+                            value={intelForm.taxRate}
+                            onChange={(e) => setIntelForm(prev => ({ ...prev, taxRate: Number(e.target.value) }))}
+                            className="w-full rounded-xl border border-white/10 bg-slate-950 px-3 py-2 text-sm text-white"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[10px] font-black uppercase text-slate-500">Tax Threshold ($)</label>
+                          <input
+                            type="number"
+                            value={intelForm.taxThreshold}
+                            onChange={(e) => setIntelForm(prev => ({ ...prev, taxThreshold: Number(e.target.value) }))}
+                            className="w-full rounded-xl border border-white/10 bg-slate-950 px-3 py-2 text-sm text-white"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[10px] font-black uppercase text-slate-500">Zombie Days</label>
+                          <input
+                            type="number"
+                            value={intelForm.zombieDays}
+                            onChange={(e) => setIntelForm(prev => ({ ...prev, zombieDays: Number(e.target.value) }))}
+                            className="w-full rounded-xl border border-white/10 bg-slate-950 px-3 py-2 text-sm text-white"
+                          />
+                        </div>
+                        <button
+                          onClick={handleUpdateIntelligence}
+                          className="w-full rounded-xl border border-sky-400/30 bg-sky-500/10 py-3 text-xs font-black uppercase tracking-widest text-sky-200 hover:bg-sky-500/20"
+                        >
+                          Sync Constants
                         </button>
                       </div>
                     </div>

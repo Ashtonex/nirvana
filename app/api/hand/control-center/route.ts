@@ -110,6 +110,7 @@ export async function GET() {
       { data: sessionData },
       { data: unreadMessages },
       { data: pendingStockRequests },
+      { data: settingsData },
       opsComputedBalance,
       opsState,
     ] = await Promise.all([
@@ -153,10 +154,9 @@ export async function GET() {
         .eq('read', false)
         .gte('created_at', twentyFourHoursAgo),
       supabaseAdmin
-        .from('stock_requests')
-        .select('id')
-        .eq('status', 'pending')
-        .gte('created_at', sevenDaysAgo),
+        .from('oracle_settings')
+        .select('*')
+        .single(),
       getOperationsComputedBalance().catch(() => 0),
       getOperationsState().catch(() => ({ actual_balance: 0, updated_at: null })),
     ]);
@@ -413,6 +413,13 @@ export async function GET() {
       recentTransactions,
       recentOperations,
       drifts,
+      settings: {
+        taxRate: Number(settingsData?.tax_rate || 0.155),
+        taxThreshold: Number(settingsData?.tax_threshold || 100),
+        taxMode: settingsData?.tax_mode || 'all',
+        zombieDays: Number(settingsData?.zombie_days || 60),
+        currencySymbol: settingsData?.currency_symbol || "$"
+      }
     });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Unknown error';

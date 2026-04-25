@@ -1200,6 +1200,32 @@ export async function getCashDrawerOpening(shopId: string, dateYYYYMMDD: string)
     return { entry };
 }
 
+export async function getCashDrawerClosing(shop: string, dateYYYYMMDD: string) {
+    const actor = await requireManagerOrOwner();
+    const day = String(dateYYYYMMDD || "").trim();
+    if (!day) throw new Error("Missing date");
+
+    const since = `${day}T00:00:00.000Z`;
+    const until = `${day}T23:59:59.999Z`;
+
+    if (actor.kind === "staff" && actor.shopId && actor.shopId !== shop) {
+        throw new Error("Forbidden");
+    }
+
+    const { data } = await supabaseAdmin
+        .from("ledger_entries")
+        .select("id, amount, date, description, category, shop_id")
+        .eq("shop_id", shop)
+        .eq("category", "Cash Drawer Closing")
+        .gte("date", since)
+        .lte("date", until)
+        .order("date", { ascending: true })
+        .limit(1);
+
+    const entry = (data || [])[0] || null;
+    return { entry };
+}
+
 export async function updateCashDrawerOpening(input: {
     shopId: string;
     dateYYYYMMDD: string;
@@ -1277,6 +1303,90 @@ export async function updateCashDrawerOpening(input: {
         employee_id: actor.id,
         action: "CASH_DRAWER_OPENING_CORRECTED",
         details: `${shopId}: opening corrected $${oldAmount.toFixed(2)} -> $${newAmount.toFixed(2)} for ${day} by ${actor.name}${reason ? ` (reason: ${reason})` : ""}`
+    });
+
+    revalidatePath(`/shops/${shopId}`);
+    revalidatePath("/admin/audit");
+    return { success: true, created: false, oldAmount, newAmount };
+}
+
+export async function updateCashDrawerClosing(input: {
+    shopId: string;
+    dateYYYYMMDD: string;
+    newAmount: number;
+    reason?: string;
+}) {
+    const actor = await requireManagerOrOwner();
+    const shopId = String(input?.shopId || "").trim();
+    const day = String(input?.dateYYYYMMDD || "").trim();
+    const newAmount = Number(input?.newAmount);
+    const reason = String(input?.reason || "").trim();
+
+    if (!shopId) throw new Error("Missing shopId");
+    if (!day) throw new Error("Missing date");
+    if (!Number.isFinite(newAmount) || newAmount < 0) throw new Error("Invalid amount");
+
+    if (actor.kind === "staff" && actor.shopId && actor.shopId !== shopId) {
+        throw new Error("Forbidden");
+    }
+
+    const since = `${day}T00:00:00.000Z`;
+    const until = `${day}T23:59:59.999Z`;
+
+    const { data: existing } = await supabaseAdmin
+        .from("ledger_entries")
+        .select("id, amount, date, description")
+        .eq("shop_id", shopId)
+        .eq("category", "Cash Drawer Closing")
+        .gte("date", since)
+        .lte("date", until)
+        .order("date", { ascending: true })
+        .limit(1);
+
+    const row = (existing || [])[0] || null;
+    const timestamp = new Date().toISOString();
+
+    if (!row) {
+        const id = Math.random().toString(36).substring(2, 9);
+        await supabaseAdmin.from("ledger_entries").insert({
+            id,
+            shop_id: shopId,
+            type: "asset",
+            category: "Cash Drawer Closing",
+            amount: newAmount,
+            date: `${day}T23:59:59.000Z`,
+            description: `Closing set by ${actor.name}${reason ? ` | Reason: ${reason}` : ""}`
+        });
+
+        await supabaseAdmin.from("audit_log").insert({
+            id: Math.random().toString(36).substring(2, 9),
+            timestamp,
+            employee_id: actor.id,
+            action: "CASH_DRAWER_CLOSING_SET",
+            details: `${shopId}: closing set to $${newAmount.toFixed(2)} for ${day} by ${actor.name}${reason ? ` (reason: ${reason})` : ""}`
+        });
+
+        revalidatePath(`/shops/${shopId}`);
+        revalidatePath("/admin/audit");
+        return { success: true, created: true };
+    }
+
+    const oldAmount = Number(row.amount || 0);
+    const descBase = String(row.description || "").trim();
+    const patchNote = `| corrected $${oldAmount.toFixed(2)} -> $${newAmount.toFixed(2)} by ${actor.name} (${actor.id}) @ ${timestamp}${reason ? ` | ${reason}` : ""}`;
+    const nextDesc = descBase ? `${descBase} ${patchNote}` : patchNote;
+
+    await supabaseAdmin
+        .from("ledger_entries")
+        .update({ amount: newAmount, description: nextDesc })
+        .eq("id", row.id);
+
+    await supabaseAdmin.from("audit_log").insert({
+        id: Math.random().toString(36).substring(2, 9),
+        timestamp,
+        employee_id: actor.id,
+        action: "CASH_DRAWER_CLOSING_CORRECTED",
+        details: `${shopId}: closing corrected $${oldAmount.toFixed(2)} -> $${newAmount.toFixed(2)} for ${day} by ${actor.name}${reason ? ` (reason: ${reason})` : ""}`
     });
 
     revalidatePath(`/shops/${shopId}`);
