@@ -238,7 +238,7 @@ export async function GET(req: Request) {
       const wSalesTotalDiscount = wSales.reduce((sum: number, s: any) => sum + Number(s.discount_applied || 0), 0);
       const wSalesTotalCOGS = wSales.reduce((sum: number, s: any) => sum + (Number(s.landed_cost || 0) * Number(s.quantity || 0)), 0);
 
-      const wPosExpenses = wLedger.filter((l: any) => ["POS Expense", "Perfume", "Overhead"].includes(l.category)).reduce((sum: number, l: any) => sum + Number(l.amount || 0), 0);
+      const wPosExpenses = wLedger.filter((l: any) => ["POS Expense", "Perfume", "Overhead", "Tithe", "Groceries"].includes(l.category)).reduce((sum: number, l: any) => sum + Number(l.amount || 0), 0);
 
       // Grouped Overheads
       const shopEx: any = shop?.expenses || {};
@@ -273,7 +273,7 @@ export async function GET(req: Request) {
         if (t === "expense") return true;
         if (t === "income") return false;
         // Fallback heuristics: POS Expense, Perfume, Overhead are always expenses.
-        return ["POS Expense", "Perfume", "Overhead"].includes(String(l?.category || ""));
+        return ["POS Expense", "Perfume", "Overhead", "Tithe", "Groceries"].includes(String(l?.category || ""));
       };
       const wLedgerExpenses = wLedger.filter(isExpenseEntry);
       const wLedgerExpenseTotal = wLedgerExpenses.reduce((sum: number, l: any) => sum + Number(l.amount || 0), 0);

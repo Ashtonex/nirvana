@@ -207,7 +207,7 @@ export async function computePosAuditReport(input: { shopId: string; dateYYYYMMD
     .reduce((sum, l) => sum + toMoney(l?.amount), 0);
 
   const prevPosExpenses = prevLedgerRows
-    .filter((l) => ["POS Expense", "Perfume", "Overhead", "Operations Transfer"].includes(String(l?.category || "")) && isSameDayISO(l?.date, prevDay))
+    .filter((l) => ["POS Expense", "Perfume", "Overhead", "Operations Transfer", "Tithe", "Groceries", "Tithe Withdrawal"].includes(String(l?.category || "")) && isSameDayISO(l?.date, prevDay))
     .reduce((sum, l) => sum + toMoney(l?.amount), 0);
 
   const prevAdjustmentNet = prevLedgerRows
@@ -243,7 +243,7 @@ export async function computePosAuditReport(input: { shopId: string; dateYYYYMMD
     .reduce((sum, l) => sum + toMoney(l?.amount), 0);
 
   const posExpenses = ledgerRows
-    .filter((l) => ["POS Expense", "Perfume", "Overhead", "Operations Transfer"].includes(String(l?.category || "")) && isSameDayISO(l?.date, day))
+    .filter((l) => ["POS Expense", "Perfume", "Overhead", "Operations Transfer", "Tithe", "Groceries", "Tithe Withdrawal"].includes(String(l?.category || "")) && isSameDayISO(l?.date, day))
     .reduce((sum, l) => sum + toMoney(l?.amount), 0);
 
   const adjustmentNet = ledgerRows

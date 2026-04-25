@@ -1,6 +1,6 @@
 import { supabaseAdmin } from "@/lib/supabase";
 
-export const POS_EXPENSE_CATEGORIES = ["POS Expense", "Perfume", "Overhead"] as const;
+export const POS_EXPENSE_CATEGORIES = ["POS Expense", "Perfume", "Overhead", "Tithe", "Groceries"] as const;
 export type PosExpenseCategory = typeof POS_EXPENSE_CATEGORIES[number];
 
 export interface ValidationIssue {

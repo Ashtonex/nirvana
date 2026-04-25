@@ -349,7 +349,7 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
     // Calculate Cash Drawer Math
     const ledger = db.ledger || [];
     const todayStr = new Date().toLocaleDateString('en-CA'); // Local Date (YYYY-MM-DD)
-    const CASH_OUT_CATEGORIES = new Set(["POS Expense", "Operations Transfer", "Perfume", "Overhead", "Tithe", "Groceries"]);
+    const CASH_OUT_CATEGORIES = new Set(["POS Expense", "Operations Transfer", "Perfume", "Overhead", "Tithe", "Groceries", "Tithe Withdrawal"]);
 
     // 1. Did we open today?
     const todaysOpening = ledger.find((l: any) => 
@@ -450,7 +450,7 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
     ).reduce((sum: number, s: any) => sum + Number(s.totalWithTax || 0), 0);
 
     const todaysPosExpenses = ledger.filter((l: any) =>
-        ['POS Expense', 'Perfume', 'Overhead', 'Tithe', 'Groceries'].includes(l.category) &&
+        ['POS Expense', 'Perfume', 'Overhead', 'Tithe', 'Groceries', 'Operations Transfer', 'Tithe Withdrawal'].includes(l.category) &&
         l.shopId === shopId &&
         String(l.date).startsWith(todayStr)
     ).reduce((sum: number, l: any) => sum + Number(l.amount || 0), 0);
