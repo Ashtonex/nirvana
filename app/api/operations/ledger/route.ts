@@ -11,9 +11,10 @@ export async function GET(req: Request) {
     const url = new URL(req.url);
     const limit = Math.min(500, Math.max(1, Number(url.searchParams.get("limit") || 100)));
     const month = url.searchParams.get("month") || undefined;
+    const shopId = url.searchParams.get("shopId") || undefined;
+    const period = (url.searchParams.get("period") as any) || undefined;
     
-    // We'll need to update listOperationsLedgerEntries to support filtering
-    const rows = await listOperationsLedgerEntries(limit, month);
+    const rows = await listOperationsLedgerEntries(limit, { month, shopId, period });
     return NextResponse.json({ rows });
   } catch (e: any) {
     const msg = e?.message || String(e);

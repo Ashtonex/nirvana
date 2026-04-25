@@ -122,6 +122,8 @@ export function OperationsConsole({
   const [isGeneratingReport, setIsGeneratingReport] = useState(false);
   const [busy, setBusy] = useState(false);
   const [activeTab, setActiveTab] = useState<"overview" | "stockvel" | "moneybrain">("overview");
+  const [selectedShop, setSelectedShop] = useState<string>("all");
+  const [selectedPeriod, setSelectedPeriod] = useState<"day" | "week" | "month" | "year" | "all">("all");
 
   const [opsState, setOpsState] = useState<OpsState>(initialState);
 
@@ -227,8 +229,15 @@ export function OperationsConsole({
 
   const fetchData = useCallback(async () => {
     try {
+
+      const queryParams = new URLSearchParams({
+        limit: "500",
+        period: selectedPeriod,
+      });
+      if (selectedShop !== "all") queryParams.append("shopId", selectedShop);
+
       const [ledgerRes, stateRes, auditRes, staffRes, empRes] = await Promise.all([
-        fetch("/api/operations/ledger?limit=100", { cache: "no-store", credentials: "include" }),
+        fetch(`/api/operations/ledger?${queryParams.toString()}`, { cache: "no-store", credentials: "include" }),
         fetch("/api/operations/state", { cache: "no-store", credentials: "include" }),
         fetch("/api/pos-audit/logs?limit=20", { cache: "no-store", credentials: "include" }).then(r => r.ok ? r.json() : { logs: [] }).catch(() => ({ logs: [] })),
         fetch("/api/staff/logs?limit=50", { cache: "no-store", credentials: "include" }).then(r => r.ok ? r.json() : { logs: [] }).catch(() => ({ logs: [] })),
@@ -246,7 +255,7 @@ export function OperationsConsole({
     } catch (e) {
       console.error("Failed to fetch data:", e);
     }
-  }, []);
+  }, [selectedShop, selectedPeriod]);
 
   useEffect(() => {
     fetchData();
@@ -285,7 +294,7 @@ export function OperationsConsole({
       clearInterval(interval);
       eventSource?.close();
     };
-  }, [fetchData]);
+  }, [fetchData, selectedShop, selectedPeriod]);
 
   const [form, setForm] = useState({
     amount: "",
@@ -293,6 +302,7 @@ export function OperationsConsole({
     category: "eod_deposit",
     shopId: "",
     title: "",
+    date: new Date().toISOString().split('T')[0],
   });
 
   const isExpense = form.type === "expense";
@@ -322,11 +332,13 @@ export function OperationsConsole({
           shopId: form.shopId || null,
           overheadCategory: form.category === "overhead_contribution" ? detectOverheadCategory(form.title) : null,
           title: form.title,
+          effectiveDate: form.date,
+
         }),
       });
       
       if (!res.ok) throw new Error("Failed");
-      setForm({ amount: "", type: "income", category: "eod_deposit", shopId: "", title: "" });
+      setForm({ amount: "", type: "income", category: "eod_deposit", shopId: "", title: "", date: new Date().toISOString().split('T')[0] });
       await fetchData();
     } catch (e) {
       alert("Failed to add entry");
@@ -794,7 +806,17 @@ export function OperationsConsole({
                   </select>
                 </div>
 
-                <div className="space-y-1 lg:col-span-2">
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black uppercase text-slate-500">Date</label>
+                  <Input
+                    type="date"
+                    value={form.date}
+                    onChange={(e) => setForm(f => ({ ...f, date: e.target.value }))}
+                    className="bg-slate-900 border border-slate-800 text-white"
+                  />
+                </div>
+
+                <div className="space-y-1 lg:col-span-1">
                   <label className="text-[10px] font-black uppercase text-slate-500">Description</label>
                   <Input
                     value={form.title}
@@ -828,10 +850,31 @@ export function OperationsConsole({
 
           {/* Recent Transactions */}
           <Card className="bg-slate-950/60 border-slate-800">
-            <CardHeader>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0">
               <CardTitle className="text-lg font-black uppercase italic flex items-center gap-2">
-                <History className="h-5 w-5" /> Recent Transactions
+                <History className="h-5 w-5" /> Transactions
               </CardTitle>
+              <div className="flex gap-2">
+                <select
+                  value={selectedShop}
+                  onChange={(e) => setSelectedShop(e.target.value)}
+                  className="bg-slate-900 border border-slate-800 text-slate-400 text-[10px] font-black uppercase px-2 py-1 rounded outline-none focus:border-emerald-500/50"
+                >
+                  <option value="all">All Shops</option>
+                  {shops.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                </select>
+                <select
+                  value={selectedPeriod}
+                  onChange={(e) => setSelectedPeriod(e.target.value as any)}
+                  className="bg-slate-900 border border-slate-800 text-slate-400 text-[10px] font-black uppercase px-2 py-1 rounded outline-none focus:border-emerald-500/50"
+                >
+                  <option value="all">All Time</option>
+                  <option value="day">Today</option>
+                  <option value="week">This Week</option>
+                  <option value="month">This Month</option>
+                  <option value="year">This Year</option>
+                </select>
+              </div>
             </CardHeader>
             <CardContent className="space-y-2 max-h-[50vh] overflow-y-auto">
               {ledger.length === 0 ? (

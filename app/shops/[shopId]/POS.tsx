@@ -586,7 +586,13 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
 
         startTransition(async () => {
             try {
-                await postDrawerToOperations({ shopId, amount: val, notes: opsPostNotes, kind: opsPostKind });
+                await postDrawerToOperations({ 
+                    shopId, 
+                    amount: val, 
+                    notes: opsPostNotes, 
+                    kind: opsPostKind,
+                    date: isBacklogMode ? backlogDate : undefined
+                });
                 setIsOpsPostModalOpen(false);
                 setOpsPostAmount("");
                 setOpsPostNotes("");

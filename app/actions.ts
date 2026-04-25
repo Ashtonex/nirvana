@@ -1458,16 +1458,19 @@ export async function recordPosExpense(
             shop_id: shopId,
             amount: amount,
             deposited_by: employeeId,
+            deposited_at: timestamp,
         });
     }
 
     // Auto-create Operations entry for overhead expenses OR if manually toggled
     // Overhead logged at POS is a contribution into the central ops pool.
-    // Actual overhead payments are only recorded when money leaves Operations.
-    if (options?.toOperations || isOverheadExpense) {
+    // User requested to hide historical transfers to perfumes/invest from operations page.
+    const shouldPostToOps = (options?.toOperations || isOverheadExpense) && !isPerfumeExpense && !options?.toInvest;
+
+    if (shouldPostToOps) {
         const opsKind = isOverheadExpense ? "overhead_contribution" : "eod_deposit";
         
-        // Insert to ledger
+        // Insert to operations_ledger
         await supabaseAdmin.from('operations_ledger').insert({
             amount: amount,
             kind: opsKind,
@@ -1475,7 +1478,8 @@ export async function recordPosExpense(
             title: description,
             notes: `Auto-routed from POS expense: ${isOverheadExpense ? 'Overhead contribution' : 'Manual deposit'}`,
             employee_id: employeeId,
-            effective_date: new Date().toISOString().split('T')[0],
+            effective_date: timestamp.split('T')[0],
+            created_at: timestamp,
         });
         
         // ALSO update the actual balance in operations_state
@@ -1944,7 +1948,7 @@ export async function transferInventory(itemId: string, fromShopId: string, toSh
     revalidatePath("/transfers");
 }
 
-export async function postDrawerToOperations(input: { shopId: string; amount: number; notes?: string; kind?: string }) {
+export async function postDrawerToOperations(input: { shopId: string; amount: number; notes?: string; kind?: string; date?: string }) {
     const actor = await requireManagerOrOwner();
     const shopId = String(input?.shopId || "").trim();
     const amount = Number(input?.amount);
@@ -1976,7 +1980,7 @@ export async function postDrawerToOperations(input: { shopId: string; amount: nu
     // PREVENTION: Add error handling
     let drawerLedgerId = "";
     try {
-        const timestamp = new Date().toISOString();
+        const timestamp = input.date ? new Date(input.date).toISOString() : new Date().toISOString();
         const dayStamp = timestamp.split("T")[0];
 
         drawerLedgerId = Math.random().toString(36).substring(2, 9);
@@ -2000,15 +2004,29 @@ export async function postDrawerToOperations(input: { shopId: string; amount: nu
             amount,
             kind,
             shopId,
-            title: `Drawer -> Operations (${shopId})`,
-            notes: notes || null,
+            title: kind === "overhead_contribution" ? "Overhead Contribution" : "EOD Transfer",
+            notes: notes ? `POS → Operations: ${notes}` : "Auto-posted from POS Drawer",
             effectiveDate: dayStamp,
-            employeeId: actor.kind === "staff" ? actor.id : null,
-            metadata: {
-                source: "pos",
-                drawerLedgerId
-            }
+            employeeId: actor.id
         });
+
+        // Update the actual balance in operations_state for EOD deposits
+        if (kind !== "overhead_contribution") {
+            const { data: currentState } = await supabaseAdmin
+                .from('operations_state')
+                .select('actual_balance')
+                .eq('id', 1)
+                .maybeSingle();
+            
+            const newBalance = Number(currentState?.actual_balance || 0) + amount;
+            await supabaseAdmin
+                .from('operations_state')
+                .upsert({ 
+                    id: 1, 
+                    actual_balance: newBalance, 
+                    updated_at: timestamp 
+                });
+        }
 
     } catch (error: any) {
         console.error('Drawer posting failed:', error);

@@ -79,15 +79,40 @@ export async function createOperationsLedgerEntry(input: {
   return data;
 }
 
-export async function listOperationsLedgerEntries(limit = 50, month?: string) {
+export async function listOperationsLedgerEntries(limit = 50, filters?: { month?: string; shopId?: string; period?: 'day' | 'week' | 'month' | 'year' | 'all' }) {
   let query = supabaseAdmin
     .from("operations_ledger")
     .select("*")
     .is("deleted_at", null);
     
-  if (month) {
+  if (filters?.month) {
+    const month = filters.month;
     query = query.gte("created_at", `${month}-01T00:00:00Z`)
                  .lt("created_at", new Date(new Date(`${month}-01T00:00:00Z`).setMonth(new Date(`${month}-01`).getMonth() + 1)).toISOString());
+  } else if (filters?.period && filters.period !== 'all') {
+    const now = new Date();
+    let start = new Date();
+    
+    if (filters.period === 'day') {
+      start.setHours(0, 0, 0, 0);
+    } else if (filters.period === 'week') {
+      const day = start.getDay();
+      const diff = start.getDate() - day + (day === 0 ? -6 : 1); // adjust when day is sunday
+      start.setDate(diff);
+      start.setHours(0, 0, 0, 0);
+    } else if (filters.period === 'month') {
+      start.setDate(1);
+      start.setHours(0, 0, 0, 0);
+    } else if (filters.period === 'year') {
+      start.setMonth(0, 1);
+      start.setHours(0, 0, 0, 0);
+    }
+    
+    query = query.gte("created_at", start.toISOString());
+  }
+
+  if (filters?.shopId) {
+    query = query.eq("shop_id", filters.shopId);
   }
   
   query = query.order("created_at", { ascending: false }).limit(limit);
