@@ -270,6 +270,7 @@ export default function TheHandPage() {
     taxThreshold: 100,
     zombieDays: 60,
   });
+  const [newAmount, setNewAmount] = useState<string>("");
 
   const addLog = (level: LogLevel, message: string) => {
     setLogs((prev) => [
