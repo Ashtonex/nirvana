@@ -1468,12 +1468,16 @@ export async function recordPosExpense(
     const groceriesKeywords = ["groceries", "grocery", "food", "supermarket", "provisions", "sundries", "rice", "sugar", "cooking oil", "flour", "bread", "milk", "eggs", "meat", "vegetables", "fruits", "snacks", "drinks", "beverages"];
     const isGroceriesExpense = groceriesKeywords.some(kw => descLower.includes(kw));
 
+    // Auto-detect transfers (Savings, Black box, etc.)
+    const transferKeywords = ["savings", "black box", "blackbox", "safe", "vault", "transfer"];
+    const isTransfer = transferKeywords.some(kw => descLower.includes(kw));
+
     // Log expense to ledger
     const ledgerEntry = await supabaseAdmin.from('ledger_entries').insert([{
         id,
         shop_id: shopId,
-        type: 'expense',
-        category: isPerfumeExpense ? 'Perfume' : isOverheadExpense ? 'Overhead' : isTitheExpense ? 'Tithe' : isGroceriesExpense ? 'Groceries' : 'POS Expense',
+        type: isTransfer ? 'asset' : 'expense',
+        category: isTransfer ? 'Transfer' : isPerfumeExpense ? 'Perfume' : isOverheadExpense ? 'Overhead' : isTitheExpense ? 'Tithe' : isGroceriesExpense ? 'Groceries' : 'POS Expense',
         amount: amount,
         date: timestamp,
         description: description,

@@ -104,16 +104,11 @@ export default async function FinancePage(props: {
         return sum + (qty * costPerUnit);
     }, 0);
 
-    const monthlyBudgetedOverhead =
-        Object.values(globalExpenses as Record<string, number>).reduce((a: number, b: number) => a + Number(b), 0) +
-        shops.reduce(
-            (sum: number, s: ShopRow) =>
-                sum +
-                Object.values((s.expenses || {}) as Record<string, number | string | null>).reduce((a: number, b: number | string | null) => a + Number(b || 0), 0),
-            0
-        );
+    const actualOverhead = ledger
+        .filter((l: LedgerRow) => (l.category === 'Overhead' || l.category === 'POS Expense' || l.category === 'misc') && String(l.type || '').toLowerCase() === 'expense')
+        .reduce((sum: number, l: LedgerRow) => sum + Number(l.amount || 0), 0);
 
-    const operatingExpenses = monthlyBudgetedOverhead * monthsFactor;
+    const operatingExpenses = actualOverhead;
     const netIncome = revenue - (cogs + operatingExpenses);
 
     // Asset Valuation
@@ -195,7 +190,7 @@ export default async function FinancePage(props: {
                         </div>
                         <CardHeader className="border-b border-slate-800 bg-emerald-500/5">
                             <CardTitle className="text-xl font-bold text-emerald-400">Income Statement (Strategic)</CardTitle>
-                            <CardDescription>P&L based on items sold vs cost of acquisition</CardDescription>
+                            <CardDescription>P&L based on items sold vs actual ledger payouts</CardDescription>
                         </CardHeader>
                         <CardContent className="pt-6 space-y-4">
                             <div className="flex justify-between items-center py-2 border-b border-slate-800">
@@ -211,9 +206,9 @@ export default async function FinancePage(props: {
                             </div>
                             <div className="flex justify-between items-center py-2 border-b border-slate-800">
                                 <div>
-                                    <span className="text-slate-300 text-sm">Operating Overhead</span>
+                                    <span className="text-slate-300 text-sm">Actual Recorded Overhead</span>
                                     <p className="text-[10px] text-slate-500 uppercase tracking-tighter">
-                                        {monthsFactor.toFixed(1)} month(s) prorated
+                                        Sum of Overhead & POS Expenses
                                     </p>
                                 </div>
                                 <span className="text-rose-400 font-medium">-${operatingExpenses.toLocaleString()}</span>
