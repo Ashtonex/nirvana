@@ -965,12 +965,41 @@ export async function getInventoryHistory() {
     return data || [];
 }
 
-export async function getFinancials() {
-    const { data: ledger } = await supabaseAdmin.from('ledger_entries').select('*').order('date', { ascending: false });
-    const { data: sales } = await supabaseAdmin.from('sales').select('*').order('date', { ascending: false });
+export async function getFinancials(startDate?: string, endDate?: string) {
+    let ledgerQuery = supabaseAdmin
+        .from('ledger_entries')
+        .select('*')
+        .is('deleted_at', null)
+        .order('date', { ascending: false })
+        .limit(50000);
+
+    let salesQuery = supabaseAdmin
+        .from('sales')
+        .select('*, inventory_items(landed_cost)')
+        .is('deleted_at', null)
+        .order('date', { ascending: false })
+        .limit(50000);
+
+    if (startDate) {
+        ledgerQuery = ledgerQuery.gte('date', startDate);
+        salesQuery = salesQuery.gte('date', startDate);
+    }
+    if (endDate) {
+        ledgerQuery = ledgerQuery.lte('date', endDate);
+        salesQuery = salesQuery.lte('date', endDate);
+    }
+
+    const { data: ledger } = await ledgerQuery;
+    const { data: sales } = await salesQuery;
     const { data: shops } = await supabaseAdmin.from('shops').select('*');
     const { data: settings } = await supabaseAdmin.from('oracle_settings').select('*').single();
-    return { ledger: ledger || [], sales: sales || [], globalExpenses: settings?.global_expenses || {}, shops: shops || [] };
+    
+    return { 
+        ledger: ledger || [], 
+        sales: sales || [], 
+        globalExpenses: settings?.global_expenses || {}, 
+        shops: shops || [] 
+    };
 }
 
 export async function getInventoryInsights(itemId: string) {
