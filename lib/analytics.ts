@@ -12,7 +12,41 @@ type SalesSummaryRow = {
     total_with_tax?: number | null;
     total_before_tax?: number | null;
     date?: string | null;
+    employee_id?: string | null;
 };
+
+/**
+ * Helper to fetch all rows from a query by paginating through results.
+ * Bypasses the default 1,000 row limit.
+ */
+async function fetchAll<T>(
+    table: string,
+    select: string,
+    filterFn?: (query: any) => any
+): Promise<T[]> {
+    let allData: T[] = [];
+    let from = 0;
+    const batchSize = 1000;
+
+    while (true) {
+        let query = supabaseAdmin
+            .from(table)
+            .select(select)
+            .range(from, from + batchSize - 1);
+
+        if (filterFn) {
+            query = filterFn(query);
+        }
+
+        const { data, error } = await query;
+        if (error || !data || data.length === 0) break;
+        allData = [...allData, ...data];
+        if (data.length < batchSize) break;
+        from += batchSize;
+    }
+
+    return allData;
+}
 
 type InventoryRow = {
     id: string;
@@ -78,25 +112,17 @@ export async function getBestSellers(daysBack = 30): Promise<SalesMetric[]> {
     const cutoff = new Date(Date.now() - daysBack * 24 * 60 * 60 * 1000).toISOString();
 
     // Get sales data with inventory info
-    const { data: salesData, error: salesError } = await supabaseAdmin
-        .from('sales')
-        .select('item_id, quantity, total_with_tax, total_before_tax')
-        .gte('date', cutoff);
-
-    if (salesError) {
-        console.error('[getBestSellers] Sales query error:', salesError);
-        return [];
-    }
+    const salesData = await fetchAll<SalesSummaryRow>(
+        'sales',
+        'item_id, quantity, total_with_tax, total_before_tax',
+        (q) => q.gte('date', cutoff).is('deleted_at', null)
+    );
 
     // Get inventory data for costs
-    const { data: inventoryData, error: invError } = await supabaseAdmin
-        .from('inventory_items')
-        .select('id, name, landed_cost');
-
-    if (invError) {
-        console.error('[getBestSellers] Inventory query error:', invError);
-        return [];
-    }
+    const inventoryData = await fetchAll<InventoryLookupRow>(
+        'inventory_items',
+        'id, name, landed_cost'
+    );
 
     // Create maps for quick lookup
     const invMap = new Map<string, { name: string; cost: number }>((inventoryData || []).map((item: InventoryLookupRow) => [item.id, {
@@ -156,27 +182,18 @@ export async function getPerformanceTrends() {
     const previousPeriodEnd = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString();
 
     // Get current period sales
-    const { data: currentSales, error: currentError } = await supabaseAdmin
-        .from('sales')
-        .select('total_with_tax')
-        .gte('date', currentPeriodStart);
-
-    if (currentError) {
-        console.error('[getPerformanceTrends] Current period query error:', currentError);
-        return { currentPeriodRevenue: 0, previousPeriodRevenue: 0, growth: 0 };
-    }
+    const currentSales = await fetchAll<{ total_with_tax?: number | null }>(
+        'sales',
+        'total_with_tax',
+        (q) => q.gte('date', currentPeriodStart).is('deleted_at', null)
+    );
 
     // Get previous period sales
-    const { data: previousSales, error: previousError } = await supabaseAdmin
-        .from('sales')
-        .select('total_with_tax')
-        .gte('date', previousPeriodStart)
-        .lt('date', previousPeriodEnd);
-
-    if (previousError) {
-        console.error('[getPerformanceTrends] Previous period query error:', previousError);
-        return { currentPeriodRevenue: 0, previousPeriodRevenue: 0, growth: 0 };
-    }
+    const previousSales = await fetchAll<{ total_with_tax?: number | null }>(
+        'sales',
+        'total_with_tax',
+        (q) => q.gte('date', previousPeriodStart).lt('date', previousPeriodEnd).is('deleted_at', null)
+    );
 
     const currentPeriodRevenue = (currentSales || []).reduce((sum: number, sale: { total_with_tax?: number | null }) => sum + Number(sale.total_with_tax || 0), 0);
     const previousPeriodRevenue = (previousSales || []).reduce((sum: number, sale: { total_with_tax?: number | null }) => sum + Number(sale.total_with_tax || 0), 0);
@@ -194,8 +211,8 @@ export async function getPerformanceTrends() {
 
 // 3. SMART REORDERING
 export async function getReorderSuggestions(): Promise<ReorderSuggestion[]> {
-    const { data: inventory } = await supabaseAdmin.from('inventory_items').select('*');
-    const { data: sales } = await supabaseAdmin.from('sales').select('item_id, quantity, date');
+    const inventory = await fetchAll<InventoryRow>('inventory_items', '*');
+    const sales = await fetchAll<SalesSummaryRow>('sales', 'item_id, quantity, date', (q) => q.is('deleted_at', null));
 
     const suggestions: ReorderSuggestion[] = [];
     const thirtyDaysAgo = new Date();
@@ -231,20 +248,20 @@ export async function getReorderSuggestions(): Promise<ReorderSuggestion[]> {
 }
 
 export async function getPremiumStockValue() {
-    const { data: inventory } = await supabaseAdmin.from('inventory_items').select('landed_cost, quantity');
-    const totalCost = (inventory || []).reduce((sum: number, item: { landed_cost?: number | null; quantity?: number | null }) => sum + (Number(item.landed_cost || 0) * Number(item.quantity || 0)), 0);
+    const inventory = await fetchAll<{ landed_cost?: number | null; quantity?: number | null }>('inventory_items', 'landed_cost, quantity');
+    const totalCost = (inventory || []).reduce((sum: number, item: any) => sum + (Number(item.landed_cost || 0) * Number(item.quantity || 0)), 0);
     return totalCost * 1.65;
 }
 
 export async function getBreakEvenStockValue() {
-    const { data: inventory } = await supabaseAdmin.from('inventory_items').select('landed_cost, quantity');
-    const totalCost = (inventory || []).reduce((sum: number, item: { landed_cost?: number | null; quantity?: number | null }) => sum + (Number(item.landed_cost || 0) * Number(item.quantity || 0)), 0);
+    const inventory = await fetchAll<{ landed_cost?: number | null; quantity?: number | null }>('inventory_items', 'landed_cost, quantity');
+    const totalCost = (inventory || []).reduce((sum: number, item: any) => sum + (Number(item.landed_cost || 0) * Number(item.quantity || 0)), 0);
     return totalCost * 1.35;
 }
 
 export async function getLeanStockValue() {
-    const { data: inventory } = await supabaseAdmin.from('inventory_items').select('landed_cost, quantity');
-    const totalCost = (inventory || []).reduce((sum: number, item: { landed_cost?: number | null; quantity?: number | null }) => sum + (Number(item.landed_cost || 0) * Number(item.quantity || 0)), 0);
+    const inventory = await fetchAll<{ landed_cost?: number | null; quantity?: number | null }>('inventory_items', 'landed_cost, quantity');
+    const totalCost = (inventory || []).reduce((sum: number, item: any) => sum + (Number(item.landed_cost || 0) * Number(item.quantity || 0)), 0);
     return totalCost * 1.25;
 }
 
@@ -282,11 +299,6 @@ export async function getSalesVsOverheadsData() {
     const { data: sales } = await supabaseAdmin.from('sales').select('shop_id, total_with_tax, date')
         .gte('date', monthStart)
         .lte('date', monthEnd);
-
-    console.log('[getSalesVsOverheadsData] Month:', `${year}-${month}, days: ${daysInMonth}, currentDay: ${currentDay}`);
-    console.log('[getSalesVsOverheadsData] Date range:', monthStart, 'to', monthEnd);
-    console.log('[getSalesVsOverheadsData] Sales count:', sales?.length || 0);
-    console.log('[getSalesVsOverheadsData] Sample sales:', (sales || []).slice(0, 3).map((s: any) => ({ date: s.date, shop_id: s.shop_id, total: s.total_with_tax })));
     
     const shopList = shops || [];
     const ledgerExpenses = (ledger || []).filter((l: any) => l.type === 'expense');
@@ -386,9 +398,6 @@ export async function getSalesVsOverheadsData() {
         });
     }
 
-    console.log('[getSalesVsOverheadsData] Final running total:', runningTotal);
-    console.log('[getSalesVsOverheadsData] Final global dataset:', datasets.global.filter(d => d.sales !== null).slice(-5));
-
     return datasets;
 }
 
@@ -413,9 +422,6 @@ export async function getRevenueExpenseProfitTrajectoryData() {
         .select('shop_id, total_with_tax, date')
         .gte('date', monthStart)
         .lte('date', monthEnd);
-
-    console.log('[getRevenueExpenseProfitTrajectoryData] Sales count:', sales?.length || 0);
-    console.log('[getRevenueExpenseProfitTrajectoryData] Sample:', (sales || []).slice(0, 3));
     
     const shopList = shops || [];
     const ledgerExpenses = (ledger || []).filter((l: any) => l.type === 'expense');
@@ -547,8 +553,8 @@ export interface DeadStockItem {
 }
 
 export async function getDeadStock(): Promise<DeadStockItem[]> {
-    const { data: inventory } = await supabaseAdmin.from('inventory_items').select('*');
-    const { data: sales } = await supabaseAdmin.from('sales').select('item_id, date');
+    const inventory = await fetchAll<any>('inventory_items', '*');
+    const sales = await fetchAll<any>('sales', 'item_id, date', (q) => q.is('deleted_at', null));
 
     const deadItems: DeadStockItem[] = [];
     const now = new Date().getTime();
@@ -596,14 +602,13 @@ export interface TodaySaleMetric {
 export async function getSalesHistory(days = 30): Promise<DailySalesMetric[]> {
     const cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
 
-    const { data: sales } = await supabaseAdmin
-        .from('sales')
-        .select('date, total_with_tax, total_before_tax, item_id, quantity')
-        .gte('date', cutoff)
-        .order('date', { ascending: false })
-        .limit(10000);
+    const sales = await fetchAll<any>(
+        'sales',
+        'date, total_with_tax, total_before_tax, item_id, quantity',
+        (q) => q.gte('date', cutoff).is('deleted_at', null).order('date', { ascending: false })
+    );
 
-    const { data: inventory } = await supabaseAdmin.from('inventory_items').select('id, landed_cost');
+    const inventory = await fetchAll<any>('inventory_items', 'id, landed_cost');
 
     const invMap = new Map((inventory || []).map((i: any) => [i.id, i.landed_cost]));
     const history: DailySalesMetric[] = [];
@@ -675,9 +680,9 @@ export interface StaffMetric {
 export async function getStaffLeaderboard(): Promise<StaffMetric[]> {
     const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
     
-    const { data: employees } = await supabaseAdmin.from('employees').select('*');
-    const { data: sales } = await supabaseAdmin.from('sales').select('employee_id, total_with_tax, date').gte('date', thirtyDaysAgo);
-    const { data: quotations } = await supabaseAdmin.from('quotations').select('employee_id, status, date').gte('date', thirtyDaysAgo);
+    const employees = await fetchAll<any>('employees', '*');
+    const sales = await fetchAll<any>('sales', 'employee_id, total_with_tax, date', (q) => q.gte('date', thirtyDaysAgo).is('deleted_at', null));
+    const quotations = await fetchAll<any>('quotations', 'employee_id, status, date', (q) => q.gte('date', thirtyDaysAgo));
 
     const stats = (employees || []).map((emp: any) => {
         const empSales = (sales || []).filter((s: any) => s.employee_id === emp.id);
@@ -715,13 +720,6 @@ export interface Forecast {
 
 export async function getRevenueForecast(): Promise<Forecast> {
     const history = await getSalesHistory(30);
-    // history is ordered recent -> old (descending date) in getSalesHistory implementation? 
-    // Wait, getSalesHistory loop: `for (let i = days - 1; i >= 0; i--)` pushes to array.
-    // So `i=29` (30 days ago) is pushed first? No.
-    // Loop: i=29...0.
-    // date = now - i.
-    // So i=29 is 29 days ago. i=0 is today.
-    // So array is [Oldest ... Newest]. Correct for charting.
 
     const n = history.length;
     if (n < 2) return { trend: 'flat', slope: 0, projectedNext30: 0, confidence: 0, nextMonthPoints: [] };
