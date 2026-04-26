@@ -85,7 +85,7 @@ export default async function FinancePage(props: {
         monthsFactor = diffDays / 30.44; // Average month length
     } else if (sales.length > 0) {
         // If no date range, but we have sales, estimate range from data
-        const dates = sales.map(s => new Date(s.date || '').getTime()).filter(d => !isNaN(d));
+        const dates = sales.map((s: SaleRow) => new Date(s.date || '').getTime()).filter((d: number) => !isNaN(d));
         if (dates.length > 1) {
             const minDate = Math.min(...dates);
             const maxDate = Math.max(...dates);
