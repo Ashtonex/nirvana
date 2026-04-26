@@ -966,31 +966,52 @@ export async function getInventoryHistory() {
 }
 
 export async function getFinancials(startDate?: string, endDate?: string) {
-    let ledgerQuery = supabaseAdmin
-        .from('ledger_entries')
-        .select('*')
-        .is('deleted_at', null)
-        .order('date', { ascending: false })
-        .limit(50000);
+    // Fetch ALL ledger entries (bypassing 1000 row limit)
+    let allLedger: any[] = [];
+    let from = 0;
+    const batchSize = 1000;
+    
+    while (true) {
+        let query = supabaseAdmin
+            .from('ledger_entries')
+            .select('*')
+            .is('deleted_at', null)
+            .order('date', { ascending: false })
+            .range(from, from + batchSize - 1);
 
-    let salesQuery = supabaseAdmin
-        .from('sales')
-        .select('*, inventory_items(landed_cost)')
-        .is('deleted_at', null)
-        .order('date', { ascending: false })
-        .limit(50000);
+        if (startDate) query = query.gte('date', startDate);
+        if (endDate) query = query.lte('date', endDate);
 
-    if (startDate) {
-        ledgerQuery = ledgerQuery.gte('date', startDate);
-        salesQuery = salesQuery.gte('date', startDate);
+        const { data, error } = await query;
+        if (error || !data || data.length === 0) break;
+        allLedger = [...allLedger, ...data];
+        if (data.length < batchSize) break;
+        from += batchSize;
     }
-    if (endDate) {
-        ledgerQuery = ledgerQuery.lte('date', endDate);
-        salesQuery = salesQuery.lte('date', endDate);
+
+    // Fetch ALL sales (bypassing 1000 row limit)
+    let allSales: any[] = [];
+    from = 0;
+    while (true) {
+        let query = supabaseAdmin
+            .from('sales')
+            .select('*, inventory_items(landed_cost)')
+            .is('deleted_at', null)
+            .order('date', { ascending: false })
+            .range(from, from + batchSize - 1);
+
+        if (startDate) query = query.gte('date', startDate);
+        if (endDate) query = query.lte('date', endDate);
+
+        const { data, error } = await query;
+        if (error || !data || data.length === 0) break;
+        allSales = [...allSales, ...data];
+        if (data.length < batchSize) break;
+        from += batchSize;
     }
 
-    const { data: ledger } = await ledgerQuery;
-    const { data: sales } = await salesQuery;
+    const ledger = allLedger;
+    const sales = allSales;
     const { data: shops } = await supabaseAdmin.from('shops').select('*');
     const { data: settings } = await supabaseAdmin.from('oracle_settings').select('*').single();
     
