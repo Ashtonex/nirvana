@@ -270,17 +270,34 @@ export async function getDashboardData(daysLimit = 60) {
 export async function getShopDashboardData(shopId: string, daysLimit = 60) {
     const hasSupabase = Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY);
     if (!hasSupabase) {
-        return { inventory: [], sales: [], shops: [], quotations: [], employees: [], shipments: [], ledger: [], auditLog: [], transfers: [], emails: [], settings: {} };
+        return {
+            inventory: [],
+            sales: [],
+            shops: [],
+            quotations: [],
+            employees: [],
+            shipments: [],
+            ledger: [],
+            auditLog: [],
+            transfers: [],
+            emails: [],
+            settings: {},
+            revenueSummary: { allTime: 0, last60Days: 0, monthToDate: 0 }
+        };
     }
 
     try {
-        const dateThreshold = new Date(Date.now() - daysLimit * 24 * 60 * 60 * 1000).toISOString();
+        const now = new Date();
+        const dateThreshold = new Date(now.getTime() - daysLimit * 24 * 60 * 60 * 1000).toISOString();
+        const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
 
         // 1. Fetch only data scoped to this specific shop (Efficiency Upgrade)
-        const [invRes, allocRes, salesRes, shopRes, quotesRes, empRes, settingsRes, ledgerRes] = await Promise.all([
+        const [invRes, allocRes, salesRes, allTimeSalesRes, monthSalesRes, shopRes, quotesRes, empRes, settingsRes, ledgerRes] = await Promise.all([
             supabaseAdmin.from('inventory_items').select('*').limit(5000),
             supabaseAdmin.from('inventory_allocations').select('*').eq('shop_id', shopId),
             supabaseAdmin.from('sales').select('*').eq('shop_id', shopId).is('deleted_at', null).gte('date', dateThreshold).order('date', { ascending: false }).limit(5000),
+            supabaseAdmin.from('sales').select('total_with_tax').eq('shop_id', shopId).is('deleted_at', null).limit(50000),
+            supabaseAdmin.from('sales').select('total_with_tax').eq('shop_id', shopId).is('deleted_at', null).gte('date', monthStart).limit(10000),
             supabaseAdmin.from('shops').select('*').eq('id', shopId).single(),
             supabaseAdmin.from('quotations').select('*').eq('shop_id', shopId).limit(2000),
             supabaseAdmin.from('employees').select('*').eq('shop_id', shopId),
@@ -291,6 +308,15 @@ export async function getShopDashboardData(shopId: string, daysLimit = 60) {
         const inventory = invRes.data || [];
         const allocations = allocRes.data || [];
         const ledgerRows = ledgerRes.data || [];
+        const last60DaySales = salesRes.data || [];
+        const allTimeSales = allTimeSalesRes.data || [];
+        const monthSales = monthSalesRes.data || [];
+
+        const revenueSummary = {
+            allTime: allTimeSales.reduce((sum: number, s: any) => sum + Number(s.total_with_tax || 0), 0),
+            last60Days: last60DaySales.reduce((sum: number, s: any) => sum + Number(s.total_with_tax || 0), 0),
+            monthToDate: monthSales.reduce((sum: number, s: any) => sum + Number(s.total_with_tax || 0), 0),
+        };
 
         return {
             inventory: inventory.map((i: any) => ({
@@ -304,7 +330,7 @@ export async function getShopDashboardData(shopId: string, daysLimit = 60) {
                     quantity: Number(a.quantity || 0)
                 }))
             })),
-            sales: (salesRes.data || []).map((s: any) => ({
+            sales: last60DaySales.map((s: any) => ({
                 id: s.id, shopId: s.shop_id, itemId: s.item_id, itemName: s.item_name || "Unknown Item",
                 quantity: Number(s.quantity || 0), unitPrice: Number(s.unit_price || 0),
                 totalWithTax: Number(s.total_with_tax || 0), totalBeforeTax: Number(s.total_before_tax || 0),
@@ -348,11 +374,25 @@ export async function getShopDashboardData(shopId: string, daysLimit = 60) {
                 taxMode: settingsRes.data?.tax_mode || 'all',
                 zombieDays: Number(settingsRes.data?.zombie_days || 60),
                 currencySymbol: settingsRes.data?.currency_symbol || "$"
-            }
+            },
+            revenueSummary
         };
     } catch (error) {
         console.error('[getShopDashboardData] Error:', error);
-        return { inventory: [], sales: [], shops: [], quotations: [], employees: [], shipments: [], ledger: [], auditLog: [], transfers: [], emails: [], settings: {} };
+        return {
+            inventory: [],
+            sales: [],
+            shops: [],
+            quotations: [],
+            employees: [],
+            shipments: [],
+            ledger: [],
+            auditLog: [],
+            transfers: [],
+            emails: [],
+            settings: {},
+            revenueSummary: { allTime: 0, last60Days: 0, monthToDate: 0 }
+        };
     }
 }
 

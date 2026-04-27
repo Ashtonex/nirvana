@@ -45,7 +45,7 @@ export default async function ShopPage({ params }: { params: { shopId: string } 
     const laybyCollected = shopLaybys.reduce((sum: number, q: any) => sum + Number(q.paidAmount || 0), 0);
     const shopEmployees = (db.employees || []).filter((e: any) => e.active);
 
-    const totalRev = shopSales.reduce((sum: number, s: any) => sum + s.totalWithTax, 0);
+    const revenueSummary = db.revenueSummary || { allTime: 0, last60Days: 0, monthToDate: 0 };
     const inventoryCount = db.inventory.reduce((sum: number, item: any) => {
         const allocation = item.allocations.find((a: any) => a.shopId === shopId);
         return sum + (allocation ? allocation.quantity : 0);
@@ -61,10 +61,18 @@ export default async function ShopPage({ params }: { params: { shopId: string } 
                     </div>
                     <p className="text-slate-400 font-medium tracking-tight">Strategic command for location {shopId.toUpperCase()}</p>
                 </div>
-                <div className="flex gap-8">
-                    <div className="text-right">
-                        <p className="text-[10px] text-slate-500 uppercase font-black tracking-widest">Store Revenue</p>
-                        <p className="text-2xl font-black text-emerald-400 font-mono">${totalRev.toLocaleString()}</p>
+                <div className="grid gap-3 text-right md:grid-cols-3">
+                    <div>
+                        <p className="text-[10px] text-slate-500 uppercase font-black tracking-widest">All-Time Revenue</p>
+                        <p className="text-2xl font-black text-emerald-400 font-mono">${revenueSummary.allTime.toLocaleString()}</p>
+                    </div>
+                    <div>
+                        <p className="text-[10px] text-slate-500 uppercase font-black tracking-widest">Last 60 Days</p>
+                        <p className="text-2xl font-black text-sky-400 font-mono">${revenueSummary.last60Days.toLocaleString()}</p>
+                    </div>
+                    <div>
+                        <p className="text-[10px] text-slate-500 uppercase font-black tracking-widest">Month To Date</p>
+                        <p className="text-2xl font-black text-amber-400 font-mono">${revenueSummary.monthToDate.toLocaleString()}</p>
                     </div>
                 </div>
             </div>
@@ -77,8 +85,8 @@ export default async function ShopPage({ params }: { params: { shopId: string } 
                         </CardTitle>
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-black text-white font-mono">${totalRev.toLocaleString()}</div>
-                        <p className="text-[10px] text-slate-500 font-bold uppercase mt-1">Total Sales</p>
+                        <div className="text-2xl font-black text-white font-mono">${revenueSummary.last60Days.toLocaleString()}</div>
+                        <p className="text-[10px] text-slate-500 font-bold uppercase mt-1">Sales • Last 60 Days</p>
                     </CardContent>
                 </Card>
 
