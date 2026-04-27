@@ -284,7 +284,10 @@ export async function computePosAuditReport(input: { shopId: string; dateYYYYMMD
 
   // Expenses list - use direct employee_id from ledger, fallback to audit log matching
   const expenses = ledgerRows
-    .filter((l) => String(l?.type || "").toLowerCase() === "expense" && isSameDayISO(l?.date, day))
+    .filter((l) =>
+      (String(l?.type || "").toLowerCase() === "expense" || isSavingsOrBlackboxTransferEntry(l)) &&
+      isSameDayISO(l?.date, day)
+    )
     .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
     .map((l) => {
       const amt = toMoney(l?.amount);
