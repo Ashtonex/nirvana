@@ -10,6 +10,7 @@ import { sendWhatsAppMessage } from "@/lib/twilio";
 import { cookies } from "next/headers";
 import { computePosAuditReport } from "@/lib/posAudit";
 import { createOperationsLedgerEntry } from "@/lib/operations";
+import { getSavingsTransferCategory, isSavingsOrBlackboxTransferEntry } from "@/lib/transfer-classification";
 
 function getPublicBaseUrl() {
     const url =
@@ -1489,16 +1490,17 @@ export async function recordPosExpense(
     const groceriesKeywords = ["groceries", "grocery", "food", "supermarket", "provisions", "sundries", "rice", "sugar", "cooking oil", "flour", "bread", "milk", "eggs", "meat", "vegetables", "fruits", "snacks", "drinks", "beverages"];
     const isGroceriesExpense = groceriesKeywords.some(kw => descLower.includes(kw));
 
-    // Auto-detect transfers (Savings, Black box, etc.)
-    const transferKeywords = ["savings", "black box", "blackbox", "safe", "vault", "transfer"];
-    const isTransfer = transferKeywords.some(kw => descLower.includes(kw));
+    // Savings/blackbox reduce the drawer and must remain visible operationally,
+    // even though the financial dashboard treats them as transfers.
+    const isTransfer = ["savings", "saving", "black box", "blackbox"].some((kw) => descLower.includes(kw));
+    const transferCategory = getSavingsTransferCategory(description);
 
     // Log expense to ledger
     const ledgerEntry = await supabaseAdmin.from('ledger_entries').insert([{
         id,
         shop_id: shopId,
-        type: isTransfer ? 'asset' : 'expense',
-        category: isTransfer ? 'Transfer' : isPerfumeExpense ? 'Perfume' : isOverheadExpense ? 'Overhead' : isTitheExpense ? 'Tithe' : isGroceriesExpense ? 'Groceries' : 'POS Expense',
+        type: 'expense',
+        category: isTransfer ? transferCategory : isPerfumeExpense ? 'Perfume' : isOverheadExpense ? 'Overhead' : isTitheExpense ? 'Tithe' : isGroceriesExpense ? 'Groceries' : 'POS Expense',
         amount: amount,
         date: timestamp,
         description: description,
@@ -2934,8 +2936,7 @@ export async function getMonthlyReportData(
     const settings = settingsRes.data;
     const prevSalesClients = new Set((prevSalesRes.data || []).map((s: any) => String(s.client_name || "").toLowerCase()).filter(Boolean));
 
-    // Only count real expenses in strategic reporting; exclude assets, adjustments, transfers, etc.
-    const expenseLedger = (ledger || []).filter((l: any) => String(l?.type || "").toLowerCase() === "expense");
+    const expenseLedger = (ledger || []).filter((l: any) => String(l?.type || "").toLowerCase() === "expense" || isSavingsOrBlackboxTransferEntry(l));
     const prevSalesPeriod = prevPeriodSalesRes?.data || [];
     const prevLedgerPeriod = prevPeriodLedgerRes?.data || [];
     const prevExpenseLedgerPeriod = (prevLedgerPeriod || []).filter((l: any) => String(l?.type || "").toLowerCase() === "expense");
@@ -3398,8 +3399,7 @@ export async function getQuarterlyReportData(
     const settings = settingsRes.data;
     const prevSalesClients = new Set((prevSalesRes.data || []).map((s: any) => String(s.client_name || "").toLowerCase()).filter(Boolean));
 
-    // Only count real expenses in strategic reporting; exclude assets, adjustments, transfers, etc.
-    const expenseLedger = (ledger || []).filter((l: any) => String(l?.type || "").toLowerCase() === "expense");
+    const expenseLedger = (ledger || []).filter((l: any) => String(l?.type || "").toLowerCase() === "expense" || isSavingsOrBlackboxTransferEntry(l));
 
     const revenue = sales.reduce((sum: number, s: any) => sum + Number(s.total_with_tax || 0), 0);
     const revenuePreTax = sales.reduce((sum: number, s: any) => sum + Number(s.total_before_tax || 0), 0);

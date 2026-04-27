@@ -6,6 +6,7 @@ import { enforceOwnerOnly } from '@/lib/auth-helpers';
 import { buildCashReconciliation } from '@/lib/cash-reconciliation';
 import { getOperationsComputedBalance, getOperationsState } from '@/lib/operations';
 import { supabaseAdmin } from '@/lib/supabase';
+import { isSavingsOrBlackboxTransferEntry } from '@/lib/transfer-classification';
 
 const SHOPS = [
   { id: 'kipasa', name: 'Kipasa' },
@@ -269,7 +270,7 @@ export async function GET() {
       const salesValue = sum(shopSales.map((sale) => sale.total_with_tax));
       const expenseValue = sum(
         shopLedger
-          .filter((entry) => String(entry.type || '').toLowerCase() === 'expense')
+          .filter((entry) => String(entry.type || '').toLowerCase() === 'expense' || isSavingsOrBlackboxTransferEntry(entry))
           .map((entry) => entry.amount)
       );
       const opsTransfers = sum(
@@ -316,7 +317,7 @@ export async function GET() {
     const totalSales30d = Number(sum(sales.map((sale) => sale.total_with_tax)));
     const totalExpenses30d = Number(sum(
       ledger
-        .filter((entry) => String(entry.type || '').toLowerCase() === 'expense')
+        .filter((entry) => String(entry.type || '').toLowerCase() === 'expense' || isSavingsOrBlackboxTransferEntry(entry))
         .map((entry) => entry.amount)
     ));
     const profit30d = totalSales30d - totalExpenses30d;

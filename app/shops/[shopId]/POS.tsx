@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useTransition, useEffect, useMemo, useDeferredValue } from "react";
+import { isSavingsOrBlackboxTransferEntry } from "@/lib/transfer-classification";
 import {
     Card,
     CardContent,
@@ -349,7 +350,7 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
     // Calculate Cash Drawer Math
     const ledger = db.ledger || [];
     const todayStr = new Date().toLocaleDateString('en-CA'); // Local Date (YYYY-MM-DD)
-    const CASH_OUT_CATEGORIES = new Set(["POS Expense", "Operations Transfer", "Perfume", "Overhead", "Tithe", "Groceries", "Tithe Withdrawal"]);
+    const CASH_OUT_CATEGORIES = new Set(["POS Expense", "Operations Transfer", "Perfume", "Overhead", "Tithe", "Groceries", "Tithe Withdrawal", "Savings", "Blackbox", "Transfer"]);
 
     // 1. Did we open today?
     const todaysOpening = ledger.find((l: any) => 
@@ -397,7 +398,7 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
 
         // Only look at yesterday's expenses (not all expenses since last opening)
         const yesterdayExpenses = ledger.filter((l: any) =>
-            (CASH_OUT_CATEGORIES.has(String(l.category || "")) || isGroceriesExpense(l) || isTitheExpense(l)) &&
+            (CASH_OUT_CATEGORIES.has(String(l.category || "")) || isGroceriesExpense(l) || isTitheExpense(l) || isSavingsOrBlackboxTransferEntry(l)) &&
             l.shopId === shopId &&
             String(l.date).includes(yesterdayStr)
         );
@@ -431,7 +432,7 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
             carryOverSales = lastDaySales.reduce((sum: number, s: any) => sum + Number(s.totalWithTax || 0), 0);
 
             const lastDayExpenses = ledger.filter((l: any) =>
-                (CASH_OUT_CATEGORIES.has(String(l.category || "")) || isGroceriesExpense(l) || isTitheExpense(l)) &&
+                (CASH_OUT_CATEGORIES.has(String(l.category || "")) || isGroceriesExpense(l) || isTitheExpense(l) || isSavingsOrBlackboxTransferEntry(l)) &&
                 l.shopId === shopId &&
                 String(l.date).includes(lastOpenDateStr)
             );
@@ -450,7 +451,7 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
     ).reduce((sum: number, s: any) => sum + Number(s.totalWithTax || 0), 0);
 
     const todaysPosExpenses = ledger.filter((l: any) =>
-        ['POS Expense', 'Perfume', 'Overhead', 'Tithe', 'Groceries', 'Operations Transfer', 'Tithe Withdrawal'].includes(l.category) &&
+        (['POS Expense', 'Perfume', 'Overhead', 'Tithe', 'Groceries', 'Operations Transfer', 'Tithe Withdrawal', 'Savings', 'Blackbox', 'Transfer'].includes(l.category) || isSavingsOrBlackboxTransferEntry(l)) &&
         l.shopId === shopId &&
         String(l.date).startsWith(todayStr)
     ).reduce((sum: number, l: any) => sum + Number(l.amount || 0), 0);

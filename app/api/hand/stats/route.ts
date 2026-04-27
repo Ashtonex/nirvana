@@ -1,6 +1,7 @@
 import { supabaseAdmin } from '@/lib/supabase';
 import { enforceOwnerOnly } from '@/lib/auth-helpers';
 import { NextResponse } from 'next/server';
+import { isSavingsOrBlackboxTransferEntry } from '@/lib/transfer-classification';
 
 export async function GET() {
   const authError = await enforceOwnerOnly();
@@ -12,11 +13,10 @@ export async function GET() {
       .from('sales')
       .select('*', { count: 'exact' });
 
-    // Get expenses count
-    const { count: expensesCount } = await supabaseAdmin
+    // Get expense-like ledger rows, including historical savings/blackbox transfers
+    const { data: expenseRows } = await supabaseAdmin
       .from('ledger_entries')
-      .select('*', { count: 'exact' })
-      .eq('type', 'expense');
+      .select('id, type, category, description');
 
     // Get cash entries
     const { count: cashEntries } = await supabaseAdmin
@@ -31,7 +31,7 @@ export async function GET() {
 
     return NextResponse.json({
       salesCount: salesCount || 0,
-      expensesCount: expensesCount || 0,
+      expensesCount: (expenseRows || []).filter((row: any) => String(row.type || '').toLowerCase() === 'expense' || isSavingsOrBlackboxTransferEntry(row)).length,
       cashEntries: cashEntries || 0,
       operationsCount: operationsCount || 0
     });

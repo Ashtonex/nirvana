@@ -1,4 +1,5 @@
 type GenericRecord = Record<string, unknown>;
+import { isSavingsOrBlackboxTransferEntry } from "@/lib/transfer-classification";
 
 export function sumNumbers(values: Array<number | string | null | undefined>): number {
   return values.reduce((sum: number, value) => sum + Number(value || 0), 0);
@@ -27,7 +28,7 @@ export function buildCashReconciliation(input: {
 
   const drawerExpenses = sumNumbers(
     shopLedger
-      .filter((entry) => String(entry.type || "").toLowerCase() === "expense")
+      .filter((entry) => String(entry.type || "").toLowerCase() === "expense" || isSavingsOrBlackboxTransferEntry(entry))
       .map((entry) => entry.amount as number | string | null | undefined)
   );
 

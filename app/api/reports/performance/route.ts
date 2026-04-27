@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { requirePrivilegedActor } from "@/lib/apiAuth";
 import { supabaseAdmin } from "@/lib/supabase";
+import { isSavingsOrBlackboxTransferEntry } from "@/lib/transfer-classification";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -80,7 +81,6 @@ export async function GET(request: Request) {
       supabaseAdmin
         .from("ledger_entries")
         .select("id, shop_id, amount, type, category, description, date")
-        .eq("type", "expense")
         .not("shop_id", "is", null)         // Must be shop-scoped
         .gte("date", queryStartDate)
         .lte("date", endDate),
@@ -94,7 +94,6 @@ export async function GET(request: Request) {
       supabaseAdmin
         .from("ledger_entries")
         .select("id, shop_id, amount, type, category, description, date")
-        .eq("type", "expense")
         .not("shop_id", "is", null)
         .gte("date", prevMonthStartDate)
         .lte("date", prevMonthEndDate)
@@ -109,7 +108,6 @@ export async function GET(request: Request) {
       supabaseAdmin
         .from("ledger_entries")
         .select("id, shop_id, amount, type, category, description, date")
-        .eq("type", "expense")
         .not("shop_id", "is", null)
         .gte("date", yearStartDate)
         .lte("date", yearEndDate)
@@ -122,15 +120,13 @@ export async function GET(request: Request) {
     const yearSales = Array.isArray(yearSalesData) ? yearSalesData : [];
 
     // Filter to only real cash-out expenses (exclude accounting noise)
-    const ledgerExpenses = (Array.isArray(ledgerData) ? ledgerData : []).filter(
-      (e: any) => !NON_CASH_CATEGORIES.has(e.category || "")
-    );
-    const prevMonthLedgerExpenses = (Array.isArray(prevMonthLedgerData) ? prevMonthLedgerData : []).filter(
-      (e: any) => !NON_CASH_CATEGORIES.has(e.category || "")
-    );
-    const yearLedgerExpenses = (Array.isArray(yearLedgerData) ? yearLedgerData : []).filter(
-      (e: any) => !NON_CASH_CATEGORIES.has(e.category || "")
-    );
+    const isOperationalExpense = (entry: any) =>
+      (String(entry?.type || "").toLowerCase() === "expense" || isSavingsOrBlackboxTransferEntry(entry)) &&
+      !NON_CASH_CATEGORIES.has(entry?.category || "");
+
+    const ledgerExpenses = (Array.isArray(ledgerData) ? ledgerData : []).filter(isOperationalExpense);
+    const prevMonthLedgerExpenses = (Array.isArray(prevMonthLedgerData) ? prevMonthLedgerData : []).filter(isOperationalExpense);
+    const yearLedgerExpenses = (Array.isArray(yearLedgerData) ? yearLedgerData : []).filter(isOperationalExpense);
 
     // Build classification lookup map
     const classMap = new Map<string, string>();

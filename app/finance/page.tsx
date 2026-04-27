@@ -2,6 +2,7 @@ import { getFinancials } from "../actions";
 import { buildCashReconciliation } from "@/lib/cash-reconciliation";
 import { getOperationsComputedBalance, getOperationsState } from "@/lib/operations";
 import { supabaseAdmin } from "@/lib/supabase";
+import { isSavingsOrBlackboxTransferEntry } from "@/lib/transfer-classification";
 import {
     Card,
     CardContent,
@@ -25,6 +26,7 @@ type LedgerRow = {
     type?: string | null;
     shop_id?: string | null;
     date?: string | null;
+    description?: string | null;
 };
 
 type SaleRow = {
@@ -123,7 +125,11 @@ export default async function FinancePage(props: {
     const posRevenue = sales.reduce((sum: number, s: SaleRow) => sum + Number(s.total_with_tax || 0), 0);
 
     const posExpenses = ledger
-        .filter((l: LedgerRow) => l.shop_id && String(l.type || '').toLowerCase() === 'expense')
+       .filter((l: LedgerRow) =>
+           l.shop_id &&
+           String(l.type || '').toLowerCase() === 'expense' &&
+           !isSavingsOrBlackboxTransferEntry(l)
+       )
         .reduce((sum: number, l: LedgerRow) => sum + Number(l.amount || 0), 0);
 
     const posCashOpening = ledger

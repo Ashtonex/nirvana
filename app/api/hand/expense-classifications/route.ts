@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { enforceOwnerOnly } from '@/lib/auth-helpers';
 import { supabaseAdmin } from '@/lib/supabase';
+import { isSavingsOrBlackboxTransferEntry } from '@/lib/transfer-classification';
 
 export const dynamic = 'force-dynamic';
 
@@ -46,7 +47,6 @@ export async function GET(request: Request) {
       supabaseAdmin
         .from('ledger_entries')
         .select('id, shop_id, amount, type, category, description, date')
-        .eq('type', 'expense')
         .not('shop_id', 'is', null)
         .gte('date', startDate)
         .lte('date', endDate)
@@ -63,7 +63,7 @@ export async function GET(request: Request) {
 
     // Filter out accounting noise — only show real cash-out expenses
     const expenses = (ledgerData || [])
-      .filter((e: any) => !NON_CASH_CATEGORIES.has(e.category || ''))
+      .filter((e: any) => (String(e.type || '').toLowerCase() === 'expense' || isSavingsOrBlackboxTransferEntry(e)) && !NON_CASH_CATEGORIES.has(e.category || ''))
       .map((exp: any) => {
         const key = `ledger_entries:${exp.id}`;
         const savedGroup = classMap.get(key) || null;

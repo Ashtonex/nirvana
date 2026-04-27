@@ -1,12 +1,16 @@
 import { supabaseAdmin } from '@/lib/supabase';
 import { enforceOwnerOnly } from '@/lib/auth-helpers';
 import { NextResponse } from 'next/server';
+import { isSavingsOrBlackboxTransferEntry } from '@/lib/transfer-classification';
 
 type SalesRow = {
   total_with_tax: number | null;
 };
 
 type ExpenseRow = {
+  type: string | null;
+  category: string | null;
+  description: string | null;
   amount: number | null;
 };
 
@@ -31,7 +35,8 @@ export async function GET() {
       0
     );
     const totalExpenses = ((expenseData || []) as ExpenseRow[]).reduce(
-      (sum: number, e: ExpenseRow) => sum + Number(e.amount || 0),
+      (sum: number, e: ExpenseRow) =>
+        sum + ((String(e.type || '').toLowerCase() === 'expense' || isSavingsOrBlackboxTransferEntry(e)) ? Number(e.amount || 0) : 0),
       0
     );
     const netBalance = totalSales - totalExpenses;

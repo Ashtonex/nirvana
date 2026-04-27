@@ -1,6 +1,7 @@
 import { supabaseAdmin } from '@/lib/supabase';
 import { enforceOwnerOnly } from '@/lib/auth-helpers';
 import { NextResponse } from 'next/server';
+import { isSavingsOrBlackboxTransferEntry } from '@/lib/transfer-classification';
 
 type SalesRow = {
   shop_id: string | null;
@@ -10,6 +11,9 @@ type SalesRow = {
 
 type ExpenseRow = {
   shop_id: string | null;
+  type: string | null;
+  category: string | null;
+  description: string | null;
   amount: number | null;
   date: string | null;
 };
@@ -46,7 +50,11 @@ export async function POST() {
         .reduce((sum: number, s: SalesRow) => sum + Number(s.total_with_tax || 0), 0);
       const expenses = ((expensesData || []) as ExpenseRow[])
         .filter((e: ExpenseRow) => e.shop_id === shop)
-        .reduce((sum: number, e: ExpenseRow) => sum + Number(e.amount || 0), 0);
+        .reduce(
+          (sum: number, e: ExpenseRow) =>
+            sum + ((String(e.type || '').toLowerCase() === 'expense' || isSavingsOrBlackboxTransferEntry(e)) ? Number(e.amount || 0) : 0),
+          0
+        );
       
       shopMetrics[shop] = {
         sales,
