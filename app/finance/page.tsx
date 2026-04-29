@@ -107,7 +107,7 @@ export default async function FinancePage(props: {
     }, 0);
 
     const actualOverhead = ledger
-        .filter((l: LedgerRow) => (l.category === 'Overhead' || l.category === 'POS Expense' || l.category === 'misc') && String(l.type || '').toLowerCase() === 'expense')
+        .filter((l: LedgerRow) => (l.category === 'Overhead' || l.category === 'POS Expense' || l.category === 'misc' || l.category === 'Tithe' || l.category === 'Groceries') && String(l.type || '').toLowerCase() === 'expense')
         .reduce((sum: number, l: LedgerRow) => sum + Number(l.amount || 0), 0);
 
     const operatingExpenses = actualOverhead;
@@ -125,11 +125,11 @@ export default async function FinancePage(props: {
     const posRevenue = sales.reduce((sum: number, s: SaleRow) => sum + Number(s.total_with_tax || 0), 0);
 
     const posExpenses = ledger
-       .filter((l: LedgerRow) =>
-           l.shop_id &&
-           String(l.type || '').toLowerCase() === 'expense' &&
-           !isSavingsOrBlackboxTransferEntry(l)
-       )
+        .filter((l: LedgerRow) =>
+            l.shop_id &&
+            String(l.type || '').toLowerCase() === 'expense' &&
+            !isSavingsOrBlackboxTransferEntry(l)
+        )
         .reduce((sum: number, l: LedgerRow) => sum + Number(l.amount || 0), 0);
 
     const posCashOpening = ledger

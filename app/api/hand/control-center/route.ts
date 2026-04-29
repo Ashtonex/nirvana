@@ -39,6 +39,7 @@ type OperationsRow = {
   shop_id: string | null;
   amount: number | null;
   kind: string | null;
+  overhead_category?: string | null;
   title: string | null;
   notes: string | null;
   created_at: string | null;
@@ -83,6 +84,20 @@ function isOverheadLike(text: string) {
   return /(rent|salary|salaries|utility|utilities|overhead)/i.test(text);
 }
 
+function detectOverheadCategory(entry: Pick<OperationsRow, 'overhead_category' | 'kind' | 'title' | 'notes'>) {
+  const stored = String(entry.overhead_category || '').toLowerCase();
+  if (stored === 'rent' || stored === 'salaries' || stored === 'utilities' || stored === 'misc') {
+    return stored;
+  }
+
+  const text = `${entry.kind || ''} ${entry.title || ''} ${entry.notes || ''}`.toLowerCase();
+  if (text.includes('rent')) return 'rent';
+  if (text.includes('utilit') || text.includes('electric') || text.includes('water')) return 'utilities';
+  if (text.includes('salar') || text.includes('wage') || text.includes('payroll')) return 'salaries';
+  if (text.includes('misc')) return 'misc';
+  return 'other';
+}
+
 function hoursSince(dateValue: string | null | undefined) {
   if (!dateValue) return Infinity;
   return (Date.now() - new Date(dateValue).getTime()) / (1000 * 60 * 60);
@@ -125,8 +140,7 @@ export async function GET() {
         .gte('date', thirtyDaysAgo),
       supabaseAdmin
         .from('operations_ledger')
-        .select('id, shop_id, amount, kind, title, notes, created_at, status')
-        .gte('created_at', thirtyDaysAgo),
+        .select('id, shop_id, amount, kind, overhead_category, title, notes, created_at, status'),
       supabaseAdmin
         .from('operations_drifts')
         .select('id, amount, reason, resolved_kind, resolved_shop, created_at')
@@ -249,15 +263,53 @@ export async function GET() {
         notes: entry.notes || '',
       }));
 
-    const overheadContributed30d = operations
+    const operations30d = operations.filter((entry) => (entry.created_at || '') >= thirtyDaysAgo);
+
+    const overheadContributed30d = operations30d
       .filter((entry) => Number(entry.amount || 0) > 0)
       .filter((entry) => isOverheadLike(`${entry.kind || ''} ${entry.title || ''} ${entry.notes || ''}`))
       .reduce((total, entry) => total + Number(entry.amount || 0), 0);
 
-    const overheadPaid30d = operations
+    const overheadPaid30d = operations30d
       .filter((entry) => Number(entry.amount || 0) < 0)
       .filter((entry) => isOverheadLike(`${entry.kind || ''} ${entry.title || ''} ${entry.notes || ''}`))
       .reduce((total, entry) => total + Math.abs(Number(entry.amount || 0)), 0);
+
+    const operationsByShop = SHOPS.map((shop) => {
+      const categoryTotals = {
+        rent: 0,
+        salaries: 0,
+        utilities: 0,
+        misc: 0,
+        other: 0,
+      };
+
+      let totalContributed = 0;
+      let totalPaid = 0;
+
+      operations
+        .filter((entry) => entry.shop_id === shop.id)
+        .forEach((entry) => {
+          const amount = Number(entry.amount || 0);
+          const category = detectOverheadCategory(entry);
+          if (amount > 0 && (entry.kind === 'overhead_contribution' || isOverheadLike(`${entry.kind || ''} ${entry.title || ''} ${entry.notes || ''}`))) {
+            totalContributed += amount;
+            categoryTotals[category as keyof typeof categoryTotals] += amount;
+          }
+          if (amount < 0 && (entry.kind === 'overhead_payment' || isOverheadLike(`${entry.kind || ''} ${entry.title || ''} ${entry.notes || ''}`))) {
+            totalPaid += Math.abs(amount);
+          }
+        });
+
+      return {
+        shopId: shop.id,
+        shopName: shop.name,
+        totalContributed,
+        totalPaid,
+        availableForOverheads: totalContributed - totalPaid,
+        categories: categoryTotals,
+      };
+    });
 
     const shopSnapshots = SHOPS.map((shop) => {
       const shopSales = sales.filter((sale) => sale.shop_id === shop.id);
@@ -403,6 +455,13 @@ export async function GET() {
         investAvailable: cashMap.investAvailable,
         overheadContributed30d,
         overheadPaid30d,
+      },
+      operations: {
+        actualBalance: cashMap.operationsActualBalance,
+        computedBalance: cashMap.operationsComputedBalance,
+        delta: cashMap.operationsDelta,
+        updatedAt: (opsState as { updated_at?: string | null })?.updated_at || null,
+        byShop: operationsByShop,
       },
       brain: {
         topShop: topShop?.name || 'Unknown',

@@ -3,12 +3,10 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
   AlertTriangle,
-  ArrowUpRight,
   BadgeDollarSign,
   BarChart3,
   Brain,
   Building2,
-  CircleAlert,
   Database,
   Lock,
   RefreshCcw,
@@ -63,6 +61,26 @@ type ControlRoomResponse = {
     investAvailable: number;
     overheadContributed30d: number;
     overheadPaid30d: number;
+  };
+  operations: {
+    actualBalance: number;
+    computedBalance: number;
+    delta: number;
+    updatedAt: string | null;
+    byShop: Array<{
+      shopId: 'kipasa' | 'dubdub' | 'tradecenter';
+      shopName: string;
+      totalContributed: number;
+      totalPaid: number;
+      availableForOverheads: number;
+      categories: {
+        rent: number;
+        salaries: number;
+        utilities: number;
+        misc: number;
+        other: number;
+      };
+    }>;
   };
   brain: {
     topShop: string;
@@ -229,6 +247,7 @@ function MetricCard({
 
 const TABS = [
   { id: 'overview', label: 'Overview', icon: Building2 },
+  { id: 'operations', label: 'Operations', icon: Wallet },
   { id: 'performance', label: 'Performance', icon: BarChart3 },
   { id: 'expenses', label: 'Expense Categorisation', icon: BadgeDollarSign },
   { id: 'inventory', label: 'Inventory', icon: ShieldCheck },
@@ -271,7 +290,8 @@ export default function TheHandPage() {
     taxThreshold: 100,
     zombieDays: 60,
   });
-  const [newAmount, setNewAmount] = useState<string>("");
+  const [vaultAmount, setVaultAmount] = useState<string>('');
+  const [closingOverrideAmount, setClosingOverrideAmount] = useState<string>('');
 
   const addLog = (level: LogLevel, message: string) => {
     setLogs((prev) => [
@@ -306,6 +326,7 @@ export default function TheHandPage() {
         taxThreshold: result.settings.taxThreshold,
         zombieDays: result.settings.zombieDays,
       });
+      setVaultAmount(String(Number(result.operations?.actualBalance || result.money.operationsActualBalance || 0)));
       if (withAuditLog) {
         addLog('success', `System audit complete. ${result.risks.length} active warnings surfaced.`);
       }
@@ -548,6 +569,40 @@ export default function TheHandPage() {
       await loadControlRoom();
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Failed to rationalize variance';
+      addLog('error', message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleUpdateVaultBalance = async () => {
+    const actualBalance = Number(vaultAmount);
+    if (!Number.isFinite(actualBalance) || actualBalance < 0) {
+      addLog('warning', 'Actual vault balance must be a valid non-negative number.');
+      return;
+    }
+
+    if (!confirm(`SET ACTUAL VAULT BALANCE? This will change the operations vault to ${currency(actualBalance)} and log the override to drift history.`)) {
+      return;
+    }
+
+    try {
+      setBusy(true);
+      const response = await fetch('/api/hand/operations-vault', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ actualBalance }),
+      });
+      const result = await response.json();
+      if (!response.ok || !result.success) {
+        throw new Error(result.message || 'Failed to update actual vault balance');
+      }
+
+      addLog('success', result.message || `Actual vault balance set to ${currency(actualBalance)}.`);
+      await loadControlRoom();
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Failed to update actual vault balance';
       addLog('error', message);
     } finally {
       setBusy(false);
@@ -856,8 +911,8 @@ export default function TheHandPage() {
                         <input
                           type="number"
                           placeholder="Closing Amount"
-                          value={newAmount}
-                          onChange={(event) => setNewAmount(event.target.value)}
+                          value={closingOverrideAmount}
+                          onChange={(event) => setClosingOverrideAmount(event.target.value)}
                           className="w-full rounded-xl border border-white/10 bg-slate-950 px-3 py-2 text-sm text-white outline-none focus:border-rose-500/50"
                         />
                         <button
@@ -867,12 +922,12 @@ export default function TheHandPage() {
                               await updateCashDrawerClosing({ 
                                 shopId: pastOpeningForm.shopId, 
                                 dateYYYYMMDD: pastOpeningForm.date, 
-                                newAmount: Number(newAmount) 
+                                newAmount: Number(closingOverrideAmount) 
                               });
-                              addLog('success', `Past closing balance for ${pastOpeningForm.shopId} on ${pastOpeningForm.date} set to ${currency(Number(newAmount))}.`);
+                              addLog('success', `Past closing balance for ${pastOpeningForm.shopId} on ${pastOpeningForm.date} set to ${currency(Number(closingOverrideAmount))}.`);
                               await loadControlRoom();
-                            } catch (e: any) {
-                              addLog('error', e.message);
+                            } catch (error: unknown) {
+                              addLog('error', error instanceof Error ? error.message : 'Failed to set past closing balance.');
                             }
                           }}
                           className="w-full rounded-xl border border-rose-400/30 bg-rose-500/10 py-3 text-xs font-black uppercase tracking-widest text-rose-200 hover:bg-rose-500/20"
@@ -1070,6 +1125,151 @@ export default function TheHandPage() {
           </>
         )}
 
+        {activeTab === 'operations' && (
+          <div className="mt-6 space-y-6">
+            <div className="grid gap-4 md:grid-cols-4 px-2">
+              <MetricCard
+                label="Actual Vault"
+                value={currency(controlRoom?.operations.actualBalance || 0)}
+                hint="Editable owner-declared cash in hand"
+                tone="text-emerald-300"
+              />
+              <MetricCard
+                label="Computed Vault"
+                value={currency(controlRoom?.operations.computedBalance || 0)}
+                hint="What the operations ledger says should exist"
+                tone="text-sky-300"
+              />
+              <MetricCard
+                label="Current Drift"
+                value={currency(controlRoom?.operations.delta || 0)}
+                hint="Actual minus computed"
+                tone={(controlRoom?.operations.delta || 0) === 0 ? 'text-emerald-300' : 'text-rose-300'}
+              />
+              <MetricCard
+                label="Last Vault Edit"
+                value={controlRoom?.operations.updatedAt ? new Date(controlRoom.operations.updatedAt).toLocaleDateString() : 'Never'}
+                hint={controlRoom?.operations.updatedAt ? timeLabel(controlRoom.operations.updatedAt) : 'No actual vault update recorded'}
+                tone="text-amber-300"
+              />
+            </div>
+
+            <div className="grid gap-6 xl:grid-cols-[420px_1fr]">
+              <WindowCard eyebrow="Vault Command" title="Actual Vault Control" icon={Wallet}>
+                <div className="space-y-5">
+                  <div className="rounded-3xl border border-white/10 bg-slate-900/40 p-5">
+                    <p className="text-xs font-black uppercase tracking-[0.22em] text-slate-500">Set actual vault balance</p>
+                    <p className="mt-2 text-sm text-slate-400">
+                      This is the real cash you physically count in Operations. It updates the same source used by Financials and Operations.
+                    </p>
+                    <div className="mt-5 space-y-3">
+                      <input
+                        value={vaultAmount}
+                        onChange={(event) => setVaultAmount(event.target.value)}
+                        inputMode="decimal"
+                        placeholder="0.00"
+                        className="w-full rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-4 text-2xl font-black text-white outline-none transition focus:border-rose-400/40"
+                      />
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        <button
+                          onClick={handleUpdateVaultBalance}
+                          disabled={busy}
+                          className="rounded-2xl border border-emerald-400/30 bg-emerald-500/10 px-4 py-3 text-sm font-black uppercase tracking-[0.2em] text-emerald-100 transition hover:bg-emerald-500/20 disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          Save Actual Vault
+                        </button>
+                        <button
+                          onClick={handleRationalize}
+                          disabled={busy || (controlRoom?.operations.delta === 0)}
+                          className="rounded-2xl border border-rose-400/30 bg-rose-500/10 px-4 py-3 text-sm font-black uppercase tracking-[0.2em] text-rose-100 transition hover:bg-rose-500/20 disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          Reset Drift To 0
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="rounded-3xl border border-white/10 bg-slate-900/40 p-5">
+                    <p className="text-xs font-black uppercase tracking-[0.22em] text-slate-500">Vault intelligence</p>
+                    <div className="mt-4 space-y-3 text-sm text-slate-300">
+                      <div className="flex items-center justify-between rounded-2xl border border-white/10 bg-slate-950/50 px-4 py-3">
+                        <span>Actual vault</span>
+                        <span className="font-mono font-bold text-emerald-300">{currency(controlRoom?.operations.actualBalance || 0)}</span>
+                      </div>
+                      <div className="flex items-center justify-between rounded-2xl border border-white/10 bg-slate-950/50 px-4 py-3">
+                        <span>Computed ledger</span>
+                        <span className="font-mono font-bold text-sky-300">{currency(controlRoom?.operations.computedBalance || 0)}</span>
+                      </div>
+                      <div className="flex items-center justify-between rounded-2xl border border-white/10 bg-slate-950/50 px-4 py-3">
+                        <span>Drift after edits</span>
+                        <span className={`font-mono font-bold ${(controlRoom?.operations.delta || 0) === 0 ? 'text-emerald-300' : 'text-rose-300'}`}>
+                          {currency(controlRoom?.operations.delta || 0)}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </WindowCard>
+
+              <WindowCard eyebrow="Overhead Matrix" title="Shop Contributions By Category" icon={Building2}>
+                <div className="grid gap-4 lg:grid-cols-2">
+                  {(controlRoom?.operations.byShop || []).map((shop) => (
+                    <div key={shop.shopId} className="rounded-3xl border border-white/10 bg-slate-900/40 p-5">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <h3 className="text-xl font-black text-white">{shop.shopName}</h3>
+                          <p className="mt-1 text-[11px] font-bold uppercase tracking-[0.22em] text-slate-500">
+                            Available for overheads {currency(shop.availableForOverheads)}
+                          </p>
+                        </div>
+                        <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-slate-300">
+                          {currency(shop.totalContributed)} in
+                        </span>
+                      </div>
+
+                      <div className="mt-5 grid grid-cols-2 gap-3">
+                        <div className="rounded-2xl border border-white/10 bg-slate-950/50 p-3">
+                          <p className="text-[10px] uppercase font-bold text-slate-500">Contributed</p>
+                          <p className="mt-2 text-xl font-black text-emerald-300">{currency(shop.totalContributed)}</p>
+                        </div>
+                        <div className="rounded-2xl border border-white/10 bg-slate-950/50 p-3">
+                          <p className="text-[10px] uppercase font-bold text-slate-500">Paid out</p>
+                          <p className="mt-2 text-xl font-black text-rose-300">{currency(shop.totalPaid)}</p>
+                        </div>
+                      </div>
+
+                      <div className="mt-5 space-y-2 rounded-2xl border border-white/10 bg-slate-950/50 p-4 text-sm">
+                        <div className="flex items-center justify-between">
+                          <span className="text-slate-400">Rent</span>
+                          <span className="font-mono font-bold text-white">{currency(shop.categories.rent)}</span>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-slate-400">Salaries</span>
+                          <span className="font-mono font-bold text-white">{currency(shop.categories.salaries)}</span>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-slate-400">Utilities</span>
+                          <span className="font-mono font-bold text-white">{currency(shop.categories.utilities)}</span>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-slate-400">Misc</span>
+                          <span className="font-mono font-bold text-white">{currency(shop.categories.misc)}</span>
+                        </div>
+                        {shop.categories.other > 0 && (
+                          <div className="flex items-center justify-between">
+                            <span className="text-slate-400">Other</span>
+                            <span className="font-mono font-bold text-white">{currency(shop.categories.other)}</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </WindowCard>
+            </div>
+          </div>
+        )}
+
         {/* Monthly Performance Tracker Tab */}
         {activeTab === 'performance' && (
           <div className="mt-6 space-y-6">
@@ -1144,7 +1344,7 @@ export default function TheHandPage() {
                 <div className="rounded-3xl border border-white/10 bg-slate-900/40 p-6">
                   <h3 className="text-xl font-black text-white">Current Variance</h3>
                   <p className="mt-2 text-sm text-slate-400">
-                    The delta between what the Computed Ledger expects in the vault and what you've declared as the Actual Vault Balance.
+                    The delta between what the Computed Ledger expects in the vault and what you&apos;ve declared as the Actual Vault Balance.
                   </p>
                   <div className="mt-6 flex flex-col gap-4">
                     <div className="flex items-center justify-between border-b border-white/5 pb-4">
