@@ -119,6 +119,7 @@ export function OperationsConsole({
   const [auditLogs, setAuditLogs] = useState<AuditEntry[]>([]);
   const [staffLogs, setStaffLogs] = useState<StaffLog[]>([]);
   const [employees, setEmployees] = useState<any[]>([]);
+  const [currentStaffUser, setCurrentStaffUser] = useState<any | null>(null);
   const [isGeneratingReport, setIsGeneratingReport] = useState(false);
   const [busy, setBusy] = useState(false);
   const [activeTab, setActiveTab] = useState<"overview" | "stockvel" | "moneybrain">("overview");
@@ -130,6 +131,11 @@ export function OperationsConsole({
   const masterVault = useMemo(() => {
     return ledger.reduce((sum, entry) => sum + Number(entry.amount || 0), 0);
   }, [ledger]);
+
+  const isPrivileged = useMemo(() => {
+    const role = (currentStaffUser?.role || "").toString().toLowerCase();
+    return role === "owner" || role === "admin";
+  }, [currentStaffUser]);
 
   const investTotal = opsState?.invest?.available || 0;
   const actualVault = Number(opsState?.actualBalance || 0);
@@ -229,33 +235,58 @@ export function OperationsConsole({
 
   const fetchData = useCallback(async () => {
     try {
-
       const queryParams = new URLSearchParams({
         limit: "500",
         period: selectedPeriod,
       });
       if (selectedShop !== "all") queryParams.append("shopId", selectedShop);
 
-      const [ledgerRes, stateRes, auditRes, staffRes, empRes] = await Promise.all([
+      const [ledgerRes, stateRes, auditRes, staffRes, empRes, staffMeRes] = await Promise.all([
         fetch(`/api/operations/ledger?${queryParams.toString()}`, { cache: "no-store", credentials: "include" }),
         fetch("/api/operations/state", { cache: "no-store", credentials: "include" }),
         fetch("/api/pos-audit/logs?limit=20", { cache: "no-store", credentials: "include" }).then(r => r.ok ? r.json() : { logs: [] }).catch(() => ({ logs: [] })),
         fetch("/api/staff/logs?limit=50", { cache: "no-store", credentials: "include" }).then(r => r.ok ? r.json() : { logs: [] }).catch(() => ({ logs: [] })),
         fetch("/api/employees", { cache: "no-store", credentials: "include" }).then(r => r.ok ? r.json() : { employees: [] }).catch(() => ({ employees: [] })),
+        fetch("/api/staff/me", { cache: "no-store", credentials: "include" }).then(r => r.ok ? r.json() : { staff: null }).catch(() => ({ staff: null })),
       ]);
-      
+
       const ledgerData = await ledgerRes.json().catch(() => ({ rows: [] }));
       const stateData = await stateRes.json().catch(() => ({}));
-      
+
       if (Array.isArray(ledgerData?.rows)) setLedger(ledgerData.rows);
       if (stateData?.computedBalance != null) setOpsState(stateData);
       if (Array.isArray(auditRes?.logs)) setAuditLogs(auditRes.logs);
       if (Array.isArray(staffRes?.logs)) setStaffLogs(staffRes.logs);
       if (Array.isArray(empRes?.employees)) setEmployees(empRes.employees);
+      if (staffMeRes?.staff) setCurrentStaffUser(staffMeRes.staff);
     } catch (e) {
       console.error("Failed to fetch data:", e);
     }
   }, [selectedShop, selectedPeriod]);
+
+  const handleSetActualBalance = async () => {
+    try {
+      const raw = prompt("Set Actual Vault Balance (numbers only):", String(opsState?.actualBalance || 0));
+      if (raw == null) return;
+      const val = Number(String(raw).trim());
+      if (!Number.isFinite(val)) return alert("Invalid amount");
+      const note = prompt("Optional note for override:", "");
+      const res = await fetch("/api/operations/state", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ actualBalance: val, note: note || undefined }),
+      });
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({}));
+        throw new Error(j?.error || j?.message || "Failed to set actual balance");
+      }
+      await fetchData();
+      alert("Actual vault balance updated.");
+    } catch (e: any) {
+      alert("Failed to set actual balance: " + (e?.message || String(e)));
+    }
+  };
 
   useEffect(() => {
     fetchData();
@@ -470,6 +501,13 @@ export function OperationsConsole({
             <p className="text-[10px] text-slate-500 mt-1">
               Actual vault | ledger: ${masterVault.toFixed(2)} | delta: ${computedDelta.toFixed(2)}
             </p>
+            {isPrivileged && (
+              <div className="mt-3">
+                <Button size="sm" onClick={handleSetActualBalance} className="font-black uppercase px-3 bg-emerald-600 hover:bg-emerald-500">
+                  Set Actual Balance
+                </Button>
+              </div>
+            )}
           </CardContent>
         </Card>
 

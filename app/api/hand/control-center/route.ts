@@ -292,7 +292,14 @@ export async function GET() {
         .forEach((entry) => {
           const amount = Number(entry.amount || 0);
           const category = detectOverheadCategory(entry);
-          if (amount > 0 && (entry.kind === 'overhead_contribution' || isOverheadLike(`${entry.kind || ''} ${entry.title || ''} ${entry.notes || ''}`))) {
+          // Treat explicit contribution/deposit kinds as contributions (include EOD and savings)
+          const contributionKinds = ['overhead_contribution', 'eod_deposit', 'overhead_deposit', 'savings_contribution', 'savings_deposit', 'savings'];
+          if (
+            amount > 0 && (
+              contributionKinds.includes(String(entry.kind || '')) ||
+              isOverheadLike(`${entry.kind || ''} ${entry.title || ''} ${entry.notes || ''}`)
+            )
+          ) {
             totalContributed += amount;
             categoryTotals[category as keyof typeof categoryTotals] += amount;
           }

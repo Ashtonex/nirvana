@@ -11,6 +11,40 @@ function isPrivilegedRole(role: string | null | undefined) {
   return r === "owner" || r === "admin";
 }
 
+export { isPrivilegedRole };
+
+export async function requireStaffActor(): Promise<Actor> {
+  const jar = await cookies();
+  const staffToken = jar.get("nirvana_staff")?.value;
+  if (!staffToken) throw new Error("Unauthorized");
+
+  const tokenHash = createHash("sha256").update(staffToken).digest("hex");
+  const { data: session } = await supabaseAdmin
+    .from("staff_sessions")
+    .select("employee_id, expires_at")
+    .eq("token_hash", tokenHash)
+    .maybeSingle();
+
+  if (!session || (session.expires_at && new Date(session.expires_at).getTime() < Date.now())) {
+    throw new Error("Unauthorized");
+  }
+
+  const { data: staff } = await supabaseAdmin
+    .from("employees")
+    .select("id, shop_id, role")
+    .eq("id", session.employee_id)
+    .maybeSingle();
+
+  if (!staff?.id) throw new Error("Unauthorized");
+
+  return {
+    type: "staff",
+    employeeId: String((staff as any).id),
+    shopId: (staff as any).shop_id ? String((staff as any).shop_id) : null,
+    role: (staff as any).role ? String((staff as any).role) : null,
+  };
+}
+
 export async function requirePrivilegedActor(): Promise<Actor> {
   const jar = await cookies();
   const ownerToken = jar.get("nirvana_owner")?.value;

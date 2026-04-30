@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { requirePrivilegedActor } from "@/lib/apiAuth";
+import { requirePrivilegedActor, requireStaffActor, isPrivilegedRole } from "@/lib/apiAuth";
 import { createOperationsLedgerEntry, listOperationsLedgerEntries } from "@/lib/operations";
 
 export const runtime = "nodejs";
@@ -25,7 +25,16 @@ export async function GET(req: Request) {
 
 export async function POST(req: Request) {
   try {
-    const actor = await requirePrivilegedActor();
+    let actor: any;
+    try {
+      actor = await requirePrivilegedActor();
+    } catch (e: any) {
+      try {
+        actor = await requireStaffActor();
+      } catch (e2: any) {
+        throw e;
+      }
+    }
     const body = await req.json().catch(() => ({}));
 
     const amount = Number(body?.amount);
@@ -39,6 +48,17 @@ export async function POST(req: Request) {
     const title = body?.title ? String(body.title) : null;
     const notes = body?.notes ? String(body.notes) : null;
     const effectiveDate = body?.effectiveDate ? String(body.effectiveDate) : null;
+
+    // If the poster is a non-privileged staff actor, restrict allowed kinds and shop scope
+    if (actor?.type === 'staff' && !isPrivilegedRole(actor.role)) {
+      const allowedKinds = ["eod_deposit", "overhead_contribution"];
+      if (!allowedKinds.includes(kind)) {
+        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      }
+      if (shopId && actor.shopId && shopId !== actor.shopId) {
+        return NextResponse.json({ error: "Forbidden: shop mismatch" }, { status: 403 });
+      }
+    }
 
     const row = await createOperationsLedgerEntry({
       amount,
