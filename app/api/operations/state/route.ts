@@ -66,8 +66,10 @@ export async function GET() {
 
     const opsSavingsByShop: Record<string, number> = {};
     (opsLedgerRows || []).forEach((r: any) => {
-      if (r.shop_id && (r.kind === "eod_deposit" || r.kind === "savings_contribution")) {
-        const shop = r.shop_id;
+      const shop = r.shop_id || "unknown";
+      const k = String(r.kind || "").toLowerCase();
+      // Treat these kinds as savings/vault commitments from POS
+      if (["eod_deposit", "savings_contribution", "savings_deposit", "savings", "blackbox", "black_box", "black-box"].includes(k)) {
         if (!opsSavingsByShop[shop]) opsSavingsByShop[shop] = 0;
         opsSavingsByShop[shop] += Number(r.amount || 0);
       }

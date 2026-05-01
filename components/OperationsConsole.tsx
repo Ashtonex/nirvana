@@ -129,7 +129,33 @@ export function OperationsConsole({
   const [opsState, setOpsState] = useState<OpsState>(initialState);
 
   const masterVault = useMemo(() => {
-    return ledger.reduce((sum, entry) => sum + Number(entry.amount || 0), 0);
+    // Vault-committed POS kinds (these should increase the Vault when posted from POS)
+    const vaultKinds = new Set([
+      "eod_deposit",
+      "savings_contribution",
+      "savings_deposit",
+      "savings",
+      "blackbox",
+      "black_box",
+      "black-box",
+      // keep drawer_post in case older posts use this label for EOD
+      "drawer_post",
+    ]);
+
+    return ledger.reduce((sum, entry) => {
+      try {
+        const k = String(entry.kind || "").toLowerCase();
+        if (vaultKinds.has(k)) return sum + Number(entry.amount || 0);
+
+        // Some POS flows annotate notes without a canonical kind
+        if (entry.notes && String(entry.notes).includes("Auto-posted from POS Drawer")) {
+          return sum + Number(entry.amount || 0);
+        }
+      } catch (e) {
+        // ignore problematic rows
+      }
+      return sum;
+    }, 0);
   }, [ledger]);
 
   const isPrivileged = useMemo(() => {
@@ -499,7 +525,7 @@ export function OperationsConsole({
               $<AnimatedNumber value={actualVault} />
             </div>
             <p className="text-[10px] text-slate-500 mt-1">
-              Actual vault | ledger: ${masterVault.toFixed(2)} | delta: ${computedDelta.toFixed(2)}
+                Actual vault | pos-posts: ${masterVault.toFixed(2)} | delta: ${computedDelta.toFixed(2)}
             </p>
             {isPrivileged && (
               <div className="mt-3">
@@ -598,6 +624,27 @@ export function OperationsConsole({
                 </div>
               ))}
             </div>
+            {isPrivileged && (
+              <div className="mt-4 flex justify-end">
+                <Button size="sm" onClick={async () => {
+                  if (!confirm('Run month-end rollover: commit leftover shop overhead nets to the vault?')) return;
+                  setBusy(true);
+                  try {
+                    const res = await fetch('/api/operations/rollover', { method: 'POST', credentials: 'include' });
+                    const json = await res.json().catch(() => ({}));
+                    if (!res.ok) throw new Error(json?.error || 'Rollover failed');
+                    await fetchData();
+                    alert('Rollover completed. ' + (json?.rolled || 0) + ' shops processed.');
+                  } catch (e: any) {
+                    alert('Rollover failed: ' + (e?.message || String(e)));
+                  } finally {
+                    setBusy(false);
+                  }
+                }} className="bg-emerald-600 hover:bg-emerald-500 font-black uppercase">
+                  Run Month-end Rollover
+                </Button>
+              </div>
+            )}
           </CardContent>
         </Card>
       )}

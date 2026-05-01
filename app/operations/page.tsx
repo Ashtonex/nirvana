@@ -53,14 +53,14 @@ export default async function OperationsPage() {
 
   return (
     <div className="space-y-8 pb-32 pt-8">
-      <div className="space-y-2 text-center max-w-4xl mx-auto">
-        <h1 className="text-5xl font-black tracking-tighter uppercase italic text-white leading-none">Operations</h1>
-        <p className="text-slate-400 font-bold tracking-widest uppercase text-xs italic">
-          Master Vault / Cash Pool • Month: {currentMonth}
-        </p>
+      <div className="flex justify-between items-end px-6">
+        <div className="space-y-2">
+          <h1 className="text-5xl font-black tracking-tighter uppercase italic text-white leading-none">Operations</h1>
+          <p className="text-slate-400 font-bold tracking-widest uppercase text-xs italic">Master Vault / Cash Pool • Month: {currentMonth}</p>
+        </div>
       </div>
 
-      <div className="max-w-6xl mx-auto px-4 space-y-6">
+      <div className="px-4 md:px-8 lg:px-12">
         <OperationsConsole shops={shops} initialState={opsState} initialLedger={ledger} />
       </div>
     </div>
