@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { enforceOwnerOnly } from '@/lib/auth-helpers';
 import { supabaseAdmin } from '@/lib/supabase';
-import { getOperationsState, getOperationsComputedBalance, setOperationsActualBalance } from '@/lib/operations';
+import { getOperationsState, getOperationsComputedBalance, createOperationsLedgerEntry } from '@/lib/operations';
 
 export async function POST() {
   const authError = await enforceOwnerOnly();
@@ -21,10 +21,19 @@ export async function POST() {
       return NextResponse.json({ success: true, message: 'Variance is already 0. Nothing to rationalize.' });
     }
 
-    // Insert into operations_drifts
+    // Insert balancing entry into the ledger
+    await createOperationsLedgerEntry({
+      amount: delta,
+      kind: 'adjustment',
+      title: 'System Variance Reset',
+      notes: `Rationalisation reset to align Computed Ledger with Actual Reality. Computed was ${computed}, Actual was ${actualBalance}.`,
+      employeeId: 'SYSTEM'
+    });
+
+    // Insert into operations_drifts for permanent history
     const { error: driftError } = await supabaseAdmin.from('operations_drifts').insert({
       amount: delta,
-      reason: `Rationalisation reset to align Actual with Computed Ledger (Actual was ${actualBalance}, Computed was ${computed})`,
+      reason: `Rationalisation reset. Computed Ledger pulled to match Actual Vault (${actualBalance}).`,
       resolved_kind: 'system_reset',
       resolved_shop: 'global'
     });
@@ -33,12 +42,9 @@ export async function POST() {
       throw new Error(`Failed to log drift: ${driftError.message}`);
     }
 
-    // Update actual balance to match computed
-    await setOperationsActualBalance(computed);
-
     return NextResponse.json({ 
       success: true, 
-      message: `Variance of ${delta} reset. Actual Vault is now aligned to Computed Ledger (${computed}).` 
+      message: `Variance of $${delta.toFixed(2)} reset. Computed Ledger is now aligned to Actual Vault ($${actualBalance.toFixed(2)}).` 
     });
 
   } catch (error: unknown) {
