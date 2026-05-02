@@ -295,7 +295,7 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
     const [isOpsPostModalOpen, setIsOpsPostModalOpen] = useState(false);
     const [opsPostAmount, setOpsPostAmount] = useState("");
     const [opsPostNotes, setOpsPostNotes] = useState("");
-    const [opsPostKind, setOpsPostKind] = useState<"eod_deposit" | "overhead_contribution">("overhead_contribution");
+    const [opsPostKind, setOpsPostKind] = useState<"eod_deposit" | "savings_deposit" | "blackbox" | "overhead_contribution" | "rent" | "salaries">("eod_deposit");
 
     // Auto-detect overhead keywords in notes
     useEffect(() => {
@@ -2641,11 +2641,11 @@ Generated via NIRVANA POS`;
             <Modal
                 isOpen={isOpsPostModalOpen}
                 onClose={() => setIsOpsPostModalOpen(false)}
-                title="Post Cash to Operations (Master Vault)"
+                title="Post Cash to Operations"
             >
                 <div className="space-y-4 pt-2">
                     <p className="text-sm text-slate-400 font-medium">
-                        This moves cash from the drawer into the business Operations vault. Drawer cash will decrease and Operations will increase.
+                        This moves cash from the drawer into Operations. Choose the deposit type below to control whether it increases the <span className="text-emerald-400 font-bold">Vault</span> or the <span className="text-amber-400 font-bold">Overhead Tracker</span>.
                     </p>
 
                     <div className="rounded-xl border border-slate-800 bg-slate-950/50 p-3 text-[10px] font-bold text-slate-400 uppercase">
@@ -2671,16 +2671,24 @@ Generated via NIRVANA POS`;
                         <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Deposit Type</label>
                         <select
                             value={opsPostKind}
-                            onChange={(e) => setOpsPostKind(e.target.value as "eod_deposit" | "overhead_contribution")}
+                            onChange={(e) => setOpsPostKind(e.target.value as typeof opsPostKind)}
                             className="w-full bg-slate-950 border border-emerald-500/30 text-white px-3 py-2 rounded-md mt-1 font-bold"
                         >
-                            <option value="eod_deposit">EOD Deposit (General Sales)</option>
-                            <option value="overhead_contribution">Overhead Contribution (Shop's Overhead Target)</option>
+                            <optgroup label="🟢 Vault Deposits (increases vault balance)">
+                                <option value="eod_deposit">EOD Deposit</option>
+                                <option value="savings_deposit">Savings</option>
+                                <option value="blackbox">Black Box</option>
+                            </optgroup>
+                            <optgroup label="🟡 Overhead Tracker (per-shop overhead)">
+                                <option value="overhead_contribution">Overhead (General)</option>
+                                <option value="rent">Rent</option>
+                                <option value="salaries">Salaries</option>
+                            </optgroup>
                         </select>
-                        <p className="text-[10px] text-slate-500 mt-1">
-                            {opsPostKind === "eod_deposit" 
-                                ? "General sales deposit - adds to Master Vault"
-                                : "Allocates toward shop's monthly overhead target"}
+                        <p className="text-[10px] mt-1">
+                            {["eod_deposit", "savings_deposit", "blackbox"].includes(opsPostKind)
+                                ? <span className="text-emerald-400">↑ This increases the Operations Vault balance</span>
+                                : <span className="text-amber-400">↑ This increases this shop&apos;s overhead tracker balance</span>}
                         </p>
                     </div>
 

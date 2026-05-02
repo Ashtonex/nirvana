@@ -16,17 +16,46 @@ export type OperationsLedgerKind =
 export type OverheadCategory = "rent" | "salaries" | "utilities" | "misc";
 
 export async function getOperationsComputedBalance(month?: string) {
-  // Call our new high-speed database function for total accuracy
-  const { data, error } = await supabaseAdmin.rpc('get_operations_computed_balance', { 
-    month_text: month || null 
-  });
+  let query = supabaseAdmin.from("operations_ledger").select("amount, kind, shop_id");
+
+  if (month) {
+    query = query.gte("effective_date", `${month}-01`)
+                 .lt("effective_date", new Date(new Date(`${month}-01`).setMonth(new Date(`${month}-01`).getMonth() + 1)).toISOString().split('T')[0]);
+  }
+
+  const { data, error } = await query;
 
   if (error) {
-    console.error('[getOperationsComputedBalance] RPC Error:', error);
+    console.error('[getOperationsComputedBalance] Query Error:', error);
     throw new Error(error.message);
   }
+
+  // Vault deposits: ONLY these kinds increase the global vault balance.
+  // Overhead contributions (rent, salaries, overhead_contribution, etc.) go to the
+  // per-shop overhead tracker and do NOT inflate the vault.
+  const vaultDepositKinds = [
+    'eod_deposit',
+    'savings_deposit', 'savings_contribution', 'savings',
+    'blackbox', 'black_box', 'black-box',
+    'capital_injection', 'loan_injection',
+  ];
+
+  let balance = 0;
+  (data || []).forEach((row: any) => {
+    const amt = Number(row.amount || 0);
+    const k = String(row.kind || "").toLowerCase();
+    
+    // Deposits into the vault (EOD, savings, blackbox, capital)
+    if (amt > 0 && vaultDepositKinds.includes(k)) {
+      balance += amt;
+    }
+    // Expenses from the vault (admin-level deductions only — no shop_id or 'global')
+    else if (amt < 0 && (!row.shop_id || row.shop_id === 'global')) {
+      balance += amt; // amount is negative, so it reduces balance
+    }
+  });
   
-  return Number(data || 0);
+  return balance;
 }
 
 export async function getOperationsState() {

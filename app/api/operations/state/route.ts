@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { requirePrivilegedActor } from "@/lib/apiAuth";
+import { getOperationsComputedBalance } from "@/lib/operations";
 import { supabaseAdmin } from "@/lib/supabase";
 
 export const runtime = "nodejs";
@@ -23,7 +24,7 @@ export async function GET() {
       .from("operations_ledger")
       .select("amount, kind, shop_id, overhead_category");
 
-    const computedBalance = (ledgerRows || []).reduce((sum: number, r: any) => sum + Number(r.amount || 0), 0);
+    const computedBalance = await getOperationsComputedBalance();
     
     const shopTotals: Record<string, number> = {};
     const overheadTotals: Record<string, number> = {};

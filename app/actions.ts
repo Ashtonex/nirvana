@@ -1558,45 +1558,61 @@ export async function recordPosExpense(
         });
     }
 
-    // Auto-create Operations entry for overhead expenses OR if manually toggled
-    // Overhead logged at POS is a contribution into the central ops pool.
-    // User requested to hide historical transfers to perfumes/invest from operations page.
-    const shouldPostToOps = (options?.toOperations || isOverheadExpense) && !isPerfumeExpense && !options?.toInvest;
+    // === OPERATIONS ROUTING ===
+    // POS can ONLY ADD to operations (positive amounts). Never deduct.
+    // Vault-increasing kinds: eod_deposit, savings_deposit, blackbox
+    // Overhead-tracker kinds: overhead_contribution (does NOT increase vault)
+    const isSavingsTransfer = ["savings", "saving"].some((kw) => descLower.includes(kw)) && !descLower.includes("black");
+    const isBlackboxTransfer = ["black box", "blackbox"].some((kw) => descLower.includes(kw));
 
-    if (shouldPostToOps) {
-        const opsKind = isOverheadExpense ? "overhead_contribution" : "eod_deposit";
-        
-        // Insert to operations_ledger
+    // Determine which operations routing applies (mutually exclusive, priority order)
+    const shouldRouteToVault = (isSavingsTransfer || isBlackboxTransfer || options?.toOperations) && !isPerfumeExpense && !options?.toInvest;
+    const shouldRouteToOverhead = isOverheadExpense && !isPerfumeExpense && !options?.toInvest && !shouldRouteToVault;
+
+    if (shouldRouteToVault) {
+        // Savings, blackbox, or manual "Deposit to Operations" -> vault deposit
+        const opsKind = isSavingsTransfer ? "savings_deposit" : isBlackboxTransfer ? "blackbox" : "eod_deposit";
+        const label = isSavingsTransfer ? "Savings deposit" : isBlackboxTransfer ? "Black Box deposit" : "Manual deposit";
+
         await supabaseAdmin.from('operations_ledger').insert({
             amount: amount,
             kind: opsKind,
             shop_id: shopId,
             title: description,
-            notes: `Auto-routed from POS expense: ${isOverheadExpense ? 'Overhead contribution' : 'Manual deposit'}`,
+            notes: `Auto-routed from POS expense: ${label}`,
             employee_id: employeeId,
             effective_date: timestamp.split('T')[0],
             created_at: timestamp,
         });
-        
-        // ALSO update the actual balance in operations_state
-        // This ensures posting from POS doesn't create fake drift
-        if (!isOverheadExpense) {
-            // EOD deposit - update actual balance
-            const { data: currentState } = await supabaseAdmin
-                .from('operations_state')
-                .select('actual_balance')
-                .eq('id', 1)
-                .maybeSingle();
-            
-            const newBalance = Number(currentState?.actual_balance || 0) + amount;
-            await supabaseAdmin
-                .from('operations_state')
-                .upsert({ 
-                    id: 1, 
-                    actual_balance: newBalance, 
-                    updated_at: new Date().toISOString() 
-                });
-        }
+
+        // Vault deposits update actual_balance
+        const { data: currentState } = await supabaseAdmin
+            .from('operations_state')
+            .select('actual_balance')
+            .eq('id', 1)
+            .maybeSingle();
+
+        const newBalance = Number(currentState?.actual_balance || 0) + amount;
+        await supabaseAdmin
+            .from('operations_state')
+            .upsert({
+                id: 1,
+                actual_balance: newBalance,
+                updated_at: new Date().toISOString()
+            });
+    } else if (shouldRouteToOverhead) {
+        // Overhead keywords -> per-shop overhead tracker (does NOT increase vault)
+        await supabaseAdmin.from('operations_ledger').insert({
+            amount: amount,
+            kind: "overhead_contribution",
+            shop_id: shopId,
+            title: description,
+            notes: `Auto-routed from POS expense: Overhead contribution`,
+            employee_id: employeeId,
+            effective_date: timestamp.split('T')[0],
+            created_at: timestamp,
+        });
+        // NOTE: No actual_balance update - overhead contributions don't inflate the vault
     }
 
     // Log to audit trail with full details
@@ -1609,10 +1625,13 @@ export async function recordPosExpense(
             amount, 
             description, 
             toInvest: isPerfumeExpense || options?.toInvest, 
-            toOperations: options?.toOperations || isOverheadExpense,
+            toVault: shouldRouteToVault,
+            toOverheadTracker: shouldRouteToOverhead,
             isPerfume: isPerfumeExpense,
             isOverhead: isOverheadExpense,
-            kind: isOverheadExpense ? "overhead_contribution" : "eod_deposit"
+            isSavings: isSavingsTransfer,
+            isBlackbox: isBlackboxTransfer,
+            kind: shouldRouteToVault ? (isSavingsTransfer ? "savings_deposit" : isBlackboxTransfer ? "blackbox" : "eod_deposit") : shouldRouteToOverhead ? "overhead_contribution" : "none"
         },
         timestamp
     }]);
@@ -2088,7 +2107,7 @@ export async function postDrawerToOperations(input: { shopId: string; amount: nu
             category: "Operations Transfer",
             amount,
             date: timestamp,
-            description: `Posted to Operations (${kind === "overhead_contribution" ? "Overhead" : "EOD"})${notes ? ` | ${notes}` : ""}`,
+            description: `Posted to Operations (${({eod_deposit:"EOD",savings_deposit:"Savings",blackbox:"Black Box",overhead_contribution:"Overhead",rent:"Rent",salaries:"Salaries"})[kind] || kind})${notes ? ` | ${notes}` : ""}`,
             employee_id: actor.id
         }]);
 
@@ -2100,14 +2119,17 @@ export async function postDrawerToOperations(input: { shopId: string; amount: nu
             amount,
             kind,
             shopId,
-            title: kind === "overhead_contribution" ? "Overhead Contribution" : "EOD Transfer",
+            title: ({eod_deposit:"EOD Transfer",savings_deposit:"Savings Deposit",blackbox:"Black Box Deposit",overhead_contribution:"Overhead Contribution",rent:"Rent Contribution",salaries:"Salaries Contribution"})[kind] || "Operations Transfer",
             notes: notes ? `POS → Operations: ${notes}` : "Auto-posted from POS Drawer",
             effectiveDate: dayStamp,
             employeeId: actor.id
         });
 
-        // Update the actual balance in operations_state for EOD deposits
-        if (kind !== "overhead_contribution") {
+        // Update the actual balance in operations_state
+        // Only vault-increasing kinds update actual_balance: eod_deposit, savings_deposit, blackbox
+        // Overhead kinds (overhead_contribution, rent, salaries) do NOT update vault
+        const vaultKinds = ["eod_deposit", "savings_deposit", "blackbox"];
+        if (vaultKinds.includes(kind)) {
             const { data: currentState } = await supabaseAdmin
                 .from('operations_state')
                 .select('actual_balance')

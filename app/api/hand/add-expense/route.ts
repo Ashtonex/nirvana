@@ -43,13 +43,14 @@ export async function POST(request: Request) {
 
     // 2. Auto-route based on category
     if (autoRoute) {
-      if (category === 'rent' || category === 'salaries') {
+      if (category === 'rent' || category === 'salaries' || category === 'utilities' || category === 'misc') {
         // Route to operations
         const { error: opsError } = await supabaseAdmin.from('operations_ledger').insert({
           id: `ops_${expenseId}`,
-          shop_id: shopId,
-          amount,
-          kind: category === 'rent' ? 'rent' : 'salary',
+          shop_id: shopId === 'global' ? null : shopId,
+          amount: -amount, // Expenses are negative
+          kind: category, // Keep the category as kind for tracking
+          overhead_category: category,
           title: `${category} - Auto-routed`,
           notes: `Manual recovery entry for ${category}`,
           employee_id: 'SYSTEM',

@@ -159,7 +159,7 @@ type SaleForm = {
 };
 
 type ExpenseForm = {
-  shopId: 'kipasa' | 'dubdub' | 'tradecenter';
+  shopId: 'kipasa' | 'dubdub' | 'tradecenter' | 'global';
   category: string;
   amount: number;
   date: string;
@@ -930,122 +930,6 @@ export default function TheHandPage() {
                               addLog('error', error instanceof Error ? error.message : 'Failed to set past closing balance.');
                             }
                           }}
-                          className="w-full rounded-xl border border-rose-400/30 bg-rose-500/10 py-3 text-xs font-black uppercase tracking-widest text-rose-200 hover:bg-rose-500/20"
-                        >
-                          Set Past Closing
-                        </button>
-                      </div>
-                    </div>
-
-                    <div className="rounded-2xl border border-white/10 bg-slate-900/40 p-4">
-                      <p className="text-xs font-black uppercase tracking-[0.22em] text-slate-500 mb-4">Intelligence Constants</p>
-                      <div className="space-y-3">
-                        <div>
-                          <label className="text-[10px] font-black uppercase text-slate-500">Tax Rate (%)</label>
-                          <input
-                            type="number"
-                            step="0.1"
-                            value={intelForm.taxRate}
-                            onChange={(e) => setIntelForm(prev => ({ ...prev, taxRate: Number(e.target.value) }))}
-                            className="w-full rounded-xl border border-white/10 bg-slate-950 px-3 py-2 text-sm text-white"
-                          />
-                        </div>
-                        <div>
-                          <label className="text-[10px] font-black uppercase text-slate-500">Tax Threshold ($)</label>
-                          <input
-                            type="number"
-                            value={intelForm.taxThreshold}
-                            onChange={(e) => setIntelForm(prev => ({ ...prev, taxThreshold: Number(e.target.value) }))}
-                            className="w-full rounded-xl border border-white/10 bg-slate-950 px-3 py-2 text-sm text-white"
-                          />
-                        </div>
-                        <div>
-                          <label className="text-[10px] font-black uppercase text-slate-500">Zombie Days</label>
-                          <input
-                            type="number"
-                            value={intelForm.zombieDays}
-                            onChange={(e) => setIntelForm(prev => ({ ...prev, zombieDays: Number(e.target.value) }))}
-                            className="w-full rounded-xl border border-white/10 bg-slate-950 px-3 py-2 text-sm text-white"
-                          />
-                        </div>
-                        <button
-                          onClick={handleUpdateIntelligence}
-                          className="w-full rounded-xl border border-sky-400/30 bg-sky-500/10 py-3 text-xs font-black uppercase tracking-widest text-sky-200 hover:bg-sky-500/20"
-                        >
-                          Sync Constants
-                        </button>
-                      </div>
-                    </div>
-
-                    <div className="rounded-2xl border border-white/10 bg-slate-900/40 p-4">
-                      <p className="text-xs font-black uppercase tracking-[0.22em] text-slate-500 mb-4">Past Sale Injection</p>
-                      <div className="space-y-3">
-                        <select
-                          value={saleForm.shopId}
-                          onChange={(event) => setSaleForm((prev) => ({ ...prev, shopId: event.target.value as SaleForm['shopId'] }))}
-                          className="w-full rounded-xl border border-white/10 bg-slate-950 px-3 py-2 text-sm text-white"
-                        >
-                          {SHOPS.map((shop) => <option key={shop.id} value={shop.id}>{shop.name}</option>)}
-                        </select>
-                        <input
-                          type="date"
-                          value={saleForm.date}
-                          onChange={(event) => setSaleForm((prev) => ({ ...prev, date: event.target.value }))}
-                          className="w-full rounded-xl border border-white/10 bg-slate-950 px-3 py-2 text-sm text-white"
-                        />
-                        <input
-                          type="text"
-                          placeholder="Client"
-                          value={saleForm.clientName}
-                          onChange={(event) => setSaleForm((prev) => ({ ...prev, clientName: event.target.value }))}
-                          className="w-full rounded-xl border border-white/10 bg-slate-950 px-3 py-2 text-sm text-white"
-                        />
-                        <input
-                          type="text"
-                          placeholder="Item"
-                          value={saleForm.itemName}
-                          onChange={(event) => setSaleForm((prev) => ({ ...prev, itemName: event.target.value }))}
-                          className="w-full rounded-xl border border-white/10 bg-slate-950 px-3 py-2 text-sm text-white"
-                        />
-                        <div className="flex gap-2">
-                          <input
-                            type="number"
-                            placeholder="Qty"
-                            value={saleForm.quantity}
-                            onChange={(event) => setSaleForm((prev) => ({ ...prev, quantity: Number(event.target.value || 0) }))}
-                            className="w-full rounded-xl border border-white/10 bg-slate-950 px-3 py-2 text-sm text-white outline-none focus:border-sky-500/50"
-                          />
-                          <input
-                            type="number"
-                            placeholder="Price"
-                            value={saleForm.unitPrice}
-                            onChange={(event) => setSaleForm((prev) => ({ ...prev, unitPrice: Number(event.target.value || 0) }))}
-                            className="w-full rounded-xl border border-white/10 bg-slate-950 px-3 py-2 text-sm text-white outline-none focus:border-sky-500/50"
-                          />
-                        </div>
-                        <button
-                          onClick={handleRecordSale}
-                          className="w-full rounded-xl border border-emerald-400/30 bg-emerald-500/10 py-3 text-xs font-black uppercase tracking-widest text-emerald-200 hover:bg-emerald-500/20"
-                        >
-                          Post Sale
-                        </button>
-                      </div>
-                    </div>
-
-                    <div className="rounded-2xl border border-white/10 bg-slate-900/40 p-4">
-                      <p className="text-xs font-black uppercase tracking-[0.22em] text-slate-500 mb-4">Past Expense Injection</p>
-                      <div className="space-y-3">
-                        <select
-                          value={expenseForm.shopId}
-                          onChange={(event) => setExpenseForm((prev) => ({ ...prev, shopId: event.target.value as ExpenseForm['shopId'] }))}
-                          className="w-full rounded-xl border border-white/10 bg-slate-950 px-3 py-2 text-sm text-white"
-                        >
-                          {SHOPS.map((shop) => <option key={shop.id} value={shop.id}>{shop.name}</option>)}
-                        </select>
-                        <input
-                          type="date"
-                          value={expenseForm.date}
-                          onChange={(event) => setExpenseForm((prev) => ({ ...prev, date: event.target.value }))}
                           className="w-full rounded-xl border border-white/10 bg-slate-950 px-3 py-2 text-sm text-white"
                         />
                         <select

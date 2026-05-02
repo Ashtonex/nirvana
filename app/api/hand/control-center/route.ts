@@ -301,10 +301,10 @@ export async function GET() {
             )
           ) {
             totalContributed += amount;
-            categoryTotals[category as keyof typeof categoryTotals] += amount;
           }
-          if (amount < 0 && (entry.kind === 'overhead_payment' || isOverheadLike(`${entry.kind || ''} ${entry.title || ''} ${entry.notes || ''}`))) {
+          if (amount < 0 && (entry.kind === 'overhead_payment' || isOverheadLike(`${entry.kind || ''} ${entry.title || ''} ${entry.notes || ''}`) || category !== 'other')) {
             totalPaid += Math.abs(amount);
+            categoryTotals[category as keyof typeof categoryTotals] += Math.abs(amount);
           }
         });
 
