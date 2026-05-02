@@ -38,6 +38,7 @@ export async function getOperationsComputedBalance(month?: string) {
     'savings_deposit', 'savings_contribution', 'savings',
     'blackbox', 'black_box', 'black-box',
     'capital_injection', 'loan_injection',
+    'adjustment',
   ];
 
   let balance = 0;

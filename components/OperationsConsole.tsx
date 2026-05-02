@@ -140,6 +140,7 @@ export function OperationsConsole({
       "black-box",
       "capital_injection",
       "loan_injection",
+      "adjustment",
       // keep drawer_post in case older posts use this label for EOD
       "drawer_post",
     ]);
