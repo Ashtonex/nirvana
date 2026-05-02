@@ -138,18 +138,29 @@ export function OperationsConsole({
       "blackbox",
       "black_box",
       "black-box",
+      "capital_injection",
+      "loan_injection",
       // keep drawer_post in case older posts use this label for EOD
       "drawer_post",
     ]);
 
     return ledger.reduce((sum, entry) => {
       try {
+        const amt = Number(entry.amount || 0);
         const k = String(entry.kind || "").toLowerCase();
-        if (vaultKinds.has(k)) return sum + Number(entry.amount || 0);
-
-        // Some POS flows annotate notes without a canonical kind
-        if (entry.notes && String(entry.notes).includes("Auto-posted from POS Drawer")) {
-          return sum + Number(entry.amount || 0);
+        
+        // Deposits into the vault
+        if (amt > 0 && vaultKinds.has(k)) {
+          return sum + amt;
+        }
+        // Expenses from the vault (admin-level deductions only)
+        else if (amt < 0 && (!entry.shop_id || entry.shop_id === 'global')) {
+          return sum + amt;
+        }
+        
+        // Some older POS flows annotate notes without a canonical kind
+        if (amt > 0 && entry.notes && String(entry.notes).includes("Auto-posted from POS Drawer")) {
+          return sum + amt;
         }
       } catch (e) {
         // ignore problematic rows

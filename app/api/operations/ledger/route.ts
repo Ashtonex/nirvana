@@ -72,6 +72,26 @@ export async function POST(req: Request) {
       metadata: body?.metadata || {},
     });
 
+    // When manually entering from Operations console, update the actual balance
+    // This keeps the delta from artificially skewing when paying expenses or manually depositing
+    if (amount !== 0) {
+      const { supabaseAdmin } = await import('@/lib/supabase');
+      const { data: currentState } = await supabaseAdmin
+        .from('operations_state')
+        .select('actual_balance')
+        .eq('id', 1)
+        .maybeSingle();
+
+      const newBalance = Number(currentState?.actual_balance || 0) + amount;
+      await supabaseAdmin
+        .from('operations_state')
+        .upsert({ 
+          id: 1, 
+          actual_balance: newBalance, 
+          updated_at: new Date().toISOString() 
+        });
+    }
+
     return NextResponse.json({ success: true, row });
   } catch (e: any) {
     const msg = e?.message || String(e);
