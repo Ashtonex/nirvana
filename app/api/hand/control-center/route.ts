@@ -275,6 +275,11 @@ export async function GET() {
       .filter((entry) => isOverheadLike(`${entry.kind || ''} ${entry.title || ''} ${entry.notes || ''}`))
       .reduce((total, entry) => total + Math.abs(Number(entry.amount || 0)), 0);
 
+    const monthStart = new Date();
+    monthStart.setUTCDate(1);
+    monthStart.setUTCHours(0, 0, 0, 0);
+    const monthStartIso = monthStart.toISOString();
+
     const operationsByShop = SHOPS.map((shop) => {
       const categoryTotals = {
         rent: 0,
@@ -288,21 +293,34 @@ export async function GET() {
       let totalPaid = 0;
 
       operations
-        .filter((entry) => entry.shop_id === shop.id)
+        .filter((entry) => entry.shop_id === shop.id && (entry.created_at || '') >= monthStartIso)
         .forEach((entry) => {
           const amount = Number(entry.amount || 0);
           const category = detectOverheadCategory(entry);
-          // Treat explicit contribution/deposit kinds as contributions (include EOD and savings)
-          const contributionKinds = ['overhead_contribution', 'eod_deposit', 'overhead_deposit', 'savings_contribution', 'savings_deposit', 'savings'];
+          // Kinds that represent a shop sending money to operations (vault + overhead)
+          const contributionKinds = [
+            'overhead_contribution', 'rent', 'salaries',
+            'eod_deposit', 'overhead_deposit',
+            'savings_contribution', 'savings_deposit', 'savings',
+            'blackbox', 'black_box',
+          ];
           if (
             amount > 0 && (
-              contributionKinds.includes(String(entry.kind || '')) ||
+              contributionKinds.includes(String(entry.kind || '').toLowerCase()) ||
               isOverheadLike(`${entry.kind || ''} ${entry.title || ''} ${entry.notes || ''}`)
             )
           ) {
             totalContributed += amount;
           }
-          if (amount < 0 && (entry.kind === 'overhead_payment' || isOverheadLike(`${entry.kind || ''} ${entry.title || ''} ${entry.notes || ''}`) || category !== 'other')) {
+          // Kinds that represent an actual payment out of the overhead pool
+          const paymentKinds = ['overhead_payment', 'rent', 'salaries', 'utilities'];
+          if (
+            amount < 0 && (
+              paymentKinds.includes(String(entry.kind || '').toLowerCase()) ||
+              isOverheadLike(`${entry.kind || ''} ${entry.title || ''} ${entry.notes || ''}`) ||
+              category !== 'other'
+            )
+          ) {
             totalPaid += Math.abs(amount);
             categoryTotals[category as keyof typeof categoryTotals] += Math.abs(amount);
           }

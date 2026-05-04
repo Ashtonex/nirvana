@@ -23,7 +23,8 @@ import {
     Wallet,
     HandCoins,
     Cpu,
-    Zap
+    Zap,
+    Brain
 } from 'lucide-react';
 import { useAuth } from '@/components/AuthProvider';
 import { useStaff } from '@/components/StaffProvider';
@@ -59,6 +60,7 @@ const navItems = [
     { name: 'Logic', href: '/logic', icon: Cpu },
     { name: 'EOD Reports', href: '/admin/eod', icon: FileText },
     { name: 'Data Vault', href: '/admin/backups', icon: ShieldCheck },
+    { name: 'Stock Intelligence', href: '/stock', icon: Brain },
     { name: 'The Hand', href: '/admin/hand', icon: Zap },
 ];
 

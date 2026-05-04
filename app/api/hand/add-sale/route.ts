@@ -3,6 +3,9 @@ import { enforceOwnerOnly } from '@/lib/auth-helpers';
 import { NextResponse } from 'next/server';
 import { promises as fs } from 'fs';
 import path from 'path';
+import { revalidatePath } from 'next/cache';
+import { sendEmail } from '@/lib/email';
+import { ORACLE_RECIPIENT } from '@/lib/resend';
 
 export async function POST(request: Request) {
   const authError = await enforceOwnerOnly();
@@ -28,19 +31,35 @@ export async function POST(request: Request) {
     }
 
     const saleId = Math.random().toString(36).substring(2, 9);
+    const timestamp = date ? new Date(date).toISOString() : new Date().toISOString();
+
+    // 1. Z-Report Alignment: Check if an EOD report already exists for this date/shop
+    const dateOnly = timestamp.split('T')[0];
+    const { data: existingEOD } = await supabaseAdmin
+      .from('audit_log')
+      .select('id')
+      .eq('shop_id', shopId)
+      .eq('action', 'EOD_REPORT_SENT')
+      .gte('timestamp', `${dateOnly}T00:00:00.000Z`)
+      .lte('timestamp', `${dateOnly}T23:59:59.999Z`)
+      .maybeSingle();
+
+    if (existingEOD) {
+      console.warn(`[add-sale] Warning: Adding sale to a day that already has a sent EOD report (${dateOnly})`);
+    }
 
     // Add to Supabase
     const { error: supabaseError } = await supabaseAdmin.from('sales').insert({
       id: saleId,
       shop_id: shopId,
       item_name: itemName,
-      item_id: null, // Allow null item_id for manual recovery sales
+      item_id: body.itemId || null, 
       quantity,
       unit_price: unitPrice,
-      total_before_tax: totalWithTax / 1.155, // Extract net from gross for ledger accuracy
-      tax: totalWithTax - (totalWithTax / 1.155), // Compute tax portion from final figure
+      total_before_tax: totalWithTax / 1.155, 
+      tax: totalWithTax - (totalWithTax / 1.155), 
       total_with_tax: totalWithTax,
-      date,
+      date: timestamp,
       employee_id: employeeId,
       client_name: clientName,
       payment_method: 'cash'
@@ -88,16 +107,72 @@ export async function POST(request: Request) {
       }
 
       if (resolvedItemId && !String(resolvedItemId).startsWith('service_')) {
-        try {
-          await supabaseAdmin.rpc('decrement_allocation', { item_id: resolvedItemId, shop_id: shopId, qty: quantity });
-        } catch (e) {
-          console.error('[add-sale] decrement_allocation failed:', e);
+        // --- IMPROVED SHOP ALLOCATION LOGIC ---
+        // 1. Check if the shop has this item allocated
+        const { data: currentAlloc } = await supabaseAdmin
+          .from('inventory_allocations')
+          .select('quantity')
+          .eq('item_id', resolvedItemId)
+          .eq('shop_id', shopId)
+          .maybeSingle();
+
+        if (currentAlloc) {
+          // Normal decrement if allocation exists
+          const newAllocQty = Number((currentAlloc as any).quantity || 0) - quantity;
+          await supabaseAdmin
+            .from('inventory_allocations')
+            .update({ quantity: newAllocQty })
+            .eq('item_id', resolvedItemId)
+            .eq('shop_id', shopId);
+        } else {
+          // LOOPHOLE FIX: If no allocation exists, create one starting at 0 then decrementing.
+          // This allows the shop pulse to show -Qty, highlighting that stock was sold but not transferred.
+          await supabaseAdmin
+            .from('inventory_allocations')
+            .insert({
+              item_id: resolvedItemId,
+              shop_id: shopId,
+              quantity: -quantity
+            });
+          console.log(`[add-sale] Auto-created missing allocation for ${resolvedItemId} at ${shopId}`);
         }
 
-        try {
-          await supabaseAdmin.rpc('decrement_inventory', { item_id: resolvedItemId, qty: quantity });
-        } catch (e) {
-          console.error('[add-sale] decrement_inventory failed:', e);
+        // 2. Decrement global inventory item quantity directly
+        const { data: currentItem } = await supabaseAdmin
+          .from('inventory_items')
+          .select('quantity, name, reorder_level')
+          .eq('id', resolvedItemId)
+          .maybeSingle();
+
+        if (currentItem) {
+          const newItemQty = Math.max(0, Number((currentItem as any).quantity || 0) - quantity);
+          await supabaseAdmin
+            .from('inventory_items')
+            .update({ quantity: newItemQty })
+            .eq('id', resolvedItemId);
+
+          // Low-Stock Triggers
+          const reorderLevel = Number((currentItem as any).reorder_level || 5);
+          if (newItemQty <= reorderLevel) {
+            try {
+              await sendEmail({
+                to: ORACLE_RECIPIENT,
+                subject: `[ALERT] Low Stock: ${(currentItem as any).name}`,
+                html: `
+                  <div style="font-family:sans-serif;padding:20px;border:1px solid #eee;border-radius:10px;">
+                    <h2 style="color:#e11d48;">Inventory Alert</h2>
+                    <p>Product <strong>${(currentItem as any).name}</strong> is running low.</p>
+                    <p>Remaining: <span style="font-size:18px;font-weight:bold;color:#e11d48;">${newItemQty}</span> units</p>
+                    <p>Shop: ${shopId}</p>
+                    <hr/>
+                    <p style="font-size:12px;color:#666;">Actioned via The Hand Manual Sale Entry</p>
+                  </div>
+                `
+              });
+            } catch (e) {
+              console.error('[add-sale] Low stock email failed:', e);
+            }
+          }
         }
       }
     } catch (e) {
@@ -130,6 +205,18 @@ export async function POST(request: Request) {
     } catch (e) {
       console.error('Local JSON backup failed:', e);
       // Don't fail if local backup fails
+    }
+
+    // 3. Real-time Matrix Refresh & Intelligence Update
+    try {
+      revalidatePath('/');
+      revalidatePath('/inventory');
+      revalidatePath('/intelligence');
+      revalidatePath('/finance/oracle');
+      revalidatePath('/admin/hand');
+      revalidatePath(`/shops/${shopId}`);
+    } catch (e) {
+      console.error('[add-sale] Revalidation failed:', e);
     }
 
     return NextResponse.json({
