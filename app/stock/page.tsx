@@ -14,7 +14,15 @@ import {
   Sparkles,
   Zap,
   TrendingUp,
-  AlertTriangle
+  AlertTriangle,
+  X,
+  PieChart,
+  BarChart,
+  ShieldAlert,
+  Calendar,
+  Layers,
+  Activity,
+  CheckCircle2
 } from 'lucide-react';
 import { 
   Card, 
@@ -27,8 +35,83 @@ import {
   Badge
 } from '@/components/ui';
 import { cn } from '@/lib/utils';
-import jsPDF from 'jspdf';
-import 'jspdf-autotable';
+import { 
+  BarChart as ReBarChart, 
+  Bar, 
+  XAxis, 
+  YAxis, 
+  CartesianGrid, 
+  Tooltip as ReTooltip, 
+  ResponsiveContainer,
+  Cell
+} from 'recharts';
+
+// Client-side PDF helper
+const generatePDF = async (data: any) => {
+  const { default: jsPDF } = await import('jspdf');
+  const { default: autoTable } = await import('jspdf-autotable');
+  
+  const doc = new jsPDF() as any;
+  const date = new Date().toLocaleDateString();
+  const season = data.analysis.season || 'Current';
+
+  // Header
+  doc.setFillColor(2, 6, 23);
+  doc.rect(0, 0, 210, 50, 'F');
+  doc.setTextColor(255, 255, 255);
+  doc.setFontSize(28);
+  doc.setFont('helvetica', 'bold');
+  doc.text('NIRVANA', 15, 25);
+  doc.setFontSize(10);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(225, 29, 72);
+  doc.text(`INTELLIGENCE ORDER DIRECTIVE [${season.toUpperCase()}]`, 15, 35);
+  doc.setTextColor(100, 116, 139);
+  doc.text(`GENERATED: ${date} | REF: STRAT-${Math.random().toString(36).substring(7).toUpperCase()}`, 15, 42);
+
+  // Financials
+  doc.setTextColor(0, 0, 0);
+  doc.setFontSize(14);
+  doc.text('I. FINANCIAL MATRIX', 15, 65);
+  
+  const summaryData = [
+    ['CAPITAL REINVESTMENT BUDGET', `$${data.analysis.suggestedBudget.toLocaleString()}`],
+    ['MONTHLY OVERHEAD RESERVE', `$${data.analysis.monthlyOverhead.toLocaleString()}`],
+    ['CURRENT VAULT LIQUIDITY', `$${data.analysis.actualVaultBalance.toLocaleString()}`]
+  ];
+
+  (doc as any).autoTable({
+    startY: 70,
+    head: [['Strategic KPI', 'Value']],
+    body: summaryData,
+    theme: 'grid',
+    headStyles: { fillColor: [15, 23, 42], fontSize: 10 },
+    styles: { fontSize: 9 }
+  });
+
+  // Orders
+  doc.text('II. DEPLOYMENT ORDERS', 15, (doc as any).lastAutoTable.finalY + 15);
+  const orderData = data.recommendations
+    .filter((r: any) => r.recommendation === 'order')
+    .map((r: any) => [
+      r.name,
+      r.category,
+      r.currentStock,
+      `+${r.suggestedQty}`,
+      `$${r.estimatedCost.toLocaleString()}`,
+      r.priority.toUpperCase()
+    ]);
+
+  (doc as any).autoTable({
+    startY: (doc as any).lastAutoTable.finalY + 20,
+    head: [['Product', 'Sector', 'Base', 'Deployment', 'Unit Capital', 'Tier']],
+    body: orderData,
+    theme: 'striped',
+    headStyles: { fillColor: [225, 29, 72] }
+  });
+
+  doc.save(`Nirvana_Order_${date.replace(/\//g, '-')}.pdf`);
+};
 
 const currency = (val: number) => `$${(val || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
@@ -36,6 +119,8 @@ export default function StockIntelligencePage() {
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [generatingPdf, setGeneratingPdf] = useState(false);
+  const [selectedItem, setSelectedItem] = useState<any>(null);
+  const [isPanelOpen, setIsPanelOpen] = useState(false);
 
   useEffect(() => {
     fetchData();
@@ -54,100 +139,30 @@ export default function StockIntelligencePage() {
     }
   };
 
-  const handleGeneratePDF = async () => {
-    if (!data) return;
+  const handleDeepAnalysis = (item: any) => {
+    setSelectedItem(item);
+    setIsPanelOpen(true);
+  };
+
+  const handleFinalizeOrder = async () => {
     setGeneratingPdf(true);
-    
-    try {
-      const doc = new jsPDF() as any;
-      const date = new Date().toLocaleDateString();
-      const season = data.analysis.season || 'Current';
-
-      // Header
-      doc.setFillColor(15, 23, 42);
-      doc.rect(0, 0, 210, 40, 'F');
-      doc.setTextColor(255, 255, 255);
-      doc.setFontSize(22);
-      doc.setFont('helvetica', 'bold');
-      doc.text('NIRVANA STOCK INTELLIGENCE', 15, 20);
-      doc.setFontSize(10);
-      doc.setFont('helvetica', 'normal');
-      doc.text(`OFFICIAL ORDER DIRECTIVE | ${date} | SEASON: ${season.toUpperCase()}`, 15, 30);
-
-      // Financial Context
-      doc.setTextColor(0, 0, 0);
-      doc.setFontSize(12);
-      doc.text('Financial Summary (30D Window)', 15, 50);
-      
-      const summaryData = [
-        ['Suggested Reinvestment Budget', currency(data.analysis.suggestedBudget)],
-        ['Monthly Overhead Target', currency(data.analysis.monthlyOverhead)],
-        ['Projected Net Profit', currency(data.analysis.projectedNet)],
-        ['Current Vault Health', currency(data.analysis.actualVaultBalance)]
-      ];
-
-      doc.autoTable({
-        startY: 55,
-        head: [['Metric', 'Value']],
-        body: summaryData,
-        theme: 'striped',
-        headStyles: { fillColor: [225, 29, 72] }
-      });
-
-      // Stock Recommendations
-      doc.text('Automated Order Recommendations', 15, doc.lastAutoTable.finalY + 15);
-      
-      const orderData = data.recommendations
-        .filter((r: any) => r.recommendation === 'order')
-        .map((r: any) => [
-          r.name,
-          r.category,
-          r.currentStock,
-          `+${r.suggestedQty}`,
-          currency(r.estimatedCost),
-          r.priority.toUpperCase()
-        ]);
-
-      doc.autoTable({
-        startY: doc.lastAutoTable.finalY + 20,
-        head: [['Product', 'Category', 'Stock', 'Order Qty', 'Est. Cost', 'Priority']],
-        body: orderData,
-        theme: 'grid',
-        headStyles: { fillColor: [15, 23, 42] }
-      });
-
-      // Shop Allocation plan
-      doc.text('Suggested Shop Allocation', 15, doc.lastAutoTable.finalY + 15);
-      
-      const allocationData = data.shopAllocations.map((shop: any) => [
-        shop.shopName,
-        shop.needs.map((n: any) => n.name).join(', ')
-      ]);
-
-      doc.autoTable({
-        startY: doc.lastAutoTable.finalY + 20,
-        head: [['Shop', 'Primary Demand Focus']],
-        body: allocationData,
-        theme: 'plain'
-      });
-
-      doc.save(`Nirvana_Stock_Order_${date.replace(/\//g, '-')}.pdf`);
-    } catch (e) {
-      console.error('PDF Generation failed:', e);
-      alert("Failed to generate PDF. Check console for details.");
-    } finally {
-      setGeneratingPdf(false);
-    }
+    await generatePDF(data);
+    setGeneratingPdf(false);
   };
 
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-[#020617] text-white p-6">
         <div className="relative">
-          <Brain className="h-16 w-16 text-rose-500 animate-pulse mb-4" />
-          <div className="absolute inset-0 bg-rose-500/20 blur-2xl rounded-full" />
+          <div className="absolute inset-0 bg-rose-500/20 blur-[100px] rounded-full animate-pulse" />
+          <Brain className="h-20 w-20 text-rose-500 animate-pulse relative z-10" />
         </div>
-        <p className="text-sm font-black uppercase tracking-[0.4em] text-rose-500/70 animate-bounce">Neural Sync Active</p>
+        <div className="mt-8 flex flex-col items-center gap-2">
+          <p className="text-xs font-black uppercase tracking-[0.5em] text-slate-500">Initializing Intelligence</p>
+          <div className="w-48 h-1 bg-slate-900 rounded-full overflow-hidden">
+            <div className="h-full bg-rose-500 animate-[loading_2s_infinite]" />
+          </div>
+        </div>
       </div>
     );
   }
@@ -156,212 +171,317 @@ export default function StockIntelligencePage() {
   const analysis = data?.analysis || {};
 
   return (
-    <div className="min-h-screen bg-[#020617] text-slate-200 p-4 md:p-8 font-sans selection:bg-rose-500/30 overflow-x-hidden">
-      {/* Background Orbs */}
-      <div className="fixed top-0 left-0 w-full h-full pointer-events-none overflow-hidden -z-10">
-        <div className="absolute -top-[10%] -left-[10%] w-[40%] h-[40%] bg-rose-600/10 blur-[120px] rounded-full" />
-        <div className="absolute -bottom-[10%] -right-[10%] w-[40%] h-[40%] bg-blue-600/10 blur-[120px] rounded-full" />
+    <div className="min-h-screen bg-[#020617] text-slate-200 font-sans selection:bg-rose-500/30 overflow-x-hidden pb-20">
+      {/* HUD Elements */}
+      <div className="fixed inset-0 pointer-events-none -z-10">
+        <div className="absolute top-0 left-0 w-full h-32 bg-gradient-to-b from-rose-500/5 to-transparent" />
+        <div className="absolute top-1/4 -right-1/4 w-[50%] h-[50%] bg-blue-600/5 blur-[150px] rounded-full animate-pulse" />
+        <div className="absolute bottom-1/4 -left-1/4 w-[50%] h-[50%] bg-rose-600/5 blur-[150px] rounded-full" />
       </div>
 
-      <div className="max-w-7xl mx-auto">
-        {/* Top Header */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-8 mb-12">
-          <div>
-            <div className="flex items-center gap-4 mb-3">
-              <div className="h-14 w-14 bg-gradient-to-br from-rose-500 to-rose-700 rounded-2xl flex items-center justify-center shadow-[0_0_30px_rgba(225,29,72,0.4)]">
-                <Brain className="h-8 w-8 text-white" />
+      <div className="max-w-[1600px] mx-auto p-4 md:p-10">
+        {/* Command Header */}
+        <header className="flex flex-col lg:flex-row lg:items-end justify-between gap-10 mb-16 relative">
+          <div className="space-y-4">
+            <div className="flex items-center gap-6">
+              <div className="relative group">
+                <div className="absolute -inset-1 bg-gradient-to-r from-rose-600 to-rose-400 rounded-2xl blur opacity-25 group-hover:opacity-75 transition duration-1000 group-hover:duration-200" />
+                <div className="relative h-20 w-20 bg-slate-900 border border-white/10 rounded-2xl flex items-center justify-center">
+                  <Brain className="h-10 w-10 text-rose-500" />
+                </div>
               </div>
               <div>
-                <h1 className="text-5xl font-black italic tracking-tighter text-white uppercase leading-none">Stock Brain</h1>
-                <div className="flex items-center gap-2 mt-1">
-                  <Badge className="bg-emerald-500/20 text-emerald-400 border-emerald-500/20 text-[10px] font-black uppercase tracking-widest px-2 py-0">Autonomous Mode</Badge>
-                  <span className="text-slate-600 text-[10px] font-black uppercase tracking-widest">{analysis.season} CYCLE v2.0</span>
+                <div className="flex items-center gap-3 mb-1">
+                  <h1 className="text-6xl font-black italic tracking-tighter text-white uppercase leading-none">Intelligence</h1>
+                  <Badge className="bg-rose-500 text-white font-black text-[10px] uppercase tracking-widest px-3 py-1 animate-pulse">Live HUD</Badge>
+                </div>
+                <div className="flex items-center gap-4 text-slate-500 text-[10px] font-black uppercase tracking-[0.3em]">
+                  <span className="flex items-center gap-2"><Activity className="h-3 w-3 text-emerald-500" /> Systems Nominal</span>
+                  <span className="h-1 w-1 bg-slate-800 rounded-full" />
+                  <span>Cycle: {analysis.season} OPS v3.4</span>
                 </div>
               </div>
             </div>
-            <p className="text-slate-400 text-sm font-bold uppercase tracking-widest max-w-lg">
-              {analysis.intelligenceInsight}
+            <p className="text-slate-400 text-sm font-medium leading-relaxed max-w-2xl border-l-2 border-rose-500/30 pl-6 italic">
+              "{analysis.intelligenceInsight}"
             </p>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-4">
             <Button 
               onClick={fetchData} 
               variant="outline" 
-              className="border-slate-800 bg-slate-900/50 text-[10px] font-black uppercase tracking-widest hover:bg-slate-800 h-12 px-6 rounded-xl transition-all hover:scale-105"
+              className="border-white/5 bg-white/5 backdrop-blur-xl text-[10px] font-black uppercase tracking-widest hover:bg-white/10 h-14 px-8 rounded-2xl transition-all hover:-translate-y-1 active:scale-95 group"
             >
-              <Zap className="h-4 w-4 mr-2 text-yellow-500" /> Re-Analyze
+              <Zap className="h-4 w-4 mr-3 text-yellow-500 group-hover:animate-bounce" /> Sync Neural Matrix
             </Button>
             <Button 
-              onClick={handleGeneratePDF}
+              onClick={handleFinalizeOrder}
               disabled={generatingPdf}
-              className="bg-white hover:bg-slate-100 text-black border-none text-[10px] font-black uppercase tracking-widest h-12 px-8 rounded-xl shadow-[0_20px_40px_-10px_rgba(255,255,255,0.2)] transition-all hover:scale-105"
+              className="bg-white hover:bg-slate-200 text-black border-none text-[10px] font-black uppercase tracking-widest h-14 px-10 rounded-2xl shadow-[0_15px_30px_-5px_rgba(255,255,255,0.1)] transition-all hover:-translate-y-1 hover:shadow-white/10 active:scale-95"
             >
-              {generatingPdf ? "Compiling PDF..." : <><Download className="h-4 w-4 mr-2" /> Download Order Sheet</>}
+              {generatingPdf ? "Compiling Data..." : <><Download className="h-4 w-4 mr-3" /> Finalize Deployment</>}
             </Button>
           </div>
-        </div>
+        </header>
 
-        <div className="grid gap-8 lg:grid-cols-12">
-          {/* Dashboard Left */}
-          <div className="lg:col-span-4 space-y-6">
-            {/* Budget Card */}
-            <Card className="bg-white/[0.03] border-white/5 backdrop-blur-3xl rounded-[32px] overflow-hidden relative group">
-              <div className="absolute top-0 right-0 p-8 opacity-10 group-hover:opacity-20 transition-opacity">
-                <DollarSign className="h-24 w-24 text-white" />
+        <main className="grid gap-10 lg:grid-cols-12">
+          {/* Tactical Sidebar */}
+          <section className="lg:col-span-3 space-y-8">
+            {/* Capital Allocation Card */}
+            <Card className="bg-white/[0.03] border-white/5 backdrop-blur-3xl rounded-[40px] overflow-hidden p-8 border-b-rose-500/50">
+              <div className="flex justify-between items-start mb-10">
+                <div className="p-3 bg-rose-500/10 rounded-2xl border border-rose-500/20 text-rose-500">
+                  <DollarSign className="h-6 w-6" />
+                </div>
+                <Badge variant="outline" className="border-slate-800 text-[9px] uppercase tracking-widest font-black text-slate-500">Capital Pool</Badge>
               </div>
-              <CardHeader>
-                <CardDescription className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">Autonomous Spend Capacity</CardDescription>
-                <CardTitle className="text-5xl font-black text-white font-mono tracking-tighter">
+              <div className="space-y-1 mb-8">
+                <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Available for Deployment</p>
+                <h2 className="text-5xl font-black text-white font-mono tracking-tighter tabular-nums">
                   {currency(analysis.suggestedBudget)}
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <div className="p-4 rounded-2xl bg-white/[0.02] border border-white/5">
-                    <div className="flex justify-between text-[10px] font-black uppercase tracking-widest mb-2">
-                      <span className="text-slate-500">Capital Reinvestment</span>
-                      <span className="text-emerald-400">40% of Net</span>
-                    </div>
-                    <Progress value={40} className="h-1.5 bg-slate-800" />
+                </h2>
+              </div>
+              <div className="space-y-6">
+                <div className="p-5 rounded-3xl bg-white/[0.02] border border-white/5 space-y-3">
+                  <div className="flex justify-between text-[10px] font-black uppercase tracking-widest">
+                    <span className="text-slate-500">Risk Profile</span>
+                    <span className="text-emerald-400">Stable</span>
                   </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="p-3 rounded-2xl bg-rose-500/5 border border-rose-500/10">
-                      <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Overhead Block</p>
-                      <p className="text-sm font-black text-rose-400">{currency(analysis.monthlyOverhead)}</p>
-                    </div>
-                    <div className="p-3 rounded-2xl bg-sky-500/5 border border-sky-500/10">
-                      <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Vault Reserve</p>
-                      <p className="text-sm font-black text-sky-400">{currency(analysis.actualVaultBalance)}</p>
-                    </div>
+                  <Progress value={40} className="h-2 bg-slate-900" />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="p-4 rounded-3xl bg-white/[0.01] border border-white/5 text-center">
+                    <p className="text-[8px] font-black text-slate-600 uppercase mb-1">Overhead</p>
+                    <p className="text-xs font-black text-white">{currency(analysis.monthlyOverhead)}</p>
+                  </div>
+                  <div className="p-4 rounded-3xl bg-white/[0.01] border border-white/5 text-center">
+                    <p className="text-[8px] font-black text-slate-600 uppercase mb-1">Reserves</p>
+                    <p className="text-xs font-black text-white">{currency(analysis.actualVaultBalance)}</p>
                   </div>
                 </div>
-              </CardContent>
+              </div>
             </Card>
 
-            {/* Shop Needs */}
-            <Card className="bg-white/[0.02] border-white/5 backdrop-blur-3xl rounded-[32px]">
-              <CardHeader>
-                <CardTitle className="text-xs font-black uppercase tracking-[0.2em] text-slate-400 flex items-center gap-2">
-                  <Target className="h-4 w-4 text-rose-500" /> Allocation Matrix
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-6">
+            {/* Logistics Strategy */}
+            <Card className="bg-white/[0.02] border-white/5 backdrop-blur-3xl rounded-[40px] p-8">
+              <h3 className="text-xs font-black uppercase tracking-[0.3em] text-slate-500 flex items-center gap-3 mb-8">
+                <Layers className="h-4 w-4 text-rose-500" /> Sector Allocation
+              </h3>
+              <div className="space-y-8">
                 {data?.shopAllocations?.map((shop: any) => (
-                  <div key={shop.shopId} className="relative pl-6 border-l-2 border-slate-800 py-1">
-                    <div className="absolute -left-[7px] top-2 h-3 w-3 rounded-full bg-slate-800 border-2 border-[#020617]" />
-                    <p className="text-xs font-black text-white uppercase tracking-widest mb-2">{shop.shopName}</p>
-                    <div className="flex flex-wrap gap-2">
+                  <div key={shop.shopId} className="group cursor-default">
+                    <div className="flex items-center gap-4 mb-4">
+                      <div className="h-8 w-8 rounded-xl bg-slate-900 border border-white/5 flex items-center justify-center text-[10px] font-black text-white">
+                        {shop.shopName.charAt(0)}
+                      </div>
+                      <p className="text-xs font-black text-white uppercase tracking-widest group-hover:text-rose-400 transition-colors">{shop.shopName}</p>
+                    </div>
+                    <div className="flex flex-wrap gap-2 pl-12">
                       {shop.needs.map((need: any, i: number) => (
-                        <span key={i} className="px-2 py-1 bg-white/5 rounded-lg text-[9px] font-bold text-slate-400 uppercase">
+                        <span key={i} className="px-3 py-1.5 bg-white/5 rounded-full text-[9px] font-bold text-slate-500 uppercase hover:bg-white/10 hover:text-slate-300 transition-all">
                           {need.name}
                         </span>
                       ))}
                     </div>
                   </div>
                 ))}
-              </CardContent>
+              </div>
             </Card>
-          </div>
+          </section>
 
-          {/* Directives Main */}
-          <div className="lg:col-span-8 space-y-6">
-            <div className="flex items-center justify-between mb-2">
-              <h2 className="text-sm font-black uppercase tracking-[0.3em] text-slate-500 flex items-center gap-2">
-                <Sparkles className="h-4 w-4 text-rose-500" /> Automated Directives
-              </h2>
-              <div className="flex gap-4">
-                <div className="flex items-center gap-2">
-                  <div className="h-2 w-2 rounded-full bg-rose-500" />
-                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">High Priority</span>
+          {/* Directives Engine */}
+          <section className="lg:col-span-9 space-y-10">
+            <div className="flex items-center justify-between border-b border-white/5 pb-6">
+              <div className="flex items-center gap-10">
+                <h2 className="text-2xl font-black uppercase tracking-tighter text-white">Deployment Orders</h2>
+                <div className="flex gap-6">
+                  <div className="flex items-center gap-2">
+                    <div className="h-1.5 w-1.5 rounded-full bg-rose-500 shadow-[0_0_10px_rgba(225,29,72,0.8)]" />
+                    <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Priority One</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="h-1.5 w-1.5 rounded-full bg-slate-700" />
+                    <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Hold/Monitor</span>
+                  </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <div className="h-2 w-2 rounded-full bg-emerald-500" />
-                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Profitable</span>
-                </div>
+              </div>
+              <div className="text-[10px] font-black text-slate-600 uppercase tracking-widest">
+                Showing {recommendations.length} Scoped Units
               </div>
             </div>
 
-            <div className="grid gap-4">
+            <div className="grid gap-6">
               {recommendations.map((rec: any, idx: number) => (
                 <div 
                   key={idx} 
                   className={cn(
-                    "group relative rounded-[32px] border p-6 transition-all duration-500",
+                    "group relative rounded-[40px] border p-8 transition-all duration-700",
                     rec.recommendation === 'order' 
-                      ? "bg-white/[0.04] border-white/5 hover:border-emerald-500/20" 
-                      : "bg-black/20 border-white/5 opacity-60 hover:opacity-100"
+                      ? "bg-white/[0.04] border-white/10 hover:bg-white/[0.06] hover:border-emerald-500/30" 
+                      : "bg-black/40 border-white/5 opacity-50 hover:opacity-100"
                   )}
                 >
-                  <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-8">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-3 mb-3">
-                        <div className={cn(
-                          "h-10 w-10 rounded-xl flex items-center justify-center transition-transform group-hover:scale-110",
-                          rec.recommendation === 'order' ? "bg-emerald-500/10 text-emerald-500" : "bg-slate-800 text-slate-500"
-                        )}>
-                          {rec.recommendation === 'order' ? <TrendingUp className="h-5 w-5" /> : <Snowflake className="h-5 w-5" />}
+                  <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-12">
+                    <div className="flex-1 space-y-6">
+                      <div className="flex items-start justify-between">
+                        <div className="flex items-center gap-6">
+                          <div className={cn(
+                            "h-16 w-16 rounded-[24px] flex items-center justify-center transition-all duration-500 group-hover:scale-110 group-hover:rotate-6 shadow-2xl",
+                            rec.recommendation === 'order' ? "bg-emerald-500/10 text-emerald-500 border border-emerald-500/20" : "bg-slate-900 text-slate-600 border border-white/5"
+                          )}>
+                            {rec.recommendation === 'order' ? <TrendingUp className="h-8 w-8" /> : <Snowflake className="h-8 w-8" />}
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-3 mb-1">
+                              <h3 className="text-2xl font-black text-white tracking-tight">{rec.name}</h3>
+                              {rec.priority === 'high' && <Badge className="bg-rose-500/10 text-rose-500 border-none text-[8px] font-black uppercase px-2 py-0 h-4">Tier 1</Badge>}
+                            </div>
+                            <div className="flex items-center gap-4 text-[9px] font-black text-slate-500 uppercase tracking-widest">
+                              <span className="text-rose-400/80">{rec.category}</span>
+                              <span className="h-1 w-1 bg-slate-800 rounded-full" />
+                              <span>Last Active: {new Date(rec.lastSold).toLocaleDateString()}</span>
+                            </div>
+                          </div>
                         </div>
-                        <div>
-                          <h3 className="text-xl font-black text-white tracking-tight">{rec.name}</h3>
-                          <p className="text-[9px] font-black text-slate-500 uppercase tracking-[0.2em]">{rec.category}</p>
-                        </div>
-                        {rec.priority === 'high' && (
-                          <Badge className="bg-rose-500/10 text-rose-500 border-none text-[8px] font-black uppercase px-2 py-0">Urgent</Badge>
-                        )}
+                        <Button 
+                          variant="ghost" 
+                          onClick={() => handleDeepAnalysis(rec)}
+                          className="h-10 px-6 rounded-2xl bg-white/5 text-[9px] font-black uppercase tracking-widest text-slate-400 hover:text-white hover:bg-rose-500 transition-all"
+                        >
+                          Deep Matrix <ChevronRight className="h-3 w-3 ml-2" />
+                        </Button>
                       </div>
-                      <p className="text-xs text-slate-400 font-medium leading-relaxed max-w-lg">
+                      <p className="text-xs text-slate-400 font-medium leading-relaxed max-w-xl group-hover:text-slate-300 transition-colors">
                         {rec.reason}
                       </p>
                     </div>
 
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-6 lg:gap-10">
-                      <div className="text-left lg:text-right">
-                        <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1">Current Stock</p>
-                        <p className="text-sm font-black text-white font-mono">{rec.currentStock} units</p>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-12 xl:w-[500px]">
+                      <div className="space-y-1">
+                        <p className="text-[9px] font-black text-slate-600 uppercase tracking-widest">Base Stock</p>
+                        <p className="text-xl font-black text-white font-mono">{rec.currentStock}</p>
                       </div>
-                      <div className="text-left lg:text-right">
-                        <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1">90D Profit</p>
-                        <p className="text-sm font-black text-emerald-400 font-mono">+{currency(rec.profit)}</p>
+                      <div className="space-y-1">
+                        <p className="text-[9px] font-black text-slate-600 uppercase tracking-widest">90D Gross</p>
+                        <p className="text-xl font-black text-emerald-500 font-mono tracking-tighter">+{currency(rec.profit)}</p>
                       </div>
-                      <div className="text-left lg:text-right">
-                        <p className="text-[9px] font-black text-rose-500 uppercase tracking-widest mb-1">Order Suggestion</p>
+                      <div className="space-y-1">
+                        <p className="text-[9px] font-black text-rose-500 uppercase tracking-widest">Deployment</p>
                         <p className={cn(
-                          "text-2xl font-black font-mono leading-none",
-                          rec.suggestedQty > 0 ? "text-white" : "text-slate-700"
+                          "text-3xl font-black font-mono leading-none tracking-tighter transition-all group-hover:scale-110 origin-left",
+                          rec.suggestedQty > 0 ? "text-white" : "text-slate-800"
                         )}>
-                          {rec.suggestedQty > 0 ? `+${rec.suggestedQty}` : '0'}
+                          {rec.suggestedQty > 0 ? `+${rec.suggestedQty}` : '00'}
                         </p>
                       </div>
-                      <div className="text-left lg:text-right">
-                        <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1">Estimate</p>
-                        <p className="text-sm font-black text-white font-mono">{currency(rec.estimatedCost)}</p>
+                      <div className="space-y-1">
+                        <p className="text-[9px] font-black text-slate-600 uppercase tracking-widest">Est. Capital</p>
+                        <p className="text-xl font-black text-white font-mono tracking-tighter">{currency(rec.estimatedCost)}</p>
                       </div>
                     </div>
                   </div>
 
-                  {/* Matrix Detail */}
-                  <div className="mt-6 pt-5 border-t border-white/5 flex items-center justify-between opacity-0 group-hover:opacity-100 transition-opacity">
-                    <div className="flex gap-6 items-center">
-                      <div className="flex items-center gap-2">
-                        <div className="h-1.5 w-1.5 rounded-full bg-slate-700" />
-                        <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">Velocity: {(rec.velocity * 7).toFixed(1)}/week</span>
+                  {/* Matrix Telemetry */}
+                  <div className="mt-8 pt-6 border-t border-white/5 flex items-center justify-between opacity-40 group-hover:opacity-100 transition-all duration-500">
+                    <div className="flex gap-10 items-center">
+                      <div className="flex items-center gap-3">
+                        <div className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                        <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Velocity: {(rec.velocity * 7).toFixed(1)} Units/WK</span>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <div className="h-1.5 w-1.5 rounded-full bg-slate-700" />
-                        <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">E-Day: {rec.daysLeft === 999 ? '∞' : `${rec.daysLeft.toFixed(0)} days`}</span>
+                      <div className="flex items-center gap-3">
+                        <div className="h-1.5 w-1.5 rounded-full bg-rose-500" />
+                        <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">E-DAY: {rec.daysLeft === 999 ? 'PERPETUAL' : `${rec.daysLeft.toFixed(0)} DAYS REMAINING`}</span>
                       </div>
                     </div>
-                    <Button variant="ghost" className="h-6 text-[9px] font-black uppercase tracking-widest text-slate-500 hover:text-white p-0">
-                      Deep Analysis <ChevronRight className="h-3 w-3 ml-1" />
-                    </Button>
+                    <div className="flex items-center gap-2 text-[9px] font-black text-slate-600 uppercase tracking-widest italic">
+                      Verified by Neural Sync
+                    </div>
                   </div>
                 </div>
               ))}
             </div>
-          </div>
-        </div>
+          </section>
+        </main>
       </div>
+
+      {/* Deep Analysis Side Panel */}
+      {isPanelOpen && selectedItem && (
+        <div className="fixed inset-0 z-50 flex justify-end">
+          <div className="absolute inset-0 bg-[#020617]/80 backdrop-blur-md" onClick={() => setIsPanelOpen(false)} />
+          <aside className="relative w-full max-w-2xl h-full bg-[#020617] border-l border-white/10 shadow-[0_0_100px_rgba(0,0,0,0.5)] p-10 overflow-y-auto animate-in slide-in-from-right duration-500">
+            <button onClick={() => setIsPanelOpen(false)} className="absolute top-8 right-8 p-2 text-slate-500 hover:text-white transition-colors">
+              <X className="h-6 w-6" />
+            </button>
+            
+            <div className="space-y-12">
+              <header className="space-y-4">
+                <Badge className="bg-rose-500/10 text-rose-500 border-rose-500/20 text-[10px] font-black uppercase tracking-widest">Neural Deep Matrix</Badge>
+                <h2 className="text-5xl font-black text-white tracking-tighter">{selectedItem.name}</h2>
+                <div className="flex gap-6 text-[10px] font-black text-slate-500 uppercase tracking-widest">
+                  <span className="flex items-center gap-2"><Warehouse className="h-3 w-3" /> {selectedItem.category}</span>
+                  <span className="flex items-center gap-2"><Activity className="h-3 w-3" /> Risk: Low</span>
+                </div>
+              </header>
+
+              <div className="grid grid-cols-2 gap-6">
+                <div className="p-8 rounded-[32px] bg-white/[0.03] border border-white/5 space-y-2">
+                  <p className="text-[9px] font-black text-slate-600 uppercase tracking-widest">Historical Yield</p>
+                  <p className="text-3xl font-black text-emerald-500 font-mono tracking-tighter">{currency(selectedItem.profit)}</p>
+                </div>
+                <div className="p-8 rounded-[32px] bg-white/[0.03] border border-white/5 space-y-2">
+                  <p className="text-[9px] font-black text-slate-600 uppercase tracking-widest">Sales Volume (90D)</p>
+                  <p className="text-3xl font-black text-white font-mono tracking-tighter">{selectedItem.qtySold90d} Units</p>
+                </div>
+              </div>
+
+              <div className="space-y-6">
+                <h3 className="text-xs font-black uppercase tracking-[0.3em] text-slate-500 flex items-center gap-3">
+                  <TrendingUp className="h-4 w-4 text-rose-500" /> Velocity Breakdown
+                </h3>
+                <div className="h-64 w-full bg-white/[0.01] border border-white/5 rounded-[32px] p-6">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <ReBarChart data={[
+                      { name: 'Last 90D', value: selectedItem.qtySold90d },
+                      { name: 'Last 30D', value: selectedItem.qtySold30d },
+                      { name: 'Avg Daily', value: selectedItem.velocity.toFixed(2) }
+                    ]}>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#1e293b" />
+                      <XAxis dataKey="name" stroke="#64748b" fontSize={10} axisLine={false} tickLine={false} />
+                      <YAxis stroke="#64748b" fontSize={10} axisLine={false} tickLine={false} />
+                      <ReTooltip cursor={{fill: 'rgba(255,255,255,0.05)'}} contentStyle={{backgroundColor: '#0f172a', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '12px'}} />
+                      <Bar dataKey="value" radius={[10, 10, 10, 10]} barSize={40}>
+                        { [0,1,2].map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={index === 1 ? '#e11d48' : '#334155'} />
+                        ))}
+                      </Bar>
+                    </ReBarChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+
+              <div className="p-10 rounded-[40px] bg-gradient-to-br from-rose-500/10 to-transparent border border-rose-500/20 space-y-6">
+                <h4 className="text-sm font-black text-white uppercase tracking-widest">Autonomous Strategy</h4>
+                <p className="text-sm text-slate-400 leading-relaxed italic">
+                  "Based on current market velocity and {selectedItem.daysLeft.toFixed(0)} day exhaustion timeline, our neural model recommends a 
+                  deployment of {selectedItem.suggestedQty} units to capture peak seasonal demand while maintaining capital efficiency."
+                </p>
+                <div className="flex gap-4">
+                  <Badge className="bg-emerald-500/20 text-emerald-400 border-none">High Yield</Badge>
+                  <Badge className="bg-sky-500/20 text-sky-400 border-none">Secure Asset</Badge>
+                </div>
+              </div>
+
+              <Button 
+                onClick={() => setIsPanelOpen(false)}
+                className="w-full bg-white text-black h-16 rounded-3xl font-black uppercase tracking-widest hover:bg-slate-200 transition-all"
+              >
+                Return to Command
+              </Button>
+            </div>
+          </aside>
+        </div>
+      )}
     </div>
   );
 }
