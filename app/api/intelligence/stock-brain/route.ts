@@ -35,12 +35,12 @@ export async function GET() {
 
     // Calculate budget based on recent performance and overhead needs
     const recentRevenue = salesRows
-      .filter(s => s.date >= thirtyDaysAgo)
-      .reduce((sum, s) => sum + Number(s.total_with_tax || 0), 0);
+      .filter((s: any) => s.date >= thirtyDaysAgo)
+      .reduce((sum: number, s: any) => sum + Number(s.total_with_tax || 0), 0);
     
-    const monthlyOverhead = shopRows.reduce((sum, shop) => {
+    const monthlyOverhead = shopRows.reduce((sum: number, shop: any) => {
       const exp = (shop.expenses as Record<string, number>) || {};
-      return sum + Object.values(exp).reduce((a, b) => a + (b || 0), 0);
+      return sum + Object.values(exp).reduce((a: number, b: any) => a + (Number(b) || 0), 0);
     }, 0);
 
     // AI/Autonomous Logic: Define orderable budget (e.g., 30% of profit after overhead)
@@ -48,8 +48,8 @@ export async function GET() {
     const stockOrderBudget = Math.max(0, projectedProfit * 0.4); // Reinvest 40% of net into growth
 
     // 1. Analyze Sales Velocity & Profitability
-    const itemStats = new Map();
-    salesRows.forEach(sale => {
+    const itemStats = new Map<string, any>();
+    salesRows.forEach((sale: any) => {
       const name = sale.item_name;
       const stats = itemStats.get(name) || { 
         name, 
@@ -74,10 +74,10 @@ export async function GET() {
     });
 
     // 2. Generate Autonomous Order Recommendations
-    const recommendations = Array.from(itemStats.values()).map(stats => {
+    const recommendations = Array.from(itemStats.values()).map((stats: any) => {
       const currentStock = inventoryRows
-        .filter(i => i.name === stats.name)
-        .reduce((sum, i) => sum + Number(i.quantity || 0), 0);
+        .filter((i: any) => i.name === stats.name)
+        .reduce((sum: number, i: any) => sum + Number(i.quantity || 0), 0);
       
       const velocity = stats.qtySold30d / 30; // units per day
       const daysLeft = velocity > 0 ? currentStock / velocity : Infinity;
@@ -118,10 +118,10 @@ export async function GET() {
     });
 
     // 3. Shop Allocations Logic (based on shop-specific sales)
-    const shopAllocations = shopRows.map(shop => {
-      const shopSales = salesRows.filter(s => s.shop_id === shop.id);
-      const topSellers = new Map();
-      shopSales.forEach(s => {
+    const shopAllocations = shopRows.map((shop: any) => {
+      const shopSales = salesRows.filter((s: any) => s.shop_id === shop.id);
+      const topSellers = new Map<string, number>();
+      shopSales.forEach((s: any) => {
         topSellers.set(s.item_name, (topSellers.get(s.item_name) || 0) + Number(s.quantity || 0));
       });
       
@@ -131,7 +131,7 @@ export async function GET() {
         needs: Array.from(topSellers.entries())
           .sort((a, b) => b[1] - a[1])
           .slice(0, 5)
-          .map(([name, qty]) => ({ name, weight: qty / shopSales.length }))
+          .map(([name, qty]) => ({ name, weight: qty / (shopSales.length || 1) }))
       };
     });
 
