@@ -47,7 +47,12 @@ export async function GET() {
     const projectedProfit = recentRevenue - monthlyOverhead;
     const stockOrderBudget = Math.max(0, projectedProfit * 0.4); // Reinvest 40% of net into growth
 
-    // 1. Analyze Sales Velocity & Profitability
+    // Seasonal Logic
+    const currentMonth = new Date().getUTCMonth();
+    const isWinter = currentMonth >= 4 && currentMonth <= 7; // May to Aug (Southern Hemisphere)
+    const season = isWinter ? 'Winter' : 'Summer';
+
+    // 1. Analyze Sales Velocity & Profitability with Seasonal Weighting
     const itemStats = new Map<string, any>();
     salesRows.forEach((sale: any) => {
       const name = sale.item_name;
@@ -57,12 +62,17 @@ export async function GET() {
         qtySold90d: 0, 
         revenue: 0, 
         profit: 0, 
-        lastSold: sale.date 
+        lastSold: sale.date,
+        seasonalScore: 0 // higher if sold in current season
       };
       
       const qty = Number(sale.quantity || 0);
       const rev = Number(sale.total_with_tax || 0);
-      const cost = Number(sale.total_before_tax || 0) * 0.7; // Fallback cost estimate
+      
+      // True COGS attempt
+      const invItem = inventoryRows.find((i: any) => i.name === name);
+      const unitCost = Number(invItem?.landed_cost || invItem?.acquisition_price || (rev / (qty || 1)) * 0.6);
+      const cost = unitCost * qty;
 
       if (sale.date >= thirtyDaysAgo) stats.qtySold30d += qty;
       stats.qtySold90d += qty;
@@ -70,39 +80,46 @@ export async function GET() {
       stats.profit += (rev - cost);
       if (sale.date > stats.lastSold) stats.lastSold = sale.date;
       
+      // Basic seasonality: If sold recently, it's 'in season'
+      if (sale.date >= thirtyDaysAgo) stats.seasonalScore += 1;
+      
       itemStats.set(name, stats);
     });
 
     // 2. Generate Autonomous Order Recommendations
     const recommendations = Array.from(itemStats.values()).map((stats: any) => {
+      const invItem = inventoryRows.find((i: any) => i.name === stats.name);
       const currentStock = inventoryRows
         .filter((i: any) => i.name === stats.name)
         .reduce((sum: number, i: any) => sum + Number(i.quantity || 0), 0);
       
       const velocity = stats.qtySold30d / 30; // units per day
-      const daysLeft = velocity > 0 ? currentStock / velocity : Infinity;
+      const daysLeft = velocity > 0 ? currentStock / velocity : (currentStock > 0 ? 999 : 0);
       
       let recommendation = 'hold';
-      let reason = 'Stock levels healthy';
+      let reason = 'Stock levels healthy for current demand.';
       let priority = 'low';
 
-      if (daysLeft < 7 && stats.qtySold30d > 0) {
+      if (daysLeft < 10 && stats.qtySold30d > 0) {
         recommendation = 'order';
-        reason = `High velocity (${velocity.toFixed(2)}/day). Runs out in ${daysLeft.toFixed(0)} days.`;
+        reason = `High velocity (${velocity.toFixed(2)}/day). Runs out in ${daysLeft.toFixed(0)} days. Priority replenishment needed.`;
         priority = 'high';
-      } else if (stats.qtySold90d > 10 && currentStock < 5) {
+      } else if (stats.qtySold90d > 15 && currentStock < (velocity * 14)) {
         recommendation = 'order';
-        reason = 'Consistent performer with low baseline stock.';
+        reason = 'Steady performer. Buffer stock is below 14-day safety threshold.';
         priority = 'medium';
-      } else if (stats.qtySold90d === 0 && currentStock > 10) {
+      } else if (stats.qtySold90d === 0 && currentStock > 0) {
         recommendation = 'liquidate';
-        reason = 'No sales in 90 days. Dead stock. Suggest 20% discount.';
+        reason = `Stale stock (${season}). No sales in 90 days. Recommend 25% discount to clear shelf space.`;
         priority = 'info';
       }
 
-      // Calculate suggested order quantity (to last 45 days)
-      const targetStock = Math.ceil(velocity * 45);
-      const orderQty = recommendation === 'order' ? Math.max(0, targetStock - currentStock) : 0;
+      // Smart order quantity: Enough to last 60 days of current velocity
+      const targetStock = Math.ceil(velocity * 60);
+      let orderQty = recommendation === 'order' ? Math.max(0, targetStock - currentStock) : 0;
+      
+      // Round up to case packs if applicable (assume 6 for now)
+      if (orderQty > 0) orderQty = Math.ceil(orderQty / 6) * 6;
 
       return {
         ...stats,
@@ -113,7 +130,8 @@ export async function GET() {
         reason,
         priority,
         suggestedQty: orderQty,
-        estimatedCost: orderQty * (stats.revenue / stats.qtySold90d) * 0.6 // rough cost estimate
+        category: invItem?.category || 'General',
+        estimatedCost: orderQty * (invItem?.landed_cost || (stats.revenue / stats.qtySold90d) * 0.6)
       };
     });
 
