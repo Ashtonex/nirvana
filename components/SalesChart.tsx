@@ -116,7 +116,7 @@ export function SalesChart({ data, forecast }: SalesChartProps) {
                             <Tooltip
                                 contentStyle={{ backgroundColor: "#0f172a", borderColor: "#1e293b", color: "#f8fafc" }}
                                 itemStyle={{ color: "#8b5cf6" }}
-                                formatter={(value: number | undefined) => [`$${(value || 0).toLocaleString()}`, "Revenue"]}
+                                formatter={(value: any) => [`$${(Number(value) || 0).toLocaleString()}`, "Revenue"]}
                             />
                             <Area
                                 type="monotone"
