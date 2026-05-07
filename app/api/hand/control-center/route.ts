@@ -21,6 +21,7 @@ type SaleRow = {
   total_with_tax: number | null;
   total_before_tax: number | null;
   quantity: number | null;
+  payment_method?: string | null;
   date: string | null;
 };
 
@@ -135,7 +136,7 @@ async function fetchAllSalesRows() {
   while (true) {
     const { data, error } = await supabaseAdmin
       .from('sales')
-      .select('shop_id, total_with_tax, total_before_tax, quantity, date')
+      .select('shop_id, total_with_tax, total_before_tax, quantity, payment_method, date')
       .is('deleted_at', null)
       .order('date', { ascending: false })
       .range(from, from + batchSize - 1);
@@ -184,7 +185,7 @@ export async function GET() {
       fetchAllLedgerRows(),
       supabaseAdmin
         .from('sales')
-        .select('shop_id, total_with_tax, total_before_tax, quantity, date')
+        .select('shop_id, total_with_tax, total_before_tax, quantity, payment_method, date')
         .is('deleted_at', null)
         .gte('date', thirtyDaysAgo),
       supabaseAdmin
