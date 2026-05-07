@@ -99,6 +99,19 @@ function detectOverheadCategory(entry: Pick<OperationsRow, 'overhead_category' |
   return 'other';
 }
 
+function isHandOperationalExpense(entry: Pick<LedgerRow, 'type' | 'category' | 'description'>) {
+  if (String(entry.type || '').toLowerCase() !== 'expense') return false;
+  if (isSavingsOrBlackboxTransferEntry(entry)) return false;
+
+  const category = String(entry.category || '');
+  const text = `${entry.category || ''} ${entry.description || ''}`.toLowerCase();
+
+  if (category === 'Perfume' || category === 'Transfer') return false;
+  if (text.includes('perfume')) return false;
+
+  return true;
+}
+
 function hoursSince(dateValue: string | null | undefined) {
   if (!dateValue) return Infinity;
   return (Date.now() - new Date(dateValue).getTime()) / (1000 * 60 * 60);
@@ -412,7 +425,7 @@ export async function GET() {
       );
       const expenseValue30d = sum(
         shopLedger30d
-          .filter((entry) => String(entry.type || '').toLowerCase() === 'expense' || isSavingsOrBlackboxTransferEntry(entry))
+          .filter((entry) => isHandOperationalExpense(entry))
           .map((entry) => entry.amount)
       );
       const opsTransfers = sum(
@@ -459,7 +472,7 @@ export async function GET() {
     const totalSales30d = Number(sum(sales30d.map((sale) => sale.total_with_tax)));
     const totalExpenses30d = Number(sum(
       ledger30d
-        .filter((entry) => String(entry.type || '').toLowerCase() === 'expense' || isSavingsOrBlackboxTransferEntry(entry))
+        .filter((entry) => isHandOperationalExpense(entry))
         .map((entry) => entry.amount)
     ));
     const profit30d = totalSales30d - totalExpenses30d;
