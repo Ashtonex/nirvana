@@ -103,6 +103,54 @@ function hoursSince(dateValue: string | null | undefined) {
   return (Date.now() - new Date(dateValue).getTime()) / (1000 * 60 * 60);
 }
 
+async function fetchAllLedgerRows() {
+  const rows: LedgerRow[] = [];
+  let from = 0;
+  const batchSize = 1000;
+
+  while (true) {
+    const { data, error } = await supabaseAdmin
+      .from('ledger_entries')
+      .select('id, shop_id, amount, type, category, description, date')
+      .is('deleted_at', null)
+      .order('date', { ascending: false })
+      .range(from, from + batchSize - 1);
+
+    if (error) throw new Error(error.message);
+    if (!data || data.length === 0) break;
+
+    rows.push(...(data as LedgerRow[]));
+    if (data.length < batchSize) break;
+    from += batchSize;
+  }
+
+  return rows;
+}
+
+async function fetchAllSalesRows() {
+  const rows: SaleRow[] = [];
+  let from = 0;
+  const batchSize = 1000;
+
+  while (true) {
+    const { data, error } = await supabaseAdmin
+      .from('sales')
+      .select('shop_id, total_with_tax, total_before_tax, quantity, date')
+      .is('deleted_at', null)
+      .order('date', { ascending: false })
+      .range(from, from + batchSize - 1);
+
+    if (error) throw new Error(error.message);
+    if (!data || data.length === 0) break;
+
+    rows.push(...(data as SaleRow[]));
+    if (data.length < batchSize) break;
+    from += batchSize;
+  }
+
+  return rows;
+}
+
 export async function GET() {
   const authError = await enforceOwnerOnly();
   if (authError) return authError;
@@ -115,8 +163,10 @@ export async function GET() {
     const deadStockCutoff = new Date(Date.now() - 60 * 24 * 60 * 60 * 1000).toISOString();
 
     const [
-      { data: salesData },
-      { data: ledgerData },
+      allSales,
+      allLedger,
+      { data: sales30dData },
+      { data: ledger30dData },
       { data: operationsData },
       { data: driftsData },
       { data: investData },
@@ -130,13 +180,17 @@ export async function GET() {
       opsComputedBalance,
       opsState,
     ] = await Promise.all([
+      fetchAllSalesRows(),
+      fetchAllLedgerRows(),
       supabaseAdmin
         .from('sales')
         .select('shop_id, total_with_tax, total_before_tax, quantity, date')
+        .is('deleted_at', null)
         .gte('date', thirtyDaysAgo),
       supabaseAdmin
         .from('ledger_entries')
         .select('id, shop_id, amount, type, category, description, date')
+        .is('deleted_at', null)
         .gte('date', thirtyDaysAgo),
       supabaseAdmin
         .from('operations_ledger')
@@ -189,8 +243,10 @@ export async function GET() {
       localJsonReady = false;
     }
 
-    const sales = (salesData || []) as SaleRow[];
-    const ledger = (ledgerData || []) as LedgerRow[];
+    const sales = allSales as SaleRow[];
+    const ledger = allLedger as LedgerRow[];
+    const sales30d = (sales30dData || []) as SaleRow[];
+    const ledger30d = (ledger30dData || []) as LedgerRow[];
     const operations = (operationsData || []) as OperationsRow[];
     const drifts = driftsData || [];
     const investDeposits = (investData || []) as InvestRow[];
@@ -338,15 +394,23 @@ export async function GET() {
 
     const shopSnapshots = SHOPS.map((shop) => {
       const shopSales = sales.filter((sale) => sale.shop_id === shop.id);
+      const shopSales30d = sales30d.filter((sale) => sale.shop_id === shop.id);
       const shopLedger = ledger.filter((entry) => entry.shop_id === shop.id);
+      const shopLedger30d = ledger30d.filter((entry) => entry.shop_id === shop.id);
       const shopInventory = inventory.filter((item) => item.shop_id === shop.id);
       const lowStockCount = shopInventory.filter((item) => Number(item.quantity || 0) > 0 && Number(item.quantity || 0) <= Number(item.reorder_level || 5)).length;
       const zeroStockCount = shopInventory.filter((item) => Number(item.quantity || 0) <= 0).length;
       const deadStockCount = shopInventory.filter((item) => Number(item.quantity || 0) > 0 && item.created_at && item.created_at < deadStockCutoff).length;
       const openingEntries = sum(shopLedger.filter((entry) => entry.category === 'Cash Drawer Opening').map((entry) => entry.amount));
       const salesValue = sum(shopSales.map((sale) => sale.total_with_tax));
+      const salesValue30d = sum(shopSales30d.map((sale) => sale.total_with_tax));
       const expenseValue = sum(
         shopLedger
+          .filter((entry) => String(entry.type || '').toLowerCase() === 'expense' || isSavingsOrBlackboxTransferEntry(entry))
+          .map((entry) => entry.amount)
+      );
+      const expenseValue30d = sum(
+        shopLedger30d
           .filter((entry) => String(entry.type || '').toLowerCase() === 'expense' || isSavingsOrBlackboxTransferEntry(entry))
           .map((entry) => entry.amount)
       );
@@ -375,8 +439,8 @@ export async function GET() {
       return {
         id: shop.id,
         name: shop.name,
-        sales30d: Number(salesValue),
-        expenses30d: Number(expenseValue),
+        sales30d: Number(salesValue30d),
+        expenses30d: Number(expenseValue30d),
         expectedDrawerCash: Number(expectedDrawerCash),
         openingBalance: Number(openingBalanceMap[shop.id]),
         activeStaff,
@@ -391,9 +455,9 @@ export async function GET() {
       };
     });
 
-    const totalSales30d = Number(sum(sales.map((sale) => sale.total_with_tax)));
+    const totalSales30d = Number(sum(sales30d.map((sale) => sale.total_with_tax)));
     const totalExpenses30d = Number(sum(
-      ledger
+      ledger30d
         .filter((entry) => String(entry.type || '').toLowerCase() === 'expense' || isSavingsOrBlackboxTransferEntry(entry))
         .map((entry) => entry.amount)
     ));
