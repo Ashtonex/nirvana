@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { supabaseAdmin } from "@/lib/supabase";
-import { getOperationsVaultImpact } from "@/lib/operations";
+import { getOperationsVaultImpact, isOverheadContributionKind, isOverheadPaymentKind } from "@/lib/operations";
 
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 
@@ -124,10 +124,10 @@ async function generateOperationsPDF(daysBack: number, data: {
     const impact = getOperationsVaultImpact(row);
     return impact < 0 ? s + impact : s;
   }, 0));
-  const overheadContributions = data.ledger.filter((l) => l.kind === "overhead_contribution");
-  const overheadPayments = data.ledger.filter((l) => l.kind === "overhead_payment" && l.shop_id);
-  const overheadIn = overheadContributions.reduce((s, l) => s + Number(l.amount || 0), 0);
-  const overheadPaid = Math.abs(overheadPayments.reduce((s, l) => s + Number(l.amount || 0), 0));
+  const overheadContributions = data.ledger.filter((l) => isOverheadContributionKind(l.kind));
+  const overheadPayments = data.ledger.filter((l) => isOverheadPaymentKind(l.kind) && l.shop_id);
+  const overheadIn = overheadContributions.reduce((s, l) => s + (Number(l.amount || 0) > 0 ? Number(l.amount || 0) : 0), 0);
+  const overheadPaid = Math.abs(data.ledger.filter(l => isOverheadPaymentKind(l.kind) || (isOverheadContributionKind(l.kind) && Number(l.amount || 0) < 0)).reduce((s, l) => s + Number(l.amount || 0), 0));
   const overheadNet = overheadIn - overheadPaid;
 
   drawText("NIRVANA OPERATIONS REPORT", 20, true, COLORS.header);
@@ -250,12 +250,12 @@ export async function POST(req: Request) {
     const vaultMovements = opsRows.map((r: any) => ({ ...r, vaultImpact: getOperationsVaultImpact(r) }));
     const vaultDeposits = vaultMovements.filter((r: any) => r.vaultImpact > 0);
     const vaultExpenses = vaultMovements.filter((r: any) => r.vaultImpact < 0);
-    const overheadContributions = opsRows.filter((r: any) => r.kind === "overhead_contribution" && r.shop_id);
-    const overheadPayments = opsRows.filter((r: any) => r.kind === "overhead_payment" && r.shop_id);
+    const overheadContributions = opsRows.filter((r: any) => isOverheadContributionKind(r.kind) && r.shop_id);
+    const overheadPayments = opsRows.filter((r: any) => isOverheadPaymentKind(r.kind) && r.shop_id);
     const totalDeposits = vaultDeposits.reduce((sum: number, r: any) => sum + Number(r.vaultImpact || 0), 0);
     const totalExpenses = Math.abs(vaultExpenses.reduce((sum: number, r: any) => sum + Number(r.vaultImpact || 0), 0));
-    const totalOverheadContributed = overheadContributions.reduce((sum: number, r: any) => sum + Number(r.amount || 0), 0);
-    const totalOverheadPaid = Math.abs(overheadPayments.reduce((sum: number, r: any) => sum + Number(r.amount || 0), 0));
+    const totalOverheadContributed = overheadContributions.reduce((sum: number, r: any) => sum + (Number(r.amount || 0) > 0 ? Number(r.amount || 0) : 0), 0);
+    const totalOverheadPaid = Math.abs(opsRows.filter(r => isOverheadPaymentKind(r.kind) || (isOverheadContributionKind(r.kind) && Number(r.amount || 0) < 0)).reduce((sum, r) => sum + Number(r.amount || 0), 0));
     const totalOverheadHeld = totalOverheadContributed - totalOverheadPaid;
     const totalInvest = investRows.reduce((sum: number, d: any) => sum + Number(d.amount || 0), 0);
     const totalLayby = laybyRows.reduce((sum: number, l: any) => sum + Number(l.amount || 0), 0);
@@ -422,8 +422,8 @@ export async function POST(req: Request) {
         const shopVaultImpacts = shopOps.map((r: any) => getOperationsVaultImpact(r));
         const shopDep = shopVaultImpacts.filter((n: number) => n > 0).reduce((s: number, n: number) => s + n, 0);
         const shopExp = Math.abs(shopVaultImpacts.filter((n: number) => n < 0).reduce((s: number, n: number) => s + n, 0));
-        const shopOverheadIn = shopOps.filter((r: any) => r.kind === "overhead_contribution").reduce((s: number, r: any) => s + Number(r.amount || 0), 0);
-        const shopOverheadPaid = Math.abs(shopOps.filter((r: any) => r.kind === "overhead_payment").reduce((s: number, r: any) => s + Number(r.amount || 0), 0));
+        const shopOverheadIn = shopOps.filter((r: any) => isOverheadContributionKind(r.kind)).reduce((s: number, r: any) => s + (Number(r.amount || 0) > 0 ? Number(r.amount || 0) : 0), 0);
+        const shopOverheadPaid = Math.abs(shopOps.filter((r: any) => isOverheadPaymentKind(r.kind) || (isOverheadContributionKind(r.kind) && Number(r.amount || 0) < 0)).reduce((s: number, r: any) => s + Number(r.amount || 0), 0));
         const shopOverheadHeld = shopOverheadIn - shopOverheadPaid;
         const shopNet = shopDep - shopExp;
         return `<tr>

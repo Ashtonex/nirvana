@@ -28,6 +28,7 @@ export function normalizeOperationsKind(kind: unknown) {
 }
 
 export function isVaultDepositKind(kind: unknown) {
+  const k = normalizeOperationsKind(kind);
   return [
     "eod_deposit",
     "savings_deposit",
@@ -41,11 +42,36 @@ export function isVaultDepositKind(kind: unknown) {
     "overhead_rollover",
     "adjustment",
     "drawer_post",
-  ].includes(normalizeOperationsKind(kind));
+    "overhead_contribution",
+    "overhead_deposit",
+    "rent",
+    "salaries",
+    "utilities",
+    "misc",
+  ].includes(k);
 }
 
 export function isShopOverheadKind(kind: unknown) {
-  return ["overhead_contribution", "overhead_payment"].includes(normalizeOperationsKind(kind));
+  const k = normalizeOperationsKind(kind);
+  return [
+    "overhead_contribution",
+    "overhead_payment",
+    "overhead_deposit",
+    "rent",
+    "salaries",
+    "utilities",
+    "misc"
+  ].includes(k);
+}
+
+export function isOverheadContributionKind(kind: unknown) {
+  const k = normalizeOperationsKind(kind);
+  return ["overhead_contribution", "overhead_deposit", "rent", "salaries", "utilities", "misc"].includes(k);
+}
+
+export function isOverheadPaymentKind(kind: unknown) {
+  const k = normalizeOperationsKind(kind);
+  return ["overhead_payment"].includes(k);
 }
 
 export function getOperationsVaultImpact(entry: OperationsLedgerRow) {

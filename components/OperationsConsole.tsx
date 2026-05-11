@@ -157,7 +157,7 @@ export function OperationsConsole({
       "capital_injection",
       "loan_injection",
       "overhead_rollover",
-      "adjustment",
+      "adjustment", "overhead_contribution", "overhead_deposit", "rent", "salaries", "utilities", "misc",
       // keep drawer_post in case older posts use this label for EOD
       "drawer_post",
     ]);
@@ -208,10 +208,14 @@ export function OperationsConsole({
       const entryMonth = entry.created_at?.substring(0, 7);
       if (entryMonth !== currentMonth) return;
 
-      if (entry.kind === "overhead_contribution" && entry.shop_id) {
-        summary[entry.shop_id] = { ...summary[entry.shop_id], contributed: (summary[entry.shop_id]?.contributed || 0) + Number(entry.amount || 0) };
+            if (["overhead_contribution", "rent", "salaries", "utilities", "misc"].includes(String(entry.kind || "").toLowerCase()) && entry.shop_id) {
+
+                if (Number(entry.amount || 0) > 0) summary[entry.shop_id].contributed += Number(entry.amount || 0);
+        else summary[entry.shop_id].paid += Math.abs(Number(entry.amount || 0));
+
       } else if (entry.kind === "overhead_payment" && entry.shop_id) {
-        summary[entry.shop_id] = { ...summary[entry.shop_id], paid: (summary[entry.shop_id]?.paid || 0) + Math.abs(Number(entry.amount || 0)) };
+                summary[entry.shop_id].paid += Math.abs(Number(entry.amount || 0));
+
       }
     });
     Object.values(summary).forEach(s => { s.net = s.contributed - s.paid; });

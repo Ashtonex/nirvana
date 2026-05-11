@@ -20,7 +20,7 @@ export async function POST(req: Request) {
       .select("shop_id, amount, kind, created_at")
       .gte("created_at", monthStart)
       .lt("created_at", nextMonth)
-      .in("kind", ["overhead_contribution", "overhead_payment"]);
+      .in("kind", ["overhead_contribution", "overhead_payment", "overhead_deposit", "rent", "salaries", "utilities", "misc"]);
 
     if (error) {
       console.error("rollover fetch error:", error);
