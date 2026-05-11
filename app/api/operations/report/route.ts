@@ -127,7 +127,7 @@ async function generateOperationsPDF(daysBack: number, data: {
   const overheadContributions = data.ledger.filter((l) => isOverheadContributionKind(l.kind));
   const overheadPayments = data.ledger.filter((l) => isOverheadPaymentKind(l.kind) && l.shop_id);
   const overheadIn = overheadContributions.reduce((s, l) => s + (Number(l.amount || 0) > 0 ? Number(l.amount || 0) : 0), 0);
-  const overheadPaid = Math.abs(data.ledger.filter(l => isOverheadPaymentKind(l.kind) || (isOverheadContributionKind(l.kind) && Number(l.amount || 0) < 0)).reduce((s, l) => s + Number(l.amount || 0), 0));
+  const overheadPaid = Math.abs(data.ledger.filter((l: any) => isOverheadPaymentKind(l.kind) || (isOverheadContributionKind(l.kind) && Number(l.amount || 0) < 0)).reduce((s: number, l: any) => s + Number(l.amount || 0), 0));
   const overheadNet = overheadIn - overheadPaid;
 
   drawText("NIRVANA OPERATIONS REPORT", 20, true, COLORS.header);
@@ -255,7 +255,7 @@ export async function POST(req: Request) {
     const totalDeposits = vaultDeposits.reduce((sum: number, r: any) => sum + Number(r.vaultImpact || 0), 0);
     const totalExpenses = Math.abs(vaultExpenses.reduce((sum: number, r: any) => sum + Number(r.vaultImpact || 0), 0));
     const totalOverheadContributed = overheadContributions.reduce((sum: number, r: any) => sum + (Number(r.amount || 0) > 0 ? Number(r.amount || 0) : 0), 0);
-    const totalOverheadPaid = Math.abs(opsRows.filter(r => isOverheadPaymentKind(r.kind) || (isOverheadContributionKind(r.kind) && Number(r.amount || 0) < 0)).reduce((sum, r) => sum + Number(r.amount || 0), 0));
+    const totalOverheadPaid = Math.abs(opsRows.filter((r: any) => isOverheadPaymentKind(r.kind) || (isOverheadContributionKind(r.kind) && Number(r.amount || 0) < 0)).reduce((sum: number, r: any) => sum + Number(r.amount || 0), 0));
     const totalOverheadHeld = totalOverheadContributed - totalOverheadPaid;
     const totalInvest = investRows.reduce((sum: number, d: any) => sum + Number(d.amount || 0), 0);
     const totalLayby = laybyRows.reduce((sum: number, l: any) => sum + Number(l.amount || 0), 0);
@@ -471,11 +471,14 @@ export async function POST(req: Request) {
       }).join('')}
     </table>` : ''}
 
-    ${overheadPayments.length > 0 ? `<div class="amber">
-      <div class="amber-hdr"><strong>OVERHEAD PAYMENTS (${overheadPayments.length} entries)</strong></div>
+    ${(overheadPayments.length > 0 || opsRows.some((r: any) => isOverheadContributionKind(r.kind) && Number(r.amount) < 0)) ? `<div class="amber">
+
+      <div class="amber-hdr"><strong>OVERHEAD PAYMENTS</strong></div>
+
       <table>
         <tr><th>DATE</th><th>DESCRIPTION</th><th class="r">AMOUNT</th></tr>
-        ${overheadPayments.map((h: any) => `<tr>
+        ${opsRows.filter((r: any) => isOverheadPaymentKind(r.kind) || (isOverheadContributionKind(r.kind) && Number(r.amount) < 0)).map((h: any) => `<tr>
+
           <td>${new Date(h.created_at).toLocaleDateString()}</td>
           <td>${h.title || h.overhead_category || 'Overhead'}</td>
           <td class="rd">-$${Math.abs(Number(h.amount || 0)).toFixed(2)}</td>
