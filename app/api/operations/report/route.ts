@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { supabaseAdmin } from "@/lib/supabase";
+import { getOperationsVaultImpact } from "@/lib/operations";
 
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 
@@ -9,6 +10,42 @@ function startOfDaysBackUTC(daysBack: number) {
   d.setUTCDate(d.getUTCDate() - Math.max(0, Number(daysBack || 7)));
   d.setUTCHours(0, 0, 0, 0);
   return d.toISOString();
+}
+
+function startOfPeriodUTC(period: string, daysBack: number) {
+  const d = new Date();
+  if (period === "day") {
+    d.setUTCHours(0, 0, 0, 0);
+    return d.toISOString();
+  }
+  if (period === "week") {
+    const day = d.getUTCDay();
+    const diff = d.getUTCDate() - day + (day === 0 ? -6 : 1);
+    d.setUTCDate(diff);
+    d.setUTCHours(0, 0, 0, 0);
+    return d.toISOString();
+  }
+  if (period === "month") {
+    d.setUTCDate(1);
+    d.setUTCHours(0, 0, 0, 0);
+    return d.toISOString();
+  }
+  if (period === "year") {
+    d.setUTCMonth(0, 1);
+    d.setUTCHours(0, 0, 0, 0);
+    return d.toISOString();
+  }
+  return startOfDaysBackUTC(daysBack);
+}
+
+function periodLabel(period: string, daysBack: number) {
+  const labels: Record<string, string> = {
+    day: "Today",
+    week: "This Week",
+    month: "This Month",
+    year: "This Year",
+  };
+  return labels[period] || `Last ${daysBack} Days`;
 }
 
 function winAnsiSafe(text: any) {
@@ -43,6 +80,7 @@ async function generateOperationsPDF(daysBack: number, data: {
   investDeposits: any[];
   sales: any[];
   shops: any[];
+  periodLabel: string;
 }) {
   const pdf = await PDFDocument.create();
   const pageSize: [number, number] = [595.28, 841.89];
@@ -77,20 +115,34 @@ async function generateOperationsPDF(daysBack: number, data: {
   };
 
   // Header
+  const vaultImpact = data.ledger.reduce((s, row) => s + getOperationsVaultImpact(row), 0);
+  const vaultIn = data.ledger.reduce((s, row) => {
+    const impact = getOperationsVaultImpact(row);
+    return impact > 0 ? s + impact : s;
+  }, 0);
+  const vaultOut = Math.abs(data.ledger.reduce((s, row) => {
+    const impact = getOperationsVaultImpact(row);
+    return impact < 0 ? s + impact : s;
+  }, 0));
+  const overheadContributions = data.ledger.filter((l) => l.kind === "overhead_contribution");
+  const overheadPayments = data.ledger.filter((l) => l.kind === "overhead_payment" && l.shop_id);
+  const overheadIn = overheadContributions.reduce((s, l) => s + Number(l.amount || 0), 0);
+  const overheadPaid = Math.abs(overheadPayments.reduce((s, l) => s + Number(l.amount || 0), 0));
+  const overheadNet = overheadIn - overheadPaid;
+
   drawText("NIRVANA OPERATIONS REPORT", 20, true, COLORS.header);
-  drawText(`Period: Last ${daysBack} Days | Generated: ${new Date().toLocaleString()}`, 10, false, COLORS.neutral);
+  drawText(`Period: ${data.periodLabel} | Generated: ${new Date().toLocaleString()}`, 10, false, COLORS.neutral);
   y -= 20;
   drawLine(COLORS.header, 2);
 
   // 1. FINANCIAL SUMMARY
-  const totalIncome = data.ledger.filter(l => l.amount > 0).reduce((s, l) => s + Number(l.amount), 0);
-  const totalExpense = data.ledger.filter(l => l.amount < 0).reduce((s, l) => s + Math.abs(Number(l.amount)), 0);
   const totalInvest = data.investDeposits.reduce((s, d) => s + Number(d.amount), 0);
   
   drawText("1. EXECUTIVE SUMMARY", 14, true, COLORS.primary);
-  drawText(`Total Operations Income: $${totalIncome.toFixed(2)}`, 11, true, COLORS.profit);
-  drawText(`Total Operations Expenses: -$${totalExpense.toFixed(2)}`, 11, true, COLORS.expense);
-  drawText(`Net Operations Position: $${(totalIncome - totalExpense).toFixed(2)}`, 11, true, (totalIncome - totalExpense) >= 0 ? COLORS.profit : COLORS.expense);
+  drawText(`Master Vault In: $${vaultIn.toFixed(2)}`, 11, true, COLORS.profit);
+  drawText(`Master Vault Out: -$${vaultOut.toFixed(2)}`, 11, true, COLORS.expense);
+  drawText(`Net Master Vault Movement: $${vaultImpact.toFixed(2)}`, 11, true, vaultImpact >= 0 ? COLORS.profit : COLORS.expense);
+  drawText(`Shop Overhead Held: $${overheadNet.toFixed(2)} (${overheadIn.toFixed(2)} set aside - ${overheadPaid.toFixed(2)} paid)`, 10, false, COLORS.neutral);
   y -= 10;
   drawText(`Total Investment Capital: $${totalInvest.toFixed(2)}`, 11, true, COLORS.primary);
   y -= 20;
@@ -111,7 +163,7 @@ async function generateOperationsPDF(daysBack: number, data: {
   // 3. LEDGER HIGHLIGHTS
   ensureSpace(300);
   drawText("3. KEY OPERATIONS MOVEMENTS", 14, true, COLORS.primary);
-  const topOps = data.ledger.sort((a, b) => Math.abs(b.amount) - Math.abs(a.amount)).slice(0, 15);
+  const topOps = [...data.ledger].sort((a, b) => Math.abs(b.amount) - Math.abs(a.amount)).slice(0, 15);
   topOps.forEach(l => {
     ensureSpace(40);
     const color = l.amount < 0 ? COLORS.expense : COLORS.profit;
@@ -127,6 +179,8 @@ async function generateOperationsPDF(daysBack: number, data: {
 export async function POST(req: Request) {
   const body = await req.json().catch(() => ({}));
   const daysBack = Number(body?.daysBack || 7);
+  const period = String(body?.period || "");
+  const reportPeriodLabel = periodLabel(period, daysBack);
 
   const cookieStore = await cookies();
   const staffToken = cookieStore.get("nirvana_staff")?.value;
@@ -138,7 +192,7 @@ export async function POST(req: Request) {
   }
 
   try {
-    const since = startOfDaysBackUTC(daysBack);
+    const since = startOfPeriodUTC(period, daysBack);
 
     const { data: shops } = await supabaseAdmin.from('shops').select('id, name, expenses');
     const shopList = shops || [];
@@ -180,7 +234,8 @@ export async function POST(req: Request) {
         ledger: opsRows,
         investDeposits: investRows,
         sales: salesRows,
-        shops: shopList
+        shops: shopList,
+        periodLabel: reportPeriodLabel
       });
       return new Response(pdfBytes as any, {
         headers: {
@@ -192,30 +247,34 @@ export async function POST(req: Request) {
 
     const filename = `ops-report-${new Date().toISOString().split('T')[0]}.html`;
 
-    const opsDeposits = opsRows.filter((r: any) => r.amount >= 0);
-    const opsExpenses = opsRows.filter((r: any) => r.amount < 0);
-    const totalDeposits = opsDeposits.reduce((sum: number, r: any) => sum + Number(r.amount || 0), 0);
-    const totalExpenses = Math.abs(opsExpenses.reduce((sum: number, r: any) => sum + Number(r.amount || 0), 0));
+    const vaultMovements = opsRows.map((r: any) => ({ ...r, vaultImpact: getOperationsVaultImpact(r) }));
+    const vaultDeposits = vaultMovements.filter((r: any) => r.vaultImpact > 0);
+    const vaultExpenses = vaultMovements.filter((r: any) => r.vaultImpact < 0);
+    const overheadContributions = opsRows.filter((r: any) => r.kind === "overhead_contribution" && r.shop_id);
+    const overheadPayments = opsRows.filter((r: any) => r.kind === "overhead_payment" && r.shop_id);
+    const totalDeposits = vaultDeposits.reduce((sum: number, r: any) => sum + Number(r.vaultImpact || 0), 0);
+    const totalExpenses = Math.abs(vaultExpenses.reduce((sum: number, r: any) => sum + Number(r.vaultImpact || 0), 0));
+    const totalOverheadContributed = overheadContributions.reduce((sum: number, r: any) => sum + Number(r.amount || 0), 0);
+    const totalOverheadPaid = Math.abs(overheadPayments.reduce((sum: number, r: any) => sum + Number(r.amount || 0), 0));
+    const totalOverheadHeld = totalOverheadContributed - totalOverheadPaid;
     const totalInvest = investRows.reduce((sum: number, d: any) => sum + Number(d.amount || 0), 0);
     const totalLayby = laybyRows.reduce((sum: number, l: any) => sum + Number(l.amount || 0), 0);
     const globalRevenue = salesRows.reduce((sum: number, s: any) => sum + Number(s.total_with_tax || 0), 0);
     const netOps = totalDeposits - totalExpenses;
 
     const expenseByCategory: Record<string, number> = {};
-    opsExpenses.forEach((r: any) => {
+    vaultExpenses.forEach((r: any) => {
       const cat = r.kind || 'other';
-      expenseByCategory[cat] = (expenseByCategory[cat] || 0) + Math.abs(Number(r.amount || 0));
+      expenseByCategory[cat] = (expenseByCategory[cat] || 0) + Math.abs(Number(r.vaultImpact || 0));
     });
     const sortedExpenses = Object.entries(expenseByCategory).sort((a, b) => Number(b[1]) - Number(a[1]));
 
     const depositByCategory: Record<string, number> = {};
-    opsDeposits.forEach((r: any) => {
+    vaultDeposits.forEach((r: any) => {
       const cat = r.kind || 'other';
-      depositByCategory[cat] = (depositByCategory[cat] || 0) + Number(r.amount || 0);
+      depositByCategory[cat] = (depositByCategory[cat] || 0) + Number(r.vaultImpact || 0);
     });
     const sortedDeposits = Object.entries(depositByCategory).sort((a, b) => Number(b[1]) - Number(a[1]));
-
-    const overheadPayments = opsRows.filter((r: any) => r.kind === 'overhead_payment');
 
     const suggestions: string[] = [];
     if (totalExpenses > totalDeposits) {
@@ -224,6 +283,9 @@ export async function POST(req: Request) {
     const largestExpense = sortedExpenses[0];
     if (largestExpense) {
       suggestions.push(`Largest: "${largestExpense[0]}" at $${Number(largestExpense[1]).toFixed(2)}`);
+    }
+    if (totalOverheadHeld > 0) {
+      suggestions.push(`Shop overhead held outside Master Vault: $${totalOverheadHeld.toFixed(2)}`);
     }
     if (totalInvest > 0) {
       suggestions.push(`Invest/Perfume: $${totalInvest.toFixed(2)}`);
@@ -337,35 +399,38 @@ export async function POST(req: Request) {
 <div class="wrap">
   <div class="header">
     <h1>OPERATIONS REPORT</h1>
-    <p>${shopList.length} Shops &nbsp;|&nbsp; ${startDateDisplay} — ${endDateDisplay} &nbsp;|&nbsp; ${daysBack} days &nbsp;|&nbsp; Generated: ${new Date().toLocaleString()}</p>
+    <p>${shopList.length} Shops &nbsp;|&nbsp; ${startDateDisplay} — ${endDateDisplay} &nbsp;|&nbsp; ${reportPeriodLabel} &nbsp;|&nbsp; Generated: ${new Date().toLocaleString()}</p>
   </div>
   <div class="content">
     <div class="kpi-row">
-      <div class="kpi green"><p class="lbl">TOTAL DEPOSITS</p><p class="val">$${totalDeposits.toFixed(2)}</p><p class="sub">${opsDeposits.length} entries</p></div>
-      <div class="kpi red"><p class="lbl">TOTAL EXPENSES</p><p class="val">$${totalExpenses.toFixed(2)}</p><p class="sub">${opsExpenses.length} entries</p></div>
-      <div class="kpi purple"><p class="lbl">INVEST/PERFUME</p><p class="val">$${totalInvest.toFixed(2)}</p><p class="sub">${investRows.length} deposits</p></div>
-      <div class="kpi blue"><p class="lbl">NET OPS</p><p class="val" style="color:${netOps >= 0 ? '#10b981' : '#ef4444'};">${netOps >= 0 ? '+' : ''}$${netOps.toFixed(2)}</p><p class="sub">Deposits - Expenses</p></div>
+      <div class="kpi green"><p class="lbl">VAULT IN</p><p class="val">$${totalDeposits.toFixed(2)}</p><p class="sub">${vaultDeposits.length} vault entries</p></div>
+      <div class="kpi red"><p class="lbl">VAULT OUT</p><p class="val">$${totalExpenses.toFixed(2)}</p><p class="sub">${vaultExpenses.length} vault entries</p></div>
+      <div class="kpi purple"><p class="lbl">SHOP OVERHEAD HELD</p><p class="val">$${totalOverheadHeld.toFixed(2)}</p><p class="sub">$${totalOverheadContributed.toFixed(2)} set aside</p></div>
+      <div class="kpi blue"><p class="lbl">NET VAULT</p><p class="val" style="color:${netOps >= 0 ? '#10b981' : '#ef4444'};">${netOps >= 0 ? '+' : ''}$${netOps.toFixed(2)}</p><p class="sub">Vault in - vault out</p></div>
     </div>
     <div class="sec-row">
       <div class="sec"><p class="lbl">POS REVENUE</p><p class="val">$${globalRevenue.toFixed(2)}</p><p class="sub">${salesRows.length} sales</p></div>
       <div class="sec"><p class="lbl">LAY-BY</p><p class="val gold">$${totalLayby.toFixed(2)}</p><p class="sub">${laybyRows.length} txns</p></div>
-      <div class="sec"><p class="lbl">OVERHEAD PAID</p><p class="val yellow">$${overheadPayments.reduce((s: number, n: any) => s+Math.abs(Number(n?.amount||0)), 0).toFixed(2)}</p><p class="sub">${overheadPayments.length} payments</p></div>
+      <div class="sec"><p class="lbl">OVERHEAD PAID</p><p class="val yellow">$${totalOverheadPaid.toFixed(2)}</p><p class="sub">${overheadPayments.length} shop payments</p></div>
     </div>
 
     <table class="card">
       <tr><td colspan="5" class="thdr"><strong>BY-SHOP CASH FLOW SUMMARY</strong></td></tr>
-      <tr><th>SHOP</th><th class="r">DEPOSITS</th><th class="r">EXPENSES</th><th class="r">INVEST</th><th class="r">NET</th></tr>
+      <tr><th>SHOP</th><th class="r">VAULT IN</th><th class="r">VAULT OUT</th><th class="r">OVERHEAD HELD</th><th class="r">NET VAULT</th></tr>
       ${shopList.map((shop: any) => {
         const shopOps = opsRows.filter((r: any) => r.shop_id === shop.id);
-        const shopDep = shopOps.filter((r: any) => r.amount >= 0).reduce((s: number, r: any) => s + Number(r.amount || 0), 0);
-        const shopExp = Math.abs(shopOps.filter((r: any) => r.amount < 0).reduce((s: number, r: any) => s + Number(r.amount || 0), 0));
-        const shopInv = investRows.filter((d: any) => d.shop_id === shop.id).reduce((s: number, d: any) => s + Number(d.amount || 0), 0);
+        const shopVaultImpacts = shopOps.map((r: any) => getOperationsVaultImpact(r));
+        const shopDep = shopVaultImpacts.filter((n: number) => n > 0).reduce((s: number, n: number) => s + n, 0);
+        const shopExp = Math.abs(shopVaultImpacts.filter((n: number) => n < 0).reduce((s: number, n: number) => s + n, 0));
+        const shopOverheadIn = shopOps.filter((r: any) => r.kind === "overhead_contribution").reduce((s: number, r: any) => s + Number(r.amount || 0), 0);
+        const shopOverheadPaid = Math.abs(shopOps.filter((r: any) => r.kind === "overhead_payment").reduce((s: number, r: any) => s + Number(r.amount || 0), 0));
+        const shopOverheadHeld = shopOverheadIn - shopOverheadPaid;
         const shopNet = shopDep - shopExp;
         return `<tr>
           <td class="b">${shop.name}</td>
           <td class="r g">$${shopDep.toFixed(2)}</td>
           <td class="r rd">$${shopExp.toFixed(2)}</td>
-          <td class="r p">$${shopInv.toFixed(2)}</td>
+          <td class="r p">$${shopOverheadHeld.toFixed(2)}</td>
           <td class="r b" style="color:${shopNet >= 0 ? '#10b981' : '#ef4444'};">${shopNet >= 0 ? '+' : ''}$${shopNet.toFixed(2)}</td>
         </tr>`;
       }).join('')}
@@ -373,17 +438,17 @@ export async function POST(req: Request) {
         <td>TOTAL</td>
         <td class="r">$${totalDeposits.toFixed(2)}</td>
         <td class="r">$${totalExpenses.toFixed(2)}</td>
-        <td class="r">$${totalInvest.toFixed(2)}</td>
+        <td class="r">$${totalOverheadHeld.toFixed(2)}</td>
         <td class="r" style="color:${netOps >= 0 ? '#10b981' : '#ef4444'};">${netOps >= 0 ? '+' : ''}$${netOps.toFixed(2)}</td>
       </tr>
     </table>
 
     ${sortedDeposits.length > 0 ? `<table class="card">
       <tr><td colspan="3" class="thdr"><strong>DEPOSIT BREAKDOWN</strong></td></tr>
-      ${sortedDeposits.slice(0, 8).map(([cat, amount]) => {
+      ${sortedDeposits.slice(0, 8).map(([cat, amount], index) => {
         const pct = ((Number(amount) / (totalDeposits || 1)) * 100).toFixed(0);
         return `<div class="br">
-          <div class="br-num">${sortedDeposits.indexOf([cat, amount]) + 1}</div>
+          <div class="br-num">${index + 1}</div>
           <div class="br-inner">
             <div class="br-meta"><span class="br-label">${kindLabel(cat)}</span><span class="br-val g">$${Number(amount).toFixed(2)} <span class="br-pct">(${pct}%)</span></span></div>
             <div class="br-bar"><div class="br-fill g" style="width:${pct}%;"></div></div>
@@ -394,10 +459,10 @@ export async function POST(req: Request) {
 
     ${sortedExpenses.length > 0 ? `<table class="card">
       <tr><td colspan="3" class="thdr"><strong>EXPENSE BREAKDOWN</strong></td></tr>
-      ${sortedExpenses.slice(0, 8).map(([cat, amount]) => {
+      ${sortedExpenses.slice(0, 8).map(([cat, amount], index) => {
         const pct = ((Number(amount) / (totalExpenses || 1)) * 100).toFixed(0);
         return `<div class="br">
-          <div class="br-num">${sortedExpenses.indexOf([cat, amount]) + 1}</div>
+          <div class="br-num">${index + 1}</div>
           <div class="br-inner">
             <div class="br-meta"><span class="br-label">${kindLabel(cat)}</span><span class="br-val rd">$${Number(amount).toFixed(2)} <span class="br-pct">(${pct}%)</span></span></div>
             <div class="br-bar"><div class="br-fill rd" style="width:${pct}%;"></div></div>

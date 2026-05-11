@@ -17,12 +17,14 @@ export async function GET() {
     const [
       { data: sales },
       { data: inventory },
+      { data: shipments },
       { data: shops },
       { data: operationsState },
       { data: ledgerEntries }
     ] = await Promise.all([
-      supabaseAdmin.from('sales').select('*').gte('date', ninetyDaysAgo),
+      supabaseAdmin.from('sales').select('*'),
       supabaseAdmin.from('inventory_items').select('*'),
+      supabaseAdmin.from('shipments').select('*'),
       supabaseAdmin.from('shops').select('*'),
       supabaseAdmin.from('operations_state').select('*').eq('id', 1).maybeSingle(),
       supabaseAdmin.from('operations_ledger').select('*').gte('created_at', thirtyDaysAgo)
@@ -30,6 +32,7 @@ export async function GET() {
 
     const salesRows = sales || [];
     const inventoryRows = inventory || [];
+    const shipmentRows = shipments || [];
     const shopRows = shops || [];
     const actualVault = Number(operationsState?.actual_balance || 0);
 
@@ -153,6 +156,190 @@ export async function GET() {
       };
     });
 
+    // 4. Shipment-level truth: every batch gets its own mini P&L.
+    const itemById = new Map<string, any>(inventoryRows.map((item: any) => [String(item.id), item]));
+    const shipmentMap = new Map<string, any>();
+
+    shipmentRows.forEach((shipment: any) => {
+      const id = String(shipment.id || shipment.shipment_number || 'UNKNOWN');
+      shipmentMap.set(id, {
+        id,
+        shipmentNumber: shipment.shipment_number || id,
+        supplier: shipment.supplier || 'Unknown supplier',
+        date: shipment.date || null,
+        recordedCost:
+          Number(shipment.purchase_price || 0) +
+          Number(shipment.shipping_cost || 0) +
+          Number(shipment.duty_cost || 0) +
+          Number(shipment.misc_cost || 0),
+        itemCount: 0,
+        currentUnits: 0,
+        soldUnits: 0,
+        recentSoldUnits: 0,
+        estimatedOriginalUnits: 0,
+        estimatedCost: 0,
+        remainingCost: 0,
+        revenue: 0,
+        grossProfit: 0,
+        lastSold: null,
+        fastestMover: null,
+        slowestMover: null,
+        items: new Map<string, any>(),
+      });
+    });
+
+    inventoryRows.forEach((item: any) => {
+      const shipmentId = String(item.shipment_id || 'UNASSIGNED');
+      if (!shipmentMap.has(shipmentId)) {
+        shipmentMap.set(shipmentId, {
+          id: shipmentId,
+          shipmentNumber: shipmentId,
+          supplier: shipmentId.includes('ADHOC') || shipmentId.includes('UNTRACKED') ? 'Ad-hoc / POS created' : 'Unknown supplier',
+          date: item.date_added || null,
+          recordedCost: 0,
+          itemCount: 0,
+          currentUnits: 0,
+          soldUnits: 0,
+          recentSoldUnits: 0,
+          estimatedOriginalUnits: 0,
+          estimatedCost: 0,
+          remainingCost: 0,
+          revenue: 0,
+          grossProfit: 0,
+          lastSold: null,
+          fastestMover: null,
+          slowestMover: null,
+          items: new Map<string, any>(),
+        });
+      }
+
+      const shipment = shipmentMap.get(shipmentId);
+      const currentQty = Number(item.quantity || 0);
+      const unitCost = Number(item.landed_cost || item.acquisition_price || 0);
+      shipment.itemCount += 1;
+      shipment.currentUnits += currentQty;
+      shipment.remainingCost += currentQty * unitCost;
+      shipment.items.set(String(item.id), {
+        id: String(item.id),
+        name: item.name || 'Unknown item',
+        category: item.category || 'General',
+        currentQty,
+        soldQty: 0,
+        recentSoldQty: 0,
+        unitCost,
+        revenue: 0,
+        grossProfit: 0,
+        lastSold: null,
+      });
+    });
+
+    salesRows.forEach((sale: any) => {
+      const item = itemById.get(String(sale.item_id || ''));
+      if (!item) return;
+
+      const shipmentId = String(item.shipment_id || 'UNASSIGNED');
+      const shipment = shipmentMap.get(shipmentId);
+      if (!shipment) return;
+
+      const itemStats = shipment.items.get(String(item.id));
+      if (!itemStats) return;
+
+      const qty = Number(sale.quantity || 0);
+      const revenue = Number(sale.total_with_tax || 0);
+      const cost = Number(item.landed_cost || item.acquisition_price || 0) * qty;
+
+      shipment.soldUnits += qty;
+      if (sale.date >= ninetyDaysAgo) shipment.recentSoldUnits += qty;
+      shipment.revenue += revenue;
+      shipment.grossProfit += revenue - cost;
+      shipment.lastSold = !shipment.lastSold || sale.date > shipment.lastSold ? sale.date : shipment.lastSold;
+
+      itemStats.soldQty += qty;
+      if (sale.date >= ninetyDaysAgo) itemStats.recentSoldQty += qty;
+      itemStats.revenue += revenue;
+      itemStats.grossProfit += revenue - cost;
+      itemStats.lastSold = !itemStats.lastSold || sale.date > itemStats.lastSold ? sale.date : itemStats.lastSold;
+    });
+
+    const shipmentAnalysis = Array.from(shipmentMap.values()).map((shipment: any) => {
+      const itemList = Array.from(shipment.items.values()).map((item: any) => {
+        const originalQty = item.currentQty + item.soldQty;
+        const sellThrough = originalQty > 0 ? (item.soldQty / originalQty) * 100 : 0;
+        return {
+          ...item,
+          originalQty,
+          sellThrough,
+        };
+      });
+
+      itemList.forEach((item: any) => {
+        shipment.estimatedOriginalUnits += item.originalQty;
+        shipment.estimatedCost += item.originalQty * item.unitCost;
+      });
+
+      const activeItems = itemList.filter((item: any) => item.originalQty > 0);
+      shipment.fastestMover = [...activeItems].sort((a: any, b: any) => b.sellThrough - a.sellThrough)[0] || null;
+      shipment.slowestMover = [...activeItems].sort((a: any, b: any) => a.sellThrough - b.sellThrough)[0] || null;
+
+      const costBasis = shipment.estimatedCost || shipment.recordedCost;
+      const sellThrough = shipment.estimatedOriginalUnits > 0
+        ? (shipment.soldUnits / shipment.estimatedOriginalUnits) * 100
+        : 0;
+      const recoveredPct = costBasis > 0 ? (shipment.revenue / costBasis) * 100 : 0;
+      const roi = costBasis > 0 ? (shipment.grossProfit / costBasis) * 100 : 0;
+      const dailyVelocity = shipment.recentSoldUnits / 90;
+      const daysLeft = dailyVelocity > 0 ? shipment.currentUnits / dailyVelocity : (shipment.currentUnits > 0 ? 999 : 0);
+
+      let status = 'monitor';
+      const flags: string[] = [];
+      if (roi > 25 && sellThrough > 50) {
+        status = 'winning';
+        flags.push('Profitable shipment with healthy sell-through.');
+      }
+      if (recoveredPct < 70 && sellThrough > 60) {
+        status = 'margin-risk';
+        flags.push('Units are moving but shipment cost is not recovered fast enough.');
+      }
+      if (sellThrough < 25 && shipment.currentUnits > 0) {
+        status = 'slow';
+        flags.push('Slow sell-through; consider price, display, or transfer action.');
+      }
+      if (daysLeft < 14 && shipment.currentUnits > 0) {
+        flags.push(`Running out soon: about ${daysLeft.toFixed(0)} days left at current velocity.`);
+      }
+      if (shipment.currentUnits === 0 && roi > 0) {
+        status = 'sold-through';
+        flags.push('Sold through with positive return.');
+      }
+
+      return {
+        id: shipment.id,
+        shipmentNumber: shipment.shipmentNumber,
+        supplier: shipment.supplier,
+        date: shipment.date,
+        itemCount: shipment.itemCount,
+        originalUnits: shipment.estimatedOriginalUnits,
+        soldUnits: shipment.soldUnits,
+        currentUnits: shipment.currentUnits,
+        costBasis,
+        remainingCost: shipment.remainingCost,
+        revenue: shipment.revenue,
+        grossProfit: shipment.grossProfit,
+        roi,
+        recoveredPct,
+        sellThrough,
+        daysLeft,
+        status,
+        flags,
+        fastestMover: shipment.fastestMover,
+        slowestMover: shipment.slowestMover,
+        items: itemList.sort((a: any, b: any) => b.grossProfit - a.grossProfit).slice(0, 8),
+      };
+    }).sort((a: any, b: any) => {
+      const statusWeight: Record<string, number> = { winning: 4, 'margin-risk': 3, slow: 2, monitor: 1, 'sold-through': 0 };
+      return (statusWeight[b.status] || 0) - (statusWeight[a.status] || 0) || b.grossProfit - a.grossProfit;
+    });
+
     return NextResponse.json({
       success: true,
       analysis: {
@@ -166,7 +353,8 @@ export async function GET() {
         if (a.priority === 'high' && b.priority !== 'high') return -1;
         return b.profit - a.profit;
       }),
-      shopAllocations
+      shopAllocations,
+      shipmentAnalysis
     });
 
   } catch (error: any) {

@@ -15,6 +15,59 @@ export type OperationsLedgerKind =
 
 export type OverheadCategory = "rent" | "salaries" | "utilities" | "misc";
 
+type OperationsLedgerRow = {
+  amount?: unknown;
+  kind?: unknown;
+  shop_id?: unknown;
+  shopId?: unknown;
+  [key: string]: unknown;
+};
+
+export function normalizeOperationsKind(kind: unknown) {
+  return String(kind || "").toLowerCase();
+}
+
+export function isVaultDepositKind(kind: unknown) {
+  return [
+    "eod_deposit",
+    "savings_deposit",
+    "savings_contribution",
+    "savings",
+    "blackbox",
+    "black_box",
+    "black-box",
+    "capital_injection",
+    "loan_injection",
+    "overhead_rollover",
+    "adjustment",
+    "drawer_post",
+  ].includes(normalizeOperationsKind(kind));
+}
+
+export function isShopOverheadKind(kind: unknown) {
+  return ["overhead_contribution", "overhead_payment"].includes(normalizeOperationsKind(kind));
+}
+
+export function getOperationsVaultImpact(entry: OperationsLedgerRow) {
+  const amount = Number(entry.amount || 0);
+  const kind = normalizeOperationsKind(entry.kind);
+  const shopId = entry.shop_id ?? entry.shopId;
+
+  if (!Number.isFinite(amount) || amount === 0) return 0;
+
+  if (amount > 0 && isVaultDepositKind(kind)) {
+    return amount;
+  }
+
+  // Shop-scoped overhead payments reduce that shop's overhead balance only.
+  // Global/admin negative entries are true vault outflows.
+  if (amount < 0 && (!shopId || shopId === "global")) {
+    return amount;
+  }
+
+  return 0;
+}
+
 export async function getOperationsComputedBalance(month?: string) {
   let query = supabaseAdmin.from("operations_ledger").select("amount, kind, shop_id");
 
@@ -30,30 +83,9 @@ export async function getOperationsComputedBalance(month?: string) {
     throw new Error(error.message);
   }
 
-  // Vault deposits: ONLY these kinds increase the global vault balance.
-  // Overhead contributions (rent, salaries, overhead_contribution, etc.) go to the
-  // per-shop overhead tracker and do NOT inflate the vault.
-  const vaultDepositKinds = [
-    'eod_deposit',
-    'savings_deposit', 'savings_contribution', 'savings',
-    'blackbox', 'black_box', 'black-box',
-    'capital_injection', 'loan_injection',
-    'adjustment',
-  ];
-
   let balance = 0;
-  (data || []).forEach((row: any) => {
-    const amt = Number(row.amount || 0);
-    const k = String(row.kind || "").toLowerCase();
-    
-    // Deposits into the vault (EOD, savings, blackbox, capital)
-    if (amt > 0 && vaultDepositKinds.includes(k)) {
-      balance += amt;
-    }
-    // Expenses from the vault (admin-level deductions only — no shop_id or 'global')
-    else if (amt < 0 && (!row.shop_id || row.shop_id === 'global')) {
-      balance += amt; // amount is negative, so it reduces balance
-    }
+  (data || []).forEach((row: OperationsLedgerRow) => {
+    balance += getOperationsVaultImpact(row);
   });
   
   return balance;
@@ -85,9 +117,9 @@ export async function createOperationsLedgerEntry(input: {
   notes?: string | null;
   effectiveDate?: string | null; // YYYY-MM-DD
   employeeId?: string | null;
-  metadata?: any;
+  metadata?: Record<string, unknown>;
 }) {
-  const row: any = {
+  const row: Record<string, unknown> = {
     amount: Number(input.amount || 0),
     kind: String(input.kind || "adjustment"),
     shop_id: input.shopId ?? null,
@@ -120,8 +152,7 @@ export async function listOperationsLedgerEntries(limit = 50, filters?: { month?
     query = query.gte("created_at", `${month}-01T00:00:00Z`)
                  .lt("created_at", new Date(new Date(`${month}-01T00:00:00Z`).setMonth(new Date(`${month}-01`).getMonth() + 1)).toISOString());
   } else if (filters?.period && filters.period !== 'all') {
-    const now = new Date();
-    let start = new Date();
+    const start = new Date();
     
     if (filters.period === 'day') {
       start.setHours(0, 0, 0, 0);

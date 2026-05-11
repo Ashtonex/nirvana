@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { requirePrivilegedActor, requireStaffActor, isPrivilegedRole } from "@/lib/apiAuth";
-import { createOperationsLedgerEntry, listOperationsLedgerEntries } from "@/lib/operations";
+import { createOperationsLedgerEntry, getOperationsVaultImpact, listOperationsLedgerEntries } from "@/lib/operations";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -72,9 +72,10 @@ export async function POST(req: Request) {
       metadata: body?.metadata || {},
     });
 
-    // When manually entering from Operations console, update the actual balance
-    // This keeps the delta from artificially skewing when paying expenses or manually depositing
-    if (amount !== 0) {
+    // Only true vault movements change the physical master vault.
+    // Shop overhead contributions/payments stay on the shop overhead tracker until rollover.
+    const vaultImpact = getOperationsVaultImpact({ amount, kind, shop_id: shopId });
+    if (vaultImpact !== 0) {
       const { supabaseAdmin } = await import('@/lib/supabase');
       const { data: currentState } = await supabaseAdmin
         .from('operations_state')
@@ -82,7 +83,7 @@ export async function POST(req: Request) {
         .eq('id', 1)
         .maybeSingle();
 
-      const newBalance = Number(currentState?.actual_balance || 0) + amount;
+      const newBalance = Number(currentState?.actual_balance || 0) + vaultImpact;
       await supabaseAdmin
         .from('operations_state')
         .upsert({ 

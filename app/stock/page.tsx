@@ -110,6 +110,28 @@ const generatePDF = async (data: any) => {
     headStyles: { fillColor: [225, 29, 72] }
   });
 
+  if (data.shipmentAnalysis?.length) {
+    doc.text('III. SHIPMENT PERFORMANCE', 15, (doc as any).lastAutoTable.finalY + 15);
+    const shipmentData = data.shipmentAnalysis.slice(0, 12).map((s: any) => [
+      s.shipmentNumber,
+      s.supplier,
+      `${s.sellThrough.toFixed(0)}%`,
+      `$${s.revenue.toLocaleString()}`,
+      `$${s.grossProfit.toLocaleString()}`,
+      `${s.roi.toFixed(0)}%`,
+      s.status.toUpperCase()
+    ]);
+
+    (doc as any).autoTable({
+      startY: (doc as any).lastAutoTable.finalY + 20,
+      head: [['Shipment', 'Supplier', 'Sold', 'Revenue', 'Profit', 'ROI', 'Signal']],
+      body: shipmentData,
+      theme: 'striped',
+      headStyles: { fillColor: [15, 23, 42] },
+      styles: { fontSize: 8 }
+    });
+  }
+
   doc.save(`Nirvana_Order_${date.replace(/\//g, '-')}.pdf`);
 };
 
@@ -169,6 +191,7 @@ export default function StockIntelligencePage() {
 
   const recommendations = data?.recommendations || [];
   const analysis = data?.analysis || {};
+  const shipmentAnalysis = data?.shipmentAnalysis || [];
 
   return (
     <div className="min-h-screen bg-[#020617] text-slate-200 font-sans selection:bg-rose-500/30 overflow-x-hidden pb-20">
@@ -292,6 +315,139 @@ export default function StockIntelligencePage() {
 
           {/* Directives Engine */}
           <section className="lg:col-span-9 space-y-10">
+            {shipmentAnalysis.length > 0 && (
+              <div className="space-y-6">
+                <div className="flex items-center justify-between border-b border-white/5 pb-6">
+                  <div>
+                    <h2 className="text-2xl font-black uppercase tracking-tighter text-white">Shipment Performance</h2>
+                    <p className="text-[10px] font-black text-slate-600 uppercase tracking-widest mt-1">
+                      Cost recovery, sell-through, ROI, and stock pressure by shipment
+                    </p>
+                  </div>
+                  <Badge className="bg-sky-500/10 text-sky-400 border-sky-500/20 text-[9px] font-black uppercase tracking-widest">
+                    {shipmentAnalysis.length} Batches
+                  </Badge>
+                </div>
+
+                <div className="grid gap-5 xl:grid-cols-2">
+                  {shipmentAnalysis.slice(0, 6).map((shipment: any) => {
+                    const isPositive = shipment.grossProfit >= 0;
+                    const urgency = shipment.daysLeft < 14 && shipment.currentUnits > 0;
+                    return (
+                      <div
+                        key={shipment.id}
+                        className={cn(
+                          "rounded-[32px] border p-6 bg-white/[0.03] transition-all hover:bg-white/[0.05]",
+                          shipment.status === 'winning' ? "border-emerald-500/20" :
+                          shipment.status === 'margin-risk' ? "border-amber-500/25" :
+                          shipment.status === 'slow' ? "border-rose-500/25" : "border-white/5"
+                        )}
+                      >
+                        <div className="flex items-start justify-between gap-4">
+                          <div>
+                            <div className="flex items-center gap-3">
+                              <div className="h-10 w-10 rounded-2xl bg-slate-950 border border-white/10 flex items-center justify-center">
+                                <Warehouse className="h-5 w-5 text-sky-400" />
+                              </div>
+                              <div>
+                                <h3 className="text-lg font-black text-white tracking-tight">{shipment.shipmentNumber}</h3>
+                                <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest">
+                                  {shipment.supplier} • {shipment.itemCount} items
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                          <Badge
+                            className={cn(
+                              "border-none text-[8px] font-black uppercase tracking-widest",
+                              shipment.status === 'winning' ? "bg-emerald-500/15 text-emerald-400" :
+                              shipment.status === 'margin-risk' ? "bg-amber-500/15 text-amber-300" :
+                              shipment.status === 'slow' ? "bg-rose-500/15 text-rose-400" :
+                              "bg-slate-500/15 text-slate-400"
+                            )}
+                          >
+                            {shipment.status.replace('-', ' ')}
+                          </Badge>
+                        </div>
+
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-6">
+                          <div className="rounded-2xl bg-black/30 border border-white/5 p-4">
+                            <p className="text-[8px] font-black text-slate-600 uppercase tracking-widest">Cost</p>
+                            <p className="text-sm font-black text-white font-mono mt-1">{currency(shipment.costBasis)}</p>
+                          </div>
+                          <div className="rounded-2xl bg-black/30 border border-white/5 p-4">
+                            <p className="text-[8px] font-black text-slate-600 uppercase tracking-widest">Revenue</p>
+                            <p className="text-sm font-black text-white font-mono mt-1">{currency(shipment.revenue)}</p>
+                          </div>
+                          <div className="rounded-2xl bg-black/30 border border-white/5 p-4">
+                            <p className="text-[8px] font-black text-slate-600 uppercase tracking-widest">Profit</p>
+                            <p className={cn("text-sm font-black font-mono mt-1", isPositive ? "text-emerald-400" : "text-rose-400")}>
+                              {currency(shipment.grossProfit)}
+                            </p>
+                          </div>
+                          <div className="rounded-2xl bg-black/30 border border-white/5 p-4">
+                            <p className="text-[8px] font-black text-slate-600 uppercase tracking-widest">ROI</p>
+                            <p className={cn("text-sm font-black font-mono mt-1", shipment.roi >= 0 ? "text-emerald-400" : "text-rose-400")}>
+                              {shipment.roi.toFixed(1)}%
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="mt-6 space-y-4">
+                          <div>
+                            <div className="flex justify-between text-[9px] font-black uppercase tracking-widest mb-2">
+                              <span className="text-slate-500">Sell-through</span>
+                              <span className="text-slate-300">{shipment.soldUnits}/{shipment.originalUnits} units • {shipment.sellThrough.toFixed(0)}%</span>
+                            </div>
+                            <Progress value={Math.min(100, shipment.sellThrough)} className="h-2 bg-slate-950" />
+                          </div>
+
+                          <div className="flex flex-wrap gap-2 text-[9px] font-black uppercase tracking-widest">
+                            <span className="px-3 py-1.5 rounded-full bg-white/5 text-slate-400">
+                              Remaining: {shipment.currentUnits} units / {currency(shipment.remainingCost)}
+                            </span>
+                            <span className={cn("px-3 py-1.5 rounded-full", urgency ? "bg-rose-500/15 text-rose-400" : "bg-white/5 text-slate-400")}>
+                              Cover: {shipment.daysLeft === 999 ? "No recent velocity" : `${shipment.daysLeft.toFixed(0)} days`}
+                            </span>
+                          </div>
+
+                          {(shipment.fastestMover || shipment.slowestMover) && (
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                              {shipment.fastestMover && (
+                                <div className="rounded-2xl bg-emerald-500/5 border border-emerald-500/10 p-4">
+                                  <p className="text-[8px] font-black text-emerald-400 uppercase tracking-widest">Fastest mover</p>
+                                  <p className="text-xs font-black text-white mt-1">{shipment.fastestMover.name}</p>
+                                  <p className="text-[10px] text-slate-500 mt-1">{shipment.fastestMover.sellThrough.toFixed(0)}% sold</p>
+                                </div>
+                              )}
+                              {shipment.slowestMover && (
+                                <div className="rounded-2xl bg-rose-500/5 border border-rose-500/10 p-4">
+                                  <p className="text-[8px] font-black text-rose-400 uppercase tracking-widest">Slowest mover</p>
+                                  <p className="text-xs font-black text-white mt-1">{shipment.slowestMover.name}</p>
+                                  <p className="text-[10px] text-slate-500 mt-1">{shipment.slowestMover.sellThrough.toFixed(0)}% sold</p>
+                                </div>
+                              )}
+                            </div>
+                          )}
+
+                          {shipment.flags.length > 0 && (
+                            <div className="rounded-2xl bg-slate-950/70 border border-white/5 p-4 space-y-2">
+                              {shipment.flags.map((flag: string, index: number) => (
+                                <p key={index} className="text-[10px] text-slate-400 leading-relaxed flex gap-2">
+                                  <span className="mt-1 h-1.5 w-1.5 rounded-full bg-sky-400 flex-none" />
+                                  {flag}
+                                </p>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
             <div className="flex items-center justify-between border-b border-white/5 pb-6">
               <div className="flex items-center gap-10">
                 <h2 className="text-2xl font-black uppercase tracking-tighter text-white">Deployment Orders</h2>

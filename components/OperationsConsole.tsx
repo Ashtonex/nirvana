@@ -15,6 +15,21 @@ function detectOverheadCategory(title: string): string {
   return "misc";
 }
 
+const overheadExpenseCategories = new Set(["overhead_payment", "rent", "utilities", "salaries", "misc"]);
+
+function resolveEntryKind(isExpense: boolean, category: string) {
+  if (!isExpense) return category;
+  return overheadExpenseCategories.has(category) ? "overhead_payment" : category;
+}
+
+function resolveOverheadCategory(isExpense: boolean, category: string, title: string) {
+  if (!isExpense && category === "overhead_contribution") return detectOverheadCategory(title);
+  if (isExpense && overheadExpenseCategories.has(category)) {
+    return category === "overhead_payment" ? detectOverheadCategory(title) : category;
+  }
+  return null;
+}
+
 function AnimatedNumber({ value, prefix = "", suffix = "" }: { value: number; prefix?: string; suffix?: string }) {
   const [display, setDisplay] = useState(0);
   const prevRef = useRef(0);
@@ -125,6 +140,7 @@ export function OperationsConsole({
   const [activeTab, setActiveTab] = useState<"overview" | "stockvel" | "moneybrain">("overview");
   const [selectedShop, setSelectedShop] = useState<string>("all");
   const [selectedPeriod, setSelectedPeriod] = useState<"day" | "week" | "month" | "year" | "all">("all");
+  const [reportPeriod, setReportPeriod] = useState<"day" | "week" | "month" | "year">("week");
 
   const [opsState, setOpsState] = useState<OpsState>(initialState);
 
@@ -140,6 +156,7 @@ export function OperationsConsole({
       "black-box",
       "capital_injection",
       "loan_injection",
+      "overhead_rollover",
       "adjustment",
       // keep drawer_post in case older posts use this label for EOD
       "drawer_post",
@@ -390,6 +407,8 @@ export function OperationsConsole({
     setBusy(true);
     try {
       const amount = isExpense ? -displayAmount : displayAmount;
+      const kind = resolveEntryKind(isExpense, form.category);
+      const overheadCategory = resolveOverheadCategory(isExpense, form.category, form.title);
       
       const res = await fetch("/api/operations/ledger", {
         method: "POST",
@@ -397,9 +416,9 @@ export function OperationsConsole({
         credentials: "include",
         body: JSON.stringify({
           amount,
-          kind: isExpense ? "overhead_payment" : form.category,
+          kind,
           shopId: form.shopId || null,
-          overheadCategory: form.category === "overhead_contribution" ? detectOverheadCategory(form.title) : null,
+          overheadCategory,
           title: form.title,
           effectiveDate: form.date,
 
@@ -456,21 +475,22 @@ export function OperationsConsole({
   };
 
   const handleGenerateReport = async () => {
-    if (!confirm("Download operations report for the last 7 days?")) return;
+    const reportLabels = { day: "today", week: "this week", month: "this month", year: "this year" };
+    if (!confirm(`Download PDF operations report for ${reportLabels[reportPeriod]}?`)) return;
     setIsGeneratingReport(true);
     try {
       const res = await fetch("/api/operations/report", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ daysBack: 7 }),
+        body: JSON.stringify({ period: reportPeriod, format: "pdf" }),
       });
       if (!res.ok) throw new Error("Failed to generate report");
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `ops-report-${new Date().toISOString().split("T")[0]}.html`;
+      a.download = `ops-report-${reportPeriod}-${new Date().toISOString().split("T")[0]}.pdf`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -662,7 +682,17 @@ export function OperationsConsole({
       )}
 
       {/* Generate Report Button */}
-      <div className="flex justify-center">
+      <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
+        <select
+          value={reportPeriod}
+          onChange={(e) => setReportPeriod(e.target.value as any)}
+          className="bg-slate-900 border border-slate-800 text-slate-200 text-xs font-black uppercase px-3 py-2 rounded-md"
+        >
+          <option value="day">Today</option>
+          <option value="week">This Week</option>
+          <option value="month">This Month</option>
+          <option value="year">This Year</option>
+        </select>
         <Button
           disabled={isGeneratingReport}
           onClick={handleGenerateReport}
@@ -676,7 +706,7 @@ export function OperationsConsole({
           ) : (
             <>
               <Download className="h-4 w-4 mr-2" />
-              Generate Operations Report
+              Download PDF Report
             </>
           )}
         </Button>
