@@ -9,7 +9,7 @@ import { sendEmail } from "@/lib/email";
 import { sendWhatsAppMessage } from "@/lib/twilio";
 import { cookies } from "next/headers";
 import { computePosAuditReport } from "@/lib/posAudit";
-import { createOperationsLedgerEntry } from "@/lib/operations";
+import { createOperationsLedgerEntry, isVaultDepositKind } from "@/lib/operations";
 import { getSavingsTransferCategory, isSavingsOrBlackboxTransferEntry } from "@/lib/transfer-classification";
 
 function getPublicBaseUrl() {
@@ -2122,14 +2122,18 @@ export async function postDrawerToOperations(input: { shopId: string; amount: nu
             title: ({eod_deposit:"EOD Transfer",savings_deposit:"Savings Deposit",blackbox:"Black Box Deposit",overhead_contribution:"Overhead Contribution",rent:"Rent Contribution",salaries:"Salaries Contribution"})[kind] || "Operations Transfer",
             notes: notes ? `POS → Operations: ${notes}` : "Auto-posted from POS Drawer",
             effectiveDate: dayStamp,
-            employeeId: actor.id
+            employeeId: actor.id,
+            metadata: {
+                source: "pos_drawer",
+                drawerLedgerId,
+                postedBy: actor.kind,
+            },
         });
 
         // Update the actual balance in operations_state
         // Only vault-increasing kinds update actual_balance: eod_deposit, savings_deposit, blackbox
         // Overhead kinds (overhead_contribution, rent, salaries) do NOT update vault
-        const vaultKinds = ["eod_deposit", "savings_deposit", "blackbox"];
-        if (vaultKinds.includes(kind)) {
+        if (isVaultDepositKind(kind)) {
             const { data: currentState } = await supabaseAdmin
                 .from('operations_state')
                 .select('actual_balance')

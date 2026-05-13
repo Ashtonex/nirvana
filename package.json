@@ -7,9 +7,20 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "analytics:forecast": ".venv\\Scripts\\python.exe -m analytics.nirvana_analytics.demand_forecast",
+    "analytics:expenses": ".venv\\Scripts\\python.exe -m analytics.nirvana_analytics.expense_anomaly",
+    "analytics:inventory": ".venv\\Scripts\\python.exe -m analytics.nirvana_analytics.inventory_velocity",
+    "analytics:capital": ".venv\\Scripts\\python.exe -m analytics.nirvana_analytics.capital_allocation",
+    "analytics:forecast:save": ".venv\\Scripts\\python.exe -m analytics.nirvana_analytics.demand_forecast --save-db",
+    "analytics:expenses:save": ".venv\\Scripts\\python.exe -m analytics.nirvana_analytics.expense_anomaly --save-db",
+    "analytics:inventory:save": ".venv\\Scripts\\python.exe -m analytics.nirvana_analytics.inventory_velocity --save-db",
+    "analytics:capital:save": ".venv\\Scripts\\python.exe -m analytics.nirvana_analytics.capital_allocation --save-db",
+    "analytics:snapshot": "npm run analytics:forecast:save && npm run analytics:expenses:save && npm run analytics:inventory:save && npm run analytics:capital:save",
     "build:mobile": "npx cap sync",
     "open:android": "npx cap open android",
-    "open:ios": "npx cap open ios"
+    "open:ios": "npx cap open ios",
+    "intelligence:dev": "uvicorn intelligence.main:app --reload",
+    "intelligence:forecast": "python -m intelligence.models.inventory_forecast"
   },
   "dependencies": {
     "@ai-sdk/openai": "^3.0.27",

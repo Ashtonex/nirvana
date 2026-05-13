@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { requirePrivilegedActor } from "@/lib/apiAuth";
-import { getOperationsComputedBalance } from "@/lib/operations";
+import { getOperationsComputedBalance, isPosOriginOperationsEntry, isSavingsOrBlackboxOperationsKind } from "@/lib/operations";
 import { supabaseAdmin } from "@/lib/supabase";
 
 export const runtime = "nodejs";
@@ -63,14 +63,12 @@ export async function GET() {
 
     const { data: opsLedgerRows } = await supabaseAdmin
       .from("operations_ledger")
-      .select("amount, kind, shop_id");
+      .select("amount, kind, shop_id, title, notes, metadata");
 
     const opsSavingsByShop: Record<string, number> = {};
     (opsLedgerRows || []).forEach((r: any) => {
       const shop = r.shop_id || "unknown";
-      const k = String(r.kind || "").toLowerCase();
-      // Treat these kinds as savings/vault commitments from POS
-      if (["eod_deposit", "savings_contribution", "savings_deposit", "savings", "blackbox", "black_box", "black-box"].includes(k)) {
+      if (Number(r.amount || 0) > 0 && isSavingsOrBlackboxOperationsKind(r.kind) && isPosOriginOperationsEntry(r)) {
         if (!opsSavingsByShop[shop]) opsSavingsByShop[shop] = 0;
         opsSavingsByShop[shop] += Number(r.amount || 0);
       }
@@ -89,7 +87,7 @@ export async function GET() {
     const monthlyOverheadByShop: Record<string, number> = {};
     (monthlyOverhead || []).forEach((r: any) => {
       if (r.shop_id) {
-        monthlyOverheadByShop[r.shop_id] = (monthlyOverheadByShop[r.shop_id] || 0) + Number(r.amount || 0);
+        monthlyOverheadByShop[r.shop_id] = (monthlyOverheadByShop[r.shop_id] || 0) + Math.abs(Number(r.amount || 0));
       }
     });
 

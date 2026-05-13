@@ -6,6 +6,8 @@ import { Coins, Loader2, Trash2, ArrowRightLeft, DollarSign, History, TrendingUp
 import { cn } from "@/components/ui";
 import { StockvelPanel } from "@/components/StockvelPanel";
 import { MoneyAuditBrain } from "@/components/MoneyAuditBrain";
+import { NirvanaIntelligenceCards } from "@/components/NirvanaIntelligenceCards";
+import { getOperationsVaultImpact, isOverheadContributionKind, isOverheadPaymentKind } from "@/lib/operations";
 
 function detectOverheadCategory(title: string): string {
   const t = title.toLowerCase();
@@ -73,6 +75,7 @@ type LedgerEntry = {
   overhead_category?: string;
   title?: string;
   notes?: string;
+  metadata?: Record<string, unknown>;
   created_at: string;
 };
 
@@ -144,48 +147,11 @@ export function OperationsConsole({
 
   const [opsState, setOpsState] = useState<OpsState>(initialState);
 
-  const masterVault = useMemo(() => {
-    // Vault-committed POS kinds (these should increase the Vault when posted from POS)
-    const vaultKinds = new Set([
-      "eod_deposit",
-      "savings_contribution",
-      "savings_deposit",
-      "savings",
-      "blackbox",
-      "black_box",
-      "black-box",
-      "capital_injection",
-      "loan_injection",
-      "overhead_rollover",
-      "adjustment", "overhead_contribution", "overhead_deposit", "rent", "salaries", "utilities", "misc",
-      // keep drawer_post in case older posts use this label for EOD
-      "drawer_post",
-    ]);
+  const masterVault = opsState?.computedBalance || 0;
 
-    return ledger.reduce((sum, entry) => {
-      try {
-        const amt = Number(entry.amount || 0);
-        const k = String(entry.kind || "").toLowerCase();
-        
-        // Deposits into the vault
-        if (amt > 0 && vaultKinds.has(k)) {
-          return sum + amt;
-        }
-        // Expenses from the vault (admin-level deductions only)
-        else if (amt < 0 && (!entry.shop_id || entry.shop_id === 'global')) {
-          return sum + amt;
-        }
-        
-        // Some older POS flows annotate notes without a canonical kind
-        if (amt > 0 && entry.notes && String(entry.notes).includes("Auto-posted from POS Drawer")) {
-          return sum + amt;
-        }
-      } catch (e) {
-        // ignore problematic rows
-      }
-      return sum;
-    }, 0);
-  }, [ledger]);
+  const totalSavings = useMemo(() => {
+    return Object.values(opsState?.savings?.byShop || {}).reduce((sum, val) => sum + val, 0);
+  }, [opsState?.savings?.byShop]);
 
   const isPrivileged = useMemo(() => {
     const role = (currentStaffUser?.role || "").toString().toLowerCase();
@@ -204,18 +170,20 @@ export function OperationsConsole({
       summary[shop.id] = { shopId: shop.id, shopName: shop.name, contributed: 0, paid: 0, net: 0 };
     });
     ledger.forEach(entry => {
-      // Only include current month for the overhead tracker "reset"
       const entryMonth = entry.created_at?.substring(0, 7);
       if (entryMonth !== currentMonth) return;
 
-            if (["overhead_contribution", "rent", "salaries", "utilities", "misc"].includes(String(entry.kind || "").toLowerCase()) && entry.shop_id) {
+      const kind = entry.kind;
+      const amount = Number(entry.amount || 0);
+      const shopId = entry.shop_id;
 
-                if (Number(entry.amount || 0) > 0) summary[entry.shop_id].contributed += Number(entry.amount || 0);
-        else summary[entry.shop_id].paid += Math.abs(Number(entry.amount || 0));
+      if (!shopId || !summary[shopId]) return;
 
-      } else if (entry.kind === "overhead_payment" && entry.shop_id) {
-                summary[entry.shop_id].paid += Math.abs(Number(entry.amount || 0));
-
+      if (isOverheadContributionKind(kind)) {
+        if (amount > 0) summary[shopId].contributed += amount;
+        else summary[shopId].paid += Math.abs(amount);
+      } else if (isOverheadPaymentKind(kind)) {
+        summary[shopId].paid += Math.abs(amount);
       }
     });
     Object.values(summary).forEach(s => { s.net = s.contributed - s.paid; });
@@ -548,8 +516,13 @@ export function OperationsConsole({
         <MoneyAuditBrain shops={shops} />
       ) : (
         <>
+      {/* Intelligence Smart Cards */}
+      <div className="mb-6">
+        <NirvanaIntelligenceCards />
+      </div>
+
       {/* Top Cards Row */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card className="bg-gradient-to-br from-emerald-950/60 to-slate-950 border-emerald-800/40">
           <CardHeader className="pb-2">
             <CardDescription className="text-[10px] font-black uppercase tracking-widest text-emerald-500/70 flex items-center gap-1">
@@ -573,12 +546,27 @@ export function OperationsConsole({
           </CardContent>
         </Card>
 
+        <Card className="bg-gradient-to-br from-cyan-950/60 to-slate-950 border-cyan-800/40">
+          <CardHeader className="pb-2">
+            <CardDescription className="text-[10px] font-black uppercase tracking-widest text-cyan-500/70 flex items-center gap-1">
+              <Coins className="h-3 w-3" /> POS Savings
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="text-4xl font-black italic text-cyan-300 font-mono">
+              $<AnimatedNumber value={totalSavings} />
+            </div>
+            <p className="text-[10px] text-slate-500 mt-1">Savings & Blackbox deposits from POS only</p>
+          </CardContent>
+        </Card>
+
         <Card className="bg-gradient-to-br from-sky-950/60 to-slate-950 border-sky-800/40">
           <CardHeader className="pb-2">
             <CardDescription className="text-[10px] font-black uppercase tracking-widest text-sky-500/70 flex items-center gap-1">
               <TrendingUp className="h-3 w-3" /> Invest
             </CardDescription>
           </CardHeader>
+
           <CardContent>
             <div className="text-4xl font-black italic text-sky-300 font-mono">
               $<AnimatedNumber value={investTotal} />
@@ -610,14 +598,14 @@ export function OperationsConsole({
             <Card key={shop.id} className="bg-gradient-to-br from-cyan-950/40 to-slate-950 border-cyan-800/30">
               <CardHeader className="pb-2">
                 <CardDescription className="text-[10px] font-black uppercase tracking-widest text-cyan-500/70">
-                  {shop.name} Savings
+                  {shop.name} POS Savings
                 </CardDescription>
               </CardHeader>
               <CardContent>
                       <div className="text-2xl font-black italic tracking-tighter text-white">
                         $<AnimatedNumber value={shopSavings} />
                       </div>
-                <p className="text-[10px] text-slate-500 mt-1">Total committed to ops</p>
+                <p className="text-[10px] text-slate-500 mt-1">Savings & Blackbox from POS</p>
               </CardContent>
             </Card>
           );
@@ -1055,7 +1043,7 @@ export function OperationsConsole({
                       <div className={cn("text-xl font-black font-mono italic", isIncome ? "text-emerald-400" : "text-rose-400")}>
                         {isIncome ? "+" : ""}{Number(entry.amount).toFixed(2)}
                       </div>
-                      {isOverhead && editingId !== entry.id && (
+                      {isPrivileged && editingId !== entry.id && (
                         <Button size="sm" variant="ghost" onClick={() => { setEditingId(entry.id); setEditKind(entry.kind); }} className="h-8 w-8 p-0 text-slate-600 hover:text-amber-400">
                           <Edit className="h-4 w-4" />
                         </Button>

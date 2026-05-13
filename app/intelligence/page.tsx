@@ -4,15 +4,22 @@ import { getOracleMasterPulse } from "../actions";
 import { OraclePulse } from "@/components/OraclePulse";
 import { MonthlyReportGenerator } from "@/components/MonthlyReportGenerator";
 import { StrategicReportVault } from "@/components/StrategicReportVault";
+import { AnalyticsPulse } from "@/components/AnalyticsPulse";
+import { AnalyticsRunner } from "@/components/AnalyticsRunner";
+import { getLatestAnalyticsResults } from "@/lib/analytics-results";
 import { Badge } from "@/components/ui";
 import { AlertCircle, Calendar, Compass, Flame, ShieldCheck } from "lucide-react";
 
 export default async function IntelligencePage() {
   let pulse: any = null;
+  let analyticsResults: Awaited<ReturnType<typeof getLatestAnalyticsResults>> = {};
   let error: unknown = null;
 
   try {
-    pulse = await getOracleMasterPulse();
+    [pulse, analyticsResults] = await Promise.all([
+      getOracleMasterPulse(),
+      getLatestAnalyticsResults(),
+    ]);
   } catch (e) {
     console.error("[Intelligence] getOracleMasterPulse failed:", e);
     error = e;
@@ -87,6 +94,13 @@ export default async function IntelligencePage() {
           <Badge className="bg-sky-500/10 text-sky-500 border-sky-500/20 px-3 py-1 font-black uppercase text-[10px] italic">
             <Calendar className="h-3 w-3 mr-2" /> Daily Sync: 18:00
           </Badge>
+        </div>
+      </div>
+
+      <div className="max-w-6xl mx-auto px-4">
+        <div className="space-y-4">
+          <AnalyticsRunner />
+          <AnalyticsPulse results={analyticsResults} />
         </div>
       </div>
 

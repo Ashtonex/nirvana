@@ -1,4 +1,10 @@
 {
+    "python.defaultInterpreterPath": "${workspaceFolder}\\.venv\\Scripts\\python.exe",
+    "jupyter.notebookFileRoot": "${workspaceFolder}",
+    "terminal.integrated.env.windows": {
+        "MPLCONFIGDIR": "${workspaceFolder}\\.mplconfig",
+        "PYTHONDONTWRITEBYTECODE": "1"
+    },
     "chat.tools.terminal.autoApprove": {
         "/^git status --porcelain; git rev-parse --abbrev-ref HEAD ; true; git checkout -B updates; git add -A; git commit -m \"Operations: full-width layout, vault classification, monthly rollover \\+ scheduler\" ; echo \"no-commit\"; git push -u origin updates$/": {
             "approve": true,

@@ -33,6 +33,7 @@ import {
     Check,
     AlertCircle
 } from "lucide-react";
+import { InventoryIntelligenceCard } from "@/components/InventoryIntelligenceCard";
 import { updateGlobalExpenses, processShipment, registerInventoryItem, registerBulkInventoryItems, updateInventoryItem, deleteInventoryItem } from "../actions";
 
 export default function InventoryMaster({ db }: { db: any }) {
@@ -709,6 +710,7 @@ export default function InventoryMaster({ db }: { db: any }) {
                             </CardTitle>
                         </CardHeader>
                         <CardContent className="p-6 space-y-6">
+                            <InventoryIntelligenceCard />
                             {/* Search Bar */}
                             <div className="flex gap-3">
                                 <div className="flex-1 relative">

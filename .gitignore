@@ -26,6 +26,9 @@ android/gradle/gradle-daemon-jvm.properties
 # misc
 .DS_Store
 *.pem
+__pycache__/
+*.py[cod]
+.mplconfig/
 
 # debug
 npm-debug.log*

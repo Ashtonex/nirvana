@@ -20,6 +20,9 @@ type OperationsLedgerRow = {
   kind?: unknown;
   shop_id?: unknown;
   shopId?: unknown;
+  notes?: unknown;
+  title?: unknown;
+  metadata?: unknown;
   [key: string]: unknown;
 };
 
@@ -42,13 +45,21 @@ export function isVaultDepositKind(kind: unknown) {
     "overhead_rollover",
     "adjustment",
     "drawer_post",
-    "overhead_contribution",
-    "overhead_deposit",
-    "rent",
-    "salaries",
-    "utilities",
-    "misc",
   ].includes(k);
+}
+
+export function isSavingsOrBlackboxOperationsKind(kind: unknown) {
+  const k = normalizeOperationsKind(kind);
+  return ["savings_deposit", "savings_contribution", "savings", "blackbox", "black_box", "black-box"].includes(k);
+}
+
+export function isPosOriginOperationsEntry(entry: OperationsLedgerRow) {
+  const metadata = entry.metadata && typeof entry.metadata === "object" ? entry.metadata as Record<string, unknown> : {};
+  const source = String(metadata.source || metadata.origin || "").toLowerCase();
+  if (source === "pos" || source === "pos_drawer" || source === "pos_page") return true;
+
+  const text = `${entry.title || ""} ${entry.notes || ""}`.toLowerCase();
+  return text.includes("pos") || text.includes("drawer");
 }
 
 export function isShopOverheadKind(kind: unknown) {
@@ -85,9 +96,10 @@ export function getOperationsVaultImpact(entry: OperationsLedgerRow) {
     return amount;
   }
 
-  // Shop-scoped overhead payments reduce that shop's overhead balance only.
-  // Global/admin negative entries are true vault outflows.
-  if (amount < 0 && (!shopId || shopId === "global")) {
+  // Any negative operations ledger entry is an outflow from the master vault, 
+  // regardless of whether it is shop-scoped (like a specific shop's rent) or global.
+  // This ensures the Master Vault reflects immediate impacts from overhead payments.
+  if (amount < 0) {
     return amount;
   }
 
