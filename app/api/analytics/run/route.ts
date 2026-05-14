@@ -12,17 +12,34 @@ const JOBS: Record<AnalyticsKind, any> = {
   capital_allocation: {},
 };
 
-async function runJob(kind: AnalyticsKind, baseUrl: string) {
+async function runJob(kind: AnalyticsKind, baseUrl: string, incomingHeaders: Headers) {
   try {
     const bridgeUrl = `${baseUrl}/api/py/analytics/run?kind=${kind}`;
+    
+    // Forward the cookie to bypass Vercel Deployment Protection on previews
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+    };
+    
+    const cookie = incomingHeaders.get("cookie");
+    if (cookie) headers["cookie"] = cookie;
+    
+    // Also forward Vercel protection bypass header if present
+    const bypass = incomingHeaders.get("x-vercel-protection-bypass");
+    if (bypass) headers["x-vercel-protection-bypass"] = bypass;
+
     const res = await fetch(bridgeUrl, { 
       method: "POST",
-      headers: { "Content-Type": "application/json" }
+      headers
     });
     
     if (!res.ok) {
       const errorText = await res.text();
-      throw new Error(`Python bridge failed (${res.status}): ${errorText}`);
+      // If it's still 401, provide a cleaner error
+      if (res.status === 401) {
+        throw new Error("Authentication failed at Python bridge. If on Vercel, ensure Deployment Protection allows internal API calls or pass a bypass token.");
+      }
+      throw new Error(`Python bridge failed (${res.status}): ${errorText.slice(0, 200)}...`);
     }
 
     const data = await res.json();
@@ -70,7 +87,7 @@ export async function POST(req: Request) {
 
   const results = [];
   for (const kind of kinds) {
-    results.push(await runJob(kind, baseUrl));
+    results.push(await runJob(kind, baseUrl, req.headers));
   }
 
   return NextResponse.json({
