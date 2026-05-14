@@ -17,7 +17,14 @@ app.add_middleware(
 
 @app.get("/")
 async def root():
-    return {"message": "Nirvana Intelligence Engine is running"}
+    import os
+    return {
+        "message": "Nirvana Intelligence Engine is running",
+        "env_check": {
+            "has_url": bool(os.getenv("NEXT_PUBLIC_SUPABASE_URL") or os.getenv("SUPABASE_URL")),
+            "has_key": bool(os.getenv("SUPABASE_SERVICE_ROLE_KEY") or os.getenv("SUPABASE_ANON_KEY") or os.getenv("SUPABASE_SERVICE_KEY")),
+        }
+    }
 
 @app.post("/api/py/analytics/run")
 async def run_analytics_job(kind: str = Query("all")):
