@@ -76,13 +76,9 @@ export async function POST(req: Request) {
       }
     }
 
-    // Update operations_state actual_balance by adding totalRolled
-    if (totalRolled > 0) {
-      const { data: state } = await supabaseAdmin.from("operations_state").select("actual_balance").eq("id", 1).maybeSingle();
-      const prev = Number(state?.actual_balance || 0);
-      const newBalance = prev + totalRolled;
-      await supabaseAdmin.from("operations_state").upsert({ id: 1, actual_balance: newBalance, updated_at: timestamp });
-    }
+    // Note: No vault update here anymore. 
+    // Since overhead contributions and payments now impact the vault immediately,
+    // the running balance is already correct. Rollover now only creates historical entries.
 
     return NextResponse.json({ success: true, rolled, totalRolled });
   } catch (e: any) {

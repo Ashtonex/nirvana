@@ -3,14 +3,21 @@ import { supabaseAdmin } from "@/lib/supabase";
 export type OperationsLedgerKind =
   | "eod_deposit"
   | "overhead_deposit"
+  | "overhead_contribution"
   | "overhead_payment"
   | "order_payment"
+  | "stock_orders"
   | "business_expense"
+  | "other_expense"
   | "capital_injection"
   | "loan_injection"
+  | "loan_received"
   | "loan_payment"
   | "peer_contribution"
+  | "peer_transfer"
   | "peer_payout"
+  | "other_income"
+  | "transport"
   | "adjustment";
 
 export type OverheadCategory = "rent" | "salaries" | "utilities" | "misc";
@@ -42,7 +49,12 @@ export function isVaultDepositKind(kind: unknown) {
     "black-box",
     "capital_injection",
     "loan_injection",
-    "overhead_rollover",
+    "loan_received",
+    "other_income",
+    "peer_transfer",
+    "peer_contribution",
+    "overhead_contribution",
+    "overhead_deposit",
     "adjustment",
     "drawer_post",
   ].includes(k);

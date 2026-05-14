@@ -27,14 +27,27 @@ class NirvanaFrames:
 
 
 def get_client() -> Client:
-    url = os.getenv("NEXT_PUBLIC_SUPABASE_URL") or os.getenv("SUPABASE_URL")
+    url = (
+        os.getenv("NEXT_PUBLIC_SUPABASE_URL")
+        or os.getenv("SUPABASE_URL")
+        or os.getenv("SUPABASE_SERVICE_URL")
+    )
     key = (
         os.getenv("SUPABASE_SERVICE_ROLE_KEY")
         or os.getenv("NEXT_PUBLIC_SUPABASE_ANON_KEY")
         or os.getenv("SUPABASE_ANON_KEY")
+        or os.getenv("SUPABASE_SERVICE_KEY")
     )
     if not url or not key:
-        raise RuntimeError("Missing Supabase env: NEXT_PUBLIC_SUPABASE_URL and a Supabase key are required.")
+        # If running in a context where we can't get envs, try a local check
+        if os.path.exists(".env.local"):
+            load_dotenv(".env.local")
+            url = os.getenv("NEXT_PUBLIC_SUPABASE_URL") or os.getenv("SUPABASE_URL")
+            key = os.getenv("SUPABASE_SERVICE_ROLE_KEY") or os.getenv("NEXT_PUBLIC_SUPABASE_ANON_KEY")
+        
+        if not url or not key:
+            raise RuntimeError("Missing Supabase env: URL and Key are required for intelligence engine.")
+    
     return create_client(url, key)
 
 
