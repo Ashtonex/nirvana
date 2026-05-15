@@ -10,6 +10,14 @@ from sklearn.ensemble import IsolationForest
 
 from .data_loader import load_ledger, load_operations, save_analytics_result, write_json
 
+def _pycaret_available() -> bool:
+    try:
+        import pycaret  # noqa: F401
+        from pycaret.anomaly import AnomalyExperiment  # noqa: F401
+        return True
+    except Exception:
+        return False
+
 
 NON_CASH_CATEGORIES = {
     "Cash Drawer Opening",
@@ -68,8 +76,22 @@ def run(days: int, limit: int) -> dict:
     df["amount_zscore"] = df["amount_zscore"].replace([np.inf, -np.inf], 0).fillna(0)
 
     if len(df) >= 10:
-        model = IsolationForest(contamination=min(0.2, max(0.05, 5 / len(df))), random_state=42)
-        df["model_score"] = model.fit_predict(df[["amount"]])
+        model_run = False
+        if _pycaret_available():
+            try:
+                from pycaret.anomaly import AnomalyExperiment
+                exp = AnomalyExperiment()
+                exp.setup(df[["amount"]], session_id=42, verbose=False)
+                iforest = exp.create_model('iforest', fraction=min(0.2, max(0.05, 5 / len(df))))
+                res = exp.assign_model(iforest)
+                df["model_score"] = np.where(res["Anomaly"] == 1, -1, 1)
+                model_run = True
+            except Exception as e:
+                print(f"PyCaret anomaly detection failed: {e}. Falling back to scikit-learn.")
+        
+        if not model_run:
+            model = IsolationForest(contamination=min(0.2, max(0.05, 5 / len(df))), random_state=42)
+            df["model_score"] = model.fit_predict(df[["amount"]])
     else:
         df["model_score"] = 1
 

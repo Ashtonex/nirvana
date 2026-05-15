@@ -10,22 +10,47 @@ from statsmodels.tsa.holtwinters import ExponentialSmoothing
 from .data_loader import load_sales, save_analytics_result, write_json
 
 
+def _pycaret_available() -> bool:
+    try:
+        import pycaret  # noqa: F401
+        from pycaret.time_series import TSForecastingExperiment  # noqa: F401
+        return True
+    except Exception:
+        return False
+
+
 def _forecast_series(series: pd.Series, horizon: int) -> list[dict]:
     daily = series.asfreq("D").fillna(0)
     if len(daily) < 14 or daily.sum() <= 0:
         baseline = float(daily.tail(7).mean() if len(daily) else 0)
         forecast = np.repeat(baseline, horizon)
     else:
-        seasonal_periods = 7 if len(daily) >= 28 else None
-        model = ExponentialSmoothing(
-            daily,
-            trend="add",
-            seasonal="add" if seasonal_periods else None,
-            seasonal_periods=seasonal_periods,
-            initialization_method="estimated",
-        )
-        fitted = model.fit(optimized=True)
-        forecast = np.maximum(fitted.forecast(horizon).to_numpy(), 0)
+        forecast = None
+        if _pycaret_available() and len(daily) >= 30:
+            try:
+                from pycaret.time_series import TSForecastingExperiment
+                exp = TSForecastingExperiment()
+                df = pd.DataFrame({"sales": daily})
+                df.index = pd.to_datetime(df.index)
+                exp.setup(data=df, fh=horizon, session_id=42, verbose=False)
+                best_model = exp.compare_models(sort="mase", n_select=1, turbo=True, verbose=False)
+                preds = exp.predict_model(best_model)
+                if preds is not None and not preds.empty:
+                    forecast = np.maximum(preds["y_pred"].values, 0)
+            except Exception as e:
+                print(f"PyCaret forecasting failed: {e}. Falling back to Statsmodels.")
+        
+        if forecast is None:
+            seasonal_periods = 7 if len(daily) >= 28 else None
+            model = ExponentialSmoothing(
+                daily,
+                trend="add",
+                seasonal="add" if seasonal_periods else None,
+                seasonal_periods=seasonal_periods,
+                initialization_method="estimated",
+            )
+            fitted = model.fit(optimized=True)
+            forecast = np.maximum(fitted.forecast(horizon).to_numpy(), 0)
 
     start = (daily.index.max() if len(daily) else pd.Timestamp.utcnow()).date()
     return [

@@ -10,3 +10,5 @@ seaborn
 python-dotenv
 supabase
 psycopg2-binary
+pycaret
+Riskfolio-Lib

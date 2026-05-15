@@ -126,11 +126,31 @@ def _heuristic_expected_returns(returns: pd.DataFrame) -> np.ndarray:
     return np.maximum(observed * 0.35 + priors * 0.65, 0.00001)
 
 
-def _optimize(returns: pd.DataFrame, risk_aversion: float) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+def _optimize(returns: pd.DataFrame, risk_aversion: float) -> tuple[np.ndarray, np.ndarray, np.ndarray, str]:
     mu = _heuristic_expected_returns(returns)
     cov = returns.reindex(columns=BUCKETS).cov().fillna(0).to_numpy()
     cov = cov + np.eye(len(BUCKETS)) * 1e-6
     bounds = [BOUNDS[bucket] for bucket in BUCKETS]
+
+    if _riskfolio_available():
+        try:
+            import riskfolio as rp
+            port = rp.Portfolio(returns=returns.reindex(columns=BUCKETS).fillna(0))
+            port.assets_stats(method_mu='hist', method_cov='hist')
+            # Inject our heuristic mu and covariance
+            port.mu = pd.DataFrame(mu, index=BUCKETS).T
+            port.cov = pd.DataFrame(cov, index=BUCKETS, columns=BUCKETS)
+            
+            # Enforce bounds
+            port.lower_bound = [BOUNDS[b][0] for b in BUCKETS]
+            port.upper_bound = [BOUNDS[b][1] for b in BUCKETS]
+            
+            w = port.optimization(model='Classic', rm='MV', obj='Sharpe', rf=0, l=0)
+            if w is not None and not w.empty:
+                weights = w['weights'].to_numpy().flatten()
+                return weights, mu, cov, "riskfolio-classic-sharpe"
+        except Exception as e:
+            print(f"Riskfolio optimization failed: {e}. Falling back to SciPy SLSQP.")
 
     def objective(weights: np.ndarray) -> float:
         expected = float(weights @ mu)
@@ -149,14 +169,14 @@ def _optimize(returns: pd.DataFrame, risk_aversion: float) -> tuple[np.ndarray, 
         weights = np.array([0.4, 0.15, 0.1, 0.25, 0.1])
     else:
         weights = result.x
-    return weights, mu, cov
+    return weights, mu, cov, "scipy-constrained-optimizer"
 
 
 def run(days: int, risk_aversion: float) -> dict:
     buckets = _capital_buckets()
     total = float(sum(buckets.values()))
     returns = _monthly_returns(days)
-    weights, mu, cov = _optimize(returns, risk_aversion)
+    weights, mu, cov, backend_name = _optimize(returns, risk_aversion)
 
     current_weights = {bucket: (amount / total if total > 0 else 0) for bucket, amount in buckets.items()}
     target = {bucket: float(weights[i]) for i, bucket in enumerate(BUCKETS)}
@@ -182,7 +202,7 @@ def run(days: int, risk_aversion: float) -> dict:
     return {
         "status": "success",
         "generated_at": datetime.now(timezone.utc).isoformat(),
-        "backend": "scipy-constrained-optimizer",
+        "backend": backend_name,
         "riskfolio_available": _riskfolio_available(),
         "window_days": days,
         "risk_aversion": risk_aversion,
