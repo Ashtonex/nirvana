@@ -47,7 +47,7 @@ export async function GET() {
     const dateStr = sixtyDaysAgo.toISOString();
 
     // Direct Data Feed: Bypassing the database RPC for extreme reliability
-    const [salesRes, ledgerRes, opsRes, shopsRes] = await Promise.all([
+    const [salesRes, ledgerRes, opsRes, shopsRes, analyticsRes] = await Promise.all([
       supabaseAdmin.from('sales').select('total_with_tax, quantity, item_name, shop_id, date').gte('date', dateStr),
       supabaseAdmin.from('ledger_entries').select('amount, type, category, shop_id, date').gte('date', dateStr),
       supabaseAdmin.from('operations_ledger').select('amount, kind, shop_id, effective_date').gte('created_at', dateStr),
