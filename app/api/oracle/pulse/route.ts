@@ -51,7 +51,8 @@ export async function GET() {
       supabaseAdmin.from('sales').select('total_with_tax, quantity, item_name, shop_id, date').gte('date', dateStr),
       supabaseAdmin.from('ledger_entries').select('amount, type, category, shop_id, date').gte('date', dateStr),
       supabaseAdmin.from('operations_ledger').select('amount, kind, shop_id, effective_date').gte('created_at', dateStr),
-      supabaseAdmin.from('shops').select('*')
+      supabaseAdmin.from('shops').select('*'),
+      supabaseAdmin.from('analytics_results').select('kind, payload').order('generated_at', { ascending: false }).limit(10)
     ]);
 
     if (salesRes.error || ledgerRes.error || opsRes.error || !shopsRes.data) {
@@ -63,6 +64,16 @@ export async function GET() {
     const ledger: LedgerRow[] = ledgerRes.data || [];
     const operations: OperationRow[] = opsRes.data || [];
     const shops: ShopRow[] = shopsRes.data || [];
+    const analytics = analyticsRes.data || [];
+
+    const velocityPayload = analytics.find(a => a.kind === 'inventory_velocity')?.payload as any;
+    const expensePayload = analytics.find(a => a.kind === 'expense_anomaly')?.payload as any;
+
+    const deadCapital = velocityPayload?.priority_items
+      ?.filter((i: any) => i.status === 'dead_stock')
+      ?.reduce((sum: number, i: any) => sum + (i.capital_tied || 0), 0) || 0;
+    
+    const zombieCount = velocityPayload?.priority_items?.filter((i: any) => i.status === 'dead_stock')?.length || 0;
 
     // Aggregations
     let totalRevenue = 0;
@@ -127,9 +138,10 @@ export async function GET() {
         monthlyBurn: totalExpenses / 2 
       },
       shopPerformance,
-      deadCapital: 0,
-      zombieCount: 0,
+      deadCapital,
+      zombieCount,
       recentEmails: [],
+      anomalies: expensePayload?.anomalies || [],
       dataIntegrity: await runOracleValidation().catch(() => null)
     });
 

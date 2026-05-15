@@ -48,9 +48,17 @@ async def run_analytics_job(kind: str = Query("all")):
         
         module = jobs[k]
         try:
-            # Most analytics modules have a run() function
-            # We pass save_db=True if the module supports it or handle saving here
-            payload = module.run() if hasattr(module, "run") else {}
+            # Most analytics modules have a run() function with specific signatures
+            if k == "demand_forecast":
+                payload = module.run(days=90, horizon=14, shop_id=None)
+            elif k == "expense_anomaly":
+                payload = module.run(days=60, limit=15)
+            elif k == "inventory_velocity":
+                payload = module.run(days=60, dead_stock_days=60, limit=25)
+            elif k == "capital_allocation":
+                payload = module.run(days=90, risk_aversion=2.5)
+            else:
+                payload = module.run() if hasattr(module, "run") else {}
             
             # Use module's internal saver or default logic
             summary = "Snapshot generated"
