@@ -70,7 +70,7 @@ export function NirvanaIntelligenceCards() {
     return acc + sum;
   }, 0) || 0;
 
-  const targets = financeOptimization?.metrics?.targets || {};
+  const targets = financeOptimization?.target_amounts || {};
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -109,16 +109,16 @@ export function NirvanaIntelligenceCards() {
         </CardHeader>
         <CardContent className="space-y-2">
           <div className="flex justify-between items-center">
-            <span className="text-[10px] font-black uppercase text-slate-400">Operations (3m)</span>
-            <span className="text-xs font-black text-white">$<AnimatedNumber value={targets.operational_buffer || 0} /></span>
+            <span className="text-[10px] font-black uppercase text-slate-400">Operations</span>
+            <span className="text-xs font-black text-white">$<AnimatedNumber value={targets.blackbox || 0} /></span>
           </div>
           <div className="flex justify-between items-center">
             <span className="text-[10px] font-black uppercase text-slate-400">Safety Reserve</span>
-            <span className="text-xs font-black text-emerald-400">$<AnimatedNumber value={targets.safety_reserve || 0} /></span>
+            <span className="text-xs font-black text-emerald-400">$<AnimatedNumber value={targets.reserves || 0} /></span>
           </div>
           <div className="flex justify-between items-center">
             <span className="text-[10px] font-black uppercase text-slate-400">Growth Pool</span>
-            <span className="text-xs font-black text-sky-400">$<AnimatedNumber value={targets.growth_pool || 0} /></span>
+            <span className="text-xs font-black text-sky-400">$<AnimatedNumber value={targets.stockvel || 0} /></span>
           </div>
         </CardContent>
       </Card>
