@@ -64,7 +64,7 @@ export async function GET() {
     const ledger: LedgerRow[] = ledgerRes.data || [];
     const operations: OperationRow[] = opsRes.data || [];
     const shops: ShopRow[] = shopsRes.data || [];
-    const analytics = analyticsRes.data || [];
+    const analytics: Array<{ kind: string; payload: any }> = analyticsRes.data || [];
 
     const velocityPayload = analytics.find(a => a.kind === 'inventory_velocity')?.payload as any;
     const expensePayload = analytics.find(a => a.kind === 'expense_anomaly')?.payload as any;
