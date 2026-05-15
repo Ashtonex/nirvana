@@ -35,18 +35,19 @@ function AnimatedNumber({ value, prefix = "", suffix = "" }: { value: number; pr
 export function NirvanaIntelligenceCards() {
   const [salesForecast, setSalesForecast] = useState<any>(null);
   const [financeOptimization, setFinanceOptimization] = useState<any>(null);
+  const [expenseAnomalies, setExpenseAnomalies] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     async function fetchData() {
       try {
-        const [salesRes, financeRes] = await Promise.all([
-          fetch("/api/py/forecast/sales?horizon=7"),
-          fetch("/api/py/finance/optimize")
-        ]);
-        
-        if (salesRes.ok) setSalesForecast(await salesRes.json());
-        if (financeRes.ok) setFinanceOptimization(await financeRes.json());
+        const res = await fetch("/api/analytics/latest");
+        if (res.ok) {
+          const json = await res.json();
+          setSalesForecast(json.results?.demand_forecast?.payload || null);
+          setFinanceOptimization(json.results?.capital_allocation?.payload || null);
+          setExpenseAnomalies(json.results?.expense_anomaly?.payload?.anomalies || []);
+        }
       } catch (err) {
         console.error("Intelligence fetch failed:", err);
       } finally {
@@ -122,23 +123,25 @@ export function NirvanaIntelligenceCards() {
         </CardContent>
       </Card>
 
-      {/* Anomaly Detection Placeholder / Risk Card */}
+      {/* Risk Analysis Card */}
       <Card className="bg-gradient-to-br from-amber-950/40 to-slate-950 border-amber-500/30 overflow-hidden relative group">
         <div className="absolute top-0 right-0 p-3 opacity-10 group-hover:opacity-20 transition-opacity">
-          <AlertTriangle className="h-16 w-16 text-amber-400" />
+          <AlertTriangle className={cn("h-16 w-16", expenseAnomalies.length > 0 ? "text-amber-400" : "text-emerald-400")} />
         </div>
         <CardHeader className="pb-2">
-          <CardDescription className="text-[10px] font-black uppercase tracking-widest text-amber-400/70 flex items-center gap-1">
+          <CardDescription className={cn("text-[10px] font-black uppercase tracking-widest flex items-center gap-1", expenseAnomalies.length > 0 ? "text-amber-400/70" : "text-emerald-400/70")}>
             <Brain className="h-3 w-3" /> Risk Analysis
           </CardDescription>
           <CardTitle className="text-sm font-black uppercase italic text-white">System Integrity</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="text-2xl font-black italic text-emerald-400 uppercase">
-            Nominal
+          <div className={cn("text-2xl font-black italic uppercase", expenseAnomalies.length > 0 ? "text-amber-400" : "text-emerald-400")}>
+            {expenseAnomalies.length > 0 ? `${expenseAnomalies.length} Flagged` : "Nominal"}
           </div>
           <p className="text-[10px] text-slate-500 mt-2">
-            No spending anomalies detected in the last 24 hours.
+            {expenseAnomalies.length > 0
+              ? `${expenseAnomalies.length} spending anomalies detected.`
+              : "No spending anomalies detected in the last snapshot."}
           </p>
         </CardContent>
       </Card>
