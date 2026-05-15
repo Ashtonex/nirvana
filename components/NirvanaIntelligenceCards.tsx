@@ -119,7 +119,7 @@ export function NirvanaIntelligenceCards() {
                   contentStyle={{ backgroundColor: '#0f172a', border: '1px solid #334155', borderRadius: '8px' }}
                   itemStyle={{ color: '#c4b5fd', fontWeight: 900 }}
                   labelStyle={{ color: '#94a3b8', fontSize: '10px', textTransform: 'uppercase' }}
-                  formatter={(value: number) => [`$${value.toFixed(2)}`, 'Sales']}
+                  formatter={(value: any) => [`$${Number(value || 0).toFixed(2)}`, 'Sales']}
                 />
                 <Area type="monotone" dataKey="predicted" stroke="#a78bfa" strokeWidth={2} fillOpacity={1} fill="url(#colorSales)" />
               </AreaChart>
@@ -152,9 +152,9 @@ export function NirvanaIntelligenceCards() {
                   cursor={{fill: 'transparent'}}
                   contentStyle={{ backgroundColor: '#0f172a', border: '1px solid #334155', borderRadius: '8px' }}
                   itemStyle={{ fontWeight: 900 }}
-                  formatter={(value: number, name: string) => {
+                  formatter={(value: any, name: any) => {
                     const label = name === 'ops' ? 'Operations' : name === 'safety' ? 'Safety' : 'Growth';
-                    return [`$${value.toFixed(2)}`, label];
+                    return [`$${Number(value || 0).toFixed(2)}`, label];
                   }}
                 />
                 <Bar dataKey="ops" stackId="a" fill="#f8fafc" radius={[4, 0, 0, 4]} />
