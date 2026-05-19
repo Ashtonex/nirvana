@@ -2,6 +2,7 @@ export const dynamic = 'force-dynamic';
 
 import { getDashboardData } from "./actions";
 import { getBestSellers, getPerformanceTrends, getReorderSuggestions, getDeadStock, getSalesHistory, getStaffLeaderboard, getRevenueForecast, getPremiumStockValue, getBreakEvenStockValue, getLeanStockValue, getSalesVsOverheadsData, getRevenueExpenseProfitTrajectoryData } from "@/lib/analytics";
+import { getTshirtsAnalytics } from "@/lib/tshirts-analytics";
 import { IntelligenceDashboard } from "@/components/IntelligenceDashboard";
 import { SalesChart } from "@/components/SalesChart";
 import { BreakEvenChart } from "@/components/BreakEvenChart";
@@ -39,7 +40,8 @@ export default async function Home() {
     breakEvenStockValue,
     leanStockValue,
     breakEvenData,
-    revExpData
+    revExpData,
+    tshirtsAnalytics
   ] = await Promise.all([
     getBestSellers(),
     getPerformanceTrends(),
@@ -52,7 +54,8 @@ export default async function Home() {
     getBreakEvenStockValue(),
     getLeanStockValue(),
     getSalesVsOverheadsData(),
-    getRevenueExpenseProfitTrajectoryData()
+    getRevenueExpenseProfitTrajectoryData(),
+    getTshirtsAnalytics(60)
   ]);
 
   const totalExpenses = Object.values(db?.globalExpenses || {}).reduce((a: number, b: any) => a + Number(b), 0);
@@ -171,10 +174,6 @@ export default async function Home() {
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
-        <RevenueExpenseProfitTrajectoryChart datasets={revExpData} />
-      </div>
-
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
         <Card className="col-span-4">
           <CardHeader>
             <CardTitle>Rationalized Distribution Index</CardTitle>
@@ -208,6 +207,106 @@ export default async function Home() {
                   Set expenses in the 'Inventory Master' to see distribution rankings.
                 </div>
               )}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* DEDICATED NIRVANA TEES CARD */}
+        <Card className="col-span-3 bg-gradient-to-br from-slate-900/60 to-orange-950/20 border-orange-500/20 shadow-[0_15px_40px_-10px_rgba(249,115,22,0.15)] relative overflow-hidden group">
+          <div className="absolute top-0 right-0 w-32 h-32 bg-orange-500/5 blur-[50px] rounded-full group-hover:bg-orange-500/10 transition-colors" />
+          <CardHeader className="pb-3">
+            <div className="flex items-start justify-between">
+              <div>
+                <span className="text-[9px] font-black uppercase tracking-[0.2em] text-orange-500 flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-orange-500 animate-pulse" />
+                  Ecosystem Hub
+                </span>
+                <CardTitle className="text-xl font-black uppercase italic text-white tracking-tight mt-1">Nirvana Tees</CardTitle>
+                <CardDescription className="text-xs text-slate-400">
+                  Compounding runway, velocity & order discount tracking.
+                </CardDescription>
+              </div>
+              <a 
+                href="/tshirts"
+                className="px-3 py-1.5 bg-orange-600 hover:bg-orange-500 text-white rounded-lg text-[9px] font-black uppercase tracking-wider transition-all hover:-translate-y-0.5 inline-block"
+              >
+                Launch Panel
+              </a>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            {/* Compounding & Reinvestment Milestone Progress */}
+            <div className="space-y-2 p-4 bg-orange-950/10 border border-orange-500/10 rounded-2xl">
+              <div className="flex justify-between text-xs font-black uppercase tracking-wider">
+                <span className="text-slate-400">Milestone Reinvestment Target</span>
+                <span className="text-orange-400">2,400 pcs</span>
+              </div>
+              <div className="flex justify-between items-baseline">
+                <span className="text-[10px] text-slate-500">Starting Cap: $1,421.00</span>
+                <span className="text-xl font-bold font-mono text-white">
+                  ${Math.round(tshirtsAnalytics.summary.revenueAllTime).toLocaleString()} / $5,616
+                </span>
+              </div>
+              <div className="h-2 w-full bg-slate-900 rounded-full overflow-hidden">
+                <div 
+                  className="h-full bg-gradient-to-r from-orange-600 to-amber-500 transition-all duration-1000"
+                  style={{ width: `${Math.min(100, (tshirtsAnalytics.summary.revenueAllTime / 5616) * 100)}%` }}
+                />
+              </div>
+              <p className="text-[9px] text-slate-500 leading-relaxed">
+                Reinvest 100% of cycle profit to compound pieces.
+              </p>
+            </div>
+
+            {/* Runout Telemetry */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="bg-slate-900/40 border border-white/5 p-3.5 rounded-2xl">
+                <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Runway Indicator</p>
+                <div className="flex items-baseline gap-1 mt-1">
+                  <span className="text-2xl font-black font-mono text-white">
+                    {tshirtsAnalytics.summary.unitsLast60Days > 0 
+                      ? Math.max(0, Math.round(
+                          ((db?.inventory || []).reduce(
+                            (sum: number, item: any) => sum + ((item.allocations || []).find((a: any) => a.shopId === "tshirts")?.quantity || 0),
+                            0
+                          )) / (tshirtsAnalytics.summary.unitsLast60Days / 60)
+                        ))
+                      : "0"}
+                  </span>
+                  <span className="text-[10px] text-slate-400 font-bold">DAYS</span>
+                </div>
+                <p className="text-[9px] text-slate-500 mt-1">Estimated stockout date</p>
+              </div>
+
+              <div className="bg-slate-900/40 border border-white/5 p-3.5 rounded-2xl">
+                <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Active Stock Allocation</p>
+                <div className="flex items-baseline gap-1 mt-1">
+                  <span className="text-2xl font-black font-mono text-white">
+                    {(db?.inventory || []).reduce(
+                      (sum: number, item: any) => sum + ((item.allocations || []).find((a: any) => a.shopId === "tshirts")?.quantity || 0),
+                      0
+                    )}
+                  </span>
+                  <span className="text-[10px] text-slate-400 font-bold">PCS</span>
+                </div>
+                <p className="text-[9px] text-slate-500 mt-1">Shirts currently in shop</p>
+              </div>
+            </div>
+
+            {/* micro grid summary */}
+            <div className="space-y-2 pt-2 border-t border-slate-800/60">
+              <div className="flex justify-between text-xs">
+                <span className="text-slate-400">All-Time Tees Revenue</span>
+                <span className="font-mono font-black text-emerald-400">
+                  ${tshirtsAnalytics.summary.revenueAllTime.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </span>
+              </div>
+              <div className="flex justify-between text-xs">
+                <span className="text-slate-400">60-Day Sales Volume</span>
+                <span className="font-mono font-black text-white">
+                  {tshirtsAnalytics.summary.unitsLast60Days} units
+                </span>
+              </div>
             </div>
           </CardContent>
         </Card>
