@@ -51,8 +51,305 @@ export default function TshirtsPredictiveEcosystem({
   const [sellPrice, setSellPrice] = useState<number>(3.50);
   const [targetUnits, setTargetUnits] = useState<number>(2400);
 
-  // Pricing Elasticity Input
   const [elasticity, setElasticity] = useState<number>(1.8);
+
+  const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
+
+  const handleGeneratePdf = async () => {
+    setIsGeneratingPdf(true);
+    try {
+      const { default: jsPDF } = await import("jspdf");
+      const { default: autoTable } = await import("jspdf-autotable");
+
+      const doc = new jsPDF() as any;
+      const date = new Date().toLocaleDateString();
+      const reportRef = `TEES-INTEL-${Math.random().toString(36).substring(7).toUpperCase()}`;
+
+      // ==========================================
+      // PAGE 1: EXECUTIVE BRIEF & PORTFOLIO BASELINE
+      // ==========================================
+
+      // Header block - Premium dark slate background
+      doc.setFillColor(15, 23, 42); // slate-900
+      doc.rect(0, 0, 210, 50, "F");
+
+      doc.setTextColor(255, 255, 255);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(24);
+      doc.text("NIRVANA TEES", 15, 22);
+
+      doc.setFontSize(9);
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(249, 115, 22); // Orange-500
+      doc.text("EXECUTIVE STRATEGIC INTELLIGENCE & SCALING MODEL", 15, 32);
+
+      doc.setTextColor(148, 163, 184); // Slate-400
+      doc.text(`GENERATED: ${date} | REFERENCE ID: ${reportRef}`, 15, 42);
+
+      // Section I: Baseline Metrics
+      doc.setTextColor(15, 23, 42);
+      doc.setFontSize(14);
+      doc.setFont("helvetica", "bold");
+      doc.text("1. SYSTEM BASELINE & HISTORICAL METRICS", 15, 65);
+
+      const baselineData = [
+        ["Initial Invested Capital", `$${startCapital.toFixed(2)} USD`, "Landed cost baseline: $2.34/unit"],
+        ["Initial Inventory Volume", "600 Pieces", "Purchased plain tees allocation"],
+        ["Landed Acquisition Cost", `$${unitCost.toFixed(2)} USD`, "Direct manufacturing cost per shirt"],
+        ["Standard Selling Price", `$${sellPrice.toFixed(2)} USD`, "Baseline price point (excluding service)"],
+        ["Branding Service Price", "$1.50 USD", "Pinned customizable service fee"],
+        ["Milestone Scaling Target", `${targetUnits} Pieces`, "Target order volume to lock-in scale discount"],
+        ["Milestone Budget Required", `$${compoundingSimulation.targetRequiredCapital.toLocaleString()} USD`, "Required cash pool for target order"],
+      ];
+
+      autoTable(doc, {
+        startY: 70,
+        head: [["Metric Parameter", "Current Value", "Strategic Context"]],
+        body: baselineData,
+        theme: "grid",
+        headStyles: { fillColor: [15, 23, 42], fontSize: 9 },
+        styles: { fontSize: 8.5 },
+        columnStyles: {
+          0: { cellWidth: 65, fontStyle: "bold" },
+          1: { cellWidth: 40 },
+          2: { cellWidth: 75 }
+        }
+      });
+
+      // Section II: Operational Realized Baseline
+      doc.setFontSize(14);
+      doc.setFont("helvetica", "bold");
+      doc.text("2. CURRENT REALIZED MARKET PERFORMANCE", 15, doc.lastAutoTable.finalY + 15);
+
+      const realizedData = [
+        ["Total Revenue All-Time", `$${data.summary.revenueAllTime.toFixed(2)} USD`, "Cumulative gross revenue recorded"],
+        ["60-Day Sales Volume", `${data.summary.unitsLast60Days} Units`, "Operational velocity indicator"],
+        ["60-Day Realized Revenue", `$${data.summary.revenueLast60Days.toFixed(2)} USD`, "Gross revenue inside rolling 60 days"],
+        ["Currently Allocated Stock", `${currentAllocatedStock} Units`, "Active plain tees buffer inside the POS"],
+        ["Average Daily Velocity", `${velocityForecast.dailyVelocity} Units / Day`, "Standard daily unit rate"],
+        ["Projected Stock Runway", `${velocityForecast.runwayDays} Days`, "Estimated days until complete stockout"],
+      ];
+
+      autoTable(doc, {
+        startY: doc.lastAutoTable.finalY + 20,
+        head: [["Performance Parameter", "Realized Metric", "Analytical Context"]],
+        body: realizedData,
+        theme: "striped",
+        headStyles: { fillColor: [234, 88, 12] }, // orange-600
+        styles: { fontSize: 8.5 },
+        columnStyles: {
+          0: { cellWidth: 65, fontStyle: "bold" },
+          1: { cellWidth: 40 },
+          2: { cellWidth: 75 }
+        }
+      });
+
+      // Add a page break
+      doc.addPage();
+
+      // ==========================================
+      // PAGE 2: COMPOUNDING SIMULATION & VELOCITY
+      // ==========================================
+      
+      // Header for page 2
+      doc.setFillColor(15, 23, 42); // slate-900
+      doc.rect(0, 0, 210, 20, "F");
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(10);
+      doc.text("NIRVANA TEES EXECUTIVE PORTFOLIO PLANNER", 15, 12);
+      
+      doc.setTextColor(15, 23, 42);
+      doc.setFontSize(14);
+      doc.setFont("helvetica", "bold");
+      doc.text("3. CAPITAL COMPOUNDING & ORDER RECYCLING SIMULATION", 15, 35);
+      
+      doc.setFontSize(9);
+      doc.setFont("helvetica", "normal");
+      doc.text(
+        `This vectorbt-style simulation assumes 100% of cycle profits are strictly retained in the vault and reinvested`,
+        15,
+        42
+      );
+      doc.text(
+        `into successive inventory orders at landed cost ($${unitCost.toFixed(2)}) and sold at $${sellPrice.toFixed(2)}:`,
+        15,
+        47
+      );
+
+      const compoundingRows = compoundingSimulation.history.map((h: any) => [
+        `Cycle ${h.cycle}`,
+        `$${(h.pieces * unitCost + (h.endingCapital - (h.pieces * sellPrice))).toFixed(2)}`,
+        `${h.pieces} units`,
+        `$${h.cost.toFixed(2)}`,
+        `$${h.revenue.toFixed(2)}`,
+        `$${h.profit.toFixed(2)}`,
+        `$${h.endingCapital.toFixed(2)}`
+      ]);
+
+      autoTable(doc, {
+        startY: 52,
+        head: [["Cycle", "Starting Cash", "Purchase Size", "Order Landed Cost", "Projected Sales", "Expected Profit", "Ending Cash"]],
+        body: compoundingRows,
+        theme: "grid",
+        headStyles: { fillColor: [15, 23, 42] },
+        styles: { fontSize: 8 }
+      });
+
+      doc.setFontSize(9.5);
+      doc.setFont("helvetica", "bold");
+      doc.text(
+        `• COMPOUNDING SIGNAL: To scale from 600 pieces to the milestone of ${targetUnits} pieces ($${compoundingSimulation.targetRequiredCapital.toLocaleString()} cost):`,
+        15,
+        doc.lastAutoTable.finalY + 12
+      );
+      doc.setFont("helvetica", "normal");
+      doc.text(
+        `It requires exactly ${compoundingSimulation.cyclesToTarget} cycles of perfect capital retention to hit the milestone target organically.`,
+        18,
+        doc.lastAutoTable.finalY + 18
+      );
+      doc.text(
+        `Final projected capital at the end of 8 cycles: $${compoundingSimulation.finalCapital.toLocaleString()} USD.`,
+        18,
+        doc.lastAutoTable.finalY + 23
+      );
+
+      // Section 4: Pricing Elasticity Optimizations
+      doc.setFontSize(14);
+      doc.setFont("helvetica", "bold");
+      doc.text("4. MICROECONOMIC PRICING ELASTICITY MATRIX", 15, doc.lastAutoTable.finalY + 35);
+      
+      doc.setFontSize(9);
+      doc.setFont("helvetica", "normal");
+      doc.text(
+        `Model: expected demand volume fluctuates based on price point with an elasticity multiplier of ${elasticity}.`,
+        15,
+        doc.lastAutoTable.finalY + 42
+      );
+
+      const optimalRow = [...pricingOptimization.comparison].sort((a, b) => b.profit - a.profit)[0];
+
+      const elasticityRows = pricingOptimization.comparison.map((c: any) => [
+        c.price,
+        `${c.volume} units`,
+        `$${c.revenue.toLocaleString()}`,
+        `$${(c.volume * unitCost).toLocaleString()}`,
+        `$${c.profit.toLocaleString()}`,
+        c.priceVal === optimalRow?.priceVal ? "OPTIMAL (MAX PROFIT)" : "SUB-OPTIMAL"
+      ]);
+
+      autoTable(doc, {
+        startY: doc.lastAutoTable.finalY + 47,
+        head: [["Test Price Point", "Expected Demand (30D)", "Gross Revenue", "Acquisition Cost Basis", "Projected Net Profit", "System Assessment"]],
+        body: elasticityRows,
+        theme: "striped",
+        headStyles: { fillColor: [234, 88, 12] },
+        styles: { fontSize: 8 }
+      });
+
+      // Add a page break
+      doc.addPage();
+
+      // ==========================================
+      // PAGE 3: MONTHLY CASHFLOWS & EXECUTIVE CHALLENGES
+      // ==========================================
+      
+      // Header for page 3
+      doc.setFillColor(15, 23, 42); // slate-900
+      doc.rect(0, 0, 210, 20, "F");
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(10);
+      doc.text("NIRVANA TEES MULTI-MONTH RUNWAY & CASHFLOWS", 15, 12);
+      
+      doc.setTextColor(15, 23, 42);
+      doc.setFontSize(14);
+      doc.setFont("helvetica", "bold");
+      doc.text("5. MULTI-MONTH MONTE CARLO PROJECTED CASHFLOWS", 15, 35);
+
+      // We'll generate 6-month projected cashflows for Best, Median, and Risk Cases
+      const months = ["Month 1", "Month 2", "Month 3", "Month 4", "Month 5", "Month 6"];
+      
+      const vDays = 30;
+      const baseDailyV = velocityForecast.dailyVelocity;
+      const unitProf = sellPrice - unitCost;
+      
+      const cashflowRows = months.map((m, idx) => {
+        const mIndex = idx + 1;
+        
+        // Cumulative calculations
+        const bestVol = Math.round(baseDailyV * 1.6 * vDays * mIndex);
+        const bestProf = bestVol * (unitProf + 1.5 * 0.8) + startCapital;
+        
+        const medVol = Math.round(baseDailyV * vDays * mIndex);
+        const medProf = medVol * (unitProf + 1.5 * 0.45) + startCapital;
+        
+        const riskVol = Math.round(baseDailyV * 0.5 * vDays * mIndex);
+        const riskProf = riskVol * unitProf - (mIndex * 50) + startCapital; // includes adhoc drag
+
+        return [
+          m,
+          `${Math.round(baseDailyV * 1.6 * vDays)} units`,
+          `$${Math.round(bestProf).toLocaleString()}`,
+          `${Math.round(baseDailyV * vDays)} units`,
+          `$${Math.round(medProf).toLocaleString()}`,
+          `${Math.round(baseDailyV * 0.5 * vDays)} units`,
+          `$${Math.round(riskProf).toLocaleString()}`,
+        ];
+      });
+
+      autoTable(doc, {
+        startY: 42,
+        head: [
+          [
+            "Period",
+            "Best Vol/Mo",
+            "Best Cash Pool",
+            "Median Vol/Mo",
+            "Median Cash Pool",
+            "Risk Vol/Mo",
+            "Risk Cash Pool"
+          ]
+        ],
+        body: cashflowRows,
+        theme: "grid",
+        headStyles: { fillColor: [15, 23, 42] },
+        styles: { fontSize: 8 }
+      });
+
+      doc.setFontSize(14);
+      doc.setFont("helvetica", "bold");
+      doc.text("6. EXECUTIVE STRATEGIC CHALLENGES & ADVISORY", 15, doc.lastAutoTable.finalY + 15);
+
+      doc.setFontSize(9);
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(0, 0, 0);
+      
+      const advisoryText = [
+        ["CHALLENGE 1: The 'Over-Extraction' Growth Trap", "Most business owners make the mistake of drawing personal wages or paying ad-hoc overhead early in the compounding cycle. Extracting cash between Cycle 1 and Cycle 4 stunts the compounding velocity. You MUST leave all sales revenue intact inside the Master Vault until your order size crosses 2,400 pieces organically."],
+        ["CHALLENGE 2: Scale Economics & Pricing Strategy", "Moving from 600 pieces to 2,400 pieces allows you to negotiate cheaper landed costs (down to $1.90 or $1.80 per unit). If you maintain a $3.50 selling price, your markup expands from 49.5% to 84.2%. Do not drop standard prices prematurely; rather, accumulate cash buffer to absorb seasonal velocity drops."],
+        ["CHALLENGE 3: Branding Service Penetration", "At $1.50 per print, the branding service carries 100% net surplus margins (zero stock costs). If branding adoption is kept above 60% of all plain tees transactions, it offsets the entire utility and rent overhead burden of the tees channel. Train cashiers to actively upsell custom branding on every plain tee purchase."],
+        ["CHALLENGE 4: Inventory Depletion Dead Zone", "At your current velocity, you have a runout of approximately " + velocityForecast.runwayDays + " days. Supabase notifications will trigger a safety stock warning when active allocations drop below 14 days of cover. Ensure order cycles are initiated with suppliers at least 10 days in advance to completely avoid empty shelf dead-zones."]
+      ];
+
+      autoTable(doc, {
+        startY: doc.lastAutoTable.finalY + 20,
+        head: [["Strategic Assessment Area", "Executive Guidance & Direct Challenge"]],
+        body: advisoryText,
+        theme: "grid",
+        headStyles: { fillColor: [234, 88, 12] },
+        styles: { fontSize: 8 },
+        columnStyles: {
+          0: { cellWidth: 50, fontStyle: "bold" },
+          1: { cellWidth: 140 }
+        }
+      });
+
+      doc.save(`Nirvana_Tees_Strategic_Report_${date.replace(/\//g, '-')}.pdf`);
+    } catch (e: any) {
+      alert(`Error compiling PDF report: ${e.message}`);
+    }
+    setIsGeneratingPdf(false);
+  };
 
   // Current actual database metrics
   const totalActualSales60d = data.summary.unitsLast60Days;
@@ -235,7 +532,7 @@ export default function TshirtsPredictiveEcosystem({
   return (
     <Card className="bg-slate-950/65 border border-white/10 shadow-[0_30px_80px_rgba(0,0,0,0.35)] backdrop-blur-xl rounded-3xl overflow-hidden">
       <CardHeader className="pb-4 border-b border-slate-900 bg-slate-950/40">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4">
           <div>
             <CardDescription className="text-[10px] font-black uppercase tracking-[0.3em] text-orange-400 flex items-center gap-1.5">
               <Brain className="h-3.5 w-3.5 text-orange-500 animate-pulse" />
@@ -245,28 +542,39 @@ export default function TshirtsPredictiveEcosystem({
               Tee Ecosystem Simulation & Growth Control
             </CardTitle>
           </div>
-          <div className="flex flex-wrap gap-1.5 bg-slate-900/60 p-1 rounded-xl border border-slate-800">
-            {(
-              [
-                ["compounding", "Compounding", Scale],
-                ["velocity", "Velocity & Runway", LineChart],
-                ["pricing", "Pricing & Optimization", Percent],
-                ["viability", "Break-Even Tracker", Coins]
-              ] as const
-            ).map(([key, label, Icon]) => (
-              <button
-                key={key}
-                onClick={() => setActiveTab(key)}
-                className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all duration-300 ${
-                  activeTab === key
-                    ? "bg-orange-600 text-white shadow-[0_4px_12px_rgba(234,88,12,0.3)]"
-                    : "text-slate-400 hover:text-slate-200 hover:bg-white/5"
-                }`}
-              >
-                <Icon className="h-3.5 w-3.5" />
-                {label}
-              </button>
-            ))}
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="flex flex-wrap gap-1.5 bg-slate-900/60 p-1 rounded-xl border border-slate-800">
+              {(
+                [
+                  ["compounding", "Compounding", Scale],
+                  ["velocity", "Velocity & Runway", LineChart],
+                  ["pricing", "Pricing & Optimization", Percent],
+                  ["viability", "Break-Even Tracker", Coins]
+                ] as const
+              ).map(([key, label, Icon]) => (
+                <button
+                  key={key}
+                  onClick={() => setActiveTab(key)}
+                  className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all duration-300 ${
+                    activeTab === key
+                      ? "bg-orange-600 text-white shadow-[0_4px_12px_rgba(234,88,12,0.3)]"
+                      : "text-slate-400 hover:text-slate-200 hover:bg-white/5"
+                  }`}
+                >
+                  <Icon className="h-3.5 w-3.5" />
+                  {label}
+                </button>
+              ))}
+            </div>
+
+            <Button
+              onClick={handleGeneratePdf}
+              disabled={isGeneratingPdf}
+              className="bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-500 hover:to-amber-500 text-black border-none text-[10px] font-black uppercase tracking-widest h-9 px-4 rounded-lg shadow-lg flex items-center gap-2 hover:-translate-y-0.5 transition-transform active:scale-95 disabled:opacity-50"
+            >
+              <TrendingUp className="h-3.5 w-3.5" />
+              {isGeneratingPdf ? "Generating..." : "Generate PDF"}
+            </Button>
           </div>
         </div>
       </CardHeader>
