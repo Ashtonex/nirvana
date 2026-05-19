@@ -218,6 +218,9 @@ export class ThermalPrinterService {
         chunks.push(encoder.encode("NIRVANA PREMIUM NETWORK\n"));
         chunks.push(encoder.encode(`${receipt.dateStamp} | ${receipt.timeStamp}\n`));
         chunks.push(encoder.encode(`CASHIER: ${receipt.cashier.toUpperCase()}\n`));
+        if (receipt.clientName && receipt.clientName !== "Walk-in" && receipt.clientName !== "General Walk-in") {
+            chunks.push(encoder.encode(`CLIENT: ${receipt.clientName.toUpperCase()}\n`));
+        }
         chunks.push(encoder.encode(line));
 
         chunks.push(left);

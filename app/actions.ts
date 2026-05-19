@@ -404,13 +404,34 @@ export async function ensureTshirtsShop() {
     if (!hasSupabase) return;
 
     const { data } = await supabaseAdmin.from("shops").select("id").eq("id", TSHIRTS_SHOP_ID).maybeSingle();
-    if (data?.id) return;
+    if (!data?.id) {
+        await supabaseAdmin.from("shops").insert({
+            id: TSHIRTS_SHOP_ID,
+            name: TSHIRTS_SHOP_NAME,
+            expenses: { rent: 0, salaries: 0, utilities: 0, misc: 0 },
+        });
+    }
 
-    await supabaseAdmin.from("shops").insert({
-        id: TSHIRTS_SHOP_ID,
-        name: TSHIRTS_SHOP_NAME,
-        expenses: { rent: 0, salaries: 0, utilities: 0, misc: 0 },
-    });
+    // Ensure branding service exists in inventory_items to satisfy foreign key constraints
+    const { data: serviceItem } = await supabaseAdmin.from("inventory_items").select("id").eq("id", "service_branding").maybeSingle();
+    if (!serviceItem?.id) {
+        await supabaseAdmin.from("inventory_items").insert({
+            id: "service_branding",
+            shipment_id: "SERVICES-AUTO",
+            name: "Branding Service",
+            category: "Services",
+            quantity: 999999,
+            acquisition_price: 0,
+            landed_cost: 0,
+            date_added: new Date().toISOString()
+        });
+        
+        await supabaseAdmin.from("inventory_allocations").insert({
+            item_id: "service_branding",
+            shop_id: TSHIRTS_SHOP_ID,
+            quantity: 999999
+        });
+    }
 }
 
 /** Shop-scoped data for the T-shirt POS — inventory filtered to tee categories only. */

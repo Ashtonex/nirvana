@@ -70,8 +70,32 @@ export default function TshirtsPOS({
   const [receiptOpen, setReceiptOpen] = useState(false);
   const [lastReceipt, setLastReceipt] = useState<any>(null);
 
+  const [printerTransport, setPrinterTransport] = useState<'usb' | 'bluetooth'>('usb');
+  const [isPrinterConnected, setIsPrinterConnected] = useState(false);
+  const [isConnectingPrinter, setIsConnectingPrinter] = useState(false);
+  const [isBacklogMode, setIsBacklogMode] = useState(false);
+  const [backlogDate, setBacklogDate] = useState(() => new Date().toISOString().split('T')[0]);
+
   const { saveSaleOffline, getPendingCount, isOnline } = useOfflineSales();
   const [pendingSync, setPendingSync] = useState(0);
+
+  const handleConnectPrinter = async (transport: 'usb' | 'bluetooth') => {
+    setIsConnectingPrinter(true);
+    try {
+      const ok = transport === 'usb'
+        ? await thermalPrinter.connectUsb()
+        : await thermalPrinter.connectBluetooth();
+      if (ok) {
+        setPrinterTransport(transport);
+        setIsPrinterConnected(true);
+      } else {
+        alert(`Failed to connect to ${transport.toUpperCase()} printer.`);
+      }
+    } catch (e: any) {
+      alert(`Error connecting to printer: ${e.message}`);
+    }
+    setIsConnectingPrinter(false);
+  };
 
   useEffect(() => {
     setInventoryState(inventory || []);
@@ -142,59 +166,87 @@ export default function TshirtsPOS({
       try {
         const cashier =
           employees.find((e: any) => e.id === selectedEmployeeId)?.name || "Staff";
-        const receiptItems: { name: string; quantity: number; totalGross: number }[] = [];
+        const receiptItems: { name: string; quantity: number; priceNet: number; priceGross: number; totalNet: number; totalGross: number; tax: number }[] = [];
         const txnId = Math.random().toString(36).substring(2, 9).toUpperCase();
+        const saleDate = isBacklogMode ? backlogDate : new Date().toISOString();
+        const dateStamp = new Date(saleDate).toLocaleDateString();
+        const timeStamp = new Date(saleDate).toLocaleTimeString();
 
         if (!isOnline) {
           for (const entry of cart) {
             const netPrice = entry.price / (1 + taxRate);
+            const grossPrice = entry.price;
+            const lineNet = netPrice * entry.quantity;
+            const lineGross = grossPrice * entry.quantity;
+            const itemTax = lineGross - lineNet;
+
             await saveSaleOffline({
               shopId,
               itemId: entry.item.id,
               itemName: entry.item.name,
               quantity: entry.quantity,
               unitPrice: netPrice,
-              totalBeforeTax: netPrice * entry.quantity,
+              totalBeforeTax: lineNet,
               employeeId: selectedEmployeeId,
               clientName: clientName || "Walk-in",
               paymentMethod,
               discount,
             });
+
             receiptItems.push({
               name: entry.item.name,
               quantity: entry.quantity,
-              totalGross: entry.price * entry.quantity,
+              priceNet: netPrice,
+              priceGross: grossPrice,
+              totalNet: lineNet,
+              totalGross: lineGross,
+              tax: itemTax
             });
           }
           setPendingSync(await getPendingCount());
         } else {
           for (const entry of cart) {
             const netPrice = entry.price / (1 + taxRate);
+            const grossPrice = entry.price;
+            const lineNet = netPrice * entry.quantity;
+            const lineGross = grossPrice * entry.quantity;
+            const itemTax = lineGross - lineNet;
+
             await recordSale({
               shopId,
               itemId: entry.item.id,
               itemName: entry.item.name,
               quantity: entry.quantity,
               unitPrice: netPrice,
-              totalBeforeTax: netPrice * entry.quantity,
+              totalBeforeTax: lineNet,
               employeeId: selectedEmployeeId,
               clientName: clientName || "Walk-in",
               paymentMethod,
               discount,
+              date: saleDate,
             });
+
             receiptItems.push({
               name: entry.item.name,
               quantity: entry.quantity,
-              totalGross: entry.price * entry.quantity,
+              priceNet: netPrice,
+              priceGross: grossPrice,
+              totalNet: lineNet,
+              totalGross: lineGross,
+              tax: itemTax
             });
           }
         }
 
         setLastReceipt({
           receiptNo: `#TEE-${txnId}`,
+          orderId: `TEE-${txnId}`,
+          transactionId: `TEE-${txnId}`,
           shopName,
           cashier,
           clientName: clientName || "Walk-in",
+          dateStamp,
+          timeStamp,
           items: receiptItems,
           subtotal: totalBeforeTax,
           tax: totalTax,
@@ -262,6 +314,107 @@ export default function TshirtsPOS({
             onChange={(e) => setSearchTerm(e.target.value)}
             className="pl-12 h-14 bg-slate-900/60 border-orange-500/20 rounded-2xl text-base focus:border-orange-500/50"
           />
+        </div>
+
+        {/* Action Controls Bar */}
+        <div className="flex flex-wrap items-center gap-2 p-2 bg-slate-900/40 border border-orange-500/10 rounded-xl">
+          {/* Branding Service Button */}
+          <Button
+            onClick={() => {
+              const existing = cart.find((c) => c.item.id === "service_branding");
+              if (existing) {
+                setCart(
+                  cart.map((c) =>
+                    c.item.id === "service_branding"
+                      ? { ...c, quantity: c.quantity + 1 }
+                      : c
+                  )
+                );
+              } else {
+                setCart([
+                  ...cart,
+                  {
+                    item: {
+                      id: "service_branding",
+                      name: "Branding Service",
+                      category: "Services",
+                      landedCost: 0,
+                      allocations: []
+                    },
+                    quantity: 1,
+                    price: 1.50
+                  }
+                ]);
+              }
+            }}
+            className="bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-500 hover:to-amber-500 text-[10px] font-black uppercase italic h-9 px-3 flex items-center gap-2 shadow-lg rounded-lg"
+          >
+            <Shirt className="h-4 w-4" /> + Branding Service ($1.50)
+          </Button>
+
+          {/* Backlog Controls */}
+          <div className="flex items-center gap-1 bg-slate-950/80 border border-slate-800 rounded-lg p-1 h-9 px-3">
+            <div className="flex items-center gap-2 mr-1">
+              <input
+                type="checkbox"
+                id="backlog-mode"
+                checked={isBacklogMode}
+                onChange={(e) => setIsBacklogMode(e.target.checked)}
+                className="h-3.5 w-3.5 rounded border-slate-700 bg-slate-800 text-orange-600 focus:ring-orange-500 focus:ring-offset-slate-900"
+              />
+              <label
+                htmlFor="backlog-mode"
+                className="text-[9px] font-black uppercase text-slate-400 cursor-pointer whitespace-nowrap"
+              >
+                Backlog
+              </label>
+            </div>
+            {isBacklogMode && (
+              <input
+                type="date"
+                value={backlogDate}
+                onChange={(e) => setBacklogDate(e.target.value)}
+                className="bg-transparent border-none text-[9px] font-black uppercase text-orange-400 focus:ring-0 w-24 p-0 ml-1 font-mono"
+              />
+            )}
+          </div>
+
+          {/* Printer Connection */}
+          <div className="flex items-center gap-1 bg-slate-950/80 border border-slate-800 rounded-lg p-1 h-9">
+            <Button
+              onClick={() => handleConnectPrinter("usb")}
+              disabled={isConnectingPrinter}
+              variant="ghost"
+              className={cn(
+                "h-7 px-2 text-[8px] font-black uppercase italic flex items-center gap-1 rounded",
+                isPrinterConnected && printerTransport === "usb"
+                  ? "bg-emerald-500/20 text-emerald-400 font-bold"
+                  : "text-slate-500 hover:text-slate-300"
+              )}
+            >
+              USB
+            </Button>
+            <Button
+              onClick={() => handleConnectPrinter("bluetooth")}
+              disabled={isConnectingPrinter}
+              variant="ghost"
+              className={cn(
+                "h-7 px-2 text-[8px] font-black uppercase italic flex items-center gap-1 rounded",
+                isPrinterConnected && printerTransport === "bluetooth"
+                  ? "bg-blue-500/20 text-blue-400 font-bold"
+                  : "text-slate-500 hover:text-slate-300"
+              )}
+            >
+              {isConnectingPrinter && printerTransport === "bluetooth" ? "..." : "BT"}
+            </Button>
+          </div>
+
+          {/* Connected Indicator */}
+          {isPrinterConnected && (
+            <Badge className="bg-emerald-500/10 text-emerald-400 border-emerald-500/30 text-[9px] font-black uppercase py-1">
+              Printer: {printerTransport.toUpperCase()} Connected
+            </Badge>
+          )}
         </div>
 
         {!isOnline && (
@@ -403,9 +556,24 @@ export default function TshirtsPOS({
                 >
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-semibold truncate">{line.item.name}</p>
-                    <p className="text-xs text-orange-400 font-mono">
-                      ${line.price.toFixed(2)} each
-                    </p>
+                    <div className="flex items-center gap-1 mt-1">
+                      <span className="text-[10px] text-slate-500 font-bold">$</span>
+                      <input
+                        type="number"
+                        step="0.01"
+                        value={line.price}
+                        onChange={(e) => {
+                          const val = parseFloat(e.target.value) || 0;
+                          setCart(
+                            cart.map((c) =>
+                              c.item.id === line.item.id ? { ...c, price: val } : c
+                            )
+                          );
+                        }}
+                        className="w-16 h-6 rounded bg-slate-950 border border-slate-800 text-xs font-mono text-orange-400 px-1 text-center focus:outline-none focus:border-orange-500/50"
+                      />
+                      <span className="text-[9px] text-slate-500 font-bold">each</span>
+                    </div>
                   </div>
                   <div className="flex items-center gap-1">
                     <Button
@@ -483,23 +651,58 @@ export default function TshirtsPOS({
 
       {receiptOpen && lastReceipt && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-sm">
-          <Card className="w-full max-w-sm border-orange-500/30 bg-slate-900">
-            <CardHeader className="flex flex-row items-center justify-between">
+          <Card className="w-full max-w-sm border-orange-500/30 bg-slate-900 shadow-2xl">
+            <CardHeader className="flex flex-row items-center justify-between pb-2 border-b border-orange-500/10">
               <CardTitle className="text-lg font-black uppercase italic">Sale complete</CardTitle>
               <Button variant="ghost" size="icon" onClick={() => setReceiptOpen(false)}>
                 <X className="h-4 w-4" />
               </Button>
             </CardHeader>
-            <CardContent className="space-y-3 text-sm">
-              <p className="font-mono text-orange-400">{lastReceipt.receiptNo}</p>
-              <p className="text-slate-400">{lastReceipt.shopName}</p>
-              <p className="text-2xl font-black font-mono">${lastReceipt.total.toFixed(2)}</p>
+            <CardContent className="space-y-4 text-sm pt-4">
+              <div>
+                <p className="font-mono text-xs text-orange-400 font-bold">{lastReceipt.receiptNo}</p>
+                <p className="text-slate-500 text-xs font-semibold">{lastReceipt.shopName}</p>
+                <p className="text-3xl font-black font-mono text-slate-100 mt-1">${lastReceipt.total.toFixed(2)}</p>
+              </div>
+
               {lastReceipt.offline && (
-                <p className="text-amber-400 text-xs">Queued for sync when back online.</p>
+                <Badge className="bg-amber-500/10 text-amber-400 border-amber-500/30 w-full justify-center">
+                  Queued for sync when back online
+                </Badge>
               )}
+
+              <div className="border-t border-b border-slate-800 py-2 space-y-1 text-xs">
+                <div className="flex justify-between">
+                  <span className="text-slate-500 font-semibold uppercase text-[9px] tracking-wider">Customer</span>
+                  <span className="text-slate-200 font-bold">{lastReceipt.clientName}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-500 font-semibold uppercase text-[9px] tracking-wider">Cashier</span>
+                  <span className="text-slate-200">{lastReceipt.cashier}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-500 font-semibold uppercase text-[9px] tracking-wider">Payment Method</span>
+                  <span className="text-slate-200 uppercase">{lastReceipt.paymentMethod}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-500 font-semibold uppercase text-[9px] tracking-wider">Date</span>
+                  <span className="text-slate-200 font-mono">{lastReceipt.dateStamp} {lastReceipt.timeStamp}</span>
+                </div>
+              </div>
+
+              <div className="max-h-24 overflow-y-auto space-y-1.5 border-b border-slate-800 pb-2">
+                <p className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Items Sold</p>
+                {lastReceipt.items.map((line: any, idx: number) => (
+                  <div key={idx} className="flex justify-between text-xs">
+                    <span className="text-slate-300">{line.name} x{line.quantity}</span>
+                    <span className="text-slate-400 font-mono">${line.totalGross.toFixed(2)}</span>
+                  </div>
+                ))}
+              </div>
+
               <Button
                 variant="outline"
-                className="w-full border-orange-500/30"
+                className="w-full border-orange-500/30 hover:bg-orange-500/10 hover:text-orange-400 text-xs font-black uppercase tracking-widest flex items-center justify-center gap-2 h-11"
                 onClick={async () => {
                   try {
                     await thermalPrinter.printReceipt(lastReceipt);
@@ -508,9 +711,9 @@ export default function TshirtsPOS({
                   }
                 }}
               >
-                <Printer className="h-4 w-4 mr-2" /> Print receipt
+                <Printer className="h-4 w-4" /> Print receipt
               </Button>
-              <Button className="w-full bg-orange-600" onClick={() => setReceiptOpen(false)}>
+              <Button className="w-full bg-orange-600 hover:bg-orange-500 font-black uppercase tracking-widest h-11" onClick={() => setReceiptOpen(false)}>
                 Done
               </Button>
             </CardContent>
