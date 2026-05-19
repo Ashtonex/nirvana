@@ -412,6 +412,23 @@ export async function ensureTshirtsShop() {
         });
     }
 
+    // Ensure dummy shipment exists to satisfy foreign key constraints on inventory_items
+    const { data: shipment } = await supabaseAdmin.from("shipments").select("id").eq("id", "SERVICES-AUTO").maybeSingle();
+    if (!shipment?.id) {
+        await supabaseAdmin.from("shipments").insert({
+            id: "SERVICES-AUTO",
+            date: new Date().toISOString(),
+            supplier: "Auto Services",
+            shipment_number: "SERVICES-AUTO",
+            purchase_price: 0,
+            shipping_cost: 0,
+            duty_cost: 0,
+            misc_cost: 0,
+            manifest_pieces: 0,
+            total_quantity: 0
+        });
+    }
+
     // Ensure branding service exists in inventory_items to satisfy foreign key constraints
     const { data: serviceItem } = await supabaseAdmin.from("inventory_items").select("id").eq("id", "service_branding").maybeSingle();
     if (!serviceItem?.id) {
