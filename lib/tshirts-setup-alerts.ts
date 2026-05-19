@@ -20,6 +20,8 @@ export type TeeSetupAlert = {
  */
 export async function getNirvanaTeesSetupAlerts(): Promise<TeeSetupAlert[]> {
   const alerts: TeeSetupAlert[] = [];
+  const hasSupabase = Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY);
+  if (!hasSupabase) return alerts;
 
   const { data: posAllocs, error: allocErr } = await supabaseAdmin
     .from("inventory_allocations")

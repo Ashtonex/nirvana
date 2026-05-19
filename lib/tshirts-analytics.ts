@@ -134,6 +134,31 @@ export interface TshirtsAnalytics {
 }
 
 export async function getTshirtsAnalytics(daysBack = 60): Promise<TshirtsAnalytics> {
+  const hasSupabase = Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY);
+  if (!hasSupabase) {
+    return {
+      summary: {
+        revenueAllTime: 0,
+        revenueLast60Days: 0,
+        revenueMonthToDate: 0,
+        unitsLast60Days: 0,
+        plainRevenue60d: 0,
+        golfRevenue60d: 0,
+        plainUnits60d: 0,
+        golfUnits60d: 0,
+        transactionCount60d: 0,
+        unknownTransactions60d: 0,
+        unknownRevenue60d: 0,
+      },
+      stockByLine: [],
+      dailyRevenue: [],
+      lineBreakdown: [],
+      topProducts: [],
+      paymentMix: [],
+      sales: [],
+    };
+  }
+
   const now = new Date();
   const days60Ago = new Date(now.getTime() - daysBack * 24 * 60 * 60 * 1000).toISOString();
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
