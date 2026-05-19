@@ -68,7 +68,7 @@ type ControlRoomResponse = {
     delta: number;
     updatedAt: string | null;
     byShop: Array<{
-      shopId: 'kipasa' | 'dubdub' | 'tradecenter';
+      shopId: 'kipasa' | 'dubdub' | 'tradecenter' | 'tshirts';
       shopName: string;
       totalContributed: number;
       totalPaid: number;
@@ -88,9 +88,9 @@ type ControlRoomResponse = {
     revenueTrend: string;
     expenseTrend: string;
   };
-  openingBalances: Record<'kipasa' | 'dubdub' | 'tradecenter', number>;
+  openingBalances: Record<'kipasa' | 'dubdub' | 'tradecenter' | 'tshirts', number>;
   shops: Array<{
-    id: 'kipasa' | 'dubdub' | 'tradecenter';
+    id: 'kipasa' | 'dubdub' | 'tradecenter' | 'tshirts';
     name: string;
     sales30d: number;
     expenses30d: number;
@@ -149,7 +149,7 @@ type ControlRoomResponse = {
 };
 
 type SaleForm = {
-  shopId: 'kipasa' | 'dubdub' | 'tradecenter';
+  shopId: 'kipasa' | 'dubdub' | 'tradecenter' | 'tshirts';
   clientName: string;
   itemName: string;
   quantity: number;
@@ -159,7 +159,7 @@ type SaleForm = {
 };
 
 type ExpenseForm = {
-  shopId: 'kipasa' | 'dubdub' | 'tradecenter' | 'global';
+  shopId: 'kipasa' | 'dubdub' | 'tradecenter' | 'tshirts' | 'global';
   category: string;
   amount: number;
   date: string;
@@ -172,6 +172,7 @@ const SHOPS = [
   { id: 'kipasa', name: 'Kipasa' },
   { id: 'dubdub', name: 'Dub Dub' },
   { id: 'tradecenter', name: 'Trade Center' },
+  { id: 'tshirts', name: 'Nirvana Tees' },
 ] as const;
 
 function currency(amount: number) {
@@ -263,10 +264,11 @@ export default function TheHandPage() {
   const [busy, setBusy] = useState(false);
   const [backupBusy, setBackupBusy] = useState(false);
   const [logs, setLogs] = useState<LogEntry[]>([]);
-  const [openingBalances, setOpeningBalances] = useState<Record<'kipasa' | 'dubdub' | 'tradecenter', number>>({
+  const [openingBalances, setOpeningBalances] = useState<Record<'kipasa' | 'dubdub' | 'tradecenter' | 'tshirts', number>>({
     kipasa: 0,
     dubdub: 0,
     tradecenter: 0,
+    tshirts: 0,
   });
   const [saleForm, setSaleForm] = useState<SaleForm>({
     shopId: 'kipasa',
@@ -372,7 +374,7 @@ export default function TheHandPage() {
     amount: 0,
   });
 
-  const updateOpeningBalance = async (shop: 'kipasa' | 'dubdub' | 'tradecenter') => {
+  const updateOpeningBalance = async (shop: 'kipasa' | 'dubdub' | 'tradecenter' | 'tshirts') => {
     if (!confirm(`ARE YOU SURE? This will override the historical opening balance for ${shop.toUpperCase()} at the source. This cannot be undone automatically.`)) {
       return;
     }

@@ -2,6 +2,10 @@ import { promises as fs } from 'fs';
 import path from 'path';
 import { NextResponse } from 'next/server';
 
+
+
+
+
 import { enforceOwnerOnly } from '@/lib/auth-helpers';
 import { buildCashReconciliation } from '@/lib/cash-reconciliation';
 import { getOperationsComputedBalance, getOperationsState } from '@/lib/operations';
@@ -12,6 +16,7 @@ const SHOPS = [
   { id: 'kipasa', name: 'Kipasa' },
   { id: 'dubdub', name: 'Dub Dub' },
   { id: 'tradecenter', name: 'Trade Center' },
+  { id: 'tshirts', name: 'Nirvana Tees' },
 ] as const;
 
 type ShopId = (typeof SHOPS)[number]['id'];

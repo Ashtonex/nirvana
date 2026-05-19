@@ -42,7 +42,11 @@ export default function StaffLoginPage() {
         const result = await offlineLogin(pin);
         if (result.success && result.session) {
           const shopId = result.session.shopId;
-          window.location.href = shopId ? `/shops/${shopId}` : "/mobile-menu";
+          window.location.href = shopId
+            ? shopId === "tshirts"
+              ? "/tshirts"
+              : `/shops/${shopId}`
+            : "/mobile-menu";
           return;
         }
         setError(result.error || "Invalid PIN for offline login");
@@ -74,7 +78,11 @@ export default function StaffLoginPage() {
       await new Promise(resolve => setTimeout(resolve, 50));
       
       console.log("[Staff Login] Navigating to:", `/shops/${shopId}`);
-      window.location.href = shopId ? `/shops/${shopId}` : "/mobile-menu";
+      window.location.href = shopId
+        ? shopId === "tshirts"
+          ? "/tshirts"
+          : `/shops/${shopId}`
+        : "/mobile-menu";
     } catch (e: any) {
       console.error("[Staff Login] Error:", e);
       setError(e?.message || "Failed to log in");

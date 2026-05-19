@@ -17,6 +17,7 @@ export function Gatekeeper({ children }: { children: React.ReactNode }) {
 
   const defaultStage = (() => {
     if (userRole === "owner") return "/";
+    if (userShop === "tshirts") return "/tshirts";
     if (userShop) return `/shops/${userShop}`;
     return "/";
   })();
@@ -42,12 +43,13 @@ export function Gatekeeper({ children }: { children: React.ReactNode }) {
     if (!user || !employee) return;
 
     const role = userRole || "sales";
-    const shopPath = userShop ? `/shops/${userShop}` : "/";
+    const shopPath =
+      userShop === "tshirts" ? "/tshirts" : userShop ? `/shops/${userShop}` : "/";
 
     if (role === "owner") return;
 
     const allowedPrefixes = role === "manager"
-      ? [shopPath, "/chat", "/transfers"]
+      ? [shopPath, "/chat", "/transfers", "/tshirts"]
       : [shopPath, "/chat"];
 
     const ok = allowedPrefixes.some((p) => pathname === p || pathname.startsWith(`${p}/`));

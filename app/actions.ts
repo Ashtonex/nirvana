@@ -11,6 +11,8 @@ import { cookies } from "next/headers";
 import { computePosAuditReport } from "@/lib/posAudit";
 import { createOperationsLedgerEntry, isVaultDepositKind } from "@/lib/operations";
 import { getSavingsTransferCategory, isSavingsOrBlackboxTransferEntry } from "@/lib/transfer-classification";
+import { TSHIRTS_SHOP_ID, TSHIRTS_SHOP_NAME, isNirvanaTeeItem } from "@/lib/tshirts";
+import { getNirvanaTeesSetupAlerts } from "@/lib/tshirts-setup-alerts";
 
 function getPublicBaseUrl() {
     const url =
@@ -396,6 +398,60 @@ export async function getShopDashboardData(shopId: string, daysLimit = 60) {
     }
 }
 
+/** Ensures the dedicated T-shirt shop row exists in Supabase. */
+export async function ensureTshirtsShop() {
+    const hasSupabase = Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY);
+    if (!hasSupabase) return;
+
+    const { data } = await supabaseAdmin.from("shops").select("id").eq("id", TSHIRTS_SHOP_ID).maybeSingle();
+    if (data?.id) return;
+
+    await supabaseAdmin.from("shops").insert({
+        id: TSHIRTS_SHOP_ID,
+        name: TSHIRTS_SHOP_NAME,
+        expenses: { rent: 0, salaries: 0, utilities: 0, misc: 0 },
+    });
+}
+
+/** Shop-scoped data for the T-shirt POS — inventory filtered to tee categories only. */
+export async function getTshirtsShopData(daysLimit = 60) {
+    await ensureTshirtsShop();
+    const [base, teeSetupAlerts] = await Promise.all([
+        getShopDashboardData(TSHIRTS_SHOP_ID, daysLimit),
+        getNirvanaTeesSetupAlerts(),
+    ]);
+    const inventory = (base.inventory || []).filter((item: any) => isNirvanaTeeItem(item));
+
+    const shop =
+        base.shops?.[0] ||
+        { id: TSHIRTS_SHOP_ID, name: TSHIRTS_SHOP_NAME, expenses: { rent: 0, salaries: 0, utilities: 0, misc: 0 } };
+
+    let employees = base.employees || [];
+    if (employees.length === 0) {
+        const { data: allStaff } = await supabaseAdmin
+            .from("employees")
+            .select("*")
+            .limit(500);
+        employees = (allStaff || [])
+            .filter((e: any) => Boolean(e.is_active ?? e.active ?? true))
+            .map((e: any) => ({
+                id: e.id,
+                name: `${e.name || ""} ${e.surname || ""}`.trim(),
+                active: true,
+                shopId: e.shop_id,
+                role: e.role || "sales",
+            }));
+    }
+
+    return {
+        ...base,
+        inventory,
+        employees,
+        shops: [{ ...shop, id: TSHIRTS_SHOP_ID, name: TSHIRTS_SHOP_NAME }],
+        teeSetupAlerts,
+    };
+}
+
 export async function updateGlobalExpenses(expenses: Database['globalExpenses']) {
     await supabase.from('oracle_settings').update({ global_expenses: expenses }).eq('id', 1);
     await supabase.from('audit_log').insert({
@@ -635,6 +691,11 @@ export async function recordSale(sale: any) {
     });
 
     revalidatePath(`/shops/${sale.shopId}`);
+    if (sale.shopId === TSHIRTS_SHOP_ID) {
+        revalidatePath("/tshirts");
+        revalidatePath("/tshirts/analytics");
+        revalidatePath("/tshirts/reports");
+    }
     revalidatePath("/inventory");
     revalidatePath("/");
     revalidatePath("/intelligence");
@@ -863,8 +924,36 @@ export async function updateInventoryItem(itemId: string, updates: any) {
                 revalidatePath(`/shops/${shop.id}`);
             }
         }
-        
-        return { success: true, message: `Item updated successfully` };
+
+        revalidatePath("/tshirts");
+        revalidatePath("/tshirts/analytics");
+        revalidatePath("/tshirts/reports");
+
+        let nirvanaTeeWarning: string | undefined;
+        if (updates && typeof updates.category === "string") {
+            const { data: row } = await supabaseAdmin
+                .from("inventory_items")
+                .select("id, name, category")
+                .eq("id", itemId)
+                .maybeSingle();
+            const { data: teeAlloc } = await supabaseAdmin
+                .from("inventory_allocations")
+                .select("quantity")
+                .eq("item_id", itemId)
+                .eq("shop_id", TSHIRTS_SHOP_ID)
+                .maybeSingle();
+            const teeQty = Number((teeAlloc as any)?.quantity || 0);
+            if (teeQty > 0 && row && !isNirvanaTeeItem(row as any)) {
+                nirvanaTeeWarning =
+                    `This SKU still has ${teeQty} unit(s) allocated to Nirvana Tees (shop “${TSHIRTS_SHOP_ID}”), but category “${(row as any).category}” is not recognized as Plain T-Shirt / Plain Golf T-Shirt — it will be hidden on the tee POS until the category is fixed.`;
+            }
+        }
+
+        return {
+            success: true,
+            message: `Item updated successfully`,
+            nirvanaTeeWarning,
+        };
     } catch (err: any) {
         console.error('[updateInventoryItem] Error:', err);
         return { success: false, error: err.message };
@@ -1192,6 +1281,11 @@ export async function addNewProductFromPos(productData: any) {
     revalidatePath("/inventory");
     revalidatePath("/");
     revalidatePath(`/shops/${shopId}`);
+    if (shopId === TSHIRTS_SHOP_ID) {
+        revalidatePath("/tshirts");
+        revalidatePath("/tshirts/analytics");
+        revalidatePath("/tshirts/reports");
+    }
 
     return {
         id,
@@ -2798,6 +2892,56 @@ export async function exportTaxLedgerCSV() {
     } catch (error) {
         console.error('Error exporting tax ledger:', error);
         return { success: false, error: 'Failed to export tax ledger' };
+    }
+}
+
+/** CSV export for Nirvana Tees (Plain T-Shirt / Plain Golf T-Shirt only). */
+export async function exportTshirtsReportCSV(
+    sales: {
+        date: string;
+        itemName: string;
+        lineLabel?: string;
+        quantity: number;
+        unitPrice: number;
+        totalWithTax: number;
+        paymentMethod?: string;
+        clientName?: string;
+    }[]
+) {
+    try {
+        if (!sales?.length) {
+            return { success: false, error: "No tee sales to export" };
+        }
+
+        const csvRows: string[] = [
+            "Date,Time,Product Line,Product,Qty,Unit Price,Total (inc. Tax),Payment,Customer",
+        ];
+
+        sales.forEach((sale) => {
+            const date = new Date(sale.date);
+            csvRows.push(
+                [
+                    date.toLocaleDateString(),
+                    date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+                    `"${sale.lineLabel || ""}"`,
+                    `"${sale.itemName}"`,
+                    sale.quantity,
+                    Number(sale.unitPrice).toFixed(2),
+                    Number(sale.totalWithTax).toFixed(2),
+                    `"${sale.paymentMethod || "cash"}"`,
+                    `"${sale.clientName || ""}"`,
+                ].join(",")
+            );
+        });
+
+        return {
+            success: true,
+            data: csvRows.join("\n"),
+            filename: `nirvana-tees-report-${new Date().toISOString().split("T")[0]}.csv`,
+        };
+    } catch (error) {
+        console.error("[exportTshirtsReportCSV]", error);
+        return { success: false, error: "Failed to export tee report" };
     }
 }
 

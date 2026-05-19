@@ -24,7 +24,8 @@ import {
     HandCoins,
     Cpu,
     Zap,
-    Brain
+    Brain,
+    Shirt
 } from 'lucide-react';
 import { useAuth } from '@/components/AuthProvider';
 import { useStaff } from '@/components/StaffProvider';
@@ -40,6 +41,7 @@ const navItems = [
     { name: 'Kipasa', href: '/shops/kipasa', icon: Store },
     { name: 'Dub Dub', href: '/shops/dubdub', icon: Store },
     { name: 'Trade Center', href: '/shops/tradecenter', icon: Store },
+    { name: 'Nirvana Tees', href: '/tshirts', icon: Shirt },
     { name: 'Inventory Master', href: '/inventory', icon: Package },
     { name: 'Stocktake Audit', href: '/inventory/stocktake', icon: ClipboardList },
     { name: 'Global Inventory', href: '/admin/inventory-manager', icon: ArrowRightLeft },

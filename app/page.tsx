@@ -8,6 +8,8 @@ import { BreakEvenChart } from "@/components/BreakEvenChart";
 import { RevenueExpenseProfitTrajectoryChart } from "@/components/RevenueExpenseProfitTrajectoryChart";
 import { Leaderboard } from "@/components/Leaderboard";
 import { RealtimeDashboard } from "@/components/RealtimeDashboard";
+import { NirvanaIntelligenceCards } from "@/components/NirvanaIntelligenceCards";
+import { CommandCenterPulse } from "@/components/CommandCenterPulse";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui";
 import {
   TrendingUp,
@@ -68,21 +70,27 @@ export default async function Home() {
 
   return (
     <div className="space-y-8">
+      {/* ── Header ── */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Nirvana Command Center</h1>
-          <p className="text-slate-400">Consolidated overview across all three locations.</p>
+          <h1 className="text-3xl font-black tracking-tight uppercase italic">Nirvana Command Center</h1>
+          <p className="text-slate-400 text-sm">Consolidated intelligence across all three locations.</p>
         </div>
-        <div className="flex items-center gap-4">
-          <div className="flex flex-col items-end">
-            <span className="text-xs text-slate-500 uppercase font-semibold">Consolidated Status</span>
-            <span className="text-emerald-400 flex items-center gap-1 font-medium">
-              <TrendingUp className="h-4 w-4" /> Operational
-            </span>
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 px-3 py-1.5 bg-emerald-950/40 border border-emerald-800/40 rounded-full">
+            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+            <span className="text-xs font-black uppercase text-emerald-400">All Systems Operational</span>
           </div>
         </div>
       </div>
 
+      {/* ── Predictive Intelligence Cards (AI Analytics) ── */}
+      <div>
+        <div className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-3">⚡ Predictive Intelligence Engine</div>
+        <NirvanaIntelligenceCards />
+      </div>
+
+      {/* ── Static Intelligence Dashboard ── */}
       <IntelligenceDashboard
         bestSellers={bestSellers}
         trends={trends}
@@ -205,6 +213,12 @@ export default async function Home() {
         </Card>
       </div>
 
+      {/* ── Live System Pulse (Control Center Feed) ── */}
+      <div className="border-t border-slate-800 pt-8">
+        <CommandCenterPulse />
+      </div>
+
+      {/* ── Today's Real-time Activity Feed ── */}
       <RealtimeDashboard />
     </div>
   );

@@ -75,6 +75,9 @@ export function AccessGate({ children }: { children: React.ReactNode }) {
   // If staff is logged in, STRICTLY limit to their shop and staff-chat only
   if (staffShopId) {
     const onTheirShop = pathname === `/shops/${staffShopId}` || pathname.startsWith(`/shops/${staffShopId}/`);
+    const onTshirtsShop =
+      staffShopId === "tshirts" &&
+      (pathname === "/tshirts" || pathname.startsWith("/tshirts/"));
     const onStaffChat = pathname === "/staff-chat";
     const onCommandCenter = pathname === "/";
 
@@ -101,9 +104,11 @@ export function AccessGate({ children }: { children: React.ReactNode }) {
       pathname === "/invest" ||
       pathname.startsWith("/invest/") ||
       pathname === "/logic" ||
-      pathname.startsWith("/logic/");
+      pathname.startsWith("/logic/") ||
+      pathname === "/tshirts" ||
+      pathname.startsWith("/tshirts/");
     
-    if (onTheirShop || onStaffChat || (isManager && managerAllowed)) {
+    if (onTheirShop || onTshirtsShop || onStaffChat || (isManager && managerAllowed)) {
       console.log("[AccessGate] Allowing access - staff on their shop or staff-chat or manager page");
       return <>{children}</>;
     }

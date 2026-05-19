@@ -781,7 +781,12 @@ export default function InventoryMaster({ db }: { db: any }) {
                                                                     startTransition(async () => {
                                                                         const result = await updateInventoryItem(item.id, { name: newName, quantity: Number(newQty) });
                                                                         if (result.success) {
-                                                                            alert(`✓ ${newName} quantity updated to ${newQty}. All pages will refresh.`);
+                                                                            const w = (result as { nirvanaTeeWarning?: string }).nirvanaTeeWarning;
+                                                                            alert(
+                                                                                w
+                                                                                    ? `✓ ${newName} quantity updated to ${newQty}.\n\n⚠️ Nirvana Tees: ${w}`
+                                                                                    : `✓ ${newName} quantity updated to ${newQty}. All pages will refresh.`
+                                                                            );
                                                                         } else {
                                                                             alert(`❌ Error updating item: ${result.error}`);
                                                                         }
