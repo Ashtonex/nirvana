@@ -34,7 +34,8 @@ import {
     AlertCircle,
     BarChart3,
     Loader2,
-    ShieldAlert
+    ShieldAlert,
+    Download
 } from "lucide-react";
 import { InventoryIntelligenceCard } from "@/components/InventoryIntelligenceCard";
 import { updateGlobalExpenses, processShipment, registerInventoryItem, registerBulkInventoryItems, updateInventoryItem, deleteInventoryItem, logInventoryAdjustment } from "../actions";
@@ -407,6 +408,101 @@ export default function InventoryMaster({ db }: { db: any }) {
         setWorkflowDraft({ type: "transfer", title: "Shop Transfer Draft", rows: rows as Array<Record<string, any>> });
     };
 
+    const downloadCsv = (filename: string, rows: Array<Record<string, any>>) => {
+        if (rows.length === 0) {
+            alert("No rows available for this export yet.");
+            return;
+        }
+        const headers = Object.keys(rows[0]);
+        const escapeCell = (value: any) => {
+            const text = String(value ?? "");
+            return /[",\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+        };
+        const csv = [
+            headers.join(","),
+            ...rows.map((row) => headers.map((header) => escapeCell(row[header])).join(","))
+        ].join("\n");
+        const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        URL.revokeObjectURL(url);
+    };
+
+    const exportPriorityReorders = () => {
+        downloadCsv("priority-reorders.csv", commandMetrics.priority.map((item: any) => {
+            const suggestedQty = Math.max(0, Math.ceil((item.insights.velocity * 30) - Number(item.quantity || 0)));
+            return {
+                sku: item.sku || item.id,
+                item: item.name,
+                category: item.category,
+                stock: Number(item.quantity || 0),
+                velocity_per_day: item.insights.velocity.toFixed(3),
+                days_to_zero: item.insights.daysToZero === Infinity ? "" : item.insights.daysToZero,
+                reorder_point: item.insights.rop,
+                safety_stock: item.insights.safetyStock,
+                suggested_order_qty: suggestedQty,
+                estimated_cost: (suggestedQty * Number(item.landedCost || 0)).toFixed(2),
+            };
+        }));
+    };
+
+    const exportTrappedCapital = () => {
+        const rows = inventory
+            .map((item: any) => ({
+                sku: item.sku || item.id,
+                item: item.name,
+                category: item.category,
+                stock: Number(item.quantity || 0),
+                landed_cost: Number(item.landedCost || 0).toFixed(2),
+                trapped_capital: (Number(item.quantity || 0) * Number(item.landedCost || 0)).toFixed(2),
+                date_added: item.dateAdded || "",
+            }))
+            .sort((a: any, b: any) => Number(b.trapped_capital) - Number(a.trapped_capital));
+        downloadCsv("trapped-capital.csv", rows);
+    };
+
+    const exportDeadStock = () => {
+        const rows = inventory
+            .map((item: any) => ({ ...item, insights: getInsights(item.id, Number(item.quantity || 0), Number(item.landedCost || 0), item.dateAdded) }))
+            .filter((item: any) => item.insights.totalSold === 0 && item.insights.daysInStock >= 60 && Number(item.quantity || 0) > 0)
+            .map((item: any) => ({
+                sku: item.sku || item.id,
+                item: item.name,
+                category: item.category,
+                stock: Number(item.quantity || 0),
+                days_in_stock: item.insights.daysInStock,
+                landed_cost: Number(item.landedCost || 0).toFixed(2),
+                dead_stock_value: (Number(item.quantity || 0) * Number(item.landedCost || 0)).toFixed(2),
+                recovery_at_20pct_discount: (Number(item.quantity || 0) * Number(item.landedCost || 0) * 0.8).toFixed(2),
+            }))
+            .sort((a: any, b: any) => Number(b.dead_stock_value) - Number(a.dead_stock_value));
+        downloadCsv("dead-stock.csv", rows);
+    };
+
+    const exportShipmentWarnings = () => {
+        const rows = commandMetrics.shipmentWarnings.map((shipment: any) => ({
+            shipment: shipment.shipmentNumber,
+            supplier: shipment.supplier,
+            status: shipment.status,
+            current_units: Number(shipment.currentUnits || 0),
+            sold_units: Number(shipment.soldUnits || 0),
+            cost_basis: Number(shipment.costBasis || 0).toFixed(2),
+            revenue: Number(shipment.revenue || 0).toFixed(2),
+            gross_profit: Number(shipment.grossProfit || 0).toFixed(2),
+            roi_pct: Number(shipment.roi || 0).toFixed(2),
+            sell_through_pct: Number(shipment.sellThrough || 0).toFixed(2),
+            fastest_mover: shipment.fastestMover?.name || "",
+            slowest_mover: shipment.slowestMover?.name || "",
+            signal: ['winning', 'sold-through'].includes(shipment.status) && Number(shipment.roi || 0) > 0 ? "buy again" : "review",
+        }));
+        downloadCsv("shipment-warnings.csv", rows);
+    };
+
     useEffect(() => {
         let cancelled = false;
         async function loadStockBrain() {
@@ -570,6 +666,47 @@ export default function InventoryMaster({ db }: { db: any }) {
                     </p>
                 </div>
             </div>
+
+            <Card className="bg-slate-900/50 border-slate-800">
+                <CardHeader className="pb-3">
+                    <CardTitle className="text-sm font-black uppercase italic tracking-widest text-white flex items-center gap-2">
+                        <Download className="h-4 w-4 text-emerald-400" /> Inventory command exports
+                    </CardTitle>
+                    <CardDescription className="text-[10px] font-bold uppercase tracking-widest text-slate-600">
+                        Download the exact lists behind the command cards for review, ordering, and cleanup.
+                    </CardDescription>
+                </CardHeader>
+                <CardContent className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+                    <Button
+                        variant="outline"
+                        onClick={exportPriorityReorders}
+                        className="h-11 justify-start border-amber-500/30 text-[10px] font-black uppercase tracking-widest text-amber-400 hover:bg-amber-500/10"
+                    >
+                        <Download className="mr-2 h-4 w-4" /> Priority reorders
+                    </Button>
+                    <Button
+                        variant="outline"
+                        onClick={exportTrappedCapital}
+                        className="h-11 justify-start border-sky-500/30 text-[10px] font-black uppercase tracking-widest text-sky-400 hover:bg-sky-500/10"
+                    >
+                        <Download className="mr-2 h-4 w-4" /> Trapped capital
+                    </Button>
+                    <Button
+                        variant="outline"
+                        onClick={exportDeadStock}
+                        className="h-11 justify-start border-rose-500/30 text-[10px] font-black uppercase tracking-widest text-rose-400 hover:bg-rose-500/10"
+                    >
+                        <Download className="mr-2 h-4 w-4" /> Dead stock list
+                    </Button>
+                    <Button
+                        variant="outline"
+                        onClick={exportShipmentWarnings}
+                        className="h-11 justify-start border-orange-500/30 text-[10px] font-black uppercase tracking-widest text-orange-400 hover:bg-orange-500/10"
+                    >
+                        <Download className="mr-2 h-4 w-4" /> Shipment warnings
+                    </Button>
+                </CardContent>
+            </Card>
 
             <div className="grid gap-8 md:grid-cols-12">
                 {/* Main Content Area */}

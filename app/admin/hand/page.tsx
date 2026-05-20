@@ -8,7 +8,9 @@ import {
   Brain,
   Building2,
   Database,
+  Download,
   Lock,
+  PackageSearch,
   RefreshCcw,
   ShieldAlert,
   ShieldCheck,
@@ -148,6 +150,24 @@ type ControlRoomResponse = {
   };
 };
 
+type InventoryCommandLists = {
+  success: boolean;
+  generatedAt: string;
+  summary: {
+    priorityReorders: number;
+    trappedCapitalValue: number;
+    deadStockCount: number;
+    deadStockValue: number;
+    shipmentWarnings: number;
+  };
+  lists: {
+    priorityReorders: Array<Record<string, any>>;
+    trappedCapital: Array<Record<string, any>>;
+    deadStock: Array<Record<string, any>>;
+    shipmentWarnings: Array<Record<string, any>>;
+  };
+};
+
 type SaleForm = {
   shopId: 'kipasa' | 'dubdub' | 'tradecenter' | 'tshirts';
   clientName: string;
@@ -246,6 +266,55 @@ function MetricCard({
   );
 }
 
+function MiniTable({
+  title,
+  rows,
+  columns,
+  empty,
+}: {
+  title: string;
+  rows: Array<Record<string, any>>;
+  columns: Array<{ key: string; label: string; format?: (value: any, row: Record<string, any>) => string }>;
+  empty: string;
+}) {
+  return (
+    <div className="rounded-3xl border border-white/10 bg-white/[0.03] overflow-hidden">
+      <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
+        <h3 className="text-sm font-black uppercase tracking-widest text-white">{title}</h3>
+        <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">{rows.length} rows</span>
+      </div>
+      {rows.length === 0 ? (
+        <div className="p-6 text-sm font-bold text-slate-500">{empty}</div>
+      ) : (
+        <div className="max-h-[360px] overflow-auto">
+          <table className="w-full min-w-[760px] text-xs">
+            <thead className="sticky top-0 bg-slate-950">
+              <tr>
+                {columns.map((column) => (
+                  <th key={column.key} className="px-3 py-2 text-left text-[9px] font-black uppercase tracking-widest text-slate-500">
+                    {column.label}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-white/5">
+              {rows.map((row, idx) => (
+                <tr key={idx} className="hover:bg-white/[0.03]">
+                  {columns.map((column) => (
+                    <td key={column.key} className="px-3 py-2 font-bold text-slate-300">
+                      {column.format ? column.format(row[column.key], row) : String(row[column.key] ?? '')}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
 const TABS = [
   { id: 'overview', label: 'Overview', icon: Building2 },
   { id: 'operations', label: 'Operations', icon: Wallet },
@@ -264,6 +333,8 @@ export default function TheHandPage() {
   const [busy, setBusy] = useState(false);
   const [backupBusy, setBackupBusy] = useState(false);
   const [logs, setLogs] = useState<LogEntry[]>([]);
+  const [inventoryCommands, setInventoryCommands] = useState<InventoryCommandLists | null>(null);
+  const [inventoryCommandsLoading, setInventoryCommandsLoading] = useState(false);
   const [openingBalances, setOpeningBalances] = useState<Record<'kipasa' | 'dubdub' | 'tradecenter' | 'tshirts', number>>({
     kipasa: 0,
     dubdub: 0,
@@ -341,6 +412,24 @@ export default function TheHandPage() {
     }
   }, []);
 
+  const loadInventoryCommands = useCallback(async () => {
+    setInventoryCommandsLoading(true);
+    try {
+      const response = await fetch('/api/inventory/command-lists', { cache: 'no-store', credentials: 'include' });
+      const result = await response.json();
+      if (!response.ok || !result.success) {
+        throw new Error(result.message || 'Failed to load inventory command lists');
+      }
+      setInventoryCommands(result);
+      addLog('success', `Inventory command lists refreshed: ${result.summary.priorityReorders} priority reorders.`);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Failed to load inventory command lists';
+      addLog('error', message);
+    } finally {
+      setInventoryCommandsLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     async function boot() {
       try {
@@ -357,6 +446,7 @@ export default function TheHandPage() {
         setClearance('granted');
         addLog('success', 'Level 5 clearance granted.');
         await loadControlRoom(true);
+        await loadInventoryCommands();
       } catch (error: unknown) {
         const message = error instanceof Error ? error.message : 'Unable to validate clearance';
         addLog('error', message);
@@ -366,7 +456,29 @@ export default function TheHandPage() {
     }
 
     boot();
-  }, [loadControlRoom]);
+  }, [loadControlRoom, loadInventoryCommands]);
+
+  const downloadInventoryCommandCsv = (name: string, rows: Array<Record<string, any>>) => {
+    if (rows.length === 0) {
+      addLog('warning', `No rows available for ${name}.`);
+      return;
+    }
+    const headers = Object.keys(rows[0]);
+    const escape = (value: any) => {
+      const text = String(value ?? '');
+      return /[",\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+    };
+    const csv = [headers.join(','), ...rows.map((row) => headers.map((header) => escape(row[header])).join(','))].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `${name}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+  };
 
   const [pastOpeningForm, setPastOpeningForm] = useState({
     shopId: 'kipasa' as SaleForm['shopId'],
@@ -1173,6 +1285,126 @@ export default function TheHandPage() {
         {/* Inventory Health Tab */}
         {activeTab === 'inventory' && (
           <div className="mt-6 space-y-6">
+            <WindowCard eyebrow="Inventory Command Layer" title="Priority Lists And Capital Exposure" icon={PackageSearch}>
+              <div className="mb-6 flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+                <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5 flex-1">
+                  <MetricCard
+                    label="Priority Reorders"
+                    value={String(inventoryCommands?.summary.priorityReorders || 0)}
+                    hint="Items below reorder runway"
+                    tone="text-amber-300"
+                  />
+                  <MetricCard
+                    label="Trapped Capital"
+                    value={currency(inventoryCommands?.summary.trappedCapitalValue || 0)}
+                    hint="Landed stock value exposed"
+                    tone="text-sky-300"
+                  />
+                  <MetricCard
+                    label="Dead Stock"
+                    value={String(inventoryCommands?.summary.deadStockCount || 0)}
+                    hint={currency(inventoryCommands?.summary.deadStockValue || 0)}
+                    tone="text-rose-300"
+                  />
+                  <MetricCard
+                    label="Shipment Warnings"
+                    value={String(inventoryCommands?.summary.shipmentWarnings || 0)}
+                    hint="Slow or margin-risk batches"
+                    tone="text-orange-300"
+                  />
+                  <MetricCard
+                    label="Updated"
+                    value={inventoryCommands?.generatedAt ? new Date(inventoryCommands.generatedAt).toLocaleTimeString() : 'Waiting'}
+                    hint="Command-list refresh"
+                    tone="text-emerald-300"
+                  />
+                </div>
+                <button
+                  onClick={loadInventoryCommands}
+                  disabled={inventoryCommandsLoading}
+                  className="rounded-2xl border border-emerald-400/30 bg-emerald-500/10 px-4 py-3 text-left text-xs font-black uppercase tracking-widest text-emerald-100 transition hover:bg-emerald-500/20 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  <RefreshCcw className={`mr-2 inline h-4 w-4 ${inventoryCommandsLoading ? 'animate-spin' : ''}`} />
+                  Refresh Command Lists
+                </button>
+              </div>
+
+              <div className="mb-6 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+                {([
+                  ['priority-reorders', 'Priority Reorders', inventoryCommands?.lists.priorityReorders || []],
+                  ['trapped-capital', 'Trapped Capital', inventoryCommands?.lists.trappedCapital || []],
+                  ['dead-stock', 'Dead Stock', inventoryCommands?.lists.deadStock || []],
+                  ['shipment-warnings', 'Shipment Warnings', inventoryCommands?.lists.shipmentWarnings || []],
+                ] as const).map(([filename, label, rows]) => (
+                  <button
+                    key={filename}
+                    onClick={() => downloadInventoryCommandCsv(filename, rows)}
+                    className="rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3 text-left text-[10px] font-black uppercase tracking-widest text-slate-300 transition hover:border-emerald-500/30 hover:text-emerald-300"
+                  >
+                    <Download className="mr-2 inline h-4 w-4" />
+                    {label}
+                  </button>
+                ))}
+              </div>
+
+              <div className="space-y-6">
+                <MiniTable
+                  title="Priority Reorders"
+                  rows={inventoryCommands?.lists.priorityReorders || []}
+                  empty="No priority reorder rows are active."
+                  columns={[
+                    { key: 'item', label: 'Item' },
+                    { key: 'category', label: 'Category' },
+                    { key: 'stock', label: 'Stock' },
+                    { key: 'velocity', label: 'Velocity', format: (v) => Number(v || 0).toFixed(2) },
+                    { key: 'daysToZero', label: 'Runway', format: (v) => v == null ? 'n/a' : `${v}d` },
+                    { key: 'reorderPoint', label: 'ROP' },
+                    { key: 'suggestedOrderQty', label: 'Order' },
+                  ]}
+                />
+                <MiniTable
+                  title="Trapped Capital"
+                  rows={(inventoryCommands?.lists.trappedCapital || []).slice(0, 50)}
+                  empty="No trapped-capital rows are available."
+                  columns={[
+                    { key: 'item', label: 'Item' },
+                    { key: 'category', label: 'Category' },
+                    { key: 'stock', label: 'Stock' },
+                    { key: 'landedCost', label: 'Landed', format: (v) => currency(Number(v || 0)) },
+                    { key: 'trappedCapital', label: 'Capital', format: (v) => currency(Number(v || 0)) },
+                    { key: 'sold30d', label: 'Sold 30d' },
+                  ]}
+                />
+                <MiniTable
+                  title="Dead Stock"
+                  rows={inventoryCommands?.lists.deadStock || []}
+                  empty="No dead-stock rows are active."
+                  columns={[
+                    { key: 'item', label: 'Item' },
+                    { key: 'category', label: 'Category' },
+                    { key: 'stock', label: 'Stock' },
+                    { key: 'daysInStock', label: 'Age', format: (v) => `${v}d` },
+                    { key: 'trappedCapital', label: 'Value', format: (v) => currency(Number(v || 0)) },
+                    { key: 'lastSaleAt', label: 'Last Sale', format: (v) => v ? new Date(v).toLocaleDateString() : 'none' },
+                  ]}
+                />
+                <MiniTable
+                  title="Shipment Warnings"
+                  rows={inventoryCommands?.lists.shipmentWarnings || []}
+                  empty="No shipment warnings are active."
+                  columns={[
+                    { key: 'shipment', label: 'Shipment' },
+                    { key: 'supplier', label: 'Supplier' },
+                    { key: 'status', label: 'Status' },
+                    { key: 'currentUnits', label: 'Left' },
+                    { key: 'sellThrough', label: 'Sell', format: (v) => `${Number(v || 0).toFixed(0)}%` },
+                    { key: 'roi', label: 'ROI', format: (v) => `${Number(v || 0).toFixed(1)}%` },
+                    { key: 'signal', label: 'Signal' },
+                  ]}
+                />
+              </div>
+            </WindowCard>
+
             <InventoryHealth />
           </div>
         )}

@@ -81,6 +81,9 @@ function sumUnits(sales: SaleRow[]): number {
   return sales.reduce((s, r) => s + Number(r.quantity || 0), 0);
 }
 
+const TEE_STARTING_STOCK = 600;
+const STANDARD_TEE_PRICE = 3.5;
+
 export interface TshirtsAnalytics {
   summary: {
     revenueAllTime: number;
@@ -95,6 +98,12 @@ export interface TshirtsAnalytics {
     /** Sales that could not be mapped to plain/golf (missing item row, odd name, etc.) */
     unknownTransactions60d: number;
     unknownRevenue60d: number;
+    unitsAllTime: number;
+    allocatedStockRaw: number;
+    reconciledStock: number;
+    stockSource: "allocation" | "reconciled_baseline";
+    averageUnitRevenueAllTime: number;
+    expectedUnitsAtStandardPrice: number;
   };
   stockByLine: {
     line: TeeProductLine;
@@ -149,6 +158,12 @@ export async function getTshirtsAnalytics(daysBack = 60): Promise<TshirtsAnalyti
         transactionCount60d: 0,
         unknownTransactions60d: 0,
         unknownRevenue60d: 0,
+        unitsAllTime: 0,
+        allocatedStockRaw: 0,
+        reconciledStock: 0,
+        stockSource: "allocation",
+        averageUnitRevenueAllTime: 0,
+        expectedUnitsAtStandardPrice: 0,
       },
       stockByLine: [],
       dailyRevenue: [],
@@ -191,11 +206,16 @@ export async function getTshirtsAnalytics(daysBack = 60): Promise<TshirtsAnalyti
   const sales60 = allSales.filter((s) => s.date >= days60Ago);
   const salesMtd = allSales.filter((s) => s.date >= monthStart);
 
+  const teeSalesAll = allSales.filter((s) => lineForSale(s, inventoryMap) !== "unknown");
+  const teeSales60 = sales60.filter((s) => lineForSale(s, inventoryMap) !== "unknown");
+  const teeSalesMtd = salesMtd.filter((s) => lineForSale(s, inventoryMap) !== "unknown");
   const plain60 = sales60.filter((s) => lineForSale(s, inventoryMap) === "plain");
   const golf60 = sales60.filter((s) => lineForSale(s, inventoryMap) === "golf");
   const unknown60 = sales60.filter((s) => lineForSale(s, inventoryMap) === "unknown");
 
-  const total60Rev = sumRevenue(sales60);
+  const teeRevenueAllTime = sumRevenue(teeSalesAll);
+  const teeUnitsAllTime = sumUnits(teeSalesAll);
+  const total60Rev = sumRevenue(teeSales60);
   const plainRev = sumRevenue(plain60);
   const golfRev = sumRevenue(golf60);
   const unknownRev = sumRevenue(unknown60);
@@ -213,6 +233,12 @@ export async function getTshirtsAnalytics(daysBack = 60): Promise<TshirtsAnalyti
       return { line, label: teeLineLabel(line), skus, units };
     }
   );
+  const allocatedStockRaw = stockByLine.reduce((sum, line) => sum + line.units, 0);
+  const reconciledStock = Math.max(0, TEE_STARTING_STOCK - teeUnitsAllTime);
+  const stockSource =
+    allocatedStockRaw > TEE_STARTING_STOCK * 2 || allocatedStockRaw < 0
+      ? "reconciled_baseline"
+      : "allocation";
 
   const dayMap = new Map<string, { plain: number; golf: number; total: number }>();
   for (let d = daysBack - 1; d >= 0; d--) {
@@ -222,7 +248,7 @@ export async function getTshirtsAnalytics(daysBack = 60): Promise<TshirtsAnalyti
     dayMap.set(key, { plain: 0, golf: 0, total: 0 });
   }
 
-  sales60.forEach((s) => {
+  teeSales60.forEach((s) => {
     const key = toLocalDateKey(s.date);
     if (!key || !dayMap.has(key)) return;
     const row = dayMap.get(key)!;
@@ -240,7 +266,7 @@ export async function getTshirtsAnalytics(daysBack = 60): Promise<TshirtsAnalyti
   const lineBreakdown: TshirtsAnalytics["lineBreakdown"] = (
     ["plain", "golf"] as const
   ).map((line) => {
-    const subset = sales60.filter((s) => lineForSale(s, inventoryMap) === line);
+    const subset = teeSales60.filter((s) => lineForSale(s, inventoryMap) === line);
     const revenue = sumRevenue(subset);
     return {
       line,
@@ -255,7 +281,7 @@ export async function getTshirtsAnalytics(daysBack = 60): Promise<TshirtsAnalyti
     string,
     { itemName: string; line: TeeProductLine; quantity: number; revenue: number }
   >();
-  sales60.forEach((s) => {
+  teeSales60.forEach((s) => {
     const line = lineForSale(s, inventoryMap);
     const key = s.item_id || s.item_name;
     const cur = productAgg.get(key) || {
@@ -282,7 +308,7 @@ export async function getTshirtsAnalytics(daysBack = 60): Promise<TshirtsAnalyti
     .slice(0, 12);
 
   const payMap = new Map<string, { count: number; revenue: number }>();
-  sales60.forEach((s) => {
+  teeSales60.forEach((s) => {
     const method = String(s.payment_method || "cash").toLowerCase();
     const cur = payMap.get(method) || { count: 0, revenue: 0 };
     cur.count += 1;
@@ -295,7 +321,7 @@ export async function getTshirtsAnalytics(daysBack = 60): Promise<TshirtsAnalyti
     ...v,
   }));
 
-  const sales = allSales.slice(0, 500).map((s) => {
+  const sales = teeSalesAll.slice(0, 500).map((s) => {
     const line = lineForSale(s, inventoryMap);
     return {
       id: s.id,
@@ -313,17 +339,23 @@ export async function getTshirtsAnalytics(daysBack = 60): Promise<TshirtsAnalyti
 
   return {
     summary: {
-      revenueAllTime: sumRevenue(allSales),
+      revenueAllTime: teeRevenueAllTime,
       revenueLast60Days: total60Rev,
-      revenueMonthToDate: sumRevenue(salesMtd),
-      unitsLast60Days: sumUnits(sales60),
+      revenueMonthToDate: sumRevenue(teeSalesMtd),
+      unitsLast60Days: sumUnits(teeSales60),
       plainRevenue60d: plainRev,
       golfRevenue60d: golfRev,
       plainUnits60d: sumUnits(plain60),
       golfUnits60d: sumUnits(golf60),
-      transactionCount60d: sales60.length,
+      transactionCount60d: teeSales60.length,
       unknownTransactions60d: unknown60.length,
       unknownRevenue60d: unknownRev,
+      unitsAllTime: teeUnitsAllTime,
+      allocatedStockRaw,
+      reconciledStock,
+      stockSource,
+      averageUnitRevenueAllTime: teeUnitsAllTime > 0 ? teeRevenueAllTime / teeUnitsAllTime : 0,
+      expectedUnitsAtStandardPrice: teeRevenueAllTime > 0 ? teeRevenueAllTime / STANDARD_TEE_PRICE : 0,
     },
     stockByLine,
     dailyRevenue,

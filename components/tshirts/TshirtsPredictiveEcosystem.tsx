@@ -32,7 +32,6 @@ import {
   Legend
 } from "recharts";
 import type { TshirtsAnalytics } from "@/lib/tshirts-analytics";
-import { TSHIRTS_SHOP_ID, shopAllocationQty } from "@/lib/tshirts";
 
 type TabKind = "compounding" | "velocity" | "pricing" | "viability";
 
@@ -357,11 +356,11 @@ export default function TshirtsPredictiveEcosystem({
 
   // Calculate actual current allocated stock
   const currentAllocatedStock = useMemo(() => {
-    return (db?.inventory || []).reduce(
-      (sum: number, item: any) => sum + shopAllocationQty(item, TSHIRTS_SHOP_ID),
-      0
-    );
-  }, [db?.inventory]);
+    if (data.summary.stockSource === "reconciled_baseline") {
+      return data.summary.reconciledStock;
+    }
+    return data.stockByLine.reduce((sum, line) => sum + Number(line.units || 0), 0);
+  }, [data.stockByLine, data.summary.reconciledStock, data.summary.stockSource]);
 
   // Tab 1: Compounding capital logic (vectorbt-style model)
   const compoundingSimulation = useMemo(() => {

@@ -60,7 +60,27 @@ export default async function Home() {
 
   const totalExpenses = Object.values(db?.globalExpenses || {}).reduce((a: number, b: any) => a + Number(b), 0);
   const totalSales = (db?.sales || []).reduce((sum: number, s: any) => sum + Number(s.totalWithTax || 0), 0);
-  const activeItems = (db?.inventory || []).reduce((sum: number, i: any) => sum + Number(i.quantity || 0), 0);
+  const rawAllocatedItems = (db?.inventory || []).reduce(
+    (sum: number, item: any) =>
+      sum + (item.allocations || []).reduce((allocSum: number, allocation: any) => allocSum + Math.max(0, Number(allocation.quantity || 0)), 0),
+    0
+  );
+  const rawTeeAllocatedItems = (db?.inventory || []).reduce(
+    (sum: number, item: any) =>
+      sum + (item.allocations || [])
+        .filter((allocation: any) => allocation.shopId === "tshirts")
+        .reduce((allocSum: number, allocation: any) => allocSum + Math.max(0, Number(allocation.quantity || 0)), 0),
+    0
+  );
+  const teeActiveStock =
+    tshirtsAnalytics.summary.stockSource === "reconciled_baseline"
+      ? tshirtsAnalytics.summary.reconciledStock
+      : tshirtsAnalytics.stockByLine.reduce((sum, line) => sum + Number(line.units || 0), 0);
+  const activeItems = rawAllocatedItems - rawTeeAllocatedItems + teeActiveStock;
+  const teeRunwayDays =
+    tshirtsAnalytics.summary.unitsLast60Days > 0
+      ? Math.round(teeActiveStock / (tshirtsAnalytics.summary.unitsLast60Days / 60))
+      : 0;
 
   // Calculate shop performance/distribution ratios
   const shopTotals = (db?.shops || []).map((shop: any) => {
@@ -264,14 +284,7 @@ export default async function Home() {
                 <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Runway Indicator</p>
                 <div className="flex items-baseline gap-1 mt-1">
                   <span className="text-2xl font-black font-mono text-white">
-                    {tshirtsAnalytics.summary.unitsLast60Days > 0 
-                      ? Math.max(0, Math.round(
-                          ((db?.inventory || []).reduce(
-                            (sum: number, item: any) => sum + ((item.allocations || []).find((a: any) => a.shopId === "tshirts")?.quantity || 0),
-                            0
-                          )) / (tshirtsAnalytics.summary.unitsLast60Days / 60)
-                        ))
-                      : "0"}
+                    {Math.max(0, teeRunwayDays)}
                   </span>
                   <span className="text-[10px] text-slate-400 font-bold">DAYS</span>
                 </div>
@@ -282,14 +295,13 @@ export default async function Home() {
                 <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Active Stock Allocation</p>
                 <div className="flex items-baseline gap-1 mt-1">
                   <span className="text-2xl font-black font-mono text-white">
-                    {(db?.inventory || []).reduce(
-                      (sum: number, item: any) => sum + ((item.allocations || []).find((a: any) => a.shopId === "tshirts")?.quantity || 0),
-                      0
-                    )}
+                    {teeActiveStock.toLocaleString()}
                   </span>
                   <span className="text-[10px] text-slate-400 font-bold">PCS</span>
                 </div>
-                <p className="text-[9px] text-slate-500 mt-1">Shirts currently in shop</p>
+                <p className="text-[9px] text-slate-500 mt-1">
+                  {tshirtsAnalytics.summary.stockSource === "reconciled_baseline" ? "Reconciled from 600 starting shirts" : "Shirts currently in shop"}
+                </p>
               </div>
             </div>
 
@@ -305,6 +317,12 @@ export default async function Home() {
                 <span className="text-slate-400">60-Day Sales Volume</span>
                 <span className="font-mono font-black text-white">
                   {tshirtsAnalytics.summary.unitsLast60Days} units
+                </span>
+              </div>
+              <div className="flex justify-between text-xs">
+                <span className="text-slate-400">Revenue Sense Check</span>
+                <span className="font-mono font-black text-sky-400">
+                  {tshirtsAnalytics.summary.expectedUnitsAtStandardPrice.toFixed(1)} units @ $3.50
                 </span>
               </div>
             </div>
