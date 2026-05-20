@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useTransition } from "react";
+import React, { useEffect, useMemo, useState, useTransition } from "react";
 import {
     Card,
     CardContent,
@@ -31,18 +31,22 @@ import {
     FileText,
     X,
     Check,
-    AlertCircle
+    AlertCircle,
+    BarChart3,
+    Loader2,
+    ShieldAlert
 } from "lucide-react";
 import { InventoryIntelligenceCard } from "@/components/InventoryIntelligenceCard";
-import { updateGlobalExpenses, processShipment, registerInventoryItem, registerBulkInventoryItems, updateInventoryItem, deleteInventoryItem } from "../actions";
+import { updateGlobalExpenses, processShipment, registerInventoryItem, registerBulkInventoryItems, updateInventoryItem, deleteInventoryItem, logInventoryAdjustment } from "../actions";
 
 export default function InventoryMaster({ db }: { db: any }) {
     const inventory = db?.inventory || [];
     const sales = db?.sales || [];
+    const shops = db?.shops || [];
 
     const TAX_RATE = 1.155; // 15.5% Tax Buffer
 
-    // Predictive logic helper
+    // Predictive logic helper — includes ML-driven Reorder Point & Safety Stock
     const getInsights = (itemId: string, currentQty: number, landedCost: number, dateAdded: string) => {
         const thirtyDaysAgo = new Date();
         thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
@@ -61,13 +65,37 @@ export default function InventoryMaster({ db }: { db: any }) {
         // Suggest a price that covers Landed + Cumulative Bleed + 50% Margin + 15.5% Tax
         const suggestedPrice = (landedCost + cumulativeBleed) * 1.5 * TAX_RATE;
 
-        return { velocity, daysToZero, totalSold, suggestedPrice, cumulativeBleed, daysInStock };
+        // ML-Driven Reorder Point & Safety Stock (95% service level, Z=1.65)
+        const safetyStock = Math.ceil(velocity * leadTimeDays * 0.5);
+        const rop = Math.ceil(velocity * leadTimeDays + safetyStock);
+        const stockStatus: 'safe' | 'monitor' | 'reorder' | 'critical' =
+            currentQty <= safetyStock ? 'critical'
+            : currentQty <= rop ? 'reorder'
+            : currentQty <= rop * 2 ? 'monitor'
+            : 'safe';
+
+        return { velocity, daysToZero, totalSold, suggestedPrice, cumulativeBleed, daysInStock, safetyStock, rop, stockStatus };
     };
 
     const [activeSimulation, setActiveSimulation] = useState<any>(null); // For The Oracle Modal
 
     const [globalExpenses, setGlobalExpenses] = useState(db?.globalExpenses || {});
     const [isPending, startTransition] = useTransition();
+    // Weighted landed cost split method: 'piece' | 'value' | 'weight'
+    const [costSplitMethod, setCostSplitMethod] = useState<'piece' | 'value' | 'weight'>('piece');
+    // Lead time in days (configurable, default 7) used for ROP
+    const [leadTimeDays, setLeadTimeDays] = useState(7);
+    // Audit log state
+    const [auditLog, setAuditLog] = useState<{ id: string; timestamp: string; details: string }[]>([]);
+    const [auditLogVisible, setAuditLogVisible] = useState(false);
+    const [auditLogLoading, setAuditLogLoading] = useState(false);
+    const [stockBrain, setStockBrain] = useState<any>(null);
+    const [stockBrainLoading, setStockBrainLoading] = useState(false);
+    const [simulationBudget, setSimulationBudget] = useState(500);
+    const [snapshotRunning, setSnapshotRunning] = useState(false);
+    const [snapshotMessage, setSnapshotMessage] = useState("");
+    const [intelligenceRefreshKey, setIntelligenceRefreshKey] = useState(0);
+    const [workflowDraft, setWorkflowDraft] = useState<{ type: string; title: string; rows: Array<Record<string, any>> } | null>(null);
     const [shipment, setShipment] = useState({
         supplier: "",
         shipmentNumber: "",
@@ -100,7 +128,7 @@ export default function InventoryMaster({ db }: { db: any }) {
     };
 
     const [items, setItems] = useState([
-        { name: "", category: "", quantity: 1, acquisitionPrice: 0, unitPurchasePrice: 0, showOracle: false }
+        { name: "", category: "", quantity: 1, acquisitionPrice: 0, unitPurchasePrice: 0, showOracle: false, weightKg: 0 }
     ]);
 
     const [showAdHoc, setShowAdHoc] = useState(false);
@@ -248,6 +276,154 @@ export default function InventoryMaster({ db }: { db: any }) {
     const itemsTotal = items.reduce((sum, item) => sum + (Number(item.acquisitionPrice) || 0), 0);
     const allocatedPieces = items.reduce((sum, item) => sum + (Number(item.quantity) || 0), 0);
 
+    const commandMetrics = useMemo(() => {
+        const enriched = inventory.map((item: any) => {
+            const insights = getInsights(item.id, Number(item.quantity || 0), Number(item.landedCost || 0), item.dateAdded);
+            const capital = Number(item.quantity || 0) * Number(item.landedCost || 0);
+            return { ...item, insights, capital };
+        });
+        const priority = enriched.filter((item: any) => item.insights.stockStatus === 'reorder' || item.insights.stockStatus === 'critical');
+        const deadStock = enriched.filter((item: any) => item.insights.totalSold === 0 && item.insights.daysInStock >= 60 && Number(item.quantity || 0) > 0);
+        const fastest = [...enriched].sort((a: any, b: any) => b.insights.velocity - a.insights.velocity)[0] || null;
+        const risk14 = enriched.filter((item: any) => item.insights.daysToZero !== Infinity && item.insights.daysToZero <= 14);
+        const capitalTied = enriched.reduce((sum: number, item: any) => sum + item.capital, 0);
+        const deadStockValue = deadStock.reduce((sum: number, item: any) => sum + item.capital, 0);
+        const shipmentWarnings = (stockBrain?.shipmentAnalysis || []).filter((shipment: any) =>
+            ['margin-risk', 'slow'].includes(shipment.status) || Number(shipment.roi || 0) < 0
+        );
+
+        return {
+            priorityCount: priority.length,
+            priority,
+            deadStockValue,
+            capitalTied,
+            fastest,
+            risk14Count: risk14.length,
+            shipmentWarnings,
+        };
+    }, [inventory, sales, globalExpenses, leadTimeDays, stockBrain]);
+
+    const whatIf = useMemo(() => {
+        const fourteenDayRisk = inventory.filter((item: any) => {
+            const currentQty = Number(item.quantity || 0);
+            const insights = getInsights(item.id, currentQty, Number(item.landedCost || 0), item.dateAdded);
+            const safetyStock14 = Math.ceil(insights.velocity * 14 * 0.5);
+            const rop14 = Math.ceil((insights.velocity * 14) + safetyStock14);
+            return insights.velocity > 0 && currentQty <= rop14;
+        });
+        const recoverableDeadStock = commandMetrics.deadStockValue * 0.8;
+        const reorderNeed = commandMetrics.priority.reduce((sum: number, item: any) => {
+            const targetUnits = Math.max(0, Math.ceil((item.insights.velocity * 30) - Number(item.quantity || 0)));
+            return sum + (targetUnits * Number(item.landedCost || 0));
+        }, 0);
+        const coverage = reorderNeed > 0 ? Math.min(100, (simulationBudget / reorderNeed) * 100) : 100;
+
+        return {
+            fourteenDayRisk: fourteenDayRisk.length,
+            recoverableDeadStock,
+            reorderNeed,
+            coverage,
+        };
+    }, [inventory, commandMetrics, simulationBudget, sales, globalExpenses]);
+
+    const runInventorySnapshot = async () => {
+        setSnapshotRunning(true);
+        setSnapshotMessage("Running inventory snapshot...");
+        try {
+            const res = await fetch('/api/analytics/run', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ kind: 'inventory_velocity' })
+            });
+            const json = await res.json().catch(() => ({}));
+            if (!res.ok || !json.success) {
+                const error = json?.results?.[0]?.error || json?.error || "Snapshot failed";
+                setSnapshotMessage(error);
+                return;
+            }
+            const summary = json.results?.[0]?.summary || "Inventory snapshot refreshed";
+            setSnapshotMessage(summary);
+            setIntelligenceRefreshKey((value) => value + 1);
+        } catch (error: any) {
+            setSnapshotMessage(error?.message || "Snapshot failed");
+        } finally {
+            setSnapshotRunning(false);
+        }
+    };
+
+    const generateReorderDraft = () => {
+        const rows = commandMetrics.priority.slice(0, 12).map((item: any) => {
+            const suggestedQty = Math.max(0, Math.ceil((item.insights.velocity * 30) - Number(item.quantity || 0)));
+            return {
+                item: item.name,
+                currentStock: Number(item.quantity || 0),
+                velocity: item.insights.velocity.toFixed(2),
+                reorderPoint: item.insights.rop,
+                suggestedQty,
+                estimatedCost: `$${(suggestedQty * Number(item.landedCost || 0)).toFixed(2)}`,
+            };
+        });
+        setWorkflowDraft({ type: "reorder", title: "Priority Reorder Draft", rows });
+    };
+
+    const generateDiscountDraft = () => {
+        const rows = inventory
+            .map((item: any) => ({ ...item, insights: getInsights(item.id, Number(item.quantity || 0), Number(item.landedCost || 0), item.dateAdded) }))
+            .filter((item: any) => item.insights.totalSold === 0 && item.insights.daysInStock >= 60 && Number(item.quantity || 0) > 0)
+            .slice(0, 12)
+            .map((item: any) => ({
+                item: item.name,
+                stock: Number(item.quantity || 0),
+                age: `${item.insights.daysInStock}d`,
+                landedValue: `$${(Number(item.quantity || 0) * Number(item.landedCost || 0)).toFixed(2)}`,
+                campaign: "20% recovery discount",
+                targetCash: `$${(Number(item.quantity || 0) * Number(item.landedCost || 0) * 0.8).toFixed(2)}`,
+            }));
+        setWorkflowDraft({ type: "discount", title: "Dead Stock Discount Draft", rows });
+    };
+
+    const generateTransferDraft = () => {
+        const rows = commandMetrics.priority
+            .map((item: any) => {
+                const allocations = Array.isArray(item.allocations) ? item.allocations : [];
+                if (allocations.length < 2) return null;
+                const sorted = [...allocations].sort((a: any, b: any) => Number(a.quantity || 0) - Number(b.quantity || 0));
+                const target = sorted[0];
+                const source = sorted[sorted.length - 1];
+                const movable = Math.max(0, Number(source.quantity || 0) - item.insights.rop);
+                if (movable <= 0) return null;
+                const fromShop = shops.find((shop: any) => shop.id === source.shopId)?.name || source.shopId;
+                const toShop = shops.find((shop: any) => shop.id === target.shopId)?.name || target.shopId;
+                return {
+                    item: item.name,
+                    from: fromShop,
+                    to: toShop,
+                    suggestedQty: Math.max(1, Math.min(Math.ceil(movable / 2), Math.ceil(item.insights.rop || 1))),
+                    reason: `${toShop} has the lowest allocation; ${item.insights.daysToZero === Infinity ? "velocity still forming" : `${item.insights.daysToZero}d runway`}`,
+                };
+            })
+            .filter(Boolean)
+            .slice(0, 12);
+        setWorkflowDraft({ type: "transfer", title: "Shop Transfer Draft", rows: rows as Array<Record<string, any>> });
+    };
+
+    useEffect(() => {
+        let cancelled = false;
+        async function loadStockBrain() {
+            setStockBrainLoading(true);
+            try {
+                const res = await fetch('/api/intelligence/stock-brain');
+                if (res.ok && !cancelled) setStockBrain(await res.json());
+            } catch {
+                if (!cancelled) setStockBrain(null);
+            } finally {
+                if (!cancelled) setStockBrainLoading(false);
+            }
+        }
+        loadStockBrain();
+        return () => { cancelled = true; };
+    }, []);
+
     const handleGlobalExpenseChange = (key: string, value: string) => {
         setGlobalExpenses({ ...globalExpenses, [key]: parseFloat(value) || 0 });
     };
@@ -260,7 +436,7 @@ export default function InventoryMaster({ db }: { db: any }) {
     };
 
     const addItemToShipment = () => {
-        setItems([...items, { name: "", category: "", quantity: 1, acquisitionPrice: 0, unitPurchasePrice: 0, showOracle: false }]);
+        setItems([...items, { name: "", category: "", quantity: 1, acquisitionPrice: 0, unitPurchasePrice: 0, showOracle: false, weightKg: 0 }]);
     };
 
     const removeItemFromShipment = (index: number) => {
@@ -294,12 +470,32 @@ export default function InventoryMaster({ db }: { db: any }) {
             await processShipment({
                 ...shipment,
                 miscCost: 0,
+                costSplitMethod,
                 items
             });
             setShipment({ supplier: "", shipmentNumber: "", shippingCost: 0, dutyCost: 0, purchasePrice: 0, manifestPieces: 0 });
-            setItems([{ name: "", category: "", quantity: 1, acquisitionPrice: 0, unitPurchasePrice: 0, showOracle: false }]);
+            setItems([{ name: "", category: "", quantity: 1, acquisitionPrice: 0, unitPurchasePrice: 0, showOracle: false, weightKg: 0 }]);
             alert("Shipment processed successfully!");
         });
+    };
+
+    const fetchAuditLog = async () => {
+        setAuditLogLoading(true);
+        try {
+            const res = await fetch('/api/inventory/history');
+            if (res.ok) {
+                const json = await res.json();
+                setAuditLog(json.log || []);
+            }
+        } catch {
+            setAuditLog([]);
+        }
+        setAuditLogLoading(false);
+    };
+
+    const handleToggleAuditLog = () => {
+        if (!auditLogVisible && auditLog.length === 0) fetchAuditLog();
+        setAuditLogVisible(!auditLogVisible);
     };
 
     return (
@@ -310,6 +506,68 @@ export default function InventoryMaster({ db }: { db: any }) {
                         <Truck className="text-violet-500 h-7 w-7 sm:h-10 sm:w-10" /> Inventory Master
                     </h1>
                     <p className="text-slate-400 font-medium tracking-tight uppercase text-xs font-black">Central source of truth for global distribution and inventory reconciliation.</p>
+                </div>
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
+                <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-4">
+                    <div className="flex items-center justify-between">
+                        <p className="text-[9px] font-black uppercase tracking-widest text-amber-400">Priority Reorders</p>
+                        <AlertTriangle className="h-4 w-4 text-amber-400" />
+                    </div>
+                    <p className="mt-3 text-2xl font-black text-white">{commandMetrics.priorityCount}</p>
+                    <p className="mt-1 truncate text-[10px] font-bold uppercase text-slate-500">
+                        {commandMetrics.priority[0]?.name || "No urgent reorder signal"}
+                    </p>
+                </div>
+
+                <div className="rounded-xl border border-rose-500/20 bg-rose-500/5 p-4">
+                    <div className="flex items-center justify-between">
+                        <p className="text-[9px] font-black uppercase tracking-widest text-rose-400">Dead Stock Value</p>
+                        <ShieldAlert className="h-4 w-4 text-rose-400" />
+                    </div>
+                    <p className="mt-3 text-2xl font-black text-white">${commandMetrics.deadStockValue.toFixed(0)}</p>
+                    <p className="mt-1 text-[10px] font-bold uppercase text-slate-500">60d with no sale</p>
+                </div>
+
+                <div className="rounded-xl border border-sky-500/20 bg-sky-500/5 p-4">
+                    <div className="flex items-center justify-between">
+                        <p className="text-[9px] font-black uppercase tracking-widest text-sky-400">Capital Trapped</p>
+                        <DollarSign className="h-4 w-4 text-sky-400" />
+                    </div>
+                    <p className="mt-3 text-2xl font-black text-white">${commandMetrics.capitalTied.toFixed(0)}</p>
+                    <p className="mt-1 text-[10px] font-bold uppercase text-slate-500">Current stock at landed cost</p>
+                </div>
+
+                <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-4">
+                    <div className="flex items-center justify-between">
+                        <p className="text-[9px] font-black uppercase tracking-widest text-emerald-400">Fastest Mover</p>
+                        <TrendingUp className="h-4 w-4 text-emerald-400" />
+                    </div>
+                    <p className="mt-3 truncate text-lg font-black text-white">{commandMetrics.fastest?.name || "Waiting"}</p>
+                    <p className="mt-1 text-[10px] font-bold uppercase text-slate-500">
+                        {(commandMetrics.fastest?.insights?.velocity || 0).toFixed(2)}/day
+                    </p>
+                </div>
+
+                <div className="rounded-xl border border-violet-500/20 bg-violet-500/5 p-4">
+                    <div className="flex items-center justify-between">
+                        <p className="text-[9px] font-black uppercase tracking-widest text-violet-400">14d Stockout Risk</p>
+                        <Clock className="h-4 w-4 text-violet-400" />
+                    </div>
+                    <p className="mt-3 text-2xl font-black text-white">{commandMetrics.risk14Count}</p>
+                    <p className="mt-1 text-[10px] font-bold uppercase text-slate-500">Based on current velocity</p>
+                </div>
+
+                <div className="rounded-xl border border-orange-500/20 bg-orange-500/5 p-4">
+                    <div className="flex items-center justify-between">
+                        <p className="text-[9px] font-black uppercase tracking-widest text-orange-400">Shipment Warnings</p>
+                        {stockBrainLoading ? <Loader2 className="h-4 w-4 animate-spin text-orange-400" /> : <BarChart3 className="h-4 w-4 text-orange-400" />}
+                    </div>
+                    <p className="mt-3 text-2xl font-black text-white">{commandMetrics.shipmentWarnings.length}</p>
+                    <p className="mt-1 truncate text-[10px] font-bold uppercase text-slate-500">
+                        {commandMetrics.shipmentWarnings[0]?.shipmentNumber || "No margin-risk shipment"}
+                    </p>
                 </div>
             </div>
 
@@ -609,6 +867,36 @@ export default function InventoryMaster({ db }: { db: any }) {
                             </div>
 
                             <div className="space-y-6 pt-6 border-t border-slate-800">
+                                {/* Weighted Cost Split Controls */}
+                                <div className="p-4 rounded-2xl bg-slate-950/60 border border-slate-800 space-y-4">
+                                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                                        <div>
+                                            <h3 className="text-[10px] font-black text-amber-400 uppercase tracking-[0.3em] flex items-center gap-1.5">
+                                                <Scale className="h-3 w-3" /> Logistics Cost Split Method
+                                            </h3>
+                                            <p className="text-[9px] text-slate-600 mt-0.5 uppercase tracking-wider">Determines how shipping + duty is distributed across product classes</p>
+                                        </div>
+                                        <div className="flex gap-1.5">
+                                            {(['piece', 'value', 'weight'] as const).map(m => (
+                                                <button key={m} onClick={() => setCostSplitMethod(m)}
+                                                    className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest border-2 transition-all ${
+                                                        costSplitMethod === m
+                                                            ? 'bg-amber-500/20 border-amber-500 text-amber-400'
+                                                            : 'bg-slate-900 border-slate-800 text-slate-600 hover:border-slate-700'
+                                                    }`}>
+                                                    {m === 'piece' ? 'By Piece' : m === 'value' ? 'By Value' : 'By Weight'}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center gap-4">
+                                        <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest whitespace-nowrap">Lead Time (Days)</label>
+                                        <Input type="number" value={leadTimeDays} onChange={e => setLeadTimeDays(Math.max(1, parseInt(e.target.value) || 7))}
+                                            className="h-8 w-24 bg-slate-900 border-slate-800 text-xs font-black text-sky-400 text-center" />
+                                        <span className="text-[9px] text-slate-600 uppercase tracking-wider">Used for Reorder Point calculations on all ledger items</span>
+                                    </div>
+                                </div>
+
                                 <div className="flex items-center justify-between">
                                     <h3 className="text-[10px] font-black text-violet-500 uppercase tracking-[0.3em]">Product Class Breakdown</h3>
                                     <Button size="sm" variant="outline" onClick={addItemToShipment} className="border-violet-500/30 text-violet-400 hover:bg-violet-500/10 h-9 text-[10px] font-black uppercase tracking-widest px-6">
@@ -620,7 +908,23 @@ export default function InventoryMaster({ db }: { db: any }) {
                                     {items.map((item, idx) => {
                                         const logisticsBasis = shipment.manifestPieces > 0 ? shipment.manifestPieces : allocatedPieces;
                                         const totalLogistics = shipment.shippingCost + shipment.dutyCost;
-                                        const feePerPiece = logisticsBasis > 0 ? totalLogistics / logisticsBasis : 0;
+
+                                        // Weighted landed cost split — By Piece / By Value / By Weight
+                                        let feePerPiece = 0;
+                                        if (costSplitMethod === 'piece') {
+                                            feePerPiece = logisticsBasis > 0 ? totalLogistics / logisticsBasis : 0;
+                                        } else if (costSplitMethod === 'value') {
+                                            feePerPiece = itemsTotal > 0 && item.quantity > 0
+                                                ? (totalLogistics * (item.acquisitionPrice / itemsTotal)) / item.quantity
+                                                : 0;
+                                        } else if (costSplitMethod === 'weight') {
+                                            const totalWeight = items.reduce((s, i) => s + ((i as any).weightKg || 0) * i.quantity, 0);
+                                            const itemWeight = ((item as any).weightKg || 0) * item.quantity;
+                                            feePerPiece = totalWeight > 0 && item.quantity > 0
+                                                ? (totalLogistics * (itemWeight / totalWeight)) / item.quantity
+                                                : 0;
+                                        }
+
                                         const unitAcquisition = item.quantity > 0 ? item.acquisitionPrice / item.quantity : 0;
                                         const landedUnitCost = unitAcquisition + feePerPiece;
 
@@ -645,9 +949,18 @@ export default function InventoryMaster({ db }: { db: any }) {
                                                         <label className="text-[10px] font-black text-slate-500 uppercase text-xs">Total Class Cost</label>
                                                         <Input type="number" value={item.acquisitionPrice} onChange={e => updateItem(idx, 'acquisitionPrice', parseFloat(e.target.value) || 0)} className="h-10 bg-slate-900 border-emerald-900/30 font-black" />
                                                     </div>
-                                                    <div className="col-span-3 space-y-1 text-center">
+                                                    {costSplitMethod === 'weight' && (
+                                                        <div className="col-span-2 space-y-2 text-amber-400">
+                                                            <label className="text-[10px] font-black text-slate-500 uppercase text-xs">Wt (kg)</label>
+                                                            <Input type="number" value={(item as any).weightKg || 0} onChange={e => updateItem(idx, 'weightKg', parseFloat(e.target.value) || 0)} className="h-10 bg-slate-900 border-amber-900/30 font-black" />
+                                                        </div>
+                                                    )}
+                                                    <div className={`${costSplitMethod === 'weight' ? 'col-span-1' : 'col-span-3'} space-y-1 text-center`}>
                                                         <div className="text-[9px] font-black text-slate-600 uppercase mb-1">Unit Landed</div>
                                                         <div className="text-sm font-black text-white italic">${landedUnitCost.toFixed(2)}</div>
+                                                        <div className="text-[8px] text-amber-500/70 uppercase tracking-widest">
+                                                            {costSplitMethod === 'piece' ? 'Flat split' : costSplitMethod === 'value' ? 'Value split' : 'Weight split'}
+                                                        </div>
                                                     </div>
 
                                                     <div className="col-span-12">
@@ -705,12 +1018,29 @@ export default function InventoryMaster({ db }: { db: any }) {
                     {/* Current Stock Intelligence */}
                     <Card className="bg-slate-900/40 border-slate-800 backdrop-blur-md shadow-2xl overflow-hidden">
                         <CardHeader className="border-b border-slate-800/50 pb-6">
-                            <CardTitle className="text-2xl font-black uppercase italic flex items-center gap-3">
-                                <Zap className="h-6 w-6 text-yellow-500 animate-pulse" /> Live Master ledger inventory
-                            </CardTitle>
+                            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                                <div>
+                                    <CardTitle className="text-2xl font-black uppercase italic flex items-center gap-3">
+                                        <Zap className="h-6 w-6 text-yellow-500 animate-pulse" /> Live Master ledger inventory
+                                    </CardTitle>
+                                    {snapshotMessage && (
+                                        <CardDescription className="mt-2 text-[10px] font-black uppercase tracking-widest text-slate-500">
+                                            {snapshotMessage}
+                                        </CardDescription>
+                                    )}
+                                </div>
+                                <Button
+                                    onClick={runInventorySnapshot}
+                                    disabled={snapshotRunning}
+                                    className="h-11 bg-yellow-500/10 border-2 border-yellow-500/30 px-5 text-[10px] font-black uppercase italic tracking-widest text-yellow-400 hover:bg-yellow-500/20"
+                                >
+                                    <RefreshCcw className={`mr-2 h-4 w-4 ${snapshotRunning ? 'animate-spin' : ''}`} />
+                                    Run Inventory Snapshot
+                                </Button>
+                            </div>
                         </CardHeader>
                         <CardContent className="p-6 space-y-6">
-                            <InventoryIntelligenceCard />
+                            <InventoryIntelligenceCard refreshKey={intelligenceRefreshKey} />
                             {/* Search Bar */}
                             <div className="flex gap-3">
                                 <div className="flex-1 relative">
@@ -748,8 +1078,20 @@ export default function InventoryMaster({ db }: { db: any }) {
                                 ) : (
                                     filteredInventory.map((item: any) => {
                                         const insights = getInsights(item.id, item.quantity, item.landedCost, item.dateAdded);
+                                        const statusColors = {
+                                            safe: 'border-emerald-500/30 bg-emerald-500/5',
+                                            monitor: 'border-sky-500/30 bg-sky-500/5',
+                                            reorder: 'border-amber-500/30 bg-amber-500/5',
+                                            critical: 'border-rose-500/30 bg-rose-500/5 animate-pulse'
+                                        };
+                                        const statusLabels = {
+                                            safe: { text: 'SAFE', color: 'text-emerald-400' },
+                                            monitor: { text: 'MONITOR', color: 'text-sky-400' },
+                                            reorder: { text: 'REORDER', color: 'text-amber-400' },
+                                            critical: { text: 'CRITICAL', color: 'text-rose-400' }
+                                        };
                                         return (
-                                            <div key={item.id} className="p-4 sm:p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 group hover:bg-white/5 transition-all">
+                                            <div key={item.id} className={`p-4 sm:p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 group hover:bg-white/5 transition-all border-l-2 ${statusColors[insights.stockStatus]}`}>
                                                 <div className="flex items-center gap-6">
                                                     <div className="h-12 w-12 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-center group-hover:border-violet-500/40 transition-colors">
                                                         <Target className="h-6 w-6 text-slate-500 group-hover:text-violet-400" />
@@ -757,6 +1099,18 @@ export default function InventoryMaster({ db }: { db: any }) {
                                                     <div>
                                                         <p className="text-lg font-black uppercase tracking-tight text-white">{item.name}</p>
                                                         <p className="text-[10px] font-black text-slate-600 uppercase tracking-widest">{item.sku} | {item.category} | Stock Age: {insights.daysInStock}d</p>
+                                                        {/* ROP Badge */}
+                                                        <div className="flex items-center gap-3 mt-1.5">
+                                                            <span className={`text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md border ${statusColors[insights.stockStatus]} ${statusLabels[insights.stockStatus].color}`}>
+                                                                {statusLabels[insights.stockStatus].text}
+                                                            </span>
+                                                            <span className="text-[9px] text-slate-600 font-bold">
+                                                                ROP: {insights.rop} | Safety: {insights.safetyStock} | Stock: {item.quantity}
+                                                            </span>
+                                                            {insights.stockStatus === 'reorder' || insights.stockStatus === 'critical' ? (
+                                                                <span className="text-[9px] font-black text-amber-400 animate-pulse">⚠ ORDER NOW</span>
+                                                            ) : null}
+                                                        </div>
                                                     </div>
                                                 </div>
                                                 <div className="flex flex-wrap gap-4 sm:gap-8 items-center w-full sm:w-auto">
@@ -772,21 +1126,35 @@ export default function InventoryMaster({ db }: { db: any }) {
                                                         <p className="text-[10px] font-black text-slate-600 uppercase mb-1">Velocity</p>
                                                         <p className="text-sm font-black text-emerald-400 italic">{insights.velocity.toFixed(2)}/d</p>
                                                     </div>
+                                                    <div className="text-right min-w-[60px]">
+                                                        <p className="text-[10px] font-black text-sky-500 uppercase mb-1">Runway</p>
+                                                        <p className="text-sm font-black text-sky-400 italic">{insights.daysToZero === Infinity ? '∞' : `${insights.daysToZero}d`}</p>
+                                                    </div>
                                                     <div className="flex items-center gap-3 ml-4 pl-4 border-l border-slate-800">
                                                         <button
                                                             onClick={() => {
                                                                 const newName = prompt("Update Product Name:", item.name);
                                                                 const newQty = prompt("Override Total Quantity:", item.quantity);
                                                                 if (newName && newQty) {
+                                                                    const reason = prompt("Adjustment Reason (e.g. Recount, Damage, Theft, Replenishment):");
+                                                                    if (!reason) { alert("Reason is required for audit compliance."); return; }
                                                                     startTransition(async () => {
                                                                         const result = await updateInventoryItem(item.id, { name: newName, quantity: Number(newQty) });
                                                                         if (result.success) {
+                                                                            await logInventoryAdjustment({
+                                                                                itemId: item.id,
+                                                                                itemName: newName,
+                                                                                oldQty: item.quantity,
+                                                                                newQty: Number(newQty),
+                                                                                reason
+                                                                            });
                                                                             const w = (result as { nirvanaTeeWarning?: string }).nirvanaTeeWarning;
                                                                             alert(
                                                                                 w
                                                                                     ? `✓ ${newName} quantity updated to ${newQty}.\n\n⚠️ Nirvana Tees: ${w}`
-                                                                                    : `✓ ${newName} quantity updated to ${newQty}. All pages will refresh.`
+                                                                                    : `✓ ${newName} quantity updated to ${newQty}. Audit logged. All pages will refresh.`
                                                                             );
+                                                                            if (auditLogVisible) fetchAuditLog();
                                                                         } else {
                                                                             alert(`❌ Error updating item: ${result.error}`);
                                                                         }
@@ -959,6 +1327,217 @@ export default function InventoryMaster({ db }: { db: any }) {
                             </div>
                         </CardContent>
                     </Card>
+
+                    <Card className="bg-slate-900/60 border-slate-800 border-2 overflow-hidden shadow-xl">
+                        <CardHeader className="pb-4 border-b border-slate-800/80">
+                            <div className="flex items-center justify-between gap-3">
+                                <CardTitle className="text-sm font-black uppercase italic tracking-widest text-amber-400 flex items-center gap-2">
+                                    <Clock className="h-4 w-4" /> Adjustment audit
+                                </CardTitle>
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={handleToggleAuditLog}
+                                    className="h-8 border-amber-500/30 px-3 text-[9px] font-black uppercase tracking-widest text-amber-400"
+                                >
+                                    {auditLogVisible ? "Hide" : "Show"}
+                                </Button>
+                            </div>
+                        </CardHeader>
+                        {auditLogVisible && (
+                            <CardContent className="space-y-3 pt-6">
+                                {auditLogLoading ? (
+                                    <div className="flex items-center justify-center py-8 text-amber-400">
+                                        <Loader2 className="h-5 w-5 animate-spin" />
+                                    </div>
+                                ) : auditLog.length === 0 ? (
+                                    <div className="rounded-xl border border-slate-800 bg-slate-950/50 p-4 text-center text-[10px] font-black uppercase tracking-widest text-slate-600">
+                                        No manual adjustments logged yet.
+                                    </div>
+                                ) : (
+                                    <div className="max-h-[280px] space-y-3 overflow-y-auto pr-1">
+                                        {auditLog.map((entry) => (
+                                            <div key={entry.id} className="rounded-xl border border-slate-800 bg-slate-950/60 p-3">
+                                                <p className="text-[9px] font-black uppercase tracking-widest text-slate-600">
+                                                    {new Date(entry.timestamp).toLocaleString()}
+                                                </p>
+                                                <p className="mt-1 text-xs font-bold leading-relaxed text-slate-300">{entry.details}</p>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </CardContent>
+                        )}
+                    </Card>
+
+                    <Card className="bg-slate-900/60 border-slate-800 border-2 overflow-hidden shadow-xl">
+                        <CardHeader className="pb-4 border-b border-slate-800/80">
+                            <CardTitle className="text-sm font-black uppercase italic tracking-widest text-orange-400 flex items-center gap-2">
+                                <BarChart3 className="h-4 w-4" /> Shipment P&L signals
+                            </CardTitle>
+                            <CardDescription className="text-[10px] font-bold uppercase tracking-widest text-slate-600">
+                                Buy-again logic from shipment sell-through and ROI.
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-3 pt-6">
+                            {stockBrainLoading ? (
+                                <div className="flex items-center justify-center py-8 text-orange-400">
+                                    <Loader2 className="h-5 w-5 animate-spin" />
+                                </div>
+                            ) : (stockBrain?.shipmentAnalysis || []).length === 0 ? (
+                                <div className="rounded-xl border border-slate-800 bg-slate-950/50 p-4 text-center text-[10px] font-black uppercase tracking-widest text-slate-600">
+                                    Shipment analysis will appear after stock brain data loads.
+                                </div>
+                            ) : (
+                                (stockBrain.shipmentAnalysis || []).slice(0, 4).map((shipment: any) => {
+                                    const buyAgain = ['winning', 'sold-through'].includes(shipment.status) && Number(shipment.roi || 0) > 0;
+                                    return (
+                                        <div key={shipment.id} className="rounded-xl border border-slate-800 bg-slate-950/60 p-4">
+                                            <div className="flex items-start justify-between gap-3">
+                                                <div className="min-w-0">
+                                                    <p className="truncate text-sm font-black uppercase text-slate-100">{shipment.shipmentNumber}</p>
+                                                    <p className="truncate text-[10px] font-bold uppercase tracking-widest text-slate-600">{shipment.supplier}</p>
+                                                </div>
+                                                <Badge className={buyAgain ? "bg-emerald-500/10 text-emerald-400" : "bg-amber-500/10 text-amber-400"}>
+                                                    {buyAgain ? "Buy again" : "Review"}
+                                                </Badge>
+                                            </div>
+                                            <div className="mt-3 grid grid-cols-3 gap-2 text-center">
+                                                <div>
+                                                    <p className="text-[9px] font-black uppercase text-slate-600">ROI</p>
+                                                    <p className="text-xs font-black text-slate-200">{Number(shipment.roi || 0).toFixed(1)}%</p>
+                                                </div>
+                                                <div>
+                                                    <p className="text-[9px] font-black uppercase text-slate-600">Sell</p>
+                                                    <p className="text-xs font-black text-slate-200">{Number(shipment.sellThrough || 0).toFixed(0)}%</p>
+                                                </div>
+                                                <div>
+                                                    <p className="text-[9px] font-black uppercase text-slate-600">Left</p>
+                                                    <p className="text-xs font-black text-slate-200">{Number(shipment.currentUnits || 0)}</p>
+                                                </div>
+                                            </div>
+                                            <p className="mt-3 text-[10px] font-bold leading-relaxed text-slate-500">
+                                                Fast: {shipment.fastestMover?.name || "n/a"} | Slow: {shipment.slowestMover?.name || "n/a"}
+                                            </p>
+                                        </div>
+                                    );
+                                })
+                            )}
+                        </CardContent>
+                    </Card>
+
+                    <Card className="bg-slate-900/60 border-slate-800 border-2 overflow-hidden shadow-xl">
+                        <CardHeader className="pb-4 border-b border-slate-800/80">
+                            <CardTitle className="text-sm font-black uppercase italic tracking-widest text-violet-400 flex items-center gap-2">
+                                <Target className="h-4 w-4" /> What-if simulator
+                            </CardTitle>
+                            <CardDescription className="text-[10px] font-bold uppercase tracking-widest text-slate-600">
+                                Fast scenarios before making stock moves.
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-4 pt-6">
+                            <div className="rounded-xl border border-slate-800 bg-slate-950/60 p-4">
+                                <p className="text-[9px] font-black uppercase tracking-widest text-slate-600">If lead time becomes 14 days</p>
+                                <p className="mt-2 text-2xl font-black text-white">{whatIf.fourteenDayRisk}</p>
+                                <p className="text-[10px] font-bold uppercase text-slate-500">items would need reorder cover</p>
+                            </div>
+                            <div className="rounded-xl border border-slate-800 bg-slate-950/60 p-4">
+                                <p className="text-[9px] font-black uppercase tracking-widest text-slate-600">If dead stock is discounted 20%</p>
+                                <p className="mt-2 text-2xl font-black text-emerald-400">${whatIf.recoverableDeadStock.toFixed(0)}</p>
+                                <p className="text-[10px] font-bold uppercase text-slate-500">potential cash recovery</p>
+                            </div>
+                            <div className="rounded-xl border border-slate-800 bg-slate-950/60 p-4">
+                                <div className="flex items-center justify-between gap-3">
+                                    <p className="text-[9px] font-black uppercase tracking-widest text-slate-600">Fixed reorder budget</p>
+                                    <Input
+                                        type="number"
+                                        value={simulationBudget}
+                                        onChange={(e) => setSimulationBudget(Math.max(0, Number(e.target.value) || 0))}
+                                        className="h-8 w-24 bg-slate-900 text-right text-xs font-black text-violet-400"
+                                    />
+                                </div>
+                                <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-900">
+                                    <div className="h-full bg-violet-500" style={{ width: `${whatIf.coverage}%` }} />
+                                </div>
+                                <p className="mt-2 text-[10px] font-bold uppercase text-slate-500">
+                                    Covers {whatIf.coverage.toFixed(0)}% of estimated priority reorder need (${whatIf.reorderNeed.toFixed(0)})
+                                </p>
+                            </div>
+                            <div className="grid grid-cols-1 gap-2">
+                                <Button
+                                    variant="outline"
+                                    onClick={generateTransferDraft}
+                                    className="h-10 justify-start border-sky-500/30 text-[10px] font-black uppercase tracking-widest text-sky-400 hover:bg-sky-500/10"
+                                >
+                                    Generate transfer draft
+                                </Button>
+                                <Button
+                                    variant="outline"
+                                    onClick={generateReorderDraft}
+                                    className="h-10 justify-start border-amber-500/30 text-[10px] font-black uppercase tracking-widest text-amber-400 hover:bg-amber-500/10"
+                                >
+                                    Generate reorder draft
+                                </Button>
+                                <Button
+                                    variant="outline"
+                                    onClick={generateDiscountDraft}
+                                    className="h-10 justify-start border-rose-500/30 text-[10px] font-black uppercase tracking-widest text-rose-400 hover:bg-rose-500/10"
+                                >
+                                    Generate discount campaign draft
+                                </Button>
+                            </div>
+                        </CardContent>
+                    </Card>
+
+                    {workflowDraft && (
+                        <Card className="bg-slate-900/60 border-slate-800 border-2 overflow-hidden shadow-xl">
+                            <CardHeader className="pb-4 border-b border-slate-800/80">
+                                <div className="flex items-center justify-between gap-3">
+                                    <CardTitle className="text-sm font-black uppercase italic tracking-widest text-white flex items-center gap-2">
+                                        <FileText className="h-4 w-4 text-violet-400" /> {workflowDraft.title}
+                                    </CardTitle>
+                                    <button onClick={() => setWorkflowDraft(null)} className="rounded-md p-2 text-slate-500 hover:bg-slate-800 hover:text-white">
+                                        <X className="h-4 w-4" />
+                                    </button>
+                                </div>
+                                <CardDescription className="text-[10px] font-bold uppercase tracking-widest text-slate-600">
+                                    Review-only draft. No stock has been moved or ordered.
+                                </CardDescription>
+                            </CardHeader>
+                            <CardContent className="space-y-3 pt-6">
+                                {workflowDraft.rows.length === 0 ? (
+                                    <div className="rounded-xl border border-slate-800 bg-slate-950/50 p-4 text-center text-[10px] font-black uppercase tracking-widest text-slate-600">
+                                        No eligible rows for this draft right now.
+                                    </div>
+                                ) : (
+                                    <div className="max-h-[360px] overflow-y-auto rounded-xl border border-slate-800">
+                                        <table className="w-full min-w-[520px] text-xs">
+                                            <thead className="sticky top-0 bg-slate-950">
+                                                <tr>
+                                                    {Object.keys(workflowDraft.rows[0]).map((key) => (
+                                                        <th key={key} className="p-2 text-left text-[9px] font-black uppercase tracking-widest text-slate-500">
+                                                            {key}
+                                                        </th>
+                                                    ))}
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-slate-800">
+                                                {workflowDraft.rows.map((row, idx) => (
+                                                    <tr key={idx} className="bg-slate-950/40">
+                                                        {Object.values(row).map((value, valueIdx) => (
+                                                            <td key={valueIdx} className="p-2 font-bold text-slate-300">
+                                                                {String(value)}
+                                                            </td>
+                                                        ))}
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                )}
+                            </CardContent>
+                        </Card>
+                    )}
 
                     <Card className="bg-slate-900/60 border-slate-800 border-2 overflow-hidden shadow-xl">
                         <CardHeader className="pb-4 border-b border-slate-800/80">

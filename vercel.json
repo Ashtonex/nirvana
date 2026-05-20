@@ -1,4 +1,10 @@
 {
+  "crons": [
+    {
+      "path": "/api/cron/analytics-snapshot",
+      "schedule": "0 5 * * *"
+    }
+  ],
   "rewrites": [
     {
       "source": "/api/py/:path*",

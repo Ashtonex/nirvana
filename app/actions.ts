@@ -513,7 +513,26 @@ export async function processShipment(shipmentData: any) {
     const timestamp = new Date().toISOString();
     const totalLogistics = shipmentData.shippingCost + shipmentData.dutyCost + shipmentData.miscCost;
     const totalQty = shipmentData.items.reduce((sum: number, i: any) => sum + i.quantity, 0);
-    const feePerPiece = shipmentData.manifestPieces > 0 ? totalLogistics / shipmentData.manifestPieces : totalLogistics / totalQty;
+    const splitMethod = shipmentData.costSplitMethod || 'piece';
+    const totalItemValue = shipmentData.items.reduce((sum: number, i: any) => sum + Number(i.acquisitionPrice || 0), 0);
+    const totalItemWeight = shipmentData.items.reduce((sum: number, i: any) => sum + (Number(i.weightKg || 0) * Number(i.quantity || 0)), 0);
+    const logisticsBasis = shipmentData.manifestPieces > 0 ? shipmentData.manifestPieces : totalQty;
+
+    const logisticsFeePerPiece = (itemData: any) => {
+        const quantity = Number(itemData.quantity || 0);
+        if (quantity <= 0 || totalLogistics <= 0) return 0;
+
+        if (splitMethod === 'value' && totalItemValue > 0) {
+            return (totalLogistics * (Number(itemData.acquisitionPrice || 0) / totalItemValue)) / quantity;
+        }
+
+        if (splitMethod === 'weight' && totalItemWeight > 0) {
+            const itemWeight = Number(itemData.weightKg || 0) * quantity;
+            return (totalLogistics * (itemWeight / totalItemWeight)) / quantity;
+        }
+
+        return logisticsBasis > 0 ? totalLogistics / logisticsBasis : 0;
+    };
 
     await supabase.from('shipments').insert({
         id: shipmentId, date: timestamp, supplier: shipmentData.supplier, shipment_number: shipmentData.shipmentNumber,
@@ -535,7 +554,7 @@ export async function processShipment(shipmentData: any) {
     for (const itemData of shipmentData.items) {
         const itemId = Math.random().toString(36).substring(2, 9);
         const unitAcquisitionPrice = itemData.quantity > 0 ? itemData.acquisitionPrice / itemData.quantity : 0;
-        const landedCost = unitAcquisitionPrice + feePerPiece;
+        const landedCost = unitAcquisitionPrice + logisticsFeePerPiece(itemData);
 
         await supabase.from('inventory_items').insert({
             id: itemId, shipment_id: shipmentId, name: itemData.name, category: itemData.category,
@@ -3838,4 +3857,48 @@ export async function getQuarterlyReportData(
         expenseCategories,
         shopName: isGlobal ? "Global Synthesis" : (shop?.name || shopId)
     };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// INVENTORY MASTER: Audit Log Action
+// Logs manual stock quantity adjustments to the audit_log table with reason.
+// ─────────────────────────────────────────────────────────────────────────────
+export async function logInventoryAdjustment(params: {
+    itemId: string;
+    itemName: string;
+    oldQty: number;
+    newQty: number;
+    reason: string;
+}) {
+    try {
+        const delta = params.newQty - params.oldQty;
+        const sign = delta >= 0 ? `+${delta}` : `${delta}`;
+        await supabaseAdmin.from('audit_log').insert({
+            id: Math.random().toString(36).substring(2, 11),
+            timestamp: new Date().toISOString(),
+            employee_id: null,
+            action: 'MANUAL_QTY_ADJUSTMENT',
+            details: `[${params.itemName}] ${params.oldQty} → ${params.newQty} (${sign} units). Reason: ${params.reason}`
+        });
+        return { success: true };
+    } catch (err: any) {
+        console.error('[logInventoryAdjustment] Error:', err);
+        return { success: false, error: err.message };
+    }
+}
+
+// Fetch recent inventory adjustment audit records (last 50)
+export async function getInventoryAdjustmentLog() {
+    try {
+        const { data, error } = await supabaseAdmin
+            .from('audit_log')
+            .select('id, timestamp, action, details')
+            .eq('action', 'MANUAL_QTY_ADJUSTMENT')
+            .order('timestamp', { ascending: false })
+            .limit(50);
+        if (error) return [];
+        return data || [];
+    } catch {
+        return [];
+    }
 }
