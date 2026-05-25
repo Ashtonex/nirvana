@@ -1,3 +1,5 @@
+"use client";
+
 import type { TeeSetupAlert } from "@/lib/tshirts-setup-alerts";
 import Link from "next/link";
 import { X } from "lucide-react";
