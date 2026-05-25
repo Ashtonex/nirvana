@@ -45,7 +45,7 @@ export async function getRunningOutItems(
 
     if (!allocations?.length) return items;
 
-    const itemIds = allocations.map((a) => a.item_id as string);
+    const itemIds = allocations.map((a: any) => a.item_id as string);
 
     // Get item details
     const { data: inventoryItems } = await supabaseAdmin
@@ -73,13 +73,13 @@ export async function getRunningOutItems(
         .eq("shop_id", shopId)
         .gte("date", periodStart.toISOString());
 
-      const velocity30d = sales30d.reduce((sum, s) => sum + (s.quantity || 0), 0);
-      const velocity7d = sales7d.reduce((sum, s) => sum + (s.quantity || 0), 0);
+      const velocity30d = sales30d.reduce((sum: number, s: any) => sum + (s.quantity || 0), 0);
+      const velocity7d = sales7d.reduce((sum: number, s: any) => sum + (s.quantity || 0), 0);
 
       if (velocity30d === 0) continue; // Skip items with no recent sales
 
       const avgDailySalesRate = velocity30d / 30;
-      const currentStock = allocations.find((a) => a.item_id === inv.id)?.quantity || 0;
+      const currentStock = allocations.find((a: any) => a.item_id === inv.id)?.quantity || 0;
       const daysUntilStockout = currentStock > 0 ? currentStock / avgDailySalesRate : 0;
 
       // Get last shipment for restock info

@@ -9,6 +9,10 @@
         "/^git status --porcelain; git rev-parse --abbrev-ref HEAD ; true; git checkout -B updates; git add -A; git commit -m \"Operations: full-width layout, vault classification, monthly rollover \\+ scheduler\" ; echo \"no-commit\"; git push -u origin updates$/": {
             "approve": true,
             "matchCommandLine": true
-        }
+        },
+        "git add": true,
+        "git commit": true,
+        "git push": true,
+        "npx tsc": true
     }
 }

@@ -49,7 +49,7 @@ export async function getOutOfStockAlerts(shopId: string = "tshirts"): Promise<S
 
     if (!zeroStockAllocations?.length) return alerts;
 
-    const itemIds = zeroStockAllocations.map((a) => a.item_id as string);
+    const itemIds = zeroStockAllocations.map((a: any) => a.item_id as string);
 
     // Get item details
     const { data: items, error: itemErr } = await supabaseAdmin
@@ -93,8 +93,8 @@ export async function getOutOfStockAlerts(shopId: string = "tshirts"): Promise<S
         .eq("shop_id", shopId)
         .gte("date", thirtyDaysAgo.toISOString());
 
-      const velocity7d = sales7d.reduce((sum, s) => sum + (s.quantity || 0), 0);
-      const velocity30d = sales30d.reduce((sum, s) => sum + (s.quantity || 0), 0);
+      const velocity7d = sales7d.reduce((sum: number, s: any) => sum + (s.quantity || 0), 0);
+      const velocity30d = sales30d.reduce((sum: number, s: any) => sum + (s.quantity || 0), 0);
       const avgDailySalesRate = velocity30d > 0 ? velocity30d / 30 : 0;
 
       // Get last sale date
@@ -152,7 +152,7 @@ export async function getLowStockAlerts(shopId: string = "tshirts", lowThreshold
 
     if (!lowStockAllocations?.length) return alerts;
 
-    const itemIds = lowStockAllocations.map((a) => a.item_id as string);
+    const itemIds = lowStockAllocations.map((a: any) => a.item_id as string);
 
     // Get item details
     const { data: items, error: itemErr } = await supabaseAdmin
@@ -176,7 +176,7 @@ export async function getLowStockAlerts(shopId: string = "tshirts", lowThreshold
 
     // For each item, get sales history
     for (const item of items || []) {
-      const currentAlloc = lowStockAllocations.find((a) => a.item_id === item.id);
+      const currentAlloc = lowStockAllocations.find((a: any) => a.item_id === item.id);
       const currentStock = currentAlloc?.quantity || 0;
 
       const now = new Date();
@@ -198,8 +198,8 @@ export async function getLowStockAlerts(shopId: string = "tshirts", lowThreshold
         .eq("shop_id", shopId)
         .gte("date", thirtyDaysAgo.toISOString());
 
-      const velocity7d = sales7d.reduce((sum, s) => sum + (s.quantity || 0), 0);
-      const velocity30d = sales30d.reduce((sum, s) => sum + (s.quantity || 0), 0);
+      const velocity7d = sales7d.reduce((sum: number, s: any) => sum + (s.quantity || 0), 0);
+      const velocity30d = sales30d.reduce((sum: number, s: any) => sum + (s.quantity || 0), 0);
       const avgDailySalesRate = velocity30d > 0 ? velocity30d / 30 : 0;
       const daysUntilStockout =
         avgDailySalesRate > 0 ? Math.ceil(currentStock / avgDailySalesRate) : 999;
@@ -276,7 +276,7 @@ export async function getReorderStrategy(itemId: string, shopId: string = "tshir
     // Get last shipment source
     const lastShipment = shipments?.[0];
     const avgQtyPerShipment = shipments
-      ? shipments.reduce((sum, s) => sum + (s.quantity || 0), 0) / shipments.length
+      ? shipments.reduce((sum: number, s: any) => sum + (s.quantity || 0), 0) / shipments.length
       : 0;
 
     // Get recent sales velocity
@@ -290,7 +290,7 @@ export async function getReorderStrategy(itemId: string, shopId: string = "tshir
       .eq("shop_id", shopId)
       .gte("date", thirtyDaysAgo.toISOString());
 
-    const velocity30d = sales30d.reduce((sum, s) => sum + (s.quantity || 0), 0);
+    const velocity30d = sales30d.reduce((sum: number, s: any) => sum + (s.quantity || 0), 0);
     const avgDailySalesRate = velocity30d / 30;
 
     // Recommendation logic
