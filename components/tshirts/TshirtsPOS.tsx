@@ -42,6 +42,16 @@ function cn(...inputs: ClassValue[]) {
 
 type CartLine = { item: any; quantity: number; price: number };
 
+/**
+ * Filters items to only show recognized tees with stock > 0
+ */
+function filterValidTees(items: any[], shopId: string): any[] {
+  return items.filter((item) => {
+    const qty = shopAllocationQty(item, shopId);
+    return classifyTeeLine(item) !== "unknown" && qty > 0;
+  });
+}
+
 function defaultSalePrice(landedCost: number, taxRate: number): number {
   return landedCost * PRICING_TIERS.STANDARD * (1 + taxRate);
 }
@@ -120,10 +130,13 @@ export default function TshirtsPOS({
 
   const catalogue = useMemo(() => {
     const list = inventoryState || [];
+    // Always filter to only recognized tees with stock > 0
+    const validTees = filterValidTees(list, shopId);
+    
     if (!query) {
-      return list.filter((item) => shopAllocationQty(item, shopId) > 0);
+      return validTees;
     }
-    return list.filter(
+    return validTees.filter(
       (item) =>
         item.name?.toLowerCase().includes(query) ||
         item.category?.toLowerCase().includes(query)

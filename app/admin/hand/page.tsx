@@ -22,6 +22,7 @@ import {
 import { MonthlyPerformanceTracker } from '@/components/MonthlyPerformanceTracker';
 import { InventoryHealth } from '@/components/InventoryHealth';
 import { ExpenseCategorisation } from '@/components/ExpenseCategorisation';
+import { StockAlertsDisplay } from '@/components/StockAlertsDisplay';
 import { cn } from '@/lib/utils';
 import { updateCashDrawerClosing } from '@/app/actions';
 
@@ -321,6 +322,7 @@ const TABS = [
   { id: 'performance', label: 'Performance', icon: BarChart3 },
   { id: 'expenses', label: 'Expense Categorisation', icon: BadgeDollarSign },
   { id: 'inventory', label: 'Inventory', icon: ShieldCheck },
+  { id: 'stock-alerts', label: 'Stock Alerts', icon: AlertTriangle },
   { id: 'logs', label: 'Audit Logs', icon: Brain },
   { id: 'rationalisation', label: 'Rationalisation', icon: AlertTriangle },
 ] as const;
@@ -1452,6 +1454,23 @@ export default function TheHandPage() {
                 </div>
               </WindowCard>
             </div>
+          </div>
+        )}
+
+        {activeTab === 'stock-alerts' && (
+          <div className="space-y-6 mt-6">
+            <WindowCard eyebrow="Nirvana Tees Inventory" title="Stock Alert Dashboard" icon={AlertTriangle} className="border-rose-500/30">
+              <div className="space-y-4">
+                <p className="text-sm text-slate-400">
+                  Real-time stock monitoring for Nirvana Tees. Items out of stock or running low are tracked with reorder strategies based on sales velocity and shipment history.
+                </p>
+                <StockAlertsDisplay 
+                  onLoadStart={() => setLoading(true)}
+                  onLoadEnd={() => setLoading(false)}
+                  onAddLog={addLog}
+                />
+              </div>
+            </WindowCard>
           </div>
         )}
 
