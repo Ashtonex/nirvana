@@ -38,7 +38,6 @@ export function classifyTeeLine(item: {
   const cat = normalizedCategory(catRaw);
   const catSlug = slugCategory(catRaw);
   const name = String(item.name || "").trim().toLowerCase();
-  const hasCategory = Boolean(catRaw);
 
   const slugMatchesGolf = catSlug === GOLF_SLUG;
 
@@ -47,9 +46,8 @@ export function classifyTeeLine(item: {
     normalizedCategory(TEE_CATEGORY_GOLF) === cat ||
     (cat.includes("golf") &&
       (cat.includes("shirt") || cat.includes("tee") || cat.includes("tshirt"))) ||
-    (!hasCategory &&
-      (/\bgolf\b/.test(name) &&
-        (/\bshirt\b/.test(name) || /\bt-?shirt\b/.test(name) || /\btee\b/.test(name))));
+    (/\bgolf\b/.test(name) &&
+      (/\bshirt\b/.test(name) || /\bt-?shirt\b/.test(name) || /\btee\b/.test(name)));
 
   if (isGolf) return "golf";
 
@@ -64,10 +62,9 @@ export function classifyTeeLine(item: {
         cat.includes("tee") ||
         cat.includes("shirt")) &&
       !cat.includes("golf")) ||
-    (!hasCategory &&
-      (/\bplain\b/.test(name) &&
-        (/\bt-?shirt\b/.test(name) || /\btee\b/.test(name)) &&
-        !/\bgolf\b/.test(name)));
+    (/\bplain\b/.test(name) &&
+      (/\bt-?shirt\b/.test(name) || /\btee\b/.test(name)) &&
+      !/\bgolf\b/.test(name));
 
   if (isPlain) return "plain";
 
