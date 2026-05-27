@@ -15,8 +15,8 @@ export default async function TshirtsPage() {
       getTshirtsShopData(),
       getTshirtsAnalytics(60),
     ]);
-    const revenue = db.revenueSummary || { allTime: 0, last60Days: 0, monthToDate: 0 };
     const s = analytics.summary;
+    const teeUnitsSold = s.plainUnits60d + s.golfUnits60d;
 
     const unitsInStock = (db.inventory || []).reduce(
       (sum: number, item: any) => sum + shopAllocationQty(item, TSHIRTS_SHOP_ID),
@@ -31,7 +31,8 @@ export default async function TshirtsPage() {
           <StatCard
             icon={<TrendingUp className="h-3 w-3 text-orange-500" />}
             label="60-day revenue"
-            value={`$${revenue.last60Days.toLocaleString()}`}
+            value={`$${s.revenueLast60Days.toLocaleString()}`}
+            hint={`${teeUnitsSold} units`}
           />
           <StatCard
             icon={<Shirt className="h-3 w-3 text-orange-400" />}
@@ -54,7 +55,8 @@ export default async function TshirtsPage() {
           <StatCard
             icon={<DollarSign className="h-3 w-3 text-emerald-500" />}
             label="All-time"
-            value={`$${revenue.allTime.toLocaleString()}`}
+            value={`$${s.revenueAllTime.toLocaleString()}`}
+            hint={`${s.unitsAllTime} units`}
           />
         </div>
 
