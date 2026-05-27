@@ -9,11 +9,13 @@ import {
   Building2,
   Database,
   Download,
+  Filter,
   Lock,
   PackageSearch,
   RefreshCcw,
   ShieldAlert,
   ShieldCheck,
+  ShieldOff,
   Sparkles,
   Wallet,
   Wrench,
@@ -322,7 +324,8 @@ const TABS = [
   { id: 'performance', label: 'Performance', icon: BarChart3 },
   { id: 'expenses', label: 'Expense Categorisation', icon: BadgeDollarSign },
   { id: 'inventory', label: 'Inventory', icon: ShieldCheck },
-  { id: 'stock-alerts', label: 'Stock Alerts', icon: AlertTriangle },
+  { id: 'inventory-intelligence', label: 'Inventory Intelligence', icon: Sparkles },
+  { id: 'pos-sync', label: 'POS Sync Intelligence', icon: Filter },
   { id: 'logs', label: 'Audit Logs', icon: Brain },
   { id: 'rationalisation', label: 'Rationalisation', icon: AlertTriangle },
 ] as const;
@@ -1457,12 +1460,12 @@ export default function TheHandPage() {
           </div>
         )}
 
-        {activeTab === 'stock-alerts' && (
+        {activeTab === 'inventory-intelligence' && (
           <div className="space-y-6 mt-6">
-            <WindowCard eyebrow="Nirvana Tees Inventory" title="Stock Alert Dashboard" icon={AlertTriangle} className="border-rose-500/30">
+            <WindowCard eyebrow="Nirvana Tees Inventory" title="Inventory Intelligence Dashboard" icon={Sparkles} className="border-violet-500/30">
               <div className="space-y-4">
                 <p className="text-sm text-slate-400">
-                  Real-time stock monitoring for Nirvana Tees. Items out of stock or running low are tracked with reorder strategies based on sales velocity and shipment history.
+                  Advanced inventory analytics with real-time stock monitoring, fast-moving product tracking, depletion forecasts, and shipment-sourced reorder recommendations for Nirvana Tees.
                 </p>
                 <StockAlertsDisplay 
                   onLoadStart={() => setLoading(true)}
@@ -1471,6 +1474,229 @@ export default function TheHandPage() {
                 />
               </div>
             </WindowCard>
+          </div>
+        )}
+
+        {/* ─── POS Sync Intelligence Tab ─── */}
+        {activeTab === 'pos-sync' && (
+          <div className="space-y-6 mt-6">
+
+            {/* Isolation status overview */}
+            <WindowCard eyebrow="Inventory Sync Layer" title="POS Isolation Intelligence" icon={Filter} className="border-sky-500/30">
+              <div className="space-y-6">
+
+                {/* What this does */}
+                <div className="rounded-2xl border border-sky-500/20 bg-sky-500/5 p-5">
+                  <div className="flex items-start gap-3">
+                    <ShieldOff className="h-5 w-5 text-sky-400 flex-shrink-0 mt-0.5" />
+                    <div>
+                      <p className="text-sm font-black text-sky-200 uppercase tracking-widest">Isolation Active</p>
+                      <p className="mt-2 text-sm text-slate-300 leading-relaxed">
+                        Inventory added through the <span className="font-black text-white">Inventory Master</span> system is
+                        never automatically exposed to the Nirvana Tees POS. Only items that match recognised
+                        Nirvana Tees product lines (Classic Tee, Oversize Tee, Kids Tee, Crop, Premium, Graphic, Polo, Hoodie, Accessories)
+                        are permitted through. All others are silently isolated at the data layer — they never
+                        reach the POS UI, never generate POS errors, and never appear in the product catalog.
+                      </p>
+                      <p className="mt-3 text-sm text-slate-300 leading-relaxed">
+                        Additionally, items with <span className="font-black text-white">zero allocated stock</span> for
+                        the Nirvana Tees shop are hidden from the POS listing entirely, preventing ghost selections
+                        and out-of-stock checkout errors.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Per-shop sync status grid */}
+                <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                  {SHOPS.map(shop => {
+                    const shopData = controlRoom?.shops.find(s => s.id === shop.id);
+                    const isTshirts = shop.id === 'tshirts';
+                    return (
+                      <div
+                        key={shop.id}
+                        className={`rounded-2xl border p-5 ${
+                          isTshirts
+                            ? 'border-sky-500/30 bg-sky-500/5'
+                            : 'border-white/10 bg-white/[0.03]'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between mb-3">
+                          <p className="text-xs font-black uppercase tracking-widest text-slate-400">{shop.name}</p>
+                          {isTshirts ? (
+                            <span className="text-[9px] font-black uppercase tracking-wider px-2 py-1 rounded-full bg-sky-500/20 text-sky-300 border border-sky-500/30">
+                              ISOLATED
+                            </span>
+                          ) : (
+                            <span className="text-[9px] font-black uppercase tracking-wider px-2 py-1 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                              STANDARD
+                            </span>
+                          )}
+                        </div>
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between text-xs">
+                            <span className="text-slate-500">Status</span>
+                            <span className={`font-bold ${
+                              shopData?.status === 'online' ? 'text-emerald-400'
+                              : shopData?.status === 'watch' ? 'text-amber-400'
+                              : 'text-rose-400'
+                            }`}>{shopData?.status?.toUpperCase() ?? 'UNKNOWN'}</span>
+                          </div>
+                          <div className="flex items-center justify-between text-xs">
+                            <span className="text-slate-500">Low Stock</span>
+                            <span className="font-bold text-amber-300">{shopData?.lowStockCount ?? '—'}</span>
+                          </div>
+                          <div className="flex items-center justify-between text-xs">
+                            <span className="text-slate-500">Zero Stock</span>
+                            <span className="font-bold text-rose-300">{shopData?.zeroStockCount ?? '—'}</span>
+                          </div>
+                          {isTshirts && (
+                            <div className="flex items-center justify-between text-xs pt-1 border-t border-white/5">
+                              <span className="text-slate-500">POS Filter</span>
+                              <span className="font-bold text-sky-300">Active</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </WindowCard>
+
+            {/* Inventory filter rules */}
+            <WindowCard eyebrow="Isolation Rules" title="Active POS Filter Logic" icon={ShieldOff}>
+              <div className="grid gap-4 md:grid-cols-2">
+
+                <div className="rounded-2xl border border-white/10 bg-slate-900/40 p-5 space-y-4">
+                  <p className="text-xs font-black uppercase tracking-widest text-emerald-400">✓ Allowed Through POS</p>
+                  <ul className="space-y-2 text-sm text-slate-300">
+                    {[
+                      'Classic Tee (category: Tees, Tops, T-Shirts)',
+                      'Oversize Tee (category: Oversized, Oversize Tee)',
+                      'Kids Tee (category: Kids, Children)',
+                      'Crop Top (category: Crop, Crop Top)',
+                      'Premium Tee (category: Premium)',
+                      'Graphic Tee (category: Graphic)',
+                      'Polo Shirt (category: Polo)',
+                      'Hoodie / Fleece (category: Hoodies, Fleece)',
+                      'Accessories (category: Accessories, Hats, Caps)',
+                      'Services (item id prefix: service_)',
+                    ].map(rule => (
+                      <li key={rule} className="flex items-start gap-2">
+                        <span className="mt-1 h-1.5 w-1.5 rounded-full bg-emerald-400 flex-shrink-0" />
+                        <span className="text-xs">{rule}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+
+                <div className="rounded-2xl border border-white/10 bg-slate-900/40 p-5 space-y-4">
+                  <p className="text-xs font-black uppercase tracking-widest text-rose-400">✗ Blocked From POS</p>
+                  <ul className="space-y-2 text-sm text-slate-300">
+                    {[
+                      'Any inventory item with an unrecognised category',
+                      'Items imported via Inventory Master with no Nirvana Tees SKU mapping',
+                      'Items where Nirvana Tees shop allocation = 0 (zero stock)',
+                      'Items where classifyTeeLine() returns \'unknown\'',
+                      'Shipment entries from other shops leaked into tshirts context',
+                      'Ad-hoc or Quick Sale items with no SKU (adhoc_ prefix)',
+                    ].map(rule => (
+                      <li key={rule} className="flex items-start gap-2">
+                        <span className="mt-1 h-1.5 w-1.5 rounded-full bg-rose-400 flex-shrink-0" />
+                        <span className="text-xs">{rule}</span>
+                      </li>
+                    ))}
+                  </ul>
+
+                  <div className="mt-4 rounded-xl border border-rose-500/20 bg-rose-500/5 p-3">
+                    <p className="text-[10px] font-black uppercase tracking-wider text-rose-400">Zero Stock Rule</p>
+                    <p className="mt-1 text-xs text-slate-400">
+                      Items with zero Nirvana Tees allocation are excluded from the POS product list.
+                      They remain visible in admin inventory dashboards and are never deleted — only hidden from the storefront.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </WindowCard>
+
+            {/* Inventory command refresh */}
+            <WindowCard eyebrow="Nirvana Tees Inventory" title="Tees-Specific Command Lists" icon={PackageSearch}>
+              <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <p className="text-sm text-slate-400">
+                  Priority reorder and dead-stock command lists scoped specifically to the Nirvana Tees shop.
+                  Use these to identify which tee lines need restocking or are stranded as dead capital.
+                </p>
+                <button
+                  onClick={loadInventoryCommands}
+                  disabled={inventoryCommandsLoading}
+                  className="rounded-2xl border border-sky-400/30 bg-sky-500/10 px-4 py-3 text-xs font-black uppercase tracking-widest text-sky-100 transition hover:bg-sky-500/20 disabled:cursor-not-allowed disabled:opacity-60 whitespace-nowrap"
+                >
+                  <RefreshCcw className={`mr-2 inline h-4 w-4 ${inventoryCommandsLoading ? 'animate-spin' : ''}`} />
+                  Refresh
+                </button>
+              </div>
+
+              <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4 mb-6">
+                <MetricCard
+                  label="Priority Reorders"
+                  value={String(inventoryCommands?.summary.priorityReorders ?? '—')}
+                  hint="Tees below safe stock runway"
+                  tone="text-amber-300"
+                />
+                <MetricCard
+                  label="Dead Stock"
+                  value={String(inventoryCommands?.summary.deadStockCount ?? '—')}
+                  hint={inventoryCommands ? currency(inventoryCommands.summary.deadStockValue) : 'Awaiting data'}
+                  tone="text-rose-300"
+                />
+                <MetricCard
+                  label="Trapped Capital"
+                  value={inventoryCommands ? currency(inventoryCommands.summary.trappedCapitalValue) : '—'}
+                  hint="Landed value sitting unsold"
+                  tone="text-sky-300"
+                />
+                <MetricCard
+                  label="Shipment Warnings"
+                  value={String(inventoryCommands?.summary.shipmentWarnings ?? '—')}
+                  hint="Slow or margin-risk batches"
+                  tone="text-orange-300"
+                />
+              </div>
+
+              <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4 mb-6">
+                {([
+                  ['tee-priority-reorders', 'Priority Reorders', inventoryCommands?.lists.priorityReorders || []],
+                  ['tee-trapped-capital', 'Trapped Capital', inventoryCommands?.lists.trappedCapital || []],
+                  ['tee-dead-stock', 'Dead Stock', inventoryCommands?.lists.deadStock || []],
+                  ['tee-shipment-warnings', 'Shipment Warnings', inventoryCommands?.lists.shipmentWarnings || []],
+                ] as const).map(([filename, label, rows]) => (
+                  <button
+                    key={filename}
+                    onClick={() => downloadInventoryCommandCsv(filename, rows)}
+                    className="rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3 text-left text-[10px] font-black uppercase tracking-widest text-slate-300 transition hover:border-sky-500/30 hover:text-sky-300"
+                  >
+                    <Download className="mr-2 inline h-4 w-4" />
+                    {label}
+                  </button>
+                ))}
+              </div>
+
+              <MiniTable
+                title="Priority Reorders — Nirvana Tees"
+                rows={inventoryCommands?.lists.priorityReorders || []}
+                empty="No priority reorder rows. All tee lines are within safe stock levels."
+                columns={[
+                  { key: 'item',             label: 'Product' },
+                  { key: 'category',         label: 'Category' },
+                  { key: 'stock',            label: 'Stock' },
+                  { key: 'velocity',         label: 'Velocity', format: v => Number(v || 0).toFixed(2) },
+                  { key: 'daysToZero',       label: 'Runway',   format: v => v == null ? 'n/a' : `${v}d` },
+                  { key: 'suggestedOrderQty',label: 'Order Qty' },
+                ]}
+              />
+            </WindowCard>
+
           </div>
         )}
 

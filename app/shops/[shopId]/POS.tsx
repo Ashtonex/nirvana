@@ -141,10 +141,29 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
         if (!query) return [];
         
         return inventoryState.filter((item: any) => {
+            // Get quantity allocated to this shop
+            const checkoutItem = lastCheckoutInventory.find(i => i.id === item.id);
+            const allocation = item.allocations?.find((a: any) => a.shopId === shopId);
+            const qtyAtShop = checkoutItem ? checkoutItem.quantity : (allocation ? allocation.quantity : 0);
+
+            // Hide products with zero stock in POS listings (only ad-hoc or services can have zero check bypass)
+            const isServiceOrAdhoc = item.id?.startsWith("service_") || item.id?.startsWith("adhoc");
+            if (qtyAtShop <= 0 && !isServiceOrAdhoc) {
+                return false;
+            }
+
+            // Hide unrecognized items for Nirvana Tees shop
+            if (shopId === "tshirts") {
+                const { classifyTeeLine } = require("@/lib/tshirts");
+                if (classifyTeeLine(item) === "unknown") {
+                    return false;
+                }
+            }
+
             return (item.name?.toLowerCase().includes(query) ||
                 item.category?.toLowerCase().includes(query));
         });
-    }, [inventoryState, deferredSearchTerm]);
+    }, [inventoryState, deferredSearchTerm, shopId, lastCheckoutInventory]);
 
     // POS Modes
     const [posMode, setPosMode] = useState<'sale' | 'quote' | 'layby'>('sale');
@@ -1906,9 +1925,10 @@ Generated via NIRVANA POS`;
                 ) : (
                     <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
                         {filteredInventory.map((item) => {
-                            // Show GLOBAL master stock instead of shop allocation
+                            // Show shop allocation instead of total global stock
                             const checkoutItem = lastCheckoutInventory.find(i => i.id === item.id);
-                            const qtyAtShop = checkoutItem ? checkoutItem.quantity : (item.quantity || 0);
+                            const allocation = item.allocations?.find((a: any) => a.shopId === shopId);
+                            const qtyAtShop = checkoutItem ? checkoutItem.quantity : (allocation ? allocation.quantity : 0);
                             const totalNetworkStock = item.quantity || 0;
 
                             const dynamicOverhead = totalShopStock > 0 ? (shopExpenses as number) / totalShopStock : 0;

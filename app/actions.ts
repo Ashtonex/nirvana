@@ -320,8 +320,14 @@ export async function getShopDashboardData(shopId: string, daysLimit = 60) {
             monthToDate: monthSales.reduce((sum: number, s: any) => sum + Number(s.total_with_tax || 0), 0),
         };
 
+        // Filter unknown items for Nirvana Tees shop
+        let filteredInventory = inventory;
+        if (shopId === TSHIRTS_SHOP_ID) {
+            filteredInventory = inventory.filter(i => isNirvanaTeeItem(i));
+        }
+
         return {
-            inventory: inventory.map((i: any) => ({
+            inventory: filteredInventory.map((i: any) => ({
                 id: i.id,
                 name: i.name || "Unknown Product",
                 category: i.category || "General",
@@ -2432,6 +2438,58 @@ export async function triggerAutomatedReports(type: 'daily' | 'weekly') {
     const period = type === 'daily' ? 'today' : 'this week';
     const shopRows = shopPerformance.map((s: any) => `${s.name}: $${s.revenue.toFixed(2)}`).join('\n');
 
+    // Fetch inventory intelligence data for Nirvana Tees
+    let inventoryIntelligenceSection = '';
+    try {
+        const { getAllStockAlerts, getReorderStrategy } = await import('@/lib/stock-alerts');
+        const stockAlerts = await getAllStockAlerts('tshirts');
+        
+        if (stockAlerts.length > 0) {
+            const criticalCount = stockAlerts.filter((a: any) => a.severity === 'critical').length;
+            const highCount = stockAlerts.filter((a: any) => a.severity === 'high').length;
+            
+            // Get fast-moving items (top 5 by velocity)
+            const fastMoving = stockAlerts.sort((a: any, b: any) => b.velocity30d - a.velocity30d).slice(0, 5);
+            const fastMovingList = fastMoving.map((item: any) => 
+                `  - ${item.itemName}: ${item.velocity30d} units/30d (${item.avgDailySalesRate.toFixed(1)}/day)`
+            ).join('\n');
+            
+            // Get reorder strategies for critical items
+            const criticalItems = stockAlerts.filter((a: any) => a.severity === 'critical').slice(0, 3);
+            let reorderStrategies = '';
+            
+            for (const item of criticalItems) {
+                try {
+                    const strategy = await getReorderStrategy(item.itemId, 'tshirts');
+                    if (strategy) {
+                        reorderStrategies += `\n  - ${strategy.itemName}: Recommend ${strategy.recommendedQty} units (${strategy.urgency}) | Est. Cost: $${strategy.estimatedCost.toFixed(2)}\n    Rationale: ${strategy.rationale}`;
+                    }
+                } catch (e) {
+                    console.error(`Failed to get strategy for ${item.itemId}:`, e);
+                }
+            }
+            
+            inventoryIntelligenceSection = `
+NIRVANA TEES INVENTORY INTELLIGENCE
+Critical Alerts: ${criticalCount}
+High Priority: ${highCount}
+Total Requiring Attention: ${stockAlerts.length}
+
+FAST-MOVING PRODUCTS (Top 5)
+${fastMovingList}
+
+${reorderStrategies ? 'REORDER RECOMMENDATIONS (Top Critical Items)' + reorderStrategies : ''}`;
+        } else {
+            inventoryIntelligenceSection = `
+NIRVANA TEES INVENTORY INTELLIGENCE
+Status: All Clear
+No low-stock or out-of-stock items detected.`;
+        }
+    } catch (e) {
+        console.error('[Report] Failed to fetch inventory intelligence:', e);
+        inventoryIntelligenceSection = '\nINVENTORY INTELLIGENCE\nUnable to fetch inventory data at this time.';
+    }
+
     const body = `${label.toUpperCase()}
 Generated: ${new Date().toLocaleString()}
 
@@ -2445,6 +2503,7 @@ Total Units in Stock: ${totalUnits}
 
 SHOP PERFORMANCE
 ${shopRows}
+${inventoryIntelligenceSection}
 
 ---
 Oracle Master Intelligence — Automated Report`;

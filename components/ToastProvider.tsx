@@ -1,46 +1,51 @@
 "use client";
 
 import { createContext, useContext, useState, useCallback, useEffect, useRef, ReactNode } from "react";
-import { X, Bell, ShoppingCart, UserPlus, UserMinus, DollarSign, TrendingUp, AlertTriangle, CheckCircle, Info, ChevronDown, MessageCircle, Package } from "lucide-react";
+import { X, Bell, ShoppingCart, UserPlus, UserMinus, DollarSign, TrendingUp, AlertTriangle, CheckCircle, Info, ChevronDown, ChevronUp, MessageCircle, Package, Minimize2, Trash2 } from "lucide-react";
 import { cn } from "@/components/ui";
 
+/* ─────────────────────────────────────────────
+   Audio
+───────────────────────────────────────────── */
 function playNotificationSound(type: string) {
   try {
     const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
-    const oscillator = ctx.createOscillator();
-    const gainNode = ctx.createGain();
-
-    oscillator.connect(gainNode);
-    gainNode.connect(ctx.destination);
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
 
     if (type === "sale" || type === "deposit" || type === "chat" || type === "stock_request") {
-      oscillator.frequency.setValueAtTime(880, ctx.currentTime);
-      oscillator.frequency.setValueAtTime(1100, ctx.currentTime + 0.1);
-      gainNode.gain.setValueAtTime(0.08, ctx.currentTime);
-      gainNode.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.25);
-      oscillator.start(ctx.currentTime);
-      oscillator.stop(ctx.currentTime + 0.25);
+      osc.frequency.setValueAtTime(880, ctx.currentTime);
+      osc.frequency.setValueAtTime(1100, ctx.currentTime + 0.1);
+      gain.gain.setValueAtTime(0.08, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.25);
+      osc.start(ctx.currentTime);
+      osc.stop(ctx.currentTime + 0.25);
     } else if (type === "alert") {
-      oscillator.frequency.setValueAtTime(600, ctx.currentTime);
-      oscillator.frequency.setValueAtTime(400, ctx.currentTime + 0.15);
-      gainNode.gain.setValueAtTime(0.1, ctx.currentTime);
-      gainNode.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.3);
-      oscillator.start(ctx.currentTime);
-      oscillator.stop(ctx.currentTime + 0.3);
+      osc.frequency.setValueAtTime(600, ctx.currentTime);
+      osc.frequency.setValueAtTime(400, ctx.currentTime + 0.15);
+      gain.gain.setValueAtTime(0.1, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.3);
+      osc.start(ctx.currentTime);
+      osc.stop(ctx.currentTime + 0.3);
     } else {
-      oscillator.frequency.setValueAtTime(523, ctx.currentTime);
-      gainNode.gain.setValueAtTime(0.05, ctx.currentTime);
-      gainNode.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.15);
-      oscillator.start(ctx.currentTime);
-      oscillator.stop(ctx.currentTime + 0.15);
+      osc.frequency.setValueAtTime(523, ctx.currentTime);
+      gain.gain.setValueAtTime(0.05, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.15);
+      osc.start(ctx.currentTime);
+      osc.stop(ctx.currentTime + 0.15);
     }
-
     ctx.close();
-  } catch {
-  }
+  } catch { }
 }
 
-export type ToastType = "sale" | "deposit" | "expense" | "staff_login" | "staff_logout" | "chat" | "stock_request" | "alert" | "success" | "info";
+/* ─────────────────────────────────────────────
+   Types
+───────────────────────────────────────────── */
+export type ToastType =
+  | "sale" | "deposit" | "expense" | "staff_login" | "staff_logout"
+  | "chat" | "stock_request" | "alert" | "success" | "info";
 
 export type Toast = {
   id: string;
@@ -51,16 +56,32 @@ export type Toast = {
   shop?: string;
   timestamp: Date;
   read?: boolean;
+  /** How many times this exact title+message was deduplicated */
+  count?: number;
+};
+
+export type ErrorLogEntry = {
+  id: string;
+  timestamp: string;
+  title: string;
+  message: string;
+  type: ToastType;
 };
 
 type ToastContextType = {
   toasts: Toast[];
+  errorLog: ErrorLogEntry[];
   addToast: (toast: Omit<Toast, "id" | "timestamp">) => void;
+  addErrorLog: (entry: Omit<ErrorLogEntry, "id" | "timestamp">) => void;
   removeToast: (id: string) => void;
+  clearAllToasts: () => void;
   markAsRead: (id: string) => void;
   unreadCount: number;
 };
 
+/* ─────────────────────────────────────────────
+   Context
+───────────────────────────────────────────── */
 const ToastContext = createContext<ToastContextType | null>(null);
 
 export function useToast() {
@@ -69,92 +90,86 @@ export function useToast() {
   return ctx;
 }
 
+/* ─────────────────────────────────────────────
+   Config
+───────────────────────────────────────────── */
 const TOAST_CONFIG: Record<ToastType, { icon: ReactNode; color: string; bg: string; border: string }> = {
-  sale: { 
-    icon: <ShoppingCart className="h-4 w-4" />, 
-    color: "text-emerald-400", 
-    bg: "bg-emerald-500/10", 
-    border: "border-emerald-500/30" 
-  },
-  deposit: { 
-    icon: <DollarSign className="h-4 w-4" />, 
-    color: "text-sky-400", 
-    bg: "bg-sky-500/10", 
-    border: "border-sky-500/30" 
-  },
-  expense: { 
-    icon: <TrendingUp className="h-4 w-4" />, 
-    color: "text-rose-400", 
-    bg: "bg-rose-500/10", 
-    border: "border-rose-500/30" 
-  },
-  staff_login: { 
-    icon: <UserPlus className="h-4 w-4" />, 
-    color: "text-violet-400", 
-    bg: "bg-violet-500/10", 
-    border: "border-violet-500/30" 
-  },
-  staff_logout: { 
-    icon: <UserMinus className="h-4 w-4" />, 
-    color: "text-slate-400", 
-    bg: "bg-slate-500/10", 
-    border: "border-slate-500/30" 
-  },
-  alert: { 
-    icon: <AlertTriangle className="h-4 w-4" />, 
-    color: "text-amber-400", 
-    bg: "bg-amber-500/10", 
-    border: "border-amber-500/30" 
-  },
-  success: { 
-    icon: <CheckCircle className="h-4 w-4" />, 
-    color: "text-emerald-400", 
-    bg: "bg-emerald-500/10", 
-    border: "border-emerald-500/30" 
-  },
-  info: { 
-    icon: <Info className="h-4 w-4" />, 
-    color: "text-blue-400", 
-    bg: "bg-blue-500/10", 
-    border: "border-blue-500/30" 
-  },
-  chat: { 
-    icon: <MessageCircle className="h-4 w-4" />, 
-    color: "text-amber-400", 
-    bg: "bg-amber-500/10", 
-    border: "border-amber-500/30" 
-  },
-  stock_request: { 
-    icon: <Package className="h-4 w-4" />, 
-    color: "text-orange-400", 
-    bg: "bg-orange-500/10", 
-    border: "border-orange-500/30" 
-  },
+  sale:         { icon: <ShoppingCart className="h-4 w-4" />, color: "text-emerald-400", bg: "bg-emerald-500/10", border: "border-emerald-500/30" },
+  deposit:      { icon: <DollarSign className="h-4 w-4" />,  color: "text-sky-400",     bg: "bg-sky-500/10",     border: "border-sky-500/30" },
+  expense:      { icon: <TrendingUp className="h-4 w-4" />,  color: "text-rose-400",    bg: "bg-rose-500/10",    border: "border-rose-500/30" },
+  staff_login:  { icon: <UserPlus className="h-4 w-4" />,    color: "text-violet-400",  bg: "bg-violet-500/10",  border: "border-violet-500/30" },
+  staff_logout: { icon: <UserMinus className="h-4 w-4" />,   color: "text-slate-400",   bg: "bg-slate-500/10",   border: "border-slate-500/30" },
+  alert:        { icon: <AlertTriangle className="h-4 w-4" />,color: "text-amber-400",  bg: "bg-amber-500/10",   border: "border-amber-500/30" },
+  success:      { icon: <CheckCircle className="h-4 w-4" />, color: "text-emerald-400", bg: "bg-emerald-500/10", border: "border-emerald-500/30" },
+  info:         { icon: <Info className="h-4 w-4" />,        color: "text-blue-400",    bg: "bg-blue-500/10",    border: "border-blue-500/30" },
+  chat:         { icon: <MessageCircle className="h-4 w-4" />,color: "text-amber-400",  bg: "bg-amber-500/10",   border: "border-amber-500/30" },
+  stock_request:{ icon: <Package className="h-4 w-4" />,     color: "text-orange-400",  bg: "bg-orange-500/10",  border: "border-orange-500/30" },
 };
 
-export function ToastProvider({ children }: { children: ReactNode }) {
-  const [toasts, setToasts] = useState<Toast[]>([]);
-  const [isVisible, setIsVisible] = useState(false);
+const DEDUP_WINDOW_MS = 10_000; // identical toasts within 10 s are merged
+const MAX_HISTORY     = 50;     // max toasts stored
+const AUTO_DISMISS_MS = 8_000;  // toasts auto-dismiss after 8 s
 
+/* ─────────────────────────────────────────────
+   Provider
+───────────────────────────────────────────── */
+export function ToastProvider({ children }: { children: ReactNode }) {
+  const [toasts,   setToasts]   = useState<Toast[]>([]);
+  const [errorLog, setErrorLog] = useState<ErrorLogEntry[]>([]);
+
+  /** Add or increment a duplicate toast */
   const addToast = useCallback((toast: Omit<Toast, "id" | "timestamp">) => {
     playNotificationSound(toast.type);
-    
-    const newToast: Toast = {
-      ...toast,
-      id: `toast-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-      timestamp: new Date(),
-    };
-    
-    setToasts(prev => [newToast, ...prev].slice(0, 20));
-    setIsVisible(true);
-    
-    setTimeout(() => {
-      setToasts(prev => prev.filter(t => t.id !== newToast.id));
-    }, 8000);
+
+    setToasts(prev => {
+      const dupKey = `${toast.title}:::${toast.message}`;
+      const now    = Date.now();
+
+      // Find an existing toast with the same key that is still within the dedup window
+      const existing = prev.find(t =>
+        `${t.title}:::${t.message}` === dupKey &&
+        now - t.timestamp.getTime() < DEDUP_WINDOW_MS
+      );
+
+      if (existing) {
+        // Bump count and refresh timestamp so the auto-dismiss resets
+        return prev
+          .map(t =>
+            t.id === existing.id
+              ? { ...t, count: (t.count ?? 1) + 1, timestamp: new Date(), read: false }
+              : t
+          )
+          .slice(0, MAX_HISTORY);
+      }
+
+      const newToast: Toast = {
+        ...toast,
+        id: `toast-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        timestamp: new Date(),
+        count: 1,
+      };
+      return [newToast, ...prev].slice(0, MAX_HISTORY);
+    });
+  }, []);
+
+  /** Manually add an entry to the persistent error/event log */
+  const addErrorLog = useCallback((entry: Omit<ErrorLogEntry, "id" | "timestamp">) => {
+    setErrorLog(prev => [
+      {
+        ...entry,
+        id: `log-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        timestamp: new Date().toISOString(),
+      },
+      ...prev,
+    ].slice(0, 200));
   }, []);
 
   const removeToast = useCallback((id: string) => {
     setToasts(prev => prev.filter(t => t.id !== id));
+  }, []);
+
+  const clearAllToasts = useCallback(() => {
+    setToasts([]);
   }, []);
 
   const markAsRead = useCallback((id: string) => {
@@ -164,62 +179,120 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   const unreadCount = toasts.filter(t => !t.read).length;
 
   return (
-    <ToastContext.Provider value={{ toasts, addToast, removeToast, markAsRead, unreadCount }}>
+    <ToastContext.Provider value={{ toasts, errorLog, addToast, addErrorLog, removeToast, clearAllToasts, markAsRead, unreadCount }}>
       {children}
-      <ToastContainer 
-        toasts={toasts} 
+      <ToastContainer
+        toasts={toasts}
         onRemove={removeToast}
         onMarkRead={markAsRead}
-        isVisible={isVisible}
-        onClose={() => setIsVisible(false)}
+        onClearAll={clearAllToasts}
         unreadCount={unreadCount}
       />
     </ToastContext.Provider>
   );
 }
 
-function ToastContainer({ 
-  toasts, 
-  onRemove, 
+/* ─────────────────────────────────────────────
+   Container
+───────────────────────────────────────────── */
+function ToastContainer({
+  toasts,
+  onRemove,
   onMarkRead,
-  isVisible, 
-  onClose,
-  unreadCount 
-}: { 
-  toasts: Toast[]; 
+  onClearAll,
+  unreadCount,
+}: {
+  toasts: Toast[];
   onRemove: (id: string) => void;
   onMarkRead: (id: string) => void;
-  isVisible: boolean;
-  onClose: () => void;
+  onClearAll: () => void;
   unreadCount: number;
 }) {
-  const [showPanel, setShowPanel] = useState(false);
+  const [showPanel,    setShowPanel]    = useState(false);
+  const [isMinimized,  setIsMinimized]  = useState(false);
 
-  if (!isVisible && toasts.length === 0) return null;
+  // Close panel when clicking outside
+  const panelRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!showPanel) return;
+    const handler = (e: MouseEvent) => {
+      if (panelRef.current && !panelRef.current.contains(e.target as Node)) {
+        setShowPanel(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [showPanel]);
+
+  // Show bell whenever there are toasts
+  if (toasts.length === 0 && !showPanel) return null;
+
+  const visibleToasts = toasts.slice(0, 5);
+  const overflowCount = Math.max(0, toasts.length - 5);
 
   return (
     <>
-      <ToastBell 
-        unreadCount={unreadCount} 
-        onClick={() => setShowPanel(!showPanel)}
+      {/* ── Bell / Hub button ── */}
+      <ToastBell
+        unreadCount={unreadCount}
+        isMinimized={isMinimized}
+        onClick={() => {
+          if (isMinimized) { setIsMinimized(false); return; }
+          setShowPanel(v => !v);
+        }}
       />
-      
-      {showPanel && (
-        <div 
+
+      {/* ── Drop-down history panel ── */}
+      {showPanel && !isMinimized && (
+        <div
+          ref={panelRef}
           className="fixed top-20 left-1/2 -translate-x-1/2 z-[9998] w-96"
-          onClick={() => setShowPanel(false)}
         >
           <div className="bg-slate-950/95 backdrop-blur-md border border-slate-800 rounded-xl shadow-2xl overflow-hidden">
+            {/* Panel header */}
             <div className="p-3 border-b border-slate-800 flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Bell className="h-4 w-4 text-amber-400" />
                 <span className="text-xs font-black text-slate-200 uppercase tracking-wide">
                   Recent Activity
                 </span>
+                {unreadCount > 0 && (
+                  <span className="text-[9px] font-black px-1.5 py-0.5 rounded-full bg-rose-500 text-white">
+                    {unreadCount} new
+                  </span>
+                )}
               </div>
-              <span className="text-[10px] text-slate-500">{toasts.length} notifications</span>
+              <div className="flex items-center gap-1">
+                {/* Minimize */}
+                <button
+                  onClick={() => { setIsMinimized(true); setShowPanel(false); }}
+                  className="p-1 rounded text-slate-500 hover:text-slate-300 hover:bg-slate-800 transition-colors"
+                  title="Minimize"
+                >
+                  <Minimize2 className="h-3.5 w-3.5" />
+                </button>
+                {/* Clear all */}
+                {toasts.length > 0 && (
+                  <button
+                    onClick={onClearAll}
+                    className="p-1 rounded text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 transition-colors"
+                    title="Clear all"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                )}
+                {/* Close panel */}
+                <button
+                  onClick={() => setShowPanel(false)}
+                  className="p-1 rounded text-slate-500 hover:text-slate-300 hover:bg-slate-800 transition-colors"
+                  title="Close"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              </div>
             </div>
-            
+
+            {/* Panel list */}
             <div className="max-h-80 overflow-y-auto">
               {toasts.length === 0 ? (
                 <div className="p-8 text-center">
@@ -230,25 +303,29 @@ function ToastContainer({
                 toasts.map(toast => {
                   const config = TOAST_CONFIG[toast.type];
                   return (
-                    <div 
+                    <div
                       key={toast.id}
-                      className="p-3 border-b border-slate-800/50 hover:bg-slate-900/50 transition-colors cursor-pointer"
-                      onClick={() => onRemove(toast.id)}
+                      className="p-3 border-b border-slate-800/50 hover:bg-slate-900/50 transition-colors"
                     >
                       <div className="flex items-start gap-2">
-                        <div className={cn("mt-0.5", config.color)}>
+                        <div className={cn("mt-0.5 flex-shrink-0", config.color)}>
                           {config.icon}
                         </div>
                         <div className="flex-1 min-w-0">
-                          <div className="flex items-center justify-between">
-                            <span className={cn("text-[10px] font-black uppercase", config.color)}>
+                          <div className="flex items-center justify-between gap-2">
+                            <span className={cn("text-[10px] font-black uppercase flex items-center gap-1", config.color)}>
                               {toast.title}
+                              {(toast.count ?? 1) > 1 && (
+                                <span className="text-[9px] font-black px-1 py-0.5 rounded-full bg-slate-700 text-slate-300">
+                                  ×{toast.count}
+                                </span>
+                              )}
                             </span>
-                            <span className="text-[9px] text-slate-600">
+                            <span className="text-[9px] text-slate-600 flex-shrink-0">
                               {new Date(toast.timestamp).toLocaleTimeString()}
                             </span>
                           </div>
-                          <p className="text-[11px] text-slate-400 mt-0.5 line-clamp-1">
+                          <p className="text-[11px] text-slate-400 mt-0.5 line-clamp-2">
                             {toast.message}
                           </p>
                           {toast.amount !== undefined && (
@@ -260,6 +337,14 @@ function ToastContainer({
                             </span>
                           )}
                         </div>
+                        {/* Per-item dismiss */}
+                        <button
+                          onClick={() => onRemove(toast.id)}
+                          className="flex-shrink-0 text-slate-600 hover:text-slate-300 transition-colors ml-1"
+                          title="Dismiss"
+                        >
+                          <X className="h-3.5 w-3.5" />
+                        </button>
                       </div>
                     </div>
                   );
@@ -269,52 +354,78 @@ function ToastContainer({
           </div>
         </div>
       )}
-      
-      <div className="fixed top-4 right-4 z-[9999] space-y-2 pointer-events-none">
-        {toasts.slice(0, 5).map((toast, idx) => (
-          <ToastItem 
-            key={toast.id} 
-            toast={toast} 
-            onRemove={onRemove}
-            onMarkRead={onMarkRead}
-            style={{ animationDelay: `${idx * 50}ms` }}
-          />
-        ))}
-      </div>
+
+      {/* ── Floating active toasts (top-right) ── */}
+      {!isMinimized && (
+        <div className="fixed top-20 right-4 z-[9999] space-y-2 pointer-events-none">
+          {visibleToasts.map((toast, idx) => (
+            <ToastItem
+              key={toast.id}
+              toast={toast}
+              onRemove={onRemove}
+              onMarkRead={onMarkRead}
+              style={{ animationDelay: `${idx * 50}ms` }}
+            />
+          ))}
+          {/* Overflow badge — shows how many more are stacked behind */}
+          {overflowCount > 0 && (
+            <div className="pointer-events-auto text-center">
+              <button
+                onClick={() => setShowPanel(true)}
+                className="text-[10px] font-black text-slate-400 hover:text-white bg-slate-900/80 border border-slate-700 rounded-full px-3 py-1 backdrop-blur-sm transition-colors"
+              >
+                +{overflowCount} more — view all
+              </button>
+            </div>
+          )}
+        </div>
+      )}
     </>
   );
 }
 
-function ToastItem({ 
-  toast, 
+/* ─────────────────────────────────────────────
+   Individual Toast Item
+───────────────────────────────────────────── */
+function ToastItem({
+  toast,
   onRemove,
   onMarkRead,
-  style 
-}: { 
-  toast: Toast; 
+  style,
+}: {
+  toast: Toast;
   onRemove: (id: string) => void;
   onMarkRead: (id: string) => void;
   style?: React.CSSProperties;
 }) {
   const config = TOAST_CONFIG[toast.type];
   const [isEntering, setIsEntering] = useState(true);
-  const [isExiting, setIsExiting] = useState(false);
+  const [isExiting,  setIsExiting]  = useState(false);
+
+  // Reset auto-dismiss when count bumps (timestamp changes)
+  const dismissTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     const enterTimer = setTimeout(() => setIsEntering(false), 300);
-    const removeTimer = setTimeout(() => {
+
+    if (dismissTimerRef.current) clearTimeout(dismissTimerRef.current);
+    dismissTimerRef.current = setTimeout(() => {
       setIsExiting(true);
       setTimeout(() => onRemove(toast.id), 300);
-    }, 7700);
-    
+    }, AUTO_DISMISS_MS - 300);
+
     return () => {
       clearTimeout(enterTimer);
-      clearTimeout(removeTimer);
+      if (dismissTimerRef.current) clearTimeout(dismissTimerRef.current);
     };
-  }, [toast.id, onRemove]);
+    // Re-run if toast.timestamp changes (dedup bump)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [toast.id, toast.timestamp]);
 
-  const handleClick = () => {
-    onMarkRead(toast.id);
+  const handleDismiss = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setIsExiting(true);
+    setTimeout(() => onRemove(toast.id), 300);
   };
 
   return (
@@ -322,10 +433,10 @@ function ToastItem({
       className={cn(
         "pointer-events-auto w-80 transform transition-all duration-300",
         isEntering ? "translate-x-full opacity-0 scale-95" : "translate-x-0 opacity-100 scale-100",
-        isExiting && "translate-x-full opacity-0 scale-95"
+        isExiting  && "translate-x-full opacity-0 scale-95"
       )}
       style={style}
-      onClick={handleClick}
+      onClick={() => onMarkRead(toast.id)}
     >
       <div className={cn(
         "relative overflow-hidden rounded-lg border backdrop-blur-sm shadow-2xl",
@@ -334,27 +445,32 @@ function ToastItem({
         "cursor-pointer hover:scale-[1.02] transition-transform"
       )}>
         <div className={cn("absolute inset-0 opacity-20", config.bg)} />
-        
+
         <div className="relative p-4">
           <div className="flex items-start gap-3">
             <div className={cn("flex-shrink-0 mt-0.5", config.color)}>
               {config.icon}
             </div>
-            
+
             <div className="flex-1 min-w-0">
               <div className="flex items-center justify-between">
-                <p className={cn("text-xs font-black uppercase tracking-wide", config.color)}>
+                <p className={cn("text-xs font-black uppercase tracking-wide flex items-center gap-1", config.color)}>
                   {toast.title}
+                  {(toast.count ?? 1) > 1 && (
+                    <span className="text-[9px] font-black px-1.5 py-0.5 rounded-full bg-slate-700 text-slate-200">
+                      ×{toast.count}
+                    </span>
+                  )}
                 </p>
                 <span className="text-[10px] text-slate-500">
-                  {toast.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  {toast.timestamp.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                 </span>
               </div>
-              
+
               <p className="text-xs text-slate-300 mt-1 line-clamp-2">
                 {toast.message}
               </p>
-              
+
               {toast.amount !== undefined && (
                 <div className={cn(
                   "mt-2 text-lg font-black font-mono italic",
@@ -363,7 +479,7 @@ function ToastItem({
                   {toast.amount >= 0 ? "+" : ""}${toast.amount.toFixed(2)}
                 </div>
               )}
-              
+
               {toast.shop && (
                 <div className="mt-2">
                   <span className="text-[10px] px-2 py-0.5 bg-slate-800 rounded text-slate-400">
@@ -372,34 +488,50 @@ function ToastItem({
                 </div>
               )}
             </div>
-            
+
+            {/* Dismiss X */}
             <button
-              onClick={(e) => { e.stopPropagation(); onRemove(toast.id); }}
-              className="flex-shrink-0 text-slate-500 hover:text-slate-300 transition-colors"
+              onClick={handleDismiss}
+              className="flex-shrink-0 text-slate-500 hover:text-white transition-colors"
+              title="Dismiss"
             >
               <X className="h-4 w-4" />
             </button>
           </div>
-          
-          <div className="absolute bottom-0 left-0 h-0.5 bg-gradient-to-r from-transparent via-current to-transparent opacity-30"
-               style={{ width: "100%", animation: "shrink 8s linear forwards" }} />
+
+          {/* Progress bar */}
+          <div
+            className="absolute bottom-0 left-0 h-0.5 bg-gradient-to-r from-transparent via-current to-transparent opacity-30"
+            style={{ width: "100%", animation: `shrink ${AUTO_DISMISS_MS}ms linear forwards` }}
+          />
         </div>
       </div>
-      
+
       <style jsx>{`
         @keyframes shrink {
           from { width: 100%; }
-          to { width: 0%; }
+          to   { width: 0%; }
         }
       `}</style>
     </div>
   );
 }
 
-function ToastBell({ unreadCount, onClick }: { unreadCount: number; onClick: () => void }) {
+/* ─────────────────────────────────────────────
+   Bell Button
+───────────────────────────────────────────── */
+function ToastBell({
+  unreadCount,
+  isMinimized,
+  onClick,
+}: {
+  unreadCount: number;
+  isMinimized: boolean;
+  onClick: () => void;
+}) {
   const [isAnimating, setIsAnimating] = useState(false);
-  const [prevCount, setPrevCount] = useState(unreadCount);
-  const [isHovered, setIsHovered] = useState(false);
+  const [prevCount,   setPrevCount]   = useState(unreadCount);
+  const [isHovered,   setIsHovered]   = useState(false);
 
   useEffect(() => {
     if (unreadCount > prevCount) {
@@ -441,31 +573,35 @@ function ToastBell({ unreadCount, onClick }: { unreadCount: number; onClick: () 
           </span>
         )}
       </div>
-      
+
       <div className="flex flex-col items-start">
         <span className="text-xs font-black text-slate-200 uppercase tracking-wider">
           Nirvana Live
         </span>
-        <div className="flex items-center gap-1">
-          {[0, 1, 2].map(i => (
-            <div
-              key={i}
-              className={cn(
-                "w-1 h-1 rounded-full",
-                "bg-emerald-400",
-                "animate-pulse"
-              )}
-              style={{ animationDelay: `${i * 200}ms` }}
-            />
-          ))}
-          <span className="text-[9px] text-slate-500 ml-1">LIVE</span>
-        </div>
+        {isMinimized ? (
+          <span className="text-[9px] text-amber-400 font-black uppercase tracking-wide">Minimized — click to restore</span>
+        ) : (
+          <div className="flex items-center gap-1">
+            {[0, 1, 2].map(i => (
+              <div
+                key={i}
+                className="w-1 h-1 rounded-full bg-emerald-400 animate-pulse"
+                style={{ animationDelay: `${i * 200}ms` }}
+              />
+            ))}
+            <span className="text-[9px] text-slate-500 ml-1">LIVE</span>
+          </div>
+        )}
       </div>
-      
-      <ChevronDown className={cn(
-        "h-4 w-4 text-slate-500 transition-transform duration-300",
-        isHovered && "translate-y-0.5"
-      )} />
+
+      {isMinimized ? (
+        <ChevronDown className="h-4 w-4 text-amber-400" />
+      ) : (
+        <ChevronDown className={cn(
+          "h-4 w-4 text-slate-500 transition-transform duration-300",
+          isHovered && "translate-y-0.5"
+        )} />
+      )}
     </button>
   );
 }

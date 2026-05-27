@@ -30,6 +30,7 @@ export default async function ShopPage({ params }: { params: { shopId: string } 
     const { shopId } = await params;
     // Fetch only the data scoped to this specific shop to dramatically reduce payload
     const db = await getShopDashboardData(shopId);
+
     const shop = db.shops.find((s: any) => s.id === shopId);
 
     if (!shop) return <div>Shop not found</div>;
