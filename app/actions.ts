@@ -12,7 +12,6 @@ import { computePosAuditReport } from "@/lib/posAudit";
 import { createOperationsLedgerEntry, isVaultDepositKind } from "@/lib/operations";
 import { getSavingsTransferCategory, isSavingsOrBlackboxTransferEntry } from "@/lib/transfer-classification";
 import { TSHIRTS_SHOP_ID, TSHIRTS_SHOP_NAME, isNirvanaTeeItem } from "@/lib/tshirts";
-import { getNirvanaTeesSetupAlerts } from "@/lib/tshirts-setup-alerts";
 
 function getPublicBaseUrl() {
     const url =
@@ -460,10 +459,7 @@ export async function ensureTshirtsShop() {
 /** Shop-scoped data for the T-shirt POS — inventory filtered to tee categories only. */
 export async function getTshirtsShopData(daysLimit = 60) {
     await ensureTshirtsShop();
-    const [base, teeSetupAlerts] = await Promise.all([
-        getShopDashboardData(TSHIRTS_SHOP_ID, daysLimit),
-        getNirvanaTeesSetupAlerts(),
-    ]);
+    const base = await getShopDashboardData(TSHIRTS_SHOP_ID, daysLimit);
     const inventory = (base.inventory || []).filter((item: any) => isNirvanaTeeItem(item));
 
     const shop =
@@ -492,7 +488,6 @@ export async function getTshirtsShopData(daysLimit = 60) {
         inventory,
         employees,
         shops: [{ ...shop, id: TSHIRTS_SHOP_ID, name: TSHIRTS_SHOP_NAME }],
-        teeSetupAlerts,
     };
 }
 

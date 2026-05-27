@@ -5,11 +5,9 @@ import { getTshirtsShopData } from "@/app/actions";
 import { getTshirtsAnalytics } from "@/lib/tshirts-analytics";
 import TshirtsPOS from "@/components/tshirts/TshirtsPOS";
 import { TshirtsHeader } from "@/components/tshirts/TshirtsHeader";
-import { TshirtsSetupBanner } from "@/components/tshirts/TshirtsSetupBanner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui";
 import { DollarSign, Package, Shirt, TrendingUp } from "lucide-react";
 import { TSHIRTS_SHOP_ID, shopAllocationQty } from "@/lib/tshirts";
-import type { TeeSetupAlert } from "@/lib/tshirts-setup-alerts";
 
 export default async function TshirtsPage() {
   try {
@@ -28,8 +26,6 @@ export default async function TshirtsPage() {
     return (
       <div className="space-y-8 pb-32">
         <TshirtsHeader subtitle="POS for Plain T-Shirt and Plain Golf T-Shirt only. Sales, analytics, and reports are separate from your three main shops." />
-
-        <TshirtsSetupBanner alerts={(db as { teeSetupAlerts?: TeeSetupAlert[] }).teeSetupAlerts ?? []} />
 
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
           <StatCard

@@ -2,8 +2,6 @@ export const dynamic = "force-dynamic";
 
 import { getTshirtsShopData } from "@/app/actions";
 import { getTshirtsAnalytics } from "@/lib/tshirts-analytics";
-import { getNirvanaTeesSetupAlerts } from "@/lib/tshirts-setup-alerts";
-import { TshirtsSetupBanner } from "@/components/tshirts/TshirtsSetupBanner";
 import { TshirtsHeader } from "@/components/tshirts/TshirtsHeader";
 import { TshirtsAnalyticsCharts } from "@/components/tshirts/TshirtsAnalyticsCharts";
 import TshirtsPredictiveEcosystem from "@/components/tshirts/TshirtsPredictiveEcosystem";
@@ -11,9 +9,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui";
 import { CreditCard, Package, Shirt, TrendingUp } from "lucide-react";
 
 export default async function TshirtsAnalyticsPage() {
-  const [data, setupAlerts, db] = await Promise.all([
+  const [data, db] = await Promise.all([
     getTshirtsAnalytics(60),
-    getNirvanaTeesSetupAlerts(),
     getTshirtsShopData(),
   ]);
   const s = data.summary;
@@ -24,8 +21,6 @@ export default async function TshirtsAnalyticsPage() {
         title="Tee Analytics"
         subtitle="Performance for Plain T-Shirt and Plain Golf T-Shirt only — isolated from main shop reports."
       />
-
-      <TshirtsSetupBanner alerts={setupAlerts} />
 
       {s.unknownTransactions60d > 0 && (
         <div className="rounded-xl border border-amber-500/35 bg-amber-950/25 px-4 py-3 text-sm text-amber-100">
