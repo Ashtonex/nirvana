@@ -42,6 +42,7 @@ async function fetchTshirtsSales(sinceIso?: string): Promise<SaleRow[]> {
       .eq("shop_id", TSHIRTS_SHOP_ID)
       .is("deleted_at", null)
       .order("date", { ascending: false })
+      .order("id", { ascending: false })
       .range(from, from + batch - 1);
 
     if (sinceIso) q = q.gte("date", sinceIso);
@@ -53,7 +54,13 @@ async function fetchTshirtsSales(sinceIso?: string): Promise<SaleRow[]> {
     from += batch;
   }
 
-  return all;
+  // Deduplicate by id in case pagination edge cases return the same row twice
+  const seen = new Set<string>();
+  return all.filter((s) => {
+    if (seen.has(s.id)) return false;
+    seen.add(s.id);
+    return true;
+  });
 }
 
 function toLocalDateKey(date: string): string {
