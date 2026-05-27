@@ -39,6 +39,14 @@ export function classifyTeeLine(item: {
   const catSlug = slugCategory(catRaw);
   const name = String(item.name || "").trim().toLowerCase();
 
+  // When category is set AND doesn't mention "shirt", "tee", or "tshirt",
+  // the item is explicitly not a tee — don't let name-based heuristics override it.
+  const isExplicitlyNonTee =
+    Boolean(catRaw) &&
+    !cat.includes("shirt") &&
+    !cat.includes("tee") &&
+    !cat.includes("tshirt");
+
   const slugMatchesGolf = catSlug === GOLF_SLUG;
 
   const isGolf =
@@ -46,8 +54,9 @@ export function classifyTeeLine(item: {
     normalizedCategory(TEE_CATEGORY_GOLF) === cat ||
     (cat.includes("golf") &&
       (cat.includes("shirt") || cat.includes("tee") || cat.includes("tshirt"))) ||
-    (/\bgolf\b/.test(name) &&
-      (/\bshirt\b/.test(name) || /\bt-?shirt\b/.test(name) || /\btee\b/.test(name)));
+    (!isExplicitlyNonTee &&
+      (/\bgolf\b/.test(name) &&
+        (/\bshirt\b/.test(name) || /\bt-?shirt\b/.test(name) || /\btee\b/.test(name))));
 
   if (isGolf) return "golf";
 
@@ -62,9 +71,10 @@ export function classifyTeeLine(item: {
         cat.includes("tee") ||
         cat.includes("shirt")) &&
       !cat.includes("golf")) ||
-    (/\bplain\b/.test(name) &&
-      (/\bt-?shirt\b/.test(name) || /\btee\b/.test(name)) &&
-      !/\bgolf\b/.test(name));
+    (!isExplicitlyNonTee &&
+      (/\bplain\b/.test(name) &&
+        (/\bt-?shirt\b/.test(name) || /\btee\b/.test(name)) &&
+        !/\bgolf\b/.test(name)));
 
   if (isPlain) return "plain";
 
