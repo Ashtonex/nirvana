@@ -320,11 +320,11 @@ export async function getShopDashboardData(shopId: string, daysLimit = 60) {
             monthToDate: monthSales.reduce((sum: number, s: any) => sum + Number(s.total_with_tax || 0), 0),
         };
 
-        // Filter unknown items for Nirvana Tees shop
-        let filteredInventory = inventory;
-        if (shopId === TSHIRTS_SHOP_ID) {
-            filteredInventory = inventory.filter(i => isNirvanaTeeItem(i));
-        }
+         // Filter unknown items for Nirvana Tees shop
+         let filteredInventory = inventory;
+         if (shopId === TSHIRTS_SHOP_ID) {
+             filteredInventory = inventory.filter((i: any) => isNirvanaTeeItem(i));
+         }
 
         return {
             inventory: filteredInventory.map((i: any) => ({
