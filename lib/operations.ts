@@ -3,11 +3,14 @@ import { supabaseAdmin } from "@/lib/supabase";
 export type OperationsLedgerKind =
   | "eod_deposit"
   | "savings_deposit"
+  | "savings_withdrawal"
   | "blackbox"
   | "stockvel_deposit"
   | "stockvel_withdrawal"
   | "round_deposit"
   | "round_withdrawal"
+  | "invest_deposit"
+  | "invest_withdrawal"
   | "overhead_deposit"
   | "overhead_contribution"
   | "overhead_payment"
@@ -85,13 +88,19 @@ export function normalizeOperationsLedgerInput(input: {
 
   let kind = rawKind;
   if (account === "savings") {
-    kind = normalizeOperationsText(`${rawKind} ${title || ""}`).includes("black") ? "blackbox" : "savings_deposit";
+    if (amount < 0) {
+      kind = "savings_withdrawal";
+    } else {
+      kind = normalizeOperationsText(`${rawKind} ${title || ""}`).includes("black") ? "blackbox" : "savings_deposit";
+    }
   } else if (account === "overhead") {
     kind = amount < 0 ? "overhead_payment" : "overhead_contribution";
   } else if (account === "stockvel") {
     kind = amount < 0 ? "stockvel_withdrawal" : "stockvel_deposit";
   } else if (account === "round") {
     kind = amount < 0 ? "round_withdrawal" : "round_deposit";
+  } else if (account === "invest") {
+    kind = amount < 0 ? "invest_withdrawal" : "invest_deposit";
   }
 
   return {
@@ -116,6 +125,7 @@ export function isVaultDepositKind(kind: unknown) {
     "black-box",
     "stockvel_deposit",
     "round_deposit",
+    "invest_deposit",
     "capital_injection",
     "loan_injection",
     "loan_received",
@@ -131,7 +141,7 @@ export function isVaultDepositKind(kind: unknown) {
 
 export function isSavingsOrBlackboxOperationsKind(kind: unknown) {
   const k = normalizeOperationsKind(kind);
-  return ["savings_deposit", "savings_contribution", "savings", "blackbox", "black_box", "black-box"].includes(k);
+  return ["savings_deposit", "savings_withdrawal", "savings_contribution", "savings", "blackbox", "black_box", "black-box"].includes(k);
 }
 
 export function isPosOriginOperationsEntry(entry: OperationsLedgerRow) {

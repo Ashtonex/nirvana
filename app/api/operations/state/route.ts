@@ -41,9 +41,13 @@ export async function GET() {
     const accountTotals = {
       savings: 0,
       overhead: 0,
+      invest: 0,
       stockvel: 0,
       round: 0,
       tshirts: 0,
+    };
+    const monthlyAccountTotals = {
+      overhead: 0,
     };
     const accountByShop: Record<string, Record<string, number>> = {};
 
@@ -89,6 +93,7 @@ export async function GET() {
       totalInvest += amount;
       totalInvestWithdrawn += withdrawn;
     });
+    accountTotals.invest += (totalInvest - totalInvestWithdrawn);
 
     const opsSavingsByShop: Record<string, number> = {};
     (ledgerRows || []).forEach((r: any) => {
@@ -120,10 +125,14 @@ export async function GET() {
 
     const monthlyOverheadByShop: Record<string, number> = {};
     (monthlyOverhead || []).forEach((r: any) => {
+      if (classifyOperationsAccount(r) !== "overhead") return;
       if (r.shop_id) {
         const amount = Number(r.amount || 0);
         const key = amount < 0 || isOverheadPaymentKind((r as any).kind) ? "paid" : "contributed";
         monthlyOverheadByShop[r.shop_id] = (monthlyOverheadByShop[r.shop_id] || 0) + (key === "paid" ? -Math.abs(amount) : amount);
+        if (isOverheadContributionKind((r as any).kind) && amount > 0) {
+          monthlyAccountTotals.overhead += amount;
+        }
       }
     });
 
@@ -165,7 +174,7 @@ export async function GET() {
       },
       accounts: {
         ...accountTotals,
-        invest: totalInvestAvailable,
+        overhead: monthlyAccountTotals.overhead,
         byShop: accountByShop
       },
       combinedTotal,

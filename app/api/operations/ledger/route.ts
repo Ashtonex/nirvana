@@ -67,9 +67,12 @@ export async function POST(req: Request) {
       const allowedKinds = [
         "eod_deposit",
         "savings_deposit",
+        "savings_withdrawal",
         "blackbox",
         "overhead_contribution",
         "overhead_payment",
+        "invest_deposit",
+        "invest_withdrawal",
         "stockvel_deposit",
         "stockvel_withdrawal",
         "round_deposit",

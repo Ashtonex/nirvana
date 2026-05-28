@@ -167,7 +167,7 @@ export function OperationsConsole({
     return role === "owner" || role === "admin";
   }, [currentStaffUser]);
 
-  const investTotal = opsState?.invest?.available || 0;
+  const investTotal = Number(opsState?.accounts?.invest ?? opsState?.invest?.available ?? 0);
   const overheadTotal = Number(opsState?.accounts?.overhead || 0);
   const teeTotal = Number(opsState?.accounts?.tshirts || 0);
   const stockvelTotal = Number(opsState?.accounts?.stockvel || 0);
@@ -370,7 +370,7 @@ export function OperationsConsole({
   const [form, setForm] = useState({
     amount: "",
     type: "income",
-    category: "eod_deposit",
+    category: "savings_deposit",
     shopId: "",
     title: "",
     date: new Date().toISOString().split('T')[0],
@@ -378,6 +378,14 @@ export function OperationsConsole({
 
   const isExpense = form.type === "expense";
   const displayAmount = Number(form.amount) || 0;
+  const selectedAccountBalance = useMemo(() => {
+    if (form.category.includes("savings") || form.category === "blackbox") return totalSavings;
+    if (form.category.includes("overhead") || ["rent", "utilities", "salaries", "misc"].includes(form.category)) return overheadTotal;
+    if (form.category.includes("invest")) return investTotal;
+    if (form.category.includes("stockvel")) return stockvelTotal;
+    if (form.category.includes("round")) return roundTotal;
+    return actualVault;
+  }, [form.category, totalSavings, overheadTotal, investTotal, stockvelTotal, roundTotal, actualVault]);
 
   const submitEntry = async () => {
     if (displayAmount <= 0) {
@@ -387,6 +395,10 @@ export function OperationsConsole({
     if (!form.title) {
       alert("Enter a description");
       return;
+    }
+    if (isExpense && displayAmount > selectedAccountBalance + 0.01) {
+      const proceed = confirm(`This payment is greater than the selected account balance ($${selectedAccountBalance.toFixed(2)}). Record it anyway?`);
+      if (!proceed) return;
     }
 
     setBusy(true);
@@ -411,7 +423,7 @@ export function OperationsConsole({
       });
       
       if (!res.ok) throw new Error("Failed");
-      setForm({ amount: "", type: "income", category: "eod_deposit", shopId: "", title: "", date: new Date().toISOString().split('T')[0] });
+      setForm({ amount: "", type: "income", category: "savings_deposit", shopId: "", title: "", date: new Date().toISOString().split('T')[0] });
       await fetchData();
     } catch (e) {
       alert("Failed to add entry");
@@ -873,14 +885,14 @@ export function OperationsConsole({
               <div className="flex gap-2">
                 <Button
                   variant={!isExpense ? "default" : "outline"}
-                  onClick={() => setForm(f => ({ ...f, type: "income" }))}
+                  onClick={() => setForm(f => ({ ...f, type: "income", category: "savings_deposit" }))}
                   className={cn("flex-1 font-black uppercase", !isExpense ? "bg-emerald-600 hover:bg-emerald-500" : "")}
                 >
                   <Plus className="h-4 w-4 mr-1" /> Add Money
                 </Button>
                 <Button
                   variant={isExpense ? "default" : "outline"}
-                  onClick={() => setForm(f => ({ ...f, type: "expense" }))}
+                  onClick={() => setForm(f => ({ ...f, type: "expense", category: "savings_withdrawal" }))}
                   className={cn("flex-1 font-black uppercase", isExpense ? "bg-rose-600 hover:bg-rose-500" : "")}
                 >
                   <Minus className="h-4 w-4 mr-1" /> Pay Expense
@@ -901,7 +913,7 @@ export function OperationsConsole({
 
                 <div className="space-y-1">
                   <label className="text-[10px] font-black uppercase text-slate-500">
-                    {isExpense ? "Expense Type" : "Source"}
+                    {isExpense ? "From Account" : "To Account"}
                   </label>
                   <select
                     value={form.category}
@@ -910,7 +922,9 @@ export function OperationsConsole({
                   >
                     {isExpense ? (
                       <>
+                        <option value="savings_withdrawal">Savings</option>
                         <option value="overhead_payment">Overhead Payment</option>
+                        <option value="invest_withdrawal">Invest</option>
                         <option value="stockvel_withdrawal">Stockvel Withdrawal/Payment</option>
                         <option value="round_withdrawal">Round Withdrawal/Payment</option>
                         <option value="stock_orders">Stock Orders</option>
@@ -924,12 +938,13 @@ export function OperationsConsole({
                       </>
                     ) : (
                       <>
-                        <option value="eod_deposit">EOD Deposit</option>
                         <option value="savings_deposit">Savings</option>
                         <option value="blackbox">Black Box</option>
                         <option value="overhead_contribution">Shop Contribution</option>
+                        <option value="invest_deposit">Invest</option>
                         <option value="stockvel_deposit">Stockvel</option>
                         <option value="round_deposit">Round</option>
+                        <option value="eod_deposit">General Vault</option>
                         <option value="loan_received">Loan Received</option>
                         <option value="peer_transfer">Peer Transfer</option>
                         <option value="other_income">Other Income</option>
@@ -977,6 +992,9 @@ export function OperationsConsole({
                     isExpense ? "text-rose-400" : "text-emerald-400"
                   )}>
                     {isExpense ? "-" : "+"}${displayAmount.toLocaleString()}
+                  </span>
+                  <span className="ml-3 text-[10px] font-black uppercase text-slate-500">
+                    Account balance: ${selectedAccountBalance.toFixed(2)}
                   </span>
                 </div>
                 <Button
