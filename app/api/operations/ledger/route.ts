@@ -1,17 +1,23 @@
 import { NextResponse } from "next/server";
 import { requirePrivilegedActor, requireStaffActor, isPrivilegedRole } from "@/lib/apiAuth";
-import { createOperationsLedgerEntry, getOperationsVaultImpact, listOperationsLedgerEntries } from "@/lib/operations";
+import { createOperationsLedgerEntry, getOperationsVaultImpact, listOperationsLedgerEntries, normalizeOperationsLedgerInput } from "@/lib/operations";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET(req: Request) {
   try {
-    await requirePrivilegedActor();
+    let actor: any;
+    try {
+      actor = await requirePrivilegedActor();
+    } catch {
+      actor = await requireStaffActor();
+    }
     const url = new URL(req.url);
     const limit = Math.min(500, Math.max(1, Number(url.searchParams.get("limit") || 100)));
     const month = url.searchParams.get("month") || undefined;
-    const shopId = url.searchParams.get("shopId") || undefined;
+    const requestedShopId = url.searchParams.get("shopId") || undefined;
+    const shopId = actor?.type === "staff" && !isPrivilegedRole(actor.role) ? actor.shopId || undefined : requestedShopId;
     const period = (url.searchParams.get("period") as any) || undefined;
     
     const rows = await listOperationsLedgerEntries(limit, { month, shopId, period });
@@ -42,7 +48,14 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Invalid amount" }, { status: 400 });
     }
 
-    const kind = String(body?.kind || "adjustment");
+    const normalizedInput = normalizeOperationsLedgerInput({
+      amount,
+      kind: body?.kind || "adjustment",
+      title: body?.title || null,
+      notes: body?.notes || null,
+      overheadCategory: body?.overheadCategory || null,
+    });
+    const kind = normalizedInput.kind;
     const shopId = body?.shopId ? String(body.shopId) : null;
     const overheadCategory = body?.overheadCategory ? String(body.overheadCategory) : null;
     const title = body?.title ? String(body.title) : null;
@@ -51,7 +64,17 @@ export async function POST(req: Request) {
 
     // If the poster is a non-privileged staff actor, restrict allowed kinds and shop scope
     if (actor?.type === 'staff' && !isPrivilegedRole(actor.role)) {
-      const allowedKinds = ["eod_deposit", "overhead_contribution"];
+      const allowedKinds = [
+        "eod_deposit",
+        "savings_deposit",
+        "blackbox",
+        "overhead_contribution",
+        "overhead_payment",
+        "stockvel_deposit",
+        "stockvel_withdrawal",
+        "round_deposit",
+        "round_withdrawal",
+      ];
       if (!allowedKinds.includes(kind)) {
         return NextResponse.json({ error: "Forbidden" }, { status: 403 });
       }

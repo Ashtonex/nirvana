@@ -9,7 +9,7 @@ import { sendEmail } from "@/lib/email";
 import { sendWhatsAppMessage } from "@/lib/twilio";
 import { cookies } from "next/headers";
 import { computePosAuditReport } from "@/lib/posAudit";
-import { createOperationsLedgerEntry, isVaultDepositKind } from "@/lib/operations";
+import { createOperationsLedgerEntry, detectOverheadCategoryFromText, isVaultDepositKind, normalizeOperationsLedgerInput } from "@/lib/operations";
 import { getSavingsTransferCategory, isSavingsOrBlackboxTransferEntry } from "@/lib/transfer-classification";
 import { TSHIRTS_SHOP_ID, TSHIRTS_SHOP_NAME, isNirvanaTeeItem } from "@/lib/tshirts";
 
@@ -1719,9 +1719,9 @@ export async function recordPosExpense(
 
     // Determine which operations routing applies (mutually exclusive, priority order)
     const shouldRouteToVault = (isSavingsTransfer || isBlackboxTransfer || options?.toOperations) && !isPerfumeExpense && !options?.toInvest;
-    const shouldRouteToOverhead = isOverheadExpense && !isPerfumeExpense && !options?.toInvest && !shouldRouteToVault;
+    const shouldRouteToOverhead = (isOverheadExpense || options?.toOperations) && !isPerfumeExpense && !options?.toInvest;
 
-    if (shouldRouteToVault) {
+    if (shouldRouteToVault && !shouldRouteToOverhead) {
         // Savings, blackbox, or manual "Deposit to Operations" -> vault deposit
         const opsKind = isSavingsTransfer ? "savings_deposit" : isBlackboxTransfer ? "blackbox" : "eod_deposit";
         const label = isSavingsTransfer ? "Savings deposit" : isBlackboxTransfer ? "Black Box deposit" : "Manual deposit";
@@ -1753,18 +1753,18 @@ export async function recordPosExpense(
                 updated_at: new Date().toISOString()
             });
     } else if (shouldRouteToOverhead) {
-        // Overhead keywords -> per-shop overhead tracker (does NOT increase vault)
+        // POS expenses can draw down the shop's overhead account without visiting Operations.
         await supabaseAdmin.from('operations_ledger').insert({
-            amount: amount,
-            kind: "overhead_contribution",
+            amount: -amount,
+            kind: "overhead_payment",
             shop_id: shopId,
             title: description,
-            notes: `Auto-routed from POS expense: Overhead contribution`,
+            notes: `Auto-routed from POS expense: Overhead payment`,
+            overhead_category: detectOverheadCategoryFromText(description) || "misc",
             employee_id: employeeId,
             effective_date: timestamp.split('T')[0],
             created_at: timestamp,
         });
-        // NOTE: No actual_balance update - overhead contributions don't inflate the vault
     }
 
     // Log to audit trail with full details
@@ -1777,13 +1777,13 @@ export async function recordPosExpense(
             amount, 
             description, 
             toInvest: isPerfumeExpense || options?.toInvest, 
-            toVault: shouldRouteToVault,
+            toVault: shouldRouteToVault && !shouldRouteToOverhead,
             toOverheadTracker: shouldRouteToOverhead,
             isPerfume: isPerfumeExpense,
             isOverhead: isOverheadExpense,
             isSavings: isSavingsTransfer,
             isBlackbox: isBlackboxTransfer,
-            kind: shouldRouteToVault ? (isSavingsTransfer ? "savings_deposit" : isBlackboxTransfer ? "blackbox" : "eod_deposit") : shouldRouteToOverhead ? "overhead_contribution" : "none"
+            kind: shouldRouteToVault && !shouldRouteToOverhead ? (isSavingsTransfer ? "savings_deposit" : isBlackboxTransfer ? "blackbox" : "eod_deposit") : shouldRouteToOverhead ? "overhead_payment" : "none"
         },
         timestamp
     }]);
@@ -2220,7 +2220,13 @@ export async function postDrawerToOperations(input: { shopId: string; amount: nu
     const shopId = String(input?.shopId || "").trim();
     const amount = Number(input?.amount);
     const notes = input?.notes ? String(input.notes) : "";
-    const kind = input?.kind || "eod_deposit";
+    const normalized = normalizeOperationsLedgerInput({
+        amount,
+        kind: input?.kind || "eod_deposit",
+        title: input?.kind || "eod_deposit",
+        notes,
+    });
+    const kind = normalized.kind;
 
     if (!shopId) throw new Error("Missing shopId");
     if (!Number.isFinite(amount) || amount <= 0) throw new Error("Invalid amount");
@@ -2259,7 +2265,7 @@ export async function postDrawerToOperations(input: { shopId: string; amount: nu
             category: "Operations Transfer",
             amount,
             date: timestamp,
-            description: `Posted to Operations (${({eod_deposit:"EOD",savings_deposit:"Savings",blackbox:"Black Box",overhead_contribution:"Overhead",rent:"Rent",salaries:"Salaries"})[kind] || kind})${notes ? ` | ${notes}` : ""}`,
+            description: `Posted to Operations (${({eod_deposit:"EOD",savings_deposit:"Savings",blackbox:"Black Box",overhead_contribution:"Overhead",stockvel_deposit:"Stockvel",round_deposit:"Round"})[kind] || kind})${notes ? ` | ${notes}` : ""}`,
             employee_id: actor.id
         }]);
 
@@ -2271,7 +2277,7 @@ export async function postDrawerToOperations(input: { shopId: string; amount: nu
             amount,
             kind,
             shopId,
-            title: ({eod_deposit:"EOD Transfer",savings_deposit:"Savings Deposit",blackbox:"Black Box Deposit",overhead_contribution:"Overhead Contribution",rent:"Rent Contribution",salaries:"Salaries Contribution"})[kind] || "Operations Transfer",
+            title: ({eod_deposit:"EOD Transfer",savings_deposit:"Savings Deposit",blackbox:"Black Box Deposit",overhead_contribution:"Overhead Contribution",stockvel_deposit:"Stockvel Deposit",round_deposit:"Round Deposit"})[kind] || "Operations Transfer",
             notes: notes ? `POS → Operations: ${notes}` : "Auto-posted from POS Drawer",
             effectiveDate: dayStamp,
             employeeId: actor.id,

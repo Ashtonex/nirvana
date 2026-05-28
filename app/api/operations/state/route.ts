@@ -1,33 +1,52 @@
 import { NextResponse } from "next/server";
-import { requirePrivilegedActor } from "@/lib/apiAuth";
-import { getOperationsComputedBalance, isPosOriginOperationsEntry, isSavingsOrBlackboxOperationsKind } from "@/lib/operations";
+import { requirePrivilegedActor, requireStaffActor, isPrivilegedRole } from "@/lib/apiAuth";
+import { classifyOperationsAccount, getOperationsComputedBalance, isOverheadContributionKind, isOverheadPaymentKind } from "@/lib/operations";
 import { supabaseAdmin } from "@/lib/supabase";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET() {
+  let actor: any;
   try {
-    await requirePrivilegedActor();
+    try {
+      actor = await requirePrivilegedActor();
+    } catch {
+      actor = await requireStaffActor();
+    }
   } catch {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   try {
+    const actorShopId = actor?.type === "staff" && !isPrivilegedRole(actor.role) ? actor.shopId : null;
     const { data: opsState } = await supabaseAdmin
       .from("operations_state")
       .select("*")
       .eq("id", 1)
       .maybeSingle();
 
-    const { data: ledgerRows } = await supabaseAdmin
+    let ledgerQuery = supabaseAdmin
       .from("operations_ledger")
-      .select("amount, kind, shop_id, overhead_category");
+      .select("amount, kind, shop_id, overhead_category, title, notes, metadata");
+    if (actorShopId) ledgerQuery = ledgerQuery.eq("shop_id", actorShopId);
+    const { data: ledgerRows } = await ledgerQuery;
 
-    const computedBalance = await getOperationsComputedBalance();
+    const computedBalance = actorShopId
+      ? (ledgerRows || []).reduce((sum: number, row: any) => sum + Number(row.amount || 0), 0)
+      : await getOperationsComputedBalance();
     
     const shopTotals: Record<string, number> = {};
     const overheadTotals: Record<string, number> = {};
+    const accountTotals = {
+      savings: 0,
+      overhead: 0,
+      stockvel: 0,
+      round: 0,
+      tshirts: 0,
+    };
+    const accountByShop: Record<string, Record<string, number>> = {};
+
     (ledgerRows || []).forEach((r: any) => {
       if (r.shop_id) {
         shopTotals[r.shop_id] = (shopTotals[r.shop_id] || 0) + Number(r.amount || 0);
@@ -35,11 +54,21 @@ export async function GET() {
       if (r.overhead_category) {
         overheadTotals[r.overhead_category] = (overheadTotals[r.overhead_category] || 0) + Number(r.amount || 0);
       }
+      const account = classifyOperationsAccount(r);
+      if (account in accountTotals) {
+        const amount = Number(r.amount || 0);
+        accountTotals[account as keyof typeof accountTotals] += amount;
+        const shop = r.shop_id || "global";
+        if (!accountByShop[shop]) accountByShop[shop] = {};
+        accountByShop[shop][account] = (accountByShop[shop][account] || 0) + amount;
+      }
     });
 
-    const { data: investRows } = await supabaseAdmin
+    let investQuery = supabaseAdmin
       .from("invest_deposits")
       .select("amount, withdrawn_amount, shop_id");
+    if (actorShopId) investQuery = investQuery.eq("shop_id", actorShopId);
+    const { data: investRows } = await investQuery;
 
     const investByShop: Record<string, { total: number; withdrawn: number; available: number }> = {};
     let totalInvest = 0;
@@ -61,42 +90,51 @@ export async function GET() {
       totalInvestWithdrawn += withdrawn;
     });
 
-    const { data: opsLedgerRows } = await supabaseAdmin
-      .from("operations_ledger")
-      .select("amount, kind, shop_id, title, notes, metadata");
-
     const opsSavingsByShop: Record<string, number> = {};
-    (opsLedgerRows || []).forEach((r: any) => {
+    (ledgerRows || []).forEach((r: any) => {
       const shop = r.shop_id || "unknown";
-      if (Number(r.amount || 0) > 0 && isSavingsOrBlackboxOperationsKind(r.kind) && isPosOriginOperationsEntry(r)) {
+      if (classifyOperationsAccount(r) === "savings") {
         if (!opsSavingsByShop[shop]) opsSavingsByShop[shop] = 0;
         opsSavingsByShop[shop] += Number(r.amount || 0);
       }
     });
 
+    let teesSalesQuery = supabaseAdmin
+      .from("sales")
+      .select("total_with_tax, shop_id")
+      .eq("shop_id", "tshirts");
+    const { data: teeSalesRows } = await teesSalesQuery;
+    const teesTotal = actorShopId ? 0 : (teeSalesRows || []).reduce((sum: number, row: any) => sum + Number(row.total_with_tax || 0), 0);
+    accountTotals.tshirts = teesTotal;
+
     const totalInvestAvailable = totalInvest - totalInvestWithdrawn;
     const combinedTotal = (opsState?.actual_balance || 0) + totalInvestAvailable;
 
     const currentMonth = new Date().toISOString().split('T')[0].substring(0, 7);
-    const { data: monthlyOverhead } = await supabaseAdmin
+    let monthlyOverheadQuery = supabaseAdmin
       .from("operations_ledger")
-      .select("amount, overhead_category, shop_id")
-      .eq("kind", "overhead_payment")
+      .select("amount, kind, overhead_category, shop_id")
       .like("effective_date", `${currentMonth}%`);
+    if (actorShopId) monthlyOverheadQuery = monthlyOverheadQuery.eq("shop_id", actorShopId);
+    const { data: monthlyOverhead } = await monthlyOverheadQuery;
 
     const monthlyOverheadByShop: Record<string, number> = {};
     (monthlyOverhead || []).forEach((r: any) => {
       if (r.shop_id) {
-        monthlyOverheadByShop[r.shop_id] = (monthlyOverheadByShop[r.shop_id] || 0) + Math.abs(Number(r.amount || 0));
+        const amount = Number(r.amount || 0);
+        const key = amount < 0 || isOverheadPaymentKind((r as any).kind) ? "paid" : "contributed";
+        monthlyOverheadByShop[r.shop_id] = (monthlyOverheadByShop[r.shop_id] || 0) + (key === "paid" ? -Math.abs(amount) : amount);
       }
     });
 
-    const { data: shops } = await supabaseAdmin.from("shops").select("id, name, expenses");
+    let shopsQuery = supabaseAdmin.from("shops").select("id, name, expenses");
+    if (actorShopId) shopsQuery = shopsQuery.eq("id", actorShopId);
+    const { data: shops } = await shopsQuery;
 
     const shopTargets = (shops || []).map((s: any) => {
       const expenses = s.expenses || {};
       const target = Object.values(expenses).reduce((acc: number, val: any) => acc + Number(val || 0), 0);
-      const tracked = monthlyOverheadByShop[s.id] || 0;
+      const tracked = Math.max(0, monthlyOverheadByShop[s.id] || 0);
       const progress = target > 0 ? (tracked / target) * 100 : 0;
       
       return {
@@ -124,6 +162,11 @@ export async function GET() {
       },
       savings: {
         byShop: opsSavingsByShop
+      },
+      accounts: {
+        ...accountTotals,
+        invest: totalInvestAvailable,
+        byShop: accountByShop
       },
       combinedTotal,
       overheadTracking: {

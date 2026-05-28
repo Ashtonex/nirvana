@@ -85,6 +85,15 @@ type OpsState = {
   delta?: number;
   invest?: { available: number; byShop: Record<string, { available: number }> };
   savings?: { byShop: Record<string, number> };
+  accounts?: {
+    savings: number;
+    overhead: number;
+    invest: number;
+    tshirts: number;
+    stockvel: number;
+    round: number;
+    byShop?: Record<string, Record<string, number>>;
+  };
 };
 
 type HandshakeEntry = {
@@ -150,8 +159,8 @@ export function OperationsConsole({
   const masterVault = opsState?.computedBalance || 0;
 
   const totalSavings = useMemo(() => {
-    return Object.values(opsState?.savings?.byShop || {}).reduce((sum, val) => sum + val, 0);
-  }, [opsState?.savings?.byShop]);
+    return Number(opsState?.accounts?.savings ?? Object.values(opsState?.savings?.byShop || {}).reduce((sum, val) => sum + val, 0));
+  }, [opsState?.accounts?.savings, opsState?.savings?.byShop]);
 
   const isPrivileged = useMemo(() => {
     const role = (currentStaffUser?.role || "").toString().toLowerCase();
@@ -159,6 +168,10 @@ export function OperationsConsole({
   }, [currentStaffUser]);
 
   const investTotal = opsState?.invest?.available || 0;
+  const overheadTotal = Number(opsState?.accounts?.overhead || 0);
+  const teeTotal = Number(opsState?.accounts?.tshirts || 0);
+  const stockvelTotal = Number(opsState?.accounts?.stockvel || 0);
+  const roundTotal = Number(opsState?.accounts?.round || 0);
   const actualVault = Number(opsState?.actualBalance || 0);
   const computedDelta = actualVault - masterVault;
   const combinedTotal = actualVault + investTotal;
@@ -487,76 +500,72 @@ export function OperationsConsole({
         >
           Overview
         </button>
-        <button
-          type="button"
-          onClick={() => setActiveTab("stockvel")}
-          className={cn(
-            "px-4 py-2 text-xs font-black uppercase italic tracking-widest border-b-2 transition-colors",
-            activeTab === "stockvel" ? "border-amber-500 text-amber-300" : "border-transparent text-slate-500 hover:text-slate-300"
-          )}
-        >
-          Stockvel
-        </button>
-        <button
-          type="button"
-          onClick={() => setActiveTab("moneybrain")}
-          className={cn(
-            "px-4 py-2 text-xs font-black uppercase italic tracking-widest border-b-2 transition-colors",
-            activeTab === "moneybrain" ? "border-violet-500 text-violet-400" : "border-transparent text-slate-500 hover:text-slate-300"
-          )}
-        >
-          <Brain className="h-3 w-3 inline mr-1" />
-          Money Brain
-        </button>
+        {isPrivileged && (
+          <>
+            <button
+              type="button"
+              onClick={() => setActiveTab("stockvel")}
+              className={cn(
+                "px-4 py-2 text-xs font-black uppercase italic tracking-widest border-b-2 transition-colors",
+                activeTab === "stockvel" ? "border-amber-500 text-amber-300" : "border-transparent text-slate-500 hover:text-slate-300"
+              )}
+            >
+              Stockvel
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab("moneybrain")}
+              className={cn(
+                "px-4 py-2 text-xs font-black uppercase italic tracking-widest border-b-2 transition-colors",
+                activeTab === "moneybrain" ? "border-violet-500 text-violet-400" : "border-transparent text-slate-500 hover:text-slate-300"
+              )}
+            >
+              <Brain className="h-3 w-3 inline mr-1" />
+              Money Brain
+            </button>
+          </>
+        )}
       </div>
 
-      {activeTab === "stockvel" ? (
+      {isPrivileged && activeTab === "stockvel" ? (
         <StockvelPanel ledger={ledger} onRefresh={fetchData} />
-      ) : activeTab === "moneybrain" ? (
+      ) : isPrivileged && activeTab === "moneybrain" ? (
         <MoneyAuditBrain shops={shops} />
       ) : (
         <>
-      {/* Intelligence Smart Cards */}
-      <div className="mb-6">
-        <NirvanaIntelligenceCards />
-      </div>
+      {isPrivileged && (
+        <div className="mb-6">
+          <NirvanaIntelligenceCards />
+        </div>
+      )}
 
-      {/* Top Cards Row */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card className="bg-gradient-to-br from-emerald-950/60 to-slate-950 border-emerald-800/40">
-          <CardHeader className="pb-2">
-            <CardDescription className="text-[10px] font-black uppercase tracking-widest text-emerald-500/70 flex items-center gap-1">
-              <Warehouse className="h-3 w-3" /> Actual Vault
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="text-4xl font-black italic text-emerald-300 font-mono">
-              $<AnimatedNumber value={actualVault} />
-            </div>
-            <p className="text-[10px] text-slate-500 mt-1">
-                Actual vault | pos-posts: ${masterVault.toFixed(2)} | delta: ${computedDelta.toFixed(2)}
-            </p>
-            {isPrivileged && (
-              <div className="mt-3">
-                <Button size="sm" onClick={handleSetActualBalance} className="font-black uppercase px-3 bg-emerald-600 hover:bg-emerald-500">
-                  Set Actual Balance
-                </Button>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
+      {/* Top Account Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-6 gap-4">
         <Card className="bg-gradient-to-br from-cyan-950/60 to-slate-950 border-cyan-800/40">
           <CardHeader className="pb-2">
             <CardDescription className="text-[10px] font-black uppercase tracking-widest text-cyan-500/70 flex items-center gap-1">
-              <Coins className="h-3 w-3" /> POS Savings
+              <Coins className="h-3 w-3" /> Savings
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="text-4xl font-black italic text-cyan-300 font-mono">
+            <div className="text-3xl font-black italic text-cyan-300 font-mono">
               $<AnimatedNumber value={totalSavings} />
             </div>
-            <p className="text-[10px] text-slate-500 mt-1">Savings & Blackbox deposits from POS only</p>
+            <p className="text-[10px] text-slate-500 mt-1">POS deposits titled Savings or Black Box</p>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-gradient-to-br from-amber-950/60 to-slate-950 border-amber-800/40">
+          <CardHeader className="pb-2">
+            <CardDescription className="text-[10px] font-black uppercase tracking-widest text-amber-500/70 flex items-center gap-1">
+              <Warehouse className="h-3 w-3" /> Overhead
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-black italic text-amber-300 font-mono">
+              $<AnimatedNumber value={overheadTotal} />
+            </div>
+            <p className="text-[10px] text-slate-500 mt-1">Rent, salaries, utilities, WiFi, and ZESA movements</p>
           </CardContent>
         </Card>
 
@@ -568,7 +577,7 @@ export function OperationsConsole({
           </CardHeader>
 
           <CardContent>
-            <div className="text-4xl font-black italic text-sky-300 font-mono">
+            <div className="text-3xl font-black italic text-sky-300 font-mono">
               $<AnimatedNumber value={investTotal} />
             </div>
             <p className="text-[10px] text-slate-500 mt-1">Perfume deposits total</p>
@@ -578,38 +587,44 @@ export function OperationsConsole({
         <Card className="bg-gradient-to-br from-violet-950/60 to-slate-950 border-violet-800/40">
           <CardHeader className="pb-2">
             <CardDescription className="text-[10px] font-black uppercase tracking-widest text-violet-500/70 flex items-center gap-1">
-              <Coins className="h-3 w-3" /> Combined
+              <Coins className="h-3 w-3" /> T-Shirts
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="text-4xl font-black italic text-violet-300 font-mono">
-              $<AnimatedNumber value={combinedTotal} />
+            <div className="text-3xl font-black italic text-violet-300 font-mono">
+              $<AnimatedNumber value={teeTotal} />
             </div>
-            <p className="text-[10px] text-slate-500 mt-1">Vault + Invest</p>
+            <p className="text-[10px] text-slate-500 mt-1">Total sales from Nirvana Tees only</p>
           </CardContent>
         </Card>
-      </div>
 
-      {/* Shop Savings Cards Row */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {shops.map((shop) => {
-          const shopSavings = opsState?.savings?.byShop?.[shop.id] || 0;
-          return (
-            <Card key={shop.id} className="bg-gradient-to-br from-cyan-950/40 to-slate-950 border-cyan-800/30">
-              <CardHeader className="pb-2">
-                <CardDescription className="text-[10px] font-black uppercase tracking-widest text-cyan-500/70">
-                  {shop.name} POS Savings
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                      <div className="text-2xl font-black italic tracking-tighter text-white">
-                        $<AnimatedNumber value={shopSavings} />
-                      </div>
-                <p className="text-[10px] text-slate-500 mt-1">Savings & Blackbox from POS</p>
-              </CardContent>
-            </Card>
-          );
-        })}
+        <Card className="bg-gradient-to-br from-lime-950/60 to-slate-950 border-lime-800/40">
+          <CardHeader className="pb-2">
+            <CardDescription className="text-[10px] font-black uppercase tracking-widest text-lime-500/70 flex items-center gap-1">
+              <ArrowRightLeft className="h-3 w-3" /> Stockvel
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-black italic text-lime-300 font-mono">
+              $<AnimatedNumber value={stockvelTotal} />
+            </div>
+            <p className="text-[10px] text-slate-500 mt-1">Stockvel deposits less withdrawals and payments</p>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-gradient-to-br from-fuchsia-950/60 to-slate-950 border-fuchsia-800/40">
+          <CardHeader className="pb-2">
+            <CardDescription className="text-[10px] font-black uppercase tracking-widest text-fuchsia-500/70 flex items-center gap-1">
+              <Handshake className="h-3 w-3" /> Round
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-black italic text-fuchsia-300 font-mono">
+              $<AnimatedNumber value={roundTotal} />
+            </div>
+            <p className="text-[10px] text-slate-500 mt-1">Round deposits less withdrawals and payments</p>
+          </CardContent>
+        </Card>
       </div>
 
       {/* Overhead Tracker */}
@@ -704,8 +719,10 @@ export function OperationsConsole({
         </Button>
       </div>
 
+      {isPrivileged && (
+      <>
       {/* Monitor Cards Row */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
         {/* Live Activity Log */}
         <Card className="bg-gradient-to-br from-slate-900/80 to-slate-950 border-slate-800/50">
           <CardHeader className="pb-2">
@@ -784,7 +801,7 @@ export function OperationsConsole({
       </div>
 
       {/* Monitor Cards Row 2 */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
         {/* POS Audit Monitor */}
         <Card className={cn(
           "bg-gradient-to-br border",
@@ -835,6 +852,8 @@ export function OperationsConsole({
           <Handshake className="h-4 w-4" /> Manage Cash Handshakes
         </a>
       </div>
+      </>
+      )}
 
       {/* Add Entry Form */}
       <Card className={cn(
@@ -892,6 +911,8 @@ export function OperationsConsole({
                     {isExpense ? (
                       <>
                         <option value="overhead_payment">Overhead Payment</option>
+                        <option value="stockvel_withdrawal">Stockvel Withdrawal/Payment</option>
+                        <option value="round_withdrawal">Round Withdrawal/Payment</option>
                         <option value="stock_orders">Stock Orders</option>
                         <option value="transport">Transport</option>
                         <option value="peer_payout">Peer Payout</option>
@@ -904,7 +925,11 @@ export function OperationsConsole({
                     ) : (
                       <>
                         <option value="eod_deposit">EOD Deposit</option>
+                        <option value="savings_deposit">Savings</option>
+                        <option value="blackbox">Black Box</option>
                         <option value="overhead_contribution">Shop Contribution</option>
+                        <option value="stockvel_deposit">Stockvel</option>
+                        <option value="round_deposit">Round</option>
                         <option value="loan_received">Loan Received</option>
                         <option value="peer_transfer">Peer Transfer</option>
                         <option value="other_income">Other Income</option>

@@ -84,7 +84,7 @@ export function StockvelPanel({
 
   const stockvelEntries = useMemo(() => {
     return ledger
-      .filter((entry) => entry.kind === "stockvel_loan" || entry.kind === "stockvel_repayment")
+      .filter((entry) => String(entry.kind || "").startsWith("stockvel"))
       .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
   }, [ledger]);
 
@@ -92,8 +92,8 @@ export function StockvelPanel({
   const projectedCurrentBalance = projection[projection.length - 1]?.closingBalance || 2500;
   const estimatedLiveBalance = projectedCurrentBalance + manualDelta;
   const outstandingManualLoans = Math.max(0, stockvelEntries.reduce((sum, entry) => {
-    if (entry.kind === "stockvel_loan") return sum + Math.abs(Number(entry.amount || 0));
-    if (entry.kind === "stockvel_repayment") return sum - Number(entry.amount || 0);
+    if (entry.kind === "stockvel_loan" || entry.kind === "stockvel_withdrawal") return sum + Math.abs(Number(entry.amount || 0));
+    if (entry.kind === "stockvel_repayment" || entry.kind === "stockvel_deposit") return sum - Number(entry.amount || 0);
     return sum;
   }, 0));
 
@@ -275,7 +275,7 @@ export function StockvelPanel({
                 stockvelEntries.map((entry) => {
                   const borrowerName = String(entry.metadata?.borrower || entry.title || "Unknown borrower");
                   const expectedDate = entry.metadata?.expectedReturnDate;
-                  const isLoan = entry.kind === "stockvel_loan";
+                  const isLoan = Number(entry.amount || 0) < 0;
                   return (
                     <div key={entry.id} className="rounded-lg border border-slate-800 bg-slate-900/40 p-3">
                       <div className="flex items-center justify-between gap-3">

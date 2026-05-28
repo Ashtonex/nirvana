@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { supabaseAdmin } from "@/lib/supabase";
-import { getOperationsVaultImpact, isOverheadContributionKind, isOverheadPaymentKind } from "@/lib/operations";
+import { classifyOperationsAccount, getOperationsVaultImpact, isOverheadContributionKind, isOverheadPaymentKind } from "@/lib/operations";
 
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 
@@ -129,6 +129,12 @@ async function generateOperationsPDF(daysBack: number, data: {
   const overheadIn = overheadContributions.reduce((s, l) => s + (Number(l.amount || 0) > 0 ? Number(l.amount || 0) : 0), 0);
   const overheadPaid = Math.abs(data.ledger.filter((l: any) => isOverheadPaymentKind(l.kind) || (isOverheadContributionKind(l.kind) && Number(l.amount || 0) < 0)).reduce((s: number, l: any) => s + Number(l.amount || 0), 0));
   const overheadNet = overheadIn - overheadPaid;
+  const accountTotals = data.ledger.reduce((acc: Record<string, number>, row: any) => {
+    const account = classifyOperationsAccount(row);
+    acc[account] = (acc[account] || 0) + Number(row.amount || 0);
+    return acc;
+  }, {});
+  const teeRevenue = data.sales.filter((s: any) => s.shop_id === "tshirts").reduce((s: number, row: any) => s + Number(row.total_with_tax || 0), 0);
 
   drawText("NIRVANA OPERATIONS REPORT", 20, true, COLORS.header);
   drawText(`Period: ${data.periodLabel} | Generated: ${new Date().toLocaleString()}`, 10, false, COLORS.neutral);
@@ -143,6 +149,7 @@ async function generateOperationsPDF(daysBack: number, data: {
   drawText(`Master Vault Out: -$${vaultOut.toFixed(2)}`, 11, true, COLORS.expense);
   drawText(`Net Master Vault Movement: $${vaultImpact.toFixed(2)}`, 11, true, vaultImpact >= 0 ? COLORS.profit : COLORS.expense);
   drawText(`Shop Overhead Held: $${overheadNet.toFixed(2)} (${overheadIn.toFixed(2)} set aside - ${overheadPaid.toFixed(2)} paid)`, 10, false, COLORS.neutral);
+  drawText(`Savings: $${Number(accountTotals.savings || 0).toFixed(2)} | Stockvel: $${Number(accountTotals.stockvel || 0).toFixed(2)} | Round: $${Number(accountTotals.round || 0).toFixed(2)} | T-Shirts: $${teeRevenue.toFixed(2)}`, 10, false, COLORS.neutral);
   y -= 10;
   drawText(`Total Investment Capital: $${totalInvest.toFixed(2)}`, 11, true, COLORS.primary);
   y -= 20;

@@ -1,7 +1,7 @@
 export const dynamic = "force-dynamic";
 
 import { redirect } from "next/navigation";
-import { requirePrivilegedActor } from "@/lib/apiAuth";
+import { requirePrivilegedActor, requireStaffActor, isPrivilegedRole } from "@/lib/apiAuth";
 import { supabaseAdmin } from "@/lib/supabase";
 import { getOperationsComputedBalance, getOperationsState, listOperationsLedgerEntries } from "@/lib/operations";
 import { OperationsConsole } from "@/components/OperationsConsole";
@@ -14,17 +14,26 @@ function monthKeyUTC(d = new Date()) {
 }
 
 export default async function OperationsPage() {
+  let actor: any;
   try {
-    await requirePrivilegedActor();
+    try {
+      actor = await requirePrivilegedActor();
+    } catch {
+      actor = await requireStaffActor();
+    }
   } catch {
     redirect("/login");
   }
+
+  const actorShopId = actor?.type === "staff" && !isPrivilegedRole(actor.role) ? actor.shopId : null;
 
   const currentMonth = monthKeyUTC(new Date());
 
   let shops: any[] = [];
   try {
-    const { data } = await supabaseAdmin.from("shops").select("id,name,expenses").order("id", { ascending: true });
+    let query = supabaseAdmin.from("shops").select("id,name,expenses").order("id", { ascending: true });
+    if (actorShopId) query = query.eq("id", actorShopId);
+    const { data } = await query;
     shops = data || [];
   } catch {
     shops = [];
@@ -37,7 +46,7 @@ export default async function OperationsPage() {
     const [computed, state, ledgerRows] = await Promise.all([
       getOperationsComputedBalance(),
       getOperationsState(),
-      listOperationsLedgerEntries(50),
+      listOperationsLedgerEntries(50, actorShopId ? { shopId: actorShopId } : undefined),
     ]);
 
     opsState = {

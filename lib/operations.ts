@@ -2,6 +2,12 @@ import { supabaseAdmin } from "@/lib/supabase";
 
 export type OperationsLedgerKind =
   | "eod_deposit"
+  | "savings_deposit"
+  | "blackbox"
+  | "stockvel_deposit"
+  | "stockvel_withdrawal"
+  | "round_deposit"
+  | "round_withdrawal"
   | "overhead_deposit"
   | "overhead_contribution"
   | "overhead_payment"
@@ -21,6 +27,7 @@ export type OperationsLedgerKind =
   | "adjustment";
 
 export type OverheadCategory = "rent" | "salaries" | "utilities" | "misc";
+export type OperationsAccount = "savings" | "overhead" | "stockvel" | "round" | "invest" | "tshirts" | "vault" | "other";
 
 type OperationsLedgerRow = {
   amount?: unknown;
@@ -37,6 +44,66 @@ export function normalizeOperationsKind(kind: unknown) {
   return String(kind || "").toLowerCase();
 }
 
+export function normalizeOperationsText(value: unknown) {
+  return String(value || "").toLowerCase().replace(/[_-]+/g, " ").replace(/\s+/g, " ").trim();
+}
+
+export function detectOverheadCategoryFromText(value: unknown): OverheadCategory | null {
+  const text = normalizeOperationsText(value);
+  if (/\brent\b/.test(text)) return "rent";
+  if (/\b(salaries|salary|wages|payroll|staff pay)\b/.test(text)) return "salaries";
+  if (/\b(utilities|utility|wifi|wi fi|internet|zesa|electric|electricity|water|rates)\b/.test(text)) return "utilities";
+  return null;
+}
+
+export function classifyOperationsAccount(entry: OperationsLedgerRow): OperationsAccount {
+  const kind = normalizeOperationsKind(entry.kind);
+  const text = normalizeOperationsText(`${entry.kind || ""} ${entry.title || ""} ${entry.notes || ""}`);
+
+  if (kind.startsWith("stockvel") || /^stockvel\b/.test(text)) return "stockvel";
+  if (kind.startsWith("round") || /^round\b/.test(text)) return "round";
+  if (isSavingsOrBlackboxOperationsKind(kind) || /\b(savings|saving|blackbox|black box)\b/.test(text)) return "savings";
+  if (isShopOverheadKind(kind) || detectOverheadCategoryFromText(text)) return "overhead";
+  if (kind.includes("invest")) return "invest";
+  if (kind === "eod_deposit" || kind === "drawer_post") return "vault";
+  return "other";
+}
+
+export function normalizeOperationsLedgerInput(input: {
+  amount: number;
+  kind?: string | null;
+  title?: string | null;
+  notes?: string | null;
+  overheadCategory?: string | null;
+}) {
+  const amount = Number(input.amount || 0);
+  const rawKind = normalizeOperationsKind(input.kind || "adjustment");
+  const title = input.title ? String(input.title) : null;
+  const notes = input.notes ? String(input.notes) : null;
+  const account = classifyOperationsAccount({ amount, kind: rawKind, title, notes });
+  const overheadCategory = input.overheadCategory || detectOverheadCategoryFromText(`${rawKind} ${title || ""} ${notes || ""}`);
+
+  let kind = rawKind;
+  if (account === "savings") {
+    kind = normalizeOperationsText(`${rawKind} ${title || ""}`).includes("black") ? "blackbox" : "savings_deposit";
+  } else if (account === "overhead") {
+    kind = amount < 0 ? "overhead_payment" : "overhead_contribution";
+  } else if (account === "stockvel") {
+    kind = amount < 0 ? "stockvel_withdrawal" : "stockvel_deposit";
+  } else if (account === "round") {
+    kind = amount < 0 ? "round_withdrawal" : "round_deposit";
+  }
+
+  return {
+    amount,
+    kind,
+    title,
+    notes,
+    overheadCategory: account === "overhead" ? (overheadCategory as OverheadCategory | null) : null,
+    account,
+  };
+}
+
 export function isVaultDepositKind(kind: unknown) {
   const k = normalizeOperationsKind(kind);
   return [
@@ -47,6 +114,8 @@ export function isVaultDepositKind(kind: unknown) {
     "blackbox",
     "black_box",
     "black-box",
+    "stockvel_deposit",
+    "round_deposit",
     "capital_injection",
     "loan_injection",
     "loan_received",
@@ -97,14 +166,22 @@ export function isOverheadPaymentKind(kind: unknown) {
   return ["overhead_payment"].includes(k);
 }
 
+export function isStockvelKind(kind: unknown) {
+  return normalizeOperationsKind(kind).startsWith("stockvel");
+}
+
+export function isRoundKind(kind: unknown) {
+  return normalizeOperationsKind(kind).startsWith("round");
+}
+
 export function getOperationsVaultImpact(entry: OperationsLedgerRow) {
   const amount = Number(entry.amount || 0);
+  const account = classifyOperationsAccount(entry);
   const kind = normalizeOperationsKind(entry.kind);
-  const shopId = entry.shop_id ?? entry.shopId;
 
   if (!Number.isFinite(amount) || amount === 0) return 0;
 
-  if (amount > 0 && isVaultDepositKind(kind)) {
+  if (amount > 0 && isVaultDepositKind(kind) && account !== "overhead") {
     return amount;
   }
 
@@ -169,15 +246,16 @@ export async function createOperationsLedgerEntry(input: {
   employeeId?: string | null;
   metadata?: Record<string, unknown>;
 }) {
+  const normalized = normalizeOperationsLedgerInput(input);
   const row: Record<string, unknown> = {
-    amount: Number(input.amount || 0),
-    kind: String(input.kind || "adjustment"),
+    amount: normalized.amount,
+    kind: normalized.kind,
     shop_id: input.shopId ?? null,
-    overhead_category: input.overheadCategory ?? null,
-    title: input.title ?? null,
-    notes: input.notes ?? null,
+    overhead_category: normalized.overheadCategory ?? null,
+    title: normalized.title,
+    notes: normalized.notes,
     employee_id: input.employeeId ?? null,
-    metadata: input.metadata ?? {},
+    metadata: { ...(input.metadata ?? {}), account: normalized.account },
   };
 
   if (input.effectiveDate) row.effective_date = input.effectiveDate;

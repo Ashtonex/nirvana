@@ -314,7 +314,7 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
     const [isOpsPostModalOpen, setIsOpsPostModalOpen] = useState(false);
     const [opsPostAmount, setOpsPostAmount] = useState("");
     const [opsPostNotes, setOpsPostNotes] = useState("");
-    const [opsPostKind, setOpsPostKind] = useState<"eod_deposit" | "savings_deposit" | "blackbox" | "overhead_contribution" | "rent" | "salaries">("eod_deposit");
+    const [opsPostKind, setOpsPostKind] = useState<"eod_deposit" | "savings_deposit" | "blackbox" | "overhead_contribution" | "rent" | "utilities" | "wifi" | "zesa" | "salaries" | "stockvel_deposit" | "round_deposit">("eod_deposit");
 
     // Auto-detect overhead keywords in notes
     useEffect(() => {
@@ -2607,7 +2607,7 @@ Generated via NIRVANA POS`;
                             <span className="text-sky-400">Perfume</span> in description → Auto-deposits to Invest
                         </div>
                         <div className="flex items-center gap-2">
-                            <span className="text-amber-400">Rent/Utilities</span> in description → Auto-deposits to Operations
+                            <span className="text-amber-400">Rent/Utilities/WiFi/ZESA</span> in description → Deducts from this shop&apos;s Overhead account
                         </div>
                     </div>
 
@@ -2642,7 +2642,7 @@ Generated via NIRVANA POS`;
                                 <div className={`h-4 w-4 rounded border ${expenseToOperations ? 'bg-emerald-500 border-emerald-500' : 'border-slate-600'}`}>
                                     {expenseToOperations && <span className="text-[8px]">✓</span>}
                                 </div>
-                                Deposit to Operations
+                                Deduct Overhead
                             </div>
                         </button>
                     </div>
@@ -2702,11 +2702,18 @@ Generated via NIRVANA POS`;
                             <optgroup label="🟡 Overhead Tracker (per-shop overhead)">
                                 <option value="overhead_contribution">Overhead (General)</option>
                                 <option value="rent">Rent</option>
+                                <option value="utilities">Utilities</option>
+                                <option value="wifi">WiFi</option>
+                                <option value="zesa">ZESA</option>
                                 <option value="salaries">Salaries</option>
+                            </optgroup>
+                            <optgroup label="🟣 Club Accounts">
+                                <option value="stockvel_deposit">Stockvel</option>
+                                <option value="round_deposit">Round</option>
                             </optgroup>
                         </select>
                         <p className="text-[10px] mt-1">
-                            {["eod_deposit", "savings_deposit", "blackbox"].includes(opsPostKind)
+                            {["eod_deposit", "savings_deposit", "blackbox", "stockvel_deposit", "round_deposit"].includes(opsPostKind)
                                 ? <span className="text-emerald-400">↑ This increases the Operations Vault balance</span>
                                 : <span className="text-amber-400">↑ This increases this shop&apos;s overhead tracker balance</span>}
                         </p>
