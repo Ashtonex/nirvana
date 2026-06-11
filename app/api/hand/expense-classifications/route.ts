@@ -22,9 +22,10 @@ const NON_CASH_CATEGORIES = new Set([
 
 const keywordGroup = (text: string): string => {
   const lower = text.toLowerCase();
-  if (/(rent|salary|salaries|utility|utilities|overhead)/.test(lower)) return 'Overheads';
+  if (/(tithe)/.test(lower)) return 'Tithes';
+  if (/(rent|salary|salaries|utility|utilities|overhead|lunch|zesa)/.test(lower)) return 'Overheads';
   if (/(stock|order|purchase|supplier|restock|supply|supplies)/.test(lower)) return 'Stock Orders';
-  if (/(invest|vault|transfer|saving|savings|blackbox|deposit|withdrawal)/.test(lower)) return 'Transfers';
+  if (/(invest|vault|transfer|saving|savings|blackbox|deposit|withdrawal|perfume|hamper)/.test(lower)) return 'Transfers';
   if (/(grocery|groceries|fuel|owner|drawing|personal)/.test(lower)) return 'Personal Use';
   return 'Other';
 };
@@ -113,7 +114,7 @@ export async function POST(request: Request) {
     }
 
     const validSources = ['operations_ledger', 'ledger_entries'];
-    const validGroups = ['Overheads', 'Stock Orders', 'Transfers', 'Personal Use', 'Other'];
+    const validGroups = ['Overheads', 'Stock Orders', 'Transfers', 'Personal Use', 'Tithes', 'Other'];
 
     if (!validSources.includes(source)) {
       return NextResponse.json({ success: false, message: 'Invalid source' }, { status: 400 });

@@ -30,7 +30,7 @@ CREATE TABLE IF NOT EXISTS expense_classifications (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   expense_id text NOT NULL,
   source text NOT NULL CHECK (source IN ('operations_ledger', 'ledger_entries')),
-  group_name text NOT NULL CHECK (group_name IN ('Overheads', 'Stock Orders', 'Transfers', 'Personal Use', 'Other')),
+  group_name text NOT NULL CHECK (group_name IN ('Overheads', 'Stock Orders', 'Transfers', 'Personal Use', 'Tithes', 'Other')),
   classified_by text DEFAULT 'owner',
   classified_at timestamptz DEFAULT now(),
   UNIQUE(expense_id, source)
@@ -44,7 +44,7 @@ BEGIN
   -- Add updated constraint
   ALTER TABLE expense_classifications
     ADD CONSTRAINT expense_classifications_group_name_check
-    CHECK (group_name IN ('Overheads', 'Stock Orders', 'Transfers', 'Personal Use', 'Other'));
+    CHECK (group_name IN ('Overheads', 'Stock Orders', 'Transfers', 'Personal Use', 'Tithes', 'Other'));
 EXCEPTION WHEN others THEN
   NULL; -- Ignore if table didn't exist yet (handled by CREATE TABLE above)
 END;

@@ -30,6 +30,7 @@
     "@capacitor/android": "^8.2.0",
     "@capacitor/core": "^8.2.0",
     "@capacitor/ios": "^8.2.0",
+    "@lmnr-ai/lmnr": "^0.8.27",
     "@sendgrid/mail": "^8.1.6",
     "@supabase/supabase-js": "^2.98.0",
     "ai": "^6.0.82",

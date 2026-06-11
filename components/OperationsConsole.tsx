@@ -7,6 +7,7 @@ import { cn } from "@/components/ui";
 import { StockvelPanel } from "@/components/StockvelPanel";
 import { MoneyAuditBrain } from "@/components/MoneyAuditBrain";
 import { NirvanaIntelligenceCards } from "@/components/NirvanaIntelligenceCards";
+import { OperationsOverviewIntelligence } from "@/components/OperationsOverviewIntelligence";
 import { getOperationsVaultImpact, isOverheadContributionKind, isOverheadPaymentKind } from "@/lib/operations";
 
 function detectOverheadCategory(title: string): string {
@@ -638,6 +639,8 @@ export function OperationsConsole({
           </CardContent>
         </Card>
       </div>
+
+      {isPrivileged && <OperationsOverviewIntelligence />}
 
       {/* Overhead Tracker */}
       {overheadSummary.length > 0 && (

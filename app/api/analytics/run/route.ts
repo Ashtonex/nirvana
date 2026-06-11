@@ -10,6 +10,7 @@ const JOBS: Record<AnalyticsKind, any> = {
   expense_anomaly: {},
   inventory_velocity: {},
   capital_allocation: {},
+  operations_overview: {},
 };
 
 async function runJob(kind: AnalyticsKind, baseUrl: string, incomingHeaders: Headers) {

@@ -139,9 +139,10 @@ export async function GET(request: Request) {
       const saved = classMap.get(`${source}:${id}`);
       if (saved) return saved;
       const lower = text.toLowerCase();
-      if (/(rent|salary|salaries|utility|utilities|overhead)/.test(lower)) return "Overheads";
+      if (/(tithe)/.test(lower)) return "Tithes";
+      if (/(rent|salary|salaries|utility|utilities|overhead|lunch|zesa)/.test(lower)) return "Overheads";
       if (/(stock|order|purchase|supplier|restock|supply|supplies)/.test(lower)) return "Stock Orders";
-      if (/(invest|vault|transfer|saving|savings|blackbox|deposit|withdrawal)/.test(lower)) return "Transfers";
+      if (/(invest|vault|transfer|saving|savings|blackbox|deposit|withdrawal|perfume|hamper)/.test(lower)) return "Transfers";
       if (/(grocery|groceries|fuel|owner|drawing|personal)/.test(lower)) return "Personal Use";
       return "Other";
     };
@@ -155,7 +156,7 @@ export async function GET(request: Request) {
         revenue: 0,
         salesCount: 0,
         // totalExpenses = all real cash out (Overheads + Stock Orders + Other)
-        // Transfers and Personal Use are tracked separately and NOT counted against profit
+        // Transfers, Tithes and Personal Use are tracked separately and NOT counted against profit
         totalExpenses: 0,
         expenseCount: 0,
         profit: 0,               // Revenue - totalExpenses (Overheads + Stock + Other)
@@ -167,6 +168,7 @@ export async function GET(request: Request) {
           "Stock Orders": 0,
           Transfers: 0,
           "Personal Use": 0,
+          Tithes: 0,
           Other: 0,
         } as { [key: string]: number },
       };
@@ -197,8 +199,8 @@ export async function GET(request: Request) {
       const textToCategorize = `${exp.category || ""} ${exp.description || ""}`;
       const group = categorizeExpense(textToCategorize, exp.id, "ledger_entries");
 
-      // Transfers and Personal Use are NOT real business expenses — track them but exclude from profit calc
-      const countsAgainstProfit = group !== "Transfers" && group !== "Personal Use";
+      // Transfers, Tithes and Personal Use are NOT real business expenses — track them but exclude from profit calc
+      const countsAgainstProfit = group !== "Transfers" && group !== "Personal Use" && group !== "Tithes";
 
       if (countsAgainstProfit) {
         performanceByShop[sid].totalExpenses += amount;
@@ -241,7 +243,7 @@ export async function GET(request: Request) {
       if (amount <= 0) return;
       const textToCategorize = `${exp.category || ""} ${exp.description || ""}`;
       const group = categorizeExpense(textToCategorize, exp.id, "ledger_entries");
-      const countsAgainstProfit = group !== "Transfers" && group !== "Personal Use";
+      const countsAgainstProfit = group !== "Transfers" && group !== "Personal Use" && group !== "Tithes";
       if (countsAgainstProfit) {
         prevMonthPerformance[sid].expenses += amount;
       }
@@ -298,6 +300,7 @@ export async function GET(request: Request) {
     const totalStockOrders = result.reduce((s: number, sh: any) => s + (sh.groupedExpenses?.["Stock Orders"] || 0), 0);
     const totalTransfers = result.reduce((s: number, sh: any) => s + (sh.groupedExpenses?.Transfers || 0), 0);
     const totalPersonal = result.reduce((s: number, sh: any) => s + (sh.groupedExpenses?.["Personal Use"] || 0), 0);
+    const totalTithes = result.reduce((s: number, sh: any) => s + (sh.groupedExpenses?.Tithes || 0), 0);
 
     // Calculate totals comparison
     const prevTotalRevenue = Object.values(prevMonthPerformance).reduce((s: number, sh: any) => s + sh.revenue, 0);
@@ -370,6 +373,7 @@ export async function GET(request: Request) {
         totalStockOrders,
         totalTransfers,
         totalPersonalUse: totalPersonal,
+        totalTithes,
         totalSales: result.reduce((s: number, sh: any) => s + sh.salesCount, 0),
         shopCount: result.length,
         profitMargin: totalRevenue > 0 ? ((totalProfit / totalRevenue) * 100) : 0,

@@ -12,7 +12,16 @@ import {
   getPremiumStockValue,
   getBreakEvenStockValue,
   getLeanStockValue,
+  getRevenueExpenseProfitTrajectoryData,
 } from "@/lib/analytics";
+import {
+  getCashFlowProjection,
+  getPaymentMethodAnalysis,
+  getInventoryCategoryBreakdown,
+  getShopComparison,
+  getInventoryTurnover,
+  getGrossMarginSummary,
+} from "@/lib/flectere/data";
 import { FlectereDashboard } from "./FlectereDashboard";
 
 export default async function FlecterePage() {
@@ -29,6 +38,13 @@ export default async function FlecterePage() {
     premiumValue,
     breakEvenValue,
     leanValue,
+    cashFlow,
+    paymentMethods,
+    categoryBreakdown,
+    shopComparison,
+    inventoryTurnover,
+    grossMargin,
+    trajectory,
   ] = await Promise.all([
     getDashboardData(60),
     getFinancials(),
@@ -42,14 +58,23 @@ export default async function FlecterePage() {
     getPremiumStockValue(),
     getBreakEvenStockValue(),
     getLeanStockValue(),
+    getCashFlowProjection(),
+    getPaymentMethodAnalysis(90),
+    getInventoryCategoryBreakdown(),
+    getShopComparison(60),
+    getInventoryTurnover(),
+    getGrossMarginSummary(),
+    getRevenueExpenseProfitTrajectoryData(),
   ]);
 
   const sales = db.sales || [];
   const inventory = db.inventory || [];
   const employees = db.employees || [];
 
-  const allTimeRevenue = sales.reduce((s: number, r: any) => s + Number(r.totalWithTax || 0), 0);
   const totalInventoryValue = inventory.reduce((s: number, i: any) => s + (Number(i.landedCost || 0) * Number(i.quantity || 0)), 0);
+
+  // Get true all-time revenue from paginated financials (bypasses 1k row limit)
+  const allTimeRevenue = (financials.sales || []).reduce((s: number, r: any) => s + Number(r.total_with_tax || 0), 0);
 
   return (
     <div className="space-y-8 pb-32">
@@ -80,6 +105,13 @@ export default async function FlecterePage() {
         leanValue={leanValue}
         financials={financials}
         salesCount={sales.length}
+        cashFlow={cashFlow}
+        paymentMethods={paymentMethods}
+        categoryBreakdown={categoryBreakdown}
+        shopComparison={shopComparison}
+        inventoryTurnover={inventoryTurnover}
+        grossMargin={grossMargin}
+        trajectory={trajectory}
       />
     </div>
   );

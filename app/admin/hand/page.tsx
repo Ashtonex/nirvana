@@ -370,6 +370,7 @@ export default function TheHandPage() {
   });
   const [vaultAmount, setVaultAmount] = useState<string>('');
   const [closingOverrideAmount, setClosingOverrideAmount] = useState<string>('');
+  const [jobBusy, setJobBusy] = useState<Record<string, boolean>>({});
 
   const addLog = (level: LogLevel, message: string) => {
     setLogs((prev) => [
@@ -748,6 +749,32 @@ export default function TheHandPage() {
       addLog('error', message);
     } finally {
       setBusy(false);
+    }
+  };
+
+  const triggerJob = async (kind: string) => {
+    setJobBusy(prev => ({ ...prev, [kind]: true }));
+    addLog('info', `AI Analytics Engine: Initiating ${kind} job...`);
+    try {
+      const res = await fetch('/api/analytics/run', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ kind }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || data.message || `Job ${kind} execution failed`);
+      }
+      
+      const summary = data.results?.map((r: any) => `[${r.kind}]: ${r.summary || 'ok'}`).join(', ') || 'Snapshot cycle executed successfully.';
+      addLog('success', `AI Engine Success: ${summary}`);
+      await loadControlRoom();
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Job execution failed';
+      addLog('error', `AI Engine Failure: ${message}`);
+    } finally {
+      setJobBusy(prev => ({ ...prev, [kind]: false }));
     }
   };
 
@@ -1407,6 +1434,94 @@ export default function TheHandPage() {
                     { key: 'signal', label: 'Signal' },
                   ]}
                 />
+              </div>
+            </WindowCard>
+
+            {/* Neural AI Analytics Control Console */}
+            <WindowCard eyebrow="Neural Intelligence Hub" title="AI Analytics & Deep Learning Engine" icon={Brain} className="border-sky-500/30">
+              <div className="space-y-6">
+                <p className="text-sm text-slate-400">
+                  Execute advanced numerical computations, machine learning regressions, and deep learning demand forecasts directly on the server's Python virtual environment.
+                </p>
+
+                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                  {/* Demand Forecast */}
+                  <div className="rounded-2xl border border-white/5 bg-slate-950/40 p-5 flex flex-col justify-between">
+                    <div>
+                      <div className="flex items-center gap-2 mb-2">
+                        <Sparkles className="h-4.5 w-4.5 text-emerald-400" />
+                        <p className="text-xs font-black uppercase tracking-wider text-emerald-300">Demand Forecast (scikit-learn)</p>
+                      </div>
+                      <p className="text-xs text-slate-500 leading-relaxed">
+                        Runs high-dimensional linear and regression pipelines on historical transaction velocities to project safe safety runways.
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => triggerJob('demand_forecast')}
+                      disabled={jobBusy['demand_forecast'] || busy}
+                      className="mt-5 w-full rounded-xl border border-emerald-400/20 bg-emerald-500/10 py-2.5 text-center text-xs font-black uppercase tracking-widest text-emerald-200 transition hover:bg-emerald-500/20 disabled:opacity-50"
+                    >
+                      {jobBusy['demand_forecast'] ? 'Computing...' : 'Run Forecast'}
+                    </button>
+                  </div>
+
+                  {/* Expense Anomaly */}
+                  <div className="rounded-2xl border border-white/5 bg-slate-950/40 p-5 flex flex-col justify-between">
+                    <div>
+                      <div className="flex items-center gap-2 mb-2">
+                        <AlertTriangle className="h-4.5 w-4.5 text-rose-400" />
+                        <p className="text-xs font-black uppercase tracking-wider text-rose-300">Expense Anomaly (statsmodels)</p>
+                      </div>
+                      <p className="text-xs text-slate-500 leading-relaxed">
+                        Deconstructs seasonal variations and calculates statistical outlier deviations across the operations and ledger books.
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => triggerJob('expense_anomaly')}
+                      disabled={jobBusy['expense_anomaly'] || busy}
+                      className="mt-5 w-full rounded-xl border border-rose-400/20 bg-rose-500/10 py-2.5 text-center text-xs font-black uppercase tracking-widest text-rose-200 transition hover:bg-rose-500/20 disabled:opacity-50"
+                    >
+                      {jobBusy['expense_anomaly'] ? 'Analyzing...' : 'Detect Anomalies'}
+                    </button>
+                  </div>
+
+                  {/* Capital Allocation */}
+                  <div className="rounded-2xl border border-white/5 bg-slate-950/40 p-5 flex flex-col justify-between">
+                    <div>
+                      <div className="flex items-center gap-2 mb-2">
+                        <BarChart3 className="h-4.5 w-4.5 text-sky-400" />
+                        <p className="text-xs font-black uppercase tracking-wider text-sky-300">Capital Optimization (SciPy)</p>
+                      </div>
+                      <p className="text-xs text-slate-500 leading-relaxed">
+                        Solves linear optimization models to allocate reinvestment capital to highest margin and high ROI shipments.
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => triggerJob('capital_allocation')}
+                      disabled={jobBusy['capital_allocation'] || busy}
+                      className="mt-5 w-full rounded-xl border border-sky-400/20 bg-sky-500/10 py-2.5 text-center text-xs font-black uppercase tracking-widest text-sky-200 transition hover:bg-sky-500/20 disabled:opacity-50"
+                    >
+                      {jobBusy['capital_allocation'] ? 'Optimizing...' : 'Run Solver'}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Big Run All Button */}
+                <div className="rounded-2xl border border-sky-500/20 bg-sky-500/5 p-5 flex flex-col sm:flex-row items-center justify-between gap-4">
+                  <div>
+                    <p className="text-sm font-black text-sky-300 uppercase tracking-widest">Execute Full Snapshot Cycle (Zipline Model)</p>
+                    <p className="text-xs text-slate-400 mt-1">
+                      Triggers all 5 deep analytical engines sequentially (Forecast, Anomalies, Velocity, Capital, Operations) and commits results to Postgres database.
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => triggerJob('all')}
+                    disabled={jobBusy['all'] || busy}
+                    className="w-full sm:w-auto rounded-xl bg-sky-500 text-slate-950 px-6 py-3.5 text-xs font-black uppercase tracking-widest hover:bg-sky-400 transition disabled:opacity-50 whitespace-nowrap"
+                  >
+                    {jobBusy['all'] ? 'Running Analytics Pipeline...' : 'Run Full Snapshot'}
+                  </button>
+                </div>
               </div>
             </WindowCard>
 

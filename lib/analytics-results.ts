@@ -1,6 +1,6 @@
 import { supabaseAdmin } from "@/lib/supabase";
 
-export type AnalyticsKind = "demand_forecast" | "expense_anomaly" | "inventory_velocity" | "capital_allocation";
+export type AnalyticsKind = "demand_forecast" | "expense_anomaly" | "inventory_velocity" | "capital_allocation" | "operations_overview";
 
 export type AnalyticsResult = {
   id: string;
@@ -17,6 +17,7 @@ export const ANALYTICS_KINDS: AnalyticsKind[] = [
   "expense_anomaly",
   "inventory_velocity",
   "capital_allocation",
+  "operations_overview",
 ];
 
 export async function getLatestAnalyticsResults(kinds: string[] = ANALYTICS_KINDS) {

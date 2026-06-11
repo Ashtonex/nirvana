@@ -2,7 +2,7 @@ from fastapi import FastAPI, Query
 from fastapi.middleware.cors import CORSMiddleware
 from intelligence.models.inventory_forecast import run_sales_forecast, calculate_inventory_velocity
 from intelligence.models.finance_optimizer import optimize_capital_allocation
-from analytics.nirvana_analytics import demand_forecast, expense_anomaly, inventory_velocity, capital_allocation
+from analytics.nirvana_analytics import demand_forecast, expense_anomaly, inventory_velocity, capital_allocation, operations_overview
 
 app = FastAPI(title="Nirvana Intelligence API")
 
@@ -38,6 +38,7 @@ async def run_analytics_job(kind: str = Query("all")):
         "expense_anomaly": expense_anomaly,
         "inventory_velocity": inventory_velocity,
         "capital_allocation": capital_allocation,
+        "operations_overview": operations_overview,
     }
     
     kinds = jobs.keys() if kind == "all" else [kind]
@@ -57,6 +58,8 @@ async def run_analytics_job(kind: str = Query("all")):
                 payload = module.run(days=60, dead_stock_days=60, limit=25)
             elif k == "capital_allocation":
                 payload = module.run(days=90, risk_aversion=2.5)
+            elif k == "operations_overview":
+                payload = module.run(days=180, horizon=3, limit=12)
             else:
                 payload = module.run() if hasattr(module, "run") else {}
             
@@ -70,6 +73,8 @@ async def run_analytics_job(kind: str = Query("all")):
                 summary = f"{len(payload.get('priority_items', []))} priority inventory items identified"
             elif k == "capital_allocation":
                 summary = f"${payload.get('total_capital', 0):,.2f} capital optimized"
+            elif k == "operations_overview":
+                summary = f"{payload.get('summary', {}).get('accounts_tracked', 0)} accounts analyzed; {payload.get('summary', {}).get('anomalies_flagged', 0)} flags"
             
             from analytics.nirvana_analytics.data_loader import save_analytics_result
             save_analytics_result(k, payload, summary)
