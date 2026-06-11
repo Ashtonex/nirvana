@@ -43,6 +43,8 @@ export async function getCashFlowProjection(): Promise<{
   totalExpenses: number;
   netProjected: number;
   runway: number;
+  hasData: boolean;
+  daysWithData: number;
 }> {
   const now = new Date();
   const year = now.getFullYear();
@@ -67,55 +69,76 @@ export async function getCashFlowProjection(): Promise<{
   );
   const dailyFixed = daysInMonth > 0 ? monthlyFixed / daysInMonth : 0;
 
-  const daily: CashFlowDay[] = [];
-  let runningRevenue = 0;
-  let runningExpenses = 0;
-  let totalExpenses = 0;
-
+  // Build daily actuals
+  const dailyActuals: { dayRev: number; dayExp: number }[] = [];
   for (let day = 1; day <= daysInMonth; day++) {
     const dateStr = `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
-
     const dayRev = (sales || [])
       .filter((s: any) => s.date && toLocalDateString(s.date) === dateStr)
       .reduce((sum: number, s: any) => sum + Number(s.total_with_tax || 0), 0);
-
     const dayExp = (ledger || [])
       .filter((l: any) => l.date && toLocalDateString(l.date) === dateStr)
       .reduce((sum: number, l: any) => sum + Math.abs(Number(l.amount || 0)), 0);
+    dailyActuals.push({ dayRev, dayExp });
+  }
+
+  const actualDays = dailyActuals.slice(0, currentDay);
+  const actualRevenue = actualDays.reduce((s, d) => s + d.dayRev, 0);
+  const actualExpenses = actualDays.reduce((s, d) => s + d.dayExp, 0);
+  const actualExpensesVariable = actualExpenses;
+  const avgDailyRevenue = currentDay > 0 ? actualRevenue / currentDay : 0;
+  const daysWithData = actualDays.filter((d) => d.dayRev > 0 || d.dayExp > 0).length;
+
+  const daily: CashFlowDay[] = [];
+  let cumRev = 0;
+  let cumExp = 0;
+
+  for (let day = 1; day <= daysInMonth; day++) {
+    const dateStr = `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+    const { dayRev, dayExp } = dailyActuals[day - 1];
 
     if (day <= currentDay) {
-      runningRevenue += dayRev;
-      runningExpenses += dayExp;
-      totalExpenses += dayExp;
+      cumRev += dayRev;
+      cumExp += dayExp;
     }
 
     const cumFixed = dailyFixed * day;
-    const cumExpenses = Math.round((runningExpenses + cumFixed) * 100) / 100;
-    const cumRevenue = day > currentDay ? null : Math.round(runningRevenue * 100) / 100;
-    const profit = cumRevenue !== null ? cumRevenue - cumExpenses : null;
-    const netCash = day > currentDay
-      ? Math.round((runningRevenue - (runningExpenses + cumFixed)) * 100) / 100
-      : Math.round((runningRevenue - cumExpenses) * 100) / 100;
+    // For future days, project revenue forward at avg daily rate
+    const projectedRev = day <= currentDay ? cumRev : cumRev + avgDailyRevenue * (day - currentDay);
+    const totalExp = cumExp + cumFixed;
 
-    daily.push({ day, date: dateStr, revenue: cumRevenue, expenses: cumExpenses, profit, netCash });
+    const revenue = day <= currentDay ? Math.round(cumRev * 100) / 100 : Math.round(projectedRev * 100) / 100;
+    const expenses = Math.round(totalExp * 100) / 100;
+    const netCash = Math.round((projectedRev - totalExp) * 100) / 100;
+    const profit = Math.round((projectedRev - totalExp) * 100) / 100;
+
+    daily.push({
+      day,
+      date: dateStr,
+      revenue: day <= currentDay ? revenue : null,
+      expenses,
+      profit: day <= currentDay ? profit : null,
+      netCash,
+    });
   }
 
-  const projectedMonthlyExpenses = totalExpenses + monthlyFixed;
-  const avgDailyRevenue = runningRevenue / currentDay;
   const projectedMonthlyRevenue = avgDailyRevenue * daysInMonth;
+  const projectedMonthlyExpenses = actualExpensesVariable + monthlyFixed;
   const netProjected = Math.round((projectedMonthlyRevenue - projectedMonthlyExpenses) * 100) / 100;
 
-  // Runway: months of cash based on current burn rate
-  const avgDailyExpense = projectedMonthlyExpenses / daysInMonth;
-  const currentCash = runningRevenue - runningExpenses - monthlyFixed;
-  const runway = avgDailyExpense > 0 ? currentCash / avgDailyExpense : 999;
+  // Runway: months of cash based on current burn
+  const avgDailyTotalExpense = projectedMonthlyExpenses / daysInMonth;
+  const currentCash = actualRevenue - actualExpenses - monthlyFixed;
+  const runway = avgDailyTotalExpense > 0 && currentCash > 0 ? currentCash / avgDailyTotalExpense : currentCash > 0 ? 999 : 0;
 
   return {
     daily,
-    totalRevenue: Math.round(runningRevenue * 100) / 100,
+    totalRevenue: Math.round(actualRevenue * 100) / 100,
     totalExpenses: Math.round(projectedMonthlyExpenses * 100) / 100,
     netProjected,
     runway,
+    hasData: daysWithData > 0,
+    daysWithData,
   };
 }
 
@@ -310,6 +333,85 @@ export async function getTransactionDetail(
     paymentMethod: s.payment_method || "cash",
     employeeId: s.employee_id,
   }));
+}
+
+export interface WoWComparison {
+  currentWeekRevenue: number;
+  previousWeekRevenue: number;
+  growth: number;
+  currentWeekOrders: number;
+  previousWeekOrders: number;
+  orderGrowth: number;
+}
+
+export async function getWeekOverWeek(): Promise<WoWComparison> {
+  const now = new Date();
+  const currentWeekStart = new Date(now);
+  currentWeekStart.setDate(now.getDate() - 7);
+  const previousWeekStart = new Date(currentWeekStart);
+  previousWeekStart.setDate(previousWeekStart.getDate() - 7);
+
+  const currentSales = await fetchAll<any>("sales", "total_with_tax", (q) =>
+    q.gte("date", currentWeekStart.toISOString()).is("deleted_at", null)
+  );
+  const previousSales = await fetchAll<any>("sales", "total_with_tax", (q) =>
+    q.gte("date", previousWeekStart.toISOString()).lt("date", currentWeekStart.toISOString()).is("deleted_at", null)
+  );
+
+  const currentWeekRevenue = (currentSales || []).reduce((s: number, r: any) => s + Number(r.total_with_tax || 0), 0);
+  const previousWeekRevenue = (previousSales || []).reduce((s: number, r: any) => s + Number(r.total_with_tax || 0), 0);
+  const growth = previousWeekRevenue > 0 ? ((currentWeekRevenue - previousWeekRevenue) / previousWeekRevenue) * 100 : currentWeekRevenue > 0 ? 100 : 0;
+
+  return {
+    currentWeekRevenue: Math.round(currentWeekRevenue * 100) / 100,
+    previousWeekRevenue: Math.round(previousWeekRevenue * 100) / 100,
+    growth: Math.round(growth * 100) / 100,
+    currentWeekOrders: (currentSales || []).length,
+    previousWeekOrders: (previousSales || []).length,
+    orderGrowth: previousSales.length > 0 ? Math.round(((currentSales.length - previousSales.length) / previousSales.length) * 10000) / 100 : 0,
+  };
+}
+
+export interface DataQualityReport {
+  totalSales: number;
+  totalInventory: number;
+  totalEmployees: number;
+  totalShops: number;
+  salesWithoutClient: number;
+  itemsWithoutCategory: number;
+  salesThisMonth: number;
+  lastSaleDate: string | null;
+}
+
+export async function getDataQuality(): Promise<DataQualityReport> {
+  const now = new Date();
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+
+  const { count: totalSales } = await supabaseAdmin.from("sales").select("*", { count: "exact", head: true }).is("deleted_at", null);
+  const { count: totalInventory } = await supabaseAdmin.from("inventory_items").select("*", { count: "exact", head: true });
+  const { count: totalEmployees } = await supabaseAdmin.from("employees").select("*", { count: "exact", head: true });
+  const { count: totalShops } = await supabaseAdmin.from("shops").select("*", { count: "exact", head: true });
+
+  const { data: noClient } = await supabaseAdmin.from("sales").select("id").is("client_name", null).is("deleted_at", null).limit(1);
+  const { data: noCategory } = await supabaseAdmin.from("inventory_items").select("id").or("category.is.null,category.eq.").limit(1);
+
+  const { count: salesThisMonth, error: monthErr } = await supabaseAdmin
+    .from("sales").select("*", { count: "exact", head: true })
+    .gte("date", monthStart).is("deleted_at", null);
+
+  const { data: lastSale } = await supabaseAdmin
+    .from("sales").select("date").is("deleted_at", null).order("date", { ascending: false }).limit(1);
+
+  return {
+    totalSales: totalSales || 0,
+    totalInventory: totalInventory || 0,
+    totalEmployees: totalEmployees || 0,
+    totalShops: totalShops || 0,
+    salesWithoutClient: noClient?.length || 0,
+    itemsWithoutCategory: noCategory?.length || 0,
+    salesThisMonth: salesThisMonth || 0,
+    lastSaleDate: lastSale?.[0]?.date || null,
+  };
 }
 
 export async function getGrossMarginSummary(): Promise<{ totalRevenue: number; totalCost: number; grossProfit: number; marginPct: number }> {

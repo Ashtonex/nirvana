@@ -22,7 +22,7 @@ import type { SalesMetric, ReorderSuggestion, DeadStockItem, DailySalesMetric, F
 import type { ApiConnectorConfig, ConnectorMetric, AiInsight } from "@/lib/flectere/types";
 import type {
   CashFlowDay, PaymentMethodSummary, CategorySummary,
-  ShopComparison, InventoryTurnover,
+  ShopComparison, InventoryTurnover, WoWComparison, DataQualityReport,
 } from "@/lib/flectere/data";
 import { generateAiInsights } from "@/lib/flectere/ai-analysis";
 import {
@@ -51,13 +51,15 @@ interface FlectereDashboardProps {
   breakEvenValue: number;
   leanValue: number;
   financials: any;
-  cashFlow: { daily: CashFlowDay[]; totalRevenue: number; totalExpenses: number; netProjected: number; runway: number };
+  cashFlow: { daily: CashFlowDay[]; totalRevenue: number; totalExpenses: number; netProjected: number; runway: number; hasData: boolean; daysWithData: number };
   paymentMethods: PaymentMethodSummary[];
   categoryBreakdown: CategorySummary[];
   shopComparison: ShopComparison[];
   inventoryTurnover: InventoryTurnover;
   grossMargin: { totalRevenue: number; totalCost: number; grossProfit: number; marginPct: number };
   trajectory: Record<string, any[]>;
+  wow: WoWComparison;
+  dataQuality: DataQualityReport;
 }
 
 const SHOP_OPTIONS = [
@@ -84,6 +86,9 @@ export function FlectereDashboard(props: FlectereDashboardProps) {
   const [emailSending, setEmailSending] = useState(false);
   const [emailResult, setEmailResult] = useState<string | null>(null);
   const [showDateFilter, setShowDateFilter] = useState(false);
+  const [pythonRunning, setPythonRunning] = useState(false);
+  const [pythonResult, setPythonResult] = useState<string | null>(null);
+  const [pythonKind, setPythonKind] = useState<string>("inventory_velocity");
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => { setMounted(true); }, []);
@@ -100,7 +105,7 @@ export function FlectereDashboard(props: FlectereDashboardProps) {
     allTimeRevenue, totalInventoryValue, employeeCount, salesCount,
     salesHistory, bestSellers, forecast, trends, overheads,
     deadStock, reorderSuggestions, premiumValue, breakEvenValue, leanValue,
-    cashFlow, paymentMethods, categoryBreakdown, shopComparison, inventoryTurnover, grossMargin, trajectory,
+    cashFlow, paymentMethods, categoryBreakdown, shopComparison, inventoryTurnover, grossMargin, trajectory, wow, dataQuality,
   } = props;
 
   const avgDailyRevenue = salesHistory.length > 0
@@ -204,6 +209,30 @@ export function FlectereDashboard(props: FlectereDashboardProps) {
     else setEmailResult(result.error || "Failed");
   }, [emailTo, allTimeRevenue, trends, totalInventoryValue, avgDailyRevenue, projectedMonthly, deadStock, deadStockValue]);
 
+  const runPythonAnalytics = useCallback(async (kind: string) => {
+    setPythonRunning(true);
+    setPythonResult(null);
+    try {
+      const res = await fetch("/api/analytics/run", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ kind }),
+      });
+      if (!res.ok) throw new Error(`Server error ${res.status}`);
+      const data = await res.json();
+      const result = data.results?.[0];
+      if (result?.ok) {
+        setPythonResult(`${kind} — ${result.summary || "Done"}`);
+      } else {
+        setPythonResult(`${kind} — Error: ${result?.error || "Unknown"}`);
+      }
+    } catch (err: any) {
+      setPythonResult(`${kind} — ${err.message}`);
+    } finally {
+      setPythonRunning(false);
+    }
+  }, []);
+
   // Chart drill-down
   const handleChartClick = useCallback((data: any) => {
     if (data?.activePayload?.[0]?.payload) {
@@ -297,10 +326,11 @@ export function FlectereDashboard(props: FlectereDashboardProps) {
         <KpiCard icon={<Users className="h-4 w-4 text-violet-400" />} label="Workforce" value={String(employeeCount)} sub="employees across shops" />
       </div>
 
-      {/* ===== GROSS MARGIN + INVENTORY TURNOVER + CASH FLOW MINI ===== */}
-      <div className="grid gap-4 md:grid-cols-3">
+      {/* ===== GROSS MARGIN + INVENTORY TURNOVER + WoW + CASH FLOW MINI ===== */}
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <KpiCard icon={<Activity className="h-4 w-4 text-emerald-400" />} label="Gross Margin (60d)" value={`${grossMargin.marginPct}%`} sub={`$${grossMargin.grossProfit.toLocaleString()} profit`} />
         <KpiCard icon={<Layers className="h-4 w-4 text-cyan-400" />} label="Inventory Turnover" value={`${inventoryTurnover.overall}x`} sub="Annualized rate" />
+        <KpiCard icon={<TrendingUp className="h-4 w-4 text-indigo-400" />} label="Week-over-Week" value={`${wow.growth >= 0 ? "+" : ""}${wow.growth.toFixed(1)}%`} sub={`$${Math.round(wow.currentWeekRevenue).toLocaleString()} vs $${Math.round(wow.previousWeekRevenue).toLocaleString()}`} />
         <KpiCard icon={<DollarSign className="h-4 w-4 text-amber-400" />} label="Cash Runway" value={`${cashFlow.runway >= 999 ? "∞" : cashFlow.runway.toFixed(0) + " months"}`} sub={`Net projected: ${cashFlow.netProjected >= 0 ? "+" : ""}$${cashFlow.netProjected.toLocaleString()}`} />
       </div>
 
@@ -441,17 +471,25 @@ export function FlectereDashboard(props: FlectereDashboardProps) {
       </div>
 
       {/* ===== CASH FLOW PROJECTION ===== */}
-      {cashFlowData.length > 0 && (
+      {cashFlowData.length > 0 && cashFlow.hasData && (
         <Card className="bg-slate-900/40 border-amber-500/20">
           <CardHeader className="pb-3">
             <CardTitle className="flex items-center gap-2 text-sm font-black uppercase tracking-widest">
               <DollarSign className="h-4 w-4 text-amber-400" /> Cash Flow Projection
             </CardTitle>
             <CardDescription className="text-[10px] text-slate-500 uppercase tracking-widest font-black">
-              Month-to-date revenue vs expenses · Runway: {cashFlow.runway >= 999 ? "∞" : `${cashFlow.runway.toFixed(1)} months`}
+              Month-to-date revenue vs expenses · Runway: {cashFlow.runway >= 999 ? "∞" : `${cashFlow.runway.toFixed(1)} months`} · {cashFlow.daysWithData} days with data
             </CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="space-y-3">
+            <div className="flex items-center gap-2 text-[9px]">
+              <span className="inline-block w-2 h-0.5 rounded bg-emerald-400" />
+              <span className="text-slate-500 uppercase tracking-wider font-black">Revenue (actual)</span>
+              <span className="inline-block w-2 h-0.5 rounded bg-emerald-400 opacity-30 ml-2" />
+              <span className="text-slate-600 uppercase tracking-wider font-black">Revenue (projected)</span>
+              <span className="inline-block w-2 h-0.5 rounded bg-fuchsia-400 ml-2" />
+              <span className="text-slate-500 uppercase tracking-wider font-black">Net Cash (projected)</span>
+            </div>
             <ResponsiveContainer width="100%" height={250}>
               <AreaChart data={cashFlowData}>
                 <defs>
@@ -464,7 +502,8 @@ export function FlectereDashboard(props: FlectereDashboardProps) {
                 <YAxis stroke="#475569" fontSize={10} tickLine={false} axisLine={false} tickFormatter={(v) => `$${v}`} />
                 <Tooltip contentStyle={{ backgroundColor: "#0f172a", border: "1px solid #1e293b", borderRadius: "8px" }} formatter={(val: any) => [`$${Number(val || 0).toLocaleString()}`]} />
                 <Legend verticalAlign="top" height={30} iconType="circle" wrapperStyle={{ fontSize: "10px", fontWeight: "bold", textTransform: "uppercase", letterSpacing: "0.05em" }} />
-                <Area type="monotone" dataKey="revenue" name="Revenue" stroke="#10b981" fill="url(#cfRev)" strokeWidth={2} dot={false} />
+                {/* Solid line for actual revenue area, dashed extension for projection */}
+                <Area type="monotone" dataKey="revenue" name="Revenue" stroke="#10b981" fill="url(#cfRev)" strokeWidth={2} dot={false} connectNulls />
                 <Area type="monotone" dataKey="expenses" name="Expenses" stroke="#f97316" fill="url(#cfExp)" strokeWidth={2} dot={false} />
                 <Area type="monotone" dataKey="netCash" name="Net Cash" stroke="#a78bfa" fill="url(#cfNet)" strokeWidth={2} dot={false} strokeDasharray="4 3" />
               </AreaChart>
@@ -483,7 +522,7 @@ export function FlectereDashboard(props: FlectereDashboardProps) {
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={250}>
-              <LineChart data={trajectory.global.filter((d: any) => d.day % 2 === 0)}>
+              <LineChart data={trajectory.global.filter((d: any) => d.revenue !== null && d.day % 2 === 0)}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
                 <XAxis dataKey="date" stroke="#475569" fontSize={9} tickLine={false} axisLine={false} />
                 <YAxis stroke="#475569" fontSize={10} tickLine={false} axisLine={false} tickFormatter={(v) => `$${v}`} />
@@ -741,6 +780,61 @@ export function FlectereDashboard(props: FlectereDashboardProps) {
         </Card>
       )}
 
+      {/* ===== PYTHON ML ANALYTICS ===== */}
+      <Card className="bg-slate-900/40 border-violet-500/20">
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-sm font-black uppercase tracking-widest">
+            <Brain className="h-4 w-4 text-violet-400" /> Python ML Analytics Engine
+          </CardTitle>
+          <CardDescription className="text-[10px] text-slate-500 uppercase tracking-widest font-black">
+            Run demand forecast, expense anomaly detection, inventory velocity, or capital allocation
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-wrap items-center gap-2">
+            <select className="bg-slate-800 rounded px-3 py-1.5 text-xs text-white font-mono border border-slate-700" value={pythonKind} onChange={(e) => setPythonKind(e.target.value)}>
+              <option value="inventory_velocity">Inventory Velocity</option>
+              <option value="demand_forecast">Demand Forecast</option>
+              <option value="expense_anomaly">Expense Anomaly</option>
+              <option value="capital_allocation">Capital Allocation</option>
+            </select>
+            <button onClick={() => runPythonAnalytics(pythonKind)} disabled={pythonRunning}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-violet-600/20 border border-violet-500/30 text-violet-300 text-[10px] font-black uppercase tracking-wider hover:bg-violet-600/30 transition-all disabled:opacity-40">
+              {pythonRunning ? <RefreshCw className="h-3 w-3 animate-spin" /> : <Zap className="h-3 w-3" />}
+              {pythonRunning ? "Running..." : "Run"}
+            </button>
+            {pythonResult && (
+              <span className={`text-[10px] font-mono ${pythonResult.includes("Error") ? "text-rose-400" : "text-emerald-400"}`}>
+                {pythonResult}
+              </span>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* ===== DATA QUALITY ===== */}
+      <Card className="bg-slate-900/40 border-cyan-500/20">
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-sm font-black uppercase tracking-widest">
+            <Activity className="h-4 w-4 text-cyan-400" /> Data Quality & System Health
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <MetricTile label="Total Sales Records" value={dataQuality.totalSales.toLocaleString()} sub={`${dataQuality.salesThisMonth} this month`} />
+            <MetricTile label="Inventory Items" value={dataQuality.totalInventory.toLocaleString()} sub={`${dataQuality.itemsWithoutCategory > 0 ? `${dataQuality.itemsWithoutCategory} uncategorized` : "All categorized"}`} />
+            <MetricTile label="Employees" value={dataQuality.totalEmployees.toString()} sub={`Across ${dataQuality.totalShops} shops`} />
+            <div className="p-3 rounded-lg bg-slate-800/20 border border-slate-700/30">
+              <p className="text-[10px] uppercase font-black text-slate-500 tracking-widest">Last Sale</p>
+              <p className="text-lg font-black font-mono text-white mt-0.5">
+                {dataQuality.lastSaleDate ? new Date(dataQuality.lastSaleDate).toLocaleDateString() : "—"}
+              </p>
+              <p className="text-[9px] text-slate-600 mt-0.5">{dataQuality.salesWithoutClient > 0 ? `${dataQuality.salesWithoutClient} missing client name` : "Client data clean"}</p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* ===== SHOP COMPARISON ===== */}
       {shopComparison.length > 0 && (
         <Card className="bg-slate-900/40 border-indigo-500/20">
@@ -859,17 +953,25 @@ export function FlectereDashboard(props: FlectereDashboardProps) {
                         </div>
                         <button onClick={() => removeConnector(c.id)} className="p-1 rounded hover:bg-rose-500/20 text-slate-500 hover:text-rose-400"><Trash2 className="h-3 w-3" /></button>
                       </div>
-                      <div className="grid grid-cols-2 gap-2 text-xs">
-                        <div><span className="text-slate-500">Base URL</span><input className="w-full bg-slate-900 rounded px-2 py-1 text-white font-mono text-[11px] border border-slate-700" value={c.baseUrl} onChange={(e) => updateConnector(c.id, { baseUrl: e.target.value })} placeholder="https://..." /></div>
-                        <div><span className="text-slate-500">Endpoint</span><input className="w-full bg-slate-900 rounded px-2 py-1 text-white font-mono text-[11px] border border-slate-700" value={c.endpoint} onChange={(e) => updateConnector(c.id, { endpoint: e.target.value })} placeholder="/api/data" /></div>
+                      <div className="grid grid-cols-3 gap-2 text-xs">
+                        <div className="col-span-2"><span className="text-slate-500">Base URL</span><input className="w-full bg-slate-900 rounded px-2 py-1 text-white font-mono text-[11px] border border-slate-700" value={c.baseUrl} onChange={(e) => updateConnector(c.id, { baseUrl: e.target.value })} placeholder="https://..." /></div>
+                        <div><span className="text-slate-500">Method</span>
+                          <select className="w-full bg-slate-900 rounded px-2 py-1 text-white text-[11px] border border-slate-700" value={c.method} onChange={(e) => updateConnector(c.id, { method: e.target.value as any })}>
+                            <option value="GET">GET</option><option value="POST">POST</option>
+                          </select>
+                        </div>
                       </div>
                       <div className="grid grid-cols-2 gap-2 text-xs">
+                        <div><span className="text-slate-500">Endpoint</span><input className="w-full bg-slate-900 rounded px-2 py-1 text-white font-mono text-[11px] border border-slate-700" value={c.endpoint} onChange={(e) => updateConnector(c.id, { endpoint: e.target.value })} placeholder="/api/data" /></div>
                         <div><span className="text-slate-500">Auth Type</span>
                           <select className="w-full bg-slate-900 rounded px-2 py-1 text-white text-[11px] border border-slate-700" value={c.authType} onChange={(e) => updateConnector(c.id, { authType: e.target.value as any })}>
                             <option value="none">None</option><option value="bearer">Bearer Token</option><option value="api-key">API Key Header</option><option value="basic">Basic Auth</option>
                           </select>
                         </div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2 text-xs">
                         <div><span className="text-slate-500">API Key / Token</span><input className="w-full bg-slate-900 rounded px-2 py-1 text-white font-mono text-[11px] border border-slate-700" type="password" value={c.apiKey || ""} onChange={(e) => updateConnector(c.id, { apiKey: e.target.value })} placeholder="sk-..." /></div>
+                        <div></div>
                       </div>
                       {c.lastError && <p className="text-[10px] text-rose-400 mt-1">Last error: {c.lastError}</p>}
                     </div>

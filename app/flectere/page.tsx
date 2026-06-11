@@ -21,6 +21,8 @@ import {
   getShopComparison,
   getInventoryTurnover,
   getGrossMarginSummary,
+  getWeekOverWeek,
+  getDataQuality,
 } from "@/lib/flectere/data";
 import { FlectereDashboard } from "./FlectereDashboard";
 
@@ -45,6 +47,8 @@ export default async function FlecterePage() {
     inventoryTurnover,
     grossMargin,
     trajectory,
+    wow,
+    dataQuality,
   ] = await Promise.all([
     getDashboardData(60),
     getFinancials(),
@@ -65,6 +69,8 @@ export default async function FlecterePage() {
     getInventoryTurnover(),
     getGrossMarginSummary(),
     getRevenueExpenseProfitTrajectoryData(),
+    getWeekOverWeek(),
+    getDataQuality(),
   ]);
 
   const sales = db.sales || [];
@@ -112,6 +118,8 @@ export default async function FlecterePage() {
         inventoryTurnover={inventoryTurnover}
         grossMargin={grossMargin}
         trajectory={trajectory}
+        wow={wow}
+        dataQuality={dataQuality}
       />
     </div>
   );
