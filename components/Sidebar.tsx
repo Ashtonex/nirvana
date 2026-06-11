@@ -64,6 +64,7 @@ const navItems = [
     { name: 'Data Vault', href: '/admin/backups', icon: ShieldCheck },
     { name: 'Stock Intelligence', href: '/stock', icon: Brain },
     { name: 'The Hand', href: '/admin/hand', icon: Zap },
+    { name: 'Flectere', href: '/flectere', icon: Brain },
 ];
 
 export default function Sidebar() {
