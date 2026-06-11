@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Card, CardContent, CardHeader, CardTitle, CardDescription,
 } from "@/components/ui";
@@ -9,11 +9,18 @@ import {
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, AreaChart, Area,
 } from "recharts";
 import {
-  TrendingUp, TrendingDown, DollarSign, Package, Shirt,
+  TrendingUp, TrendingDown, DollarSign, Package,
   AlertTriangle, Brain, Target, BarChart3, Users, Zap,
   ArrowUpRight, ArrowDownRight, Store, ShoppingCart, Clock,
+  RefreshCw, Plus, Trash2, ExternalLink, Settings2, Check, X,
+  Sparkles, Radio,
 } from "lucide-react";
 import type { SalesMetric, ReorderSuggestion, DeadStockItem, DailySalesMetric, Forecast } from "@/lib/analytics";
+import type { ApiConnectorConfig, ConnectorMetric, AiInsight } from "@/lib/flectere/types";
+import { generateAiInsights } from "@/lib/flectere/ai-analysis";
+import {
+  loadConnectors, saveConnectors, getDefaultConnectors,
+} from "@/lib/flectere/api-connectors";
 
 interface FlectereDashboardProps {
   allTimeRevenue: number;
@@ -33,9 +40,27 @@ interface FlectereDashboardProps {
   financials: any;
 }
 
+const SHOP_OPTIONS = [
+  { id: "kipasa", label: "Kipasa" },
+  { id: "dubdub", label: "Dub Dub" },
+  { id: "tradecenter", label: "Trade Center" },
+  { id: "tshirts", label: "Nirvana Tees" },
+];
+
 export function FlectereDashboard(props: FlectereDashboardProps) {
   const [mounted, setMounted] = useState(false);
+  const [selectedShops, setSelectedShops] = useState<string[]>(["kipasa", "dubdub", "tradecenter"]);
+  const [showDateFilter, setShowDateFilter] = useState(false);
+  const [insights, setInsights] = useState<AiInsight[]>([]);
+  const [insightsLoading, setInsightsLoading] = useState(false);
+  const [connectors, setConnectors] = useState<ApiConnectorConfig[]>([]);
+  const [connectorMetrics, setConnectorMetrics] = useState<ConnectorMetric[]>([]);
+  const [connectorsLoading, setConnectorsLoading] = useState(false);
+  const [showConnectorConfig, setShowConnectorConfig] = useState(false);
+  const [connectorError, setConnectorError] = useState<string | null>(null);
+
   useEffect(() => { setMounted(true); }, []);
+  useEffect(() => { setConnectors(loadConnectors()); }, []);
 
   const {
     allTimeRevenue, totalInventoryValue, employeeCount, salesCount,
@@ -48,6 +73,7 @@ export function FlectereDashboard(props: FlectereDashboardProps) {
     : 0;
 
   const projectedMonthly = avgDailyRevenue * 30;
+  const deadStockValue = deadStock.reduce((s, d) => s + d.value, 0);
 
   const bestSellersData = useMemo(() => {
     return bestSellers.slice(0, 8).map((item, i) => ({
@@ -55,9 +81,92 @@ export function FlectereDashboard(props: FlectereDashboardProps) {
       name: item.itemName.length > 28 ? item.itemName.slice(0, 28) + "..." : item.itemName,
       qty: item.totalQuantity,
       revenue: item.totalRevenue,
-      margin: item.grossMargin.toFixed(1),
+      margin: Number(item.grossMargin.toFixed(1)),
     }));
   }, [bestSellers]);
+
+  const runAiAnalysis = useCallback(async () => {
+    setInsightsLoading(true);
+    setInsights([]);
+    try {
+      const result = await generateAiInsights({
+        allTimeRevenue,
+        salesCount,
+        employeeCount,
+        totalInventoryValue,
+        avgDailyRevenue,
+        growthPct: trends.growth,
+        currentRevenue: trends.currentPeriodRevenue,
+        previousRevenue: trends.previousPeriodRevenue,
+        deadStockCount: deadStock.length,
+        deadStockValue,
+        reorderCount: reorderSuggestions.length,
+        premiumValue,
+        breakEvenValue,
+        leanValue,
+        bestSellers: bestSellersData,
+        forecastTrend: forecast.trend,
+        forecastProjected: forecast.projectedNext30,
+        forecastConfidence: forecast.confidence,
+        shopCount: SHOP_OPTIONS.length,
+      });
+      setInsights(result);
+    } catch {
+      setInsights([]);
+    } finally {
+      setInsightsLoading(false);
+    }
+  }, [allTimeRevenue, salesCount, employeeCount, totalInventoryValue, avgDailyRevenue, trends, deadStock.length, deadStockValue, reorderSuggestions.length, premiumValue, breakEvenValue, leanValue, bestSellersData, forecast]);
+
+  const refreshConnectors = useCallback(async () => {
+    const enabled = connectors.filter((c) => c.enabled && c.baseUrl);
+    if (enabled.length === 0) {
+      setConnectorError("No enabled connectors with a base URL. Configure one below.");
+      return;
+    }
+    setConnectorsLoading(true);
+    setConnectorError(null);
+    try {
+      const res = await fetch("/api/flectere/connectors", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ connectors }),
+      });
+      if (!res.ok) throw new Error(`Server error ${res.status}`);
+      const data = await res.json();
+      setConnectorMetrics(data.metrics || []);
+      if (data.connectors) {
+        setConnectors(data.connectors);
+        saveConnectors(data.connectors);
+      }
+    } catch (err: any) {
+      setConnectorError(err.message || "Failed to fetch connectors");
+    } finally {
+      setConnectorsLoading(false);
+    }
+  }, [connectors]);
+
+  const addDefaultConnectors = useCallback(() => {
+    const defaults = getDefaultConnectors();
+    setConnectors((prev) => [...prev, ...defaults]);
+    saveConnectors([...connectors, ...defaults]);
+  }, [connectors]);
+
+  const updateConnector = useCallback((id: string, patch: Partial<ApiConnectorConfig>) => {
+    setConnectors((prev) => {
+      const next = prev.map((c) => (c.id === id ? { ...c, ...patch } : c));
+      saveConnectors(next);
+      return next;
+    });
+  }, []);
+
+  const removeConnector = useCallback((id: string) => {
+    setConnectors((prev) => {
+      const next = prev.filter((c) => c.id !== id);
+      saveConnectors(next);
+      return next;
+    });
+  }, []);
 
   if (!mounted) {
     return (
@@ -74,55 +183,120 @@ export function FlectereDashboard(props: FlectereDashboardProps) {
   }
 
   return (
-    <div className="space-y-8">
-      {/* Executive Summary */}
+    <div className="space-y-6">
+      {/* FILTERS BAR */}
+      <Card className="bg-slate-900/60 border-slate-700/50">
+        <CardContent className="pt-4">
+          <div className="flex flex-wrap items-center gap-3">
+            <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">Shops:</span>
+            {SHOP_OPTIONS.map((shop) => (
+              <button
+                key={shop.id}
+                onClick={() =>
+                  setSelectedShops((prev) =>
+                    prev.includes(shop.id)
+                      ? prev.filter((s) => s !== shop.id)
+                      : [...prev, shop.id]
+                  )
+                }
+                className={`px-3 py-1 rounded-md text-xs font-bold uppercase tracking-wider transition-all ${
+                  selectedShops.includes(shop.id)
+                    ? "bg-orange-500/20 text-orange-400 border border-orange-500/30"
+                    : "bg-slate-800 text-slate-500 border border-slate-700/50 hover:text-slate-300"
+                }`}
+              >
+                {shop.label}
+              </button>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* EXECUTIVE SUMMARY */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
-        <KpiCard
-          icon={<DollarSign className="h-4 w-4 text-emerald-400" />}
-          label="All-Time Revenue"
-          value={`$${allTimeRevenue.toLocaleString()}`}
-          sub={`${salesCount} transactions`}
-        />
-        <KpiCard
-          icon={<Package className="h-4 w-4 text-sky-400" />}
-          label="Inventory Value"
-          value={`$${totalInventoryValue.toLocaleString()}`}
-          sub={`Lean $${leanValue.toLocaleString()}`}
-        />
-        <KpiCard
-          icon={<BarChart3 className="h-4 w-4 text-orange-400" />}
-          label="Avg Daily Revenue (60d)"
-          value={`$${Math.round(avgDailyRevenue).toLocaleString()}`}
-          sub={`Proj. monthly $${Math.round(projectedMonthly).toLocaleString()}`}
-        />
-        <KpiCard
-          icon={<TrendingUp className="h-4 w-4 text-rose-400" />}
-          label="Growth (30d vs prev)"
-          value={`${trends.growth >= 0 ? "+" : ""}${trends.growth.toFixed(1)}%`}
-          sub={`$${trends.currentPeriodRevenue.toLocaleString()} vs $${trends.previousPeriodRevenue.toLocaleString()}`}
-        />
-        <KpiCard
-          icon={<Users className="h-4 w-4 text-violet-400" />}
-          label="Workforce"
-          value={String(employeeCount)}
-          sub="employees across shops"
-        />
+        <KpiCard icon={<DollarSign className="h-4 w-4 text-emerald-400" />} label="All-Time Revenue" value={`$${allTimeRevenue.toLocaleString()}`} sub={`${salesCount} transactions`} />
+        <KpiCard icon={<Package className="h-4 w-4 text-sky-400" />} label="Inventory Value" value={`$${totalInventoryValue.toLocaleString()}`} sub={`Lean $${leanValue.toLocaleString()}`} />
+        <KpiCard icon={<BarChart3 className="h-4 w-4 text-orange-400" />} label="Avg Daily Revenue (60d)" value={`$${Math.round(avgDailyRevenue).toLocaleString()}`} sub={`Proj. monthly $${Math.round(projectedMonthly).toLocaleString()}`} />
+        <KpiCard icon={<TrendingUp className="h-4 w-4 text-rose-400" />} label="Growth (30d vs prev)" value={`${trends.growth >= 0 ? "+" : ""}${trends.growth.toFixed(1)}%`} sub={`$${trends.currentPeriodRevenue.toLocaleString()} vs $${trends.previousPeriodRevenue.toLocaleString()}`} />
+        <KpiCard icon={<Users className="h-4 w-4 text-violet-400" />} label="Workforce" value={String(employeeCount)} sub="employees across shops" />
       </div>
 
-      {/* Revenue Trend + Forecast */}
+      {/* AI INSIGHTS */}
+      <Card className={`border ${insights.length > 0 ? "border-violet-500/30" : "border-slate-700/50"} bg-slate-900/40`}>
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="flex items-center gap-2 text-sm font-black uppercase tracking-widest">
+                <Sparkles className={`h-4 w-4 ${insights.length > 0 ? "text-violet-400" : "text-slate-500"}`} /> AI Deep Analysis
+              </CardTitle>
+              <CardDescription className="text-[10px] text-slate-500 uppercase tracking-widest font-black">
+                {insights.length > 0 ? `${insights.length} insights generated` : "Plain-English business intelligence powered by OpenAI"}
+              </CardDescription>
+            </div>
+            <button
+              onClick={runAiAnalysis}
+              disabled={insightsLoading}
+              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-violet-600/20 border border-violet-500/30 text-violet-300 text-xs font-black uppercase tracking-wider hover:bg-violet-600/30 transition-all disabled:opacity-40"
+            >
+              {insightsLoading ? (
+                <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <Brain className="h-3.5 w-3.5" />
+              )}
+              {insightsLoading ? "Analyzing..." : insights.length > 0 ? "Refresh Analysis" : "Run Analysis"}
+            </button>
+          </div>
+        </CardHeader>
+        {insights.length > 0 && (
+          <CardContent>
+            <div className="grid gap-3 md:grid-cols-2">
+              {insights.map((ins) => (
+                <div
+                  key={ins.id}
+                  className={`p-3 rounded-lg border ${
+                    ins.severity === "critical"
+                      ? "bg-rose-500/5 border-rose-500/20"
+                      : ins.severity === "warning"
+                      ? "bg-amber-500/5 border-amber-500/20"
+                      : ins.severity === "positive"
+                      ? "bg-emerald-500/5 border-emerald-500/20"
+                      : "bg-slate-800/30 border-slate-700/50"
+                  }`}
+                >
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className={`text-[10px] font-black uppercase tracking-widest ${
+                      ins.severity === "critical" ? "text-rose-400" : ins.severity === "warning" ? "text-amber-400" : ins.severity === "positive" ? "text-emerald-400" : "text-slate-400"
+                    }`}>
+                      {ins.category} · {ins.severity}
+                    </span>
+                  </div>
+                  <p className="text-sm font-bold text-white">{ins.title}</p>
+                  <p className="text-xs text-slate-400 mt-0.5">{ins.body}</p>
+                  {ins.metric && (
+                    <div className="mt-2 flex items-center gap-2 text-xs font-mono">
+                      <span className="text-slate-500">{ins.metric.label}:</span>
+                      <span className="text-orange-400 font-black">{ins.metric.value}</span>
+                    </div>
+                  )}
+                  {ins.action && (
+                    <p className="mt-1.5 text-[10px] text-slate-500 italic">
+                      → {ins.action}
+                    </p>
+                  )}
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        )}
+      </Card>
+
+      {/* REVENUE TREND + FORECAST */}
       <div className="grid gap-6 lg:grid-cols-3">
         <Card className="lg:col-span-2 bg-slate-900/40 border-emerald-500/20">
           <CardHeader className="pb-3">
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle className="flex items-center gap-2 text-sm font-black uppercase tracking-widest">
-                  <TrendingUp className="h-4 w-4 text-emerald-400" /> Revenue Trend (60 days)
-                </CardTitle>
-                <CardDescription className="text-[10px] text-slate-500 uppercase tracking-widest font-black">
-                  Daily revenue with moving average
-                </CardDescription>
-              </div>
-            </div>
+            <CardTitle className="flex items-center gap-2 text-sm font-black uppercase tracking-widest">
+              <TrendingUp className="h-4 w-4 text-emerald-400" /> Revenue Trend (60 days)
+            </CardTitle>
           </CardHeader>
           <CardContent>
             {salesHistory.length === 0 ? (
@@ -130,11 +304,17 @@ export function FlectereDashboard(props: FlectereDashboardProps) {
             ) : (
               <ResponsiveContainer width="100%" height={250}>
                 <AreaChart data={salesHistory}>
+                  <defs>
+                    <linearGradient id="revGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#10b981" stopOpacity={0.2} />
+                      <stop offset="100%" stopColor="#10b981" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
                   <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
                   <XAxis dataKey="date" stroke="#475569" fontSize={9} tickLine={false} axisLine={false} interval="preserveStartEnd" />
                   <YAxis stroke="#475569" fontSize={10} tickLine={false} axisLine={false} tickFormatter={(v) => `$${v}`} />
                   <Tooltip contentStyle={{ backgroundColor: "#0f172a", border: "1px solid #1e293b", borderRadius: "8px" }} formatter={(val: any) => [`$${Number(val || 0).toLocaleString()}`]} />
-                  <Area type="monotone" dataKey="revenue" stroke="#10b981" fill="#10b981" fillOpacity={0.15} strokeWidth={2} dot={false} />
+                  <Area type="monotone" dataKey="revenue" stroke="#10b981" fill="url(#revGrad)" strokeWidth={2} dot={false} />
                 </AreaChart>
               </ResponsiveContainer>
             )}
@@ -181,7 +361,7 @@ export function FlectereDashboard(props: FlectereDashboardProps) {
         </Card>
       </div>
 
-      {/* Best Sellers + Performance Trends */}
+      {/* BEST SELLERS + STOCK VALUES */}
       <div className="grid gap-6 lg:grid-cols-2">
         <Card className="bg-slate-900/40 border-amber-500/20">
           <CardHeader className="pb-3">
@@ -203,7 +383,7 @@ export function FlectereDashboard(props: FlectereDashboardProps) {
                     <div className="flex items-center gap-4 shrink-0">
                       <span className="text-xs font-mono text-slate-400">{item.qty} units</span>
                       <span className="text-xs font-mono text-emerald-400 w-20 text-right">${item.revenue.toLocaleString()}</span>
-                      <span className={`text-[10px] font-black w-10 text-right ${Number(item.margin) >= 40 ? "text-emerald-400" : Number(item.margin) >= 20 ? "text-amber-400" : "text-rose-400"}`}>
+                      <span className={`text-[10px] font-black w-10 text-right ${item.margin >= 40 ? "text-emerald-400" : item.margin >= 20 ? "text-amber-400" : "text-rose-400"}`}>
                         {item.margin}%
                       </span>
                     </div>
@@ -248,7 +428,7 @@ export function FlectereDashboard(props: FlectereDashboardProps) {
         </Card>
       </div>
 
-      {/* Revenue vs Overheads */}
+      {/* SALES VS OVERHEADS */}
       {overheads?.global?.length > 0 && (
         <Card className="bg-slate-900/40 border-orange-500/20">
           <CardHeader className="pb-3">
@@ -262,9 +442,7 @@ export function FlectereDashboard(props: FlectereDashboardProps) {
                 <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
                 <XAxis dataKey="day" stroke="#475569" fontSize={9} tickLine={false} axisLine={false} />
                 <YAxis stroke="#475569" fontSize={10} tickLine={false} axisLine={false} tickFormatter={(v) => `$${v}`} />
-                <Tooltip contentStyle={{ backgroundColor: "#0f172a", border: "1px solid #1e293b", borderRadius: "8px" }}
-                  formatter={(val: any) => [`$${Number(val || 0).toLocaleString()}`]}
-                />
+                <Tooltip contentStyle={{ backgroundColor: "#0f172a", border: "1px solid #1e293b", borderRadius: "8px" }} formatter={(val: any) => [`$${Number(val || 0).toLocaleString()}`]} />
                 <Legend verticalAlign="top" height={30} iconType="circle" wrapperStyle={{ fontSize: "10px", fontWeight: "bold", textTransform: "uppercase", letterSpacing: "0.05em" }} />
                 <Bar dataKey="sales" name="Cumulative Sales" fill="#10b981" radius={[2, 2, 0, 0]} />
                 <Bar dataKey="overhead" name="Cumulative Overhead" fill="#f97316" radius={[2, 2, 0, 0]} />
@@ -274,9 +452,8 @@ export function FlectereDashboard(props: FlectereDashboardProps) {
         </Card>
       )}
 
-      {/* Deep Analysis Grid */}
+      {/* DEEP ANALYSIS GRID */}
       <div className="grid gap-6 lg:grid-cols-2">
-        {/* Dead Stock */}
         <Card className="bg-slate-900/40 border-rose-500/20">
           <CardHeader className="pb-3">
             <CardTitle className="flex items-center gap-2 text-sm font-black uppercase tracking-widest">
@@ -306,7 +483,6 @@ export function FlectereDashboard(props: FlectereDashboardProps) {
           </CardContent>
         </Card>
 
-        {/* Reorder Suggestions */}
         <Card className="bg-slate-900/40 border-amber-500/20">
           <CardHeader className="pb-3">
             <CardTitle className="flex items-center gap-2 text-sm font-black uppercase tracking-widest">
@@ -337,7 +513,7 @@ export function FlectereDashboard(props: FlectereDashboardProps) {
         </Card>
       </div>
 
-      {/* Per-Shop Overhead Breakdown */}
+      {/* PER-SHOP OVERHEAD */}
       {overheads && (
         <Card className="bg-slate-900/40 border-indigo-500/20">
           <CardHeader className="pb-3">
@@ -348,8 +524,7 @@ export function FlectereDashboard(props: FlectereDashboardProps) {
           <CardContent>
             <div className="grid gap-4 md:grid-cols-3">
               {["kipasa", "dubdub", "tradecenter"].map((shopKey) => {
-                const shopData = overheads[shopKey] || [];
-                const latest = shopData.filter((d: any) => d.sales !== null).slice(-1)[0];
+                const latest = (overheads[shopKey] || []).filter((d: any) => d.sales !== null).slice(-1)[0];
                 if (!latest) return null;
                 return (
                   <div key={shopKey} className="p-3 rounded-lg bg-slate-800/30 border border-slate-700/50">
@@ -366,7 +541,147 @@ export function FlectereDashboard(props: FlectereDashboardProps) {
         </Card>
       )}
 
-      {/* All-time Average Unit Revenue */}
+      {/* EXTERNAL API CONNECTORS */}
+      <Card className={`border ${connectorMetrics.length > 0 ? "border-cyan-500/30" : "border-slate-700/50"} bg-slate-900/40`}>
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <div>
+              <CardTitle className="flex items-center gap-2 text-sm font-black uppercase tracking-widest">
+                <Radio className={`h-4 w-4 ${connectorMetrics.length > 0 ? "text-cyan-400" : "text-slate-500"}`} />
+                External API Connectors
+              </CardTitle>
+              <CardDescription className="text-[10px] text-slate-500 uppercase tracking-widest font-black">
+                Pull data from Shopify, PayPal, or any REST API
+              </CardDescription>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setShowConnectorConfig(!showConnectorConfig)}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800 border border-slate-700 text-slate-400 text-[10px] font-black uppercase tracking-wider hover:bg-slate-700 transition-all"
+              >
+                <Settings2 className="h-3 w-3" /> Configure
+              </button>
+              <button
+                onClick={refreshConnectors}
+                disabled={connectorsLoading}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-cyan-600/20 border border-cyan-500/30 text-cyan-300 text-[10px] font-black uppercase tracking-wider hover:bg-cyan-600/30 transition-all disabled:opacity-40"
+              >
+                <RefreshCw className={`h-3 w-3 ${connectorsLoading ? "animate-spin" : ""}`} />
+                {connectorsLoading ? "Fetching..." : "Refresh All"}
+              </button>
+            </div>
+          </div>
+        </CardHeader>
+
+        {showConnectorConfig && (
+          <CardContent className="border-b border-slate-800 pb-4 mb-2">
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Connector Configuration</p>
+                <button
+                  onClick={addDefaultConnectors}
+                  className="flex items-center gap-1 px-2 py-1 rounded bg-slate-800 text-slate-400 text-[10px] font-black uppercase tracking-wider hover:text-slate-200"
+                >
+                  <Plus className="h-3 w-3" /> Add Template
+                </button>
+              </div>
+              {connectors.length === 0 ? (
+                <p className="text-xs text-slate-500">No connectors configured. Click "Add Template" to start.</p>
+              ) : (
+                <div className="space-y-2 max-h-[400px] overflow-y-auto">
+                  {connectors.map((c) => (
+                    <div key={c.id} className="p-3 rounded-lg bg-slate-800/40 border border-slate-700/50 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => updateConnector(c.id, { enabled: !c.enabled })}
+                            className={`p-1 rounded ${c.enabled ? "bg-emerald-500/20 text-emerald-400" : "bg-slate-700 text-slate-500"}`}
+                          >
+                            {c.enabled ? <Check className="h-3 w-3" /> : <X className="h-3 w-3" />}
+                          </button>
+                          <input
+                            className="bg-transparent border-b border-slate-700 text-sm text-white font-mono focus:border-cyan-500 outline-none"
+                            value={c.name}
+                            onChange={(e) => updateConnector(c.id, { name: e.target.value })}
+                            placeholder="Connector name"
+                          />
+                        </div>
+                        <button onClick={() => removeConnector(c.id)} className="p-1 rounded hover:bg-rose-500/20 text-slate-500 hover:text-rose-400">
+                          <Trash2 className="h-3 w-3" />
+                        </button>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2 text-xs">
+                        <div>
+                          <span className="text-slate-500">Base URL</span>
+                          <input className="w-full bg-slate-900 rounded px-2 py-1 text-white font-mono text-[11px] border border-slate-700" value={c.baseUrl} onChange={(e) => updateConnector(c.id, { baseUrl: e.target.value })} placeholder="https://..." />
+                        </div>
+                        <div>
+                          <span className="text-slate-500">Endpoint</span>
+                          <input className="w-full bg-slate-900 rounded px-2 py-1 text-white font-mono text-[11px] border border-slate-700" value={c.endpoint} onChange={(e) => updateConnector(c.id, { endpoint: e.target.value })} placeholder="/api/data" />
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2 text-xs">
+                        <div>
+                          <span className="text-slate-500">Auth Type</span>
+                          <select className="w-full bg-slate-900 rounded px-2 py-1 text-white text-[11px] border border-slate-700" value={c.authType} onChange={(e) => updateConnector(c.id, { authType: e.target.value as any })}>
+                            <option value="none">None</option>
+                            <option value="bearer">Bearer Token</option>
+                            <option value="api-key">API Key Header</option>
+                            <option value="basic">Basic Auth</option>
+                          </select>
+                        </div>
+                        <div>
+                          <span className="text-slate-500">API Key / Token</span>
+                          <input className="w-full bg-slate-900 rounded px-2 py-1 text-white font-mono text-[11px] border border-slate-700" type="password" value={c.apiKey || ""} onChange={(e) => updateConnector(c.id, { apiKey: e.target.value })} placeholder="sk-..." />
+                        </div>
+                      </div>
+                      {c.lastError && (
+                        <p className="text-[10px] text-rose-400 mt-1">Last error: {c.lastError}</p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </CardContent>
+        )}
+
+        {/* Connector metric display */}
+        <CardContent>
+          {connectorMetrics.length > 0 ? (
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              {connectorMetrics.map((m, i) => (
+                <div key={`${m.connectorId}-${i}`} className="p-3 rounded-lg bg-slate-800/30 border border-slate-700/50">
+                  <div className="flex items-center gap-1.5 mb-1">
+                    <ExternalLink className="h-3 w-3 text-cyan-400" />
+                    <span className="text-[9px] uppercase font-black text-cyan-400 tracking-widest truncate">{m.connectorName}</span>
+                  </div>
+                  <p className="text-lg font-black font-mono text-white">
+                    {m.unit === "$" && typeof m.value === "number" ? `$${m.value.toLocaleString()}` : m.value}
+                    {m.unit && m.unit !== "$" ? <span className="text-[10px] text-slate-500 ml-0.5">{m.unit}</span> : null}
+                  </p>
+                  <p className="text-[10px] text-slate-500 uppercase tracking-wider truncate">{m.label}</p>
+                  {m.change && (
+                    <span className={`text-[10px] font-black ${m.changeDirection === "up" ? "text-emerald-400" : m.changeDirection === "down" ? "text-rose-400" : "text-slate-500"}`}>
+                      {m.change}
+                    </span>
+                  )}
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-6">
+              <ExternalLink className="h-8 w-8 text-slate-600 mx-auto mb-2" />
+              <p className="text-sm text-slate-500">
+                {connectorError || "Configure connectors above and click Refresh to pull external data."}
+              </p>
+              <p className="text-[10px] text-slate-600 mt-1">Supports Shopify, PayPal, or any REST API with bearer/api-key/basic auth</p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* PERFORMANCE SUMMARY */}
       <Card className="bg-slate-900/40 border-emerald-500/20">
         <CardHeader className="pb-3">
           <CardTitle className="flex items-center gap-2 text-sm font-black uppercase tracking-widest">
