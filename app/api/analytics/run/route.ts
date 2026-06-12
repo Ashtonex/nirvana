@@ -15,7 +15,8 @@ const JOBS: Record<AnalyticsKind, any> = {
 
 async function runJob(kind: AnalyticsKind, baseUrl: string, incomingHeaders: Headers) {
   try {
-    const intelligenceUrl = process.env.INTELLIGENCE_URL || baseUrl;
+    let intelligenceUrl = process.env.INTELLIGENCE_URL || baseUrl;
+    if (!/^https?:\/\//i.test(intelligenceUrl)) intelligenceUrl = `https://${intelligenceUrl}`;
     const bridgeUrl = `${intelligenceUrl}/api/py/analytics/run?kind=${kind}`;
     
     const headers: Record<string, string> = {
