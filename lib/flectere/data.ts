@@ -1,6 +1,6 @@
 import { supabaseAdmin } from "@/lib/supabase";
 
-async function fetchAll<T>(
+export async function fetchAll<T>(
   table: string,
   select: string,
   filterFn?: (query: any) => any

@@ -16,7 +16,7 @@ import {
   RefreshCw, Plus, Trash2, ExternalLink, Settings2, Check, X,
   Sparkles, Radio, Download, Mail, FileSpreadsheet, PieChart as PieIcon,
   RotateCw, Search, Eye, CreditCard, Building2, TrendingUp as TrendUpIcon,
-  Activity, Layers, Crosshair,
+  Activity, Layers, Crosshair, Box, Truck,
 } from "lucide-react";
 import type { SalesMetric, ReorderSuggestion, DeadStockItem, DailySalesMetric, Forecast } from "@/lib/analytics";
 import type { ApiConnectorConfig, ConnectorMetric, AiInsight } from "@/lib/flectere/types";
@@ -24,11 +24,13 @@ import type {
   CashFlowDay, PaymentMethodSummary, CategorySummary,
   ShopComparison, InventoryTurnover, WoWComparison, DataQualityReport,
 } from "@/lib/flectere/data";
+import type { ShipmentSummary, ShipmentFullData } from "@/lib/flectere/shipments";
 import { generateAiInsights } from "@/lib/flectere/ai-analysis";
 import {
   loadConnectors, saveConnectors, getDefaultConnectors,
 } from "@/lib/flectere/api-connectors";
 import { exportCsv, generatePdf, sendEmailReport } from "@/lib/flectere/reporting";
+
 
 const CHART_COLORS = ["#10b981", "#38bdf8", "#f97316", "#a78bfa", "#f43f5e", "#eab308", "#14b8a6", "#8b5cf6"];
 const PAYMENT_COLORS: Record<string, string> = {
@@ -60,6 +62,7 @@ interface FlectereDashboardProps {
   trajectory: Record<string, any[]>;
   wow: WoWComparison;
   dataQuality: DataQualityReport;
+  shipments: ShipmentSummary[];
 }
 
 const SHOP_OPTIONS = [
@@ -92,6 +95,8 @@ export function FlectereDashboard(props: FlectereDashboardProps) {
   const [showPythonModal, setShowPythonModal] = useState(false);
   const [allPythonResults, setAllPythonResults] = useState<Record<string, any>>({});
   const [activePythonTab, setActivePythonTab] = useState<string>("inventory_velocity");
+  const [activeTab, setActiveTab] = useState("overview");
+  const [shipmentModal, setShipmentModal] = useState<{ open: boolean; shipmentId: string; data: ShipmentFullData | null; loading: boolean }>({ open: false, shipmentId: "", data: null, loading: false });
   const chartRef = useRef<HTMLDivElement>(null);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -109,7 +114,7 @@ export function FlectereDashboard(props: FlectereDashboardProps) {
     allTimeRevenue, totalInventoryValue, employeeCount, salesCount,
     salesHistory, bestSellers, forecast, trends, overheads,
     deadStock, reorderSuggestions, premiumValue, breakEvenValue, leanValue,
-    cashFlow, paymentMethods, categoryBreakdown, shopComparison, inventoryTurnover, grossMargin, trajectory, wow, dataQuality,
+    cashFlow, paymentMethods, categoryBreakdown, shopComparison, inventoryTurnover, grossMargin, trajectory, wow, dataQuality, shipments,
   } = props;
 
   const avgDailyRevenue = salesHistory.length > 0
@@ -305,6 +310,18 @@ export function FlectereDashboard(props: FlectereDashboardProps) {
     }
   }, []);
 
+  const openShipmentModal = useCallback(async (shipmentId: string) => {
+    setShipmentModal({ open: true, shipmentId, data: null, loading: true });
+    try {
+      const res = await fetch(`/api/flectere/shipment-detail?shipmentId=${encodeURIComponent(shipmentId)}`);
+      if (!res.ok) throw new Error(`Server error ${res.status}`);
+      const data = await res.json();
+      setShipmentModal((prev) => ({ ...prev, data: data.data, loading: false }));
+    } catch {
+      setShipmentModal((prev) => ({ ...prev, loading: false }));
+    }
+  }, []);
+
   // Chart drill-down
   const handleChartClick = useCallback((data: any) => {
     if (data?.activePayload?.[0]?.payload) {
@@ -381,8 +398,31 @@ export function FlectereDashboard(props: FlectereDashboardProps) {
         </Card>
       )}
 
-      {/* ===== EXECUTIVE SUMMARY ===== */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
+      {/* ===== TAB BAR ===== */}
+      <div className="flex flex-wrap gap-1 border-b border-slate-800 pb-px">
+        {[
+          { id: "overview", label: "Overview", icon: <BarChart3 className="h-3.5 w-3.5" /> },
+          { id: "sales", label: "Sales & Products", icon: <ShoppingCart className="h-3.5 w-3.5" /> },
+          { id: "inventory", label: "Inventory & Stock", icon: <Package className="h-3.5 w-3.5" /> },
+          { id: "analytics", label: "ML Analytics", icon: <Brain className="h-3.5 w-3.5" /> },
+          { id: "integrations", label: "Integrations", icon: <Radio className="h-3.5 w-3.5" /> },
+          { id: "shipments", label: "Shipments", icon: <Truck className="h-3.5 w-3.5" /> },
+        ].map((tab) => (
+          <button key={tab.id} onClick={() => setActiveTab(tab.id)}
+            className={`flex items-center gap-1.5 px-4 py-2 rounded-t text-[10px] font-black uppercase tracking-wider transition-all ${activeTab === tab.id
+              ? "bg-slate-900/60 text-orange-400 border border-slate-700 border-b-transparent -mb-px"
+              : "text-slate-500 hover:text-slate-300 border border-transparent"
+            }`}>
+            {tab.icon} {tab.label}
+          </button>
+        ))}
+      </div>
+
+      {/* ===== TAB CONTENT: OVERVIEW / SALES / INVENTORY / ANALYTICS (shared) ===== */}
+      {activeTab !== "shipments" && (
+        <>
+          {/* ===== EXECUTIVE SUMMARY ===== */}
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
         <KpiCard icon={<DollarSign className="h-4 w-4 text-emerald-400" />} label="All-Time Revenue" value={`$${allTimeRevenue.toLocaleString()}`} sub={`${salesCount} transactions`} />
         <KpiCard icon={<Package className="h-4 w-4 text-sky-400" />} label="Inventory Value" value={`$${totalInventoryValue.toLocaleString()}`} sub={`Lean $${leanValue.toLocaleString()}`} />
         <KpiCard icon={<BarChart3 className="h-4 w-4 text-orange-400" />} label="Avg Daily Revenue (60d)" value={`$${Math.round(avgDailyRevenue).toLocaleString()}`} sub={`Proj. monthly $${Math.round(projectedMonthly).toLocaleString()}`} />
@@ -1125,6 +1165,223 @@ export function FlectereDashboard(props: FlectereDashboardProps) {
           )}
         </CardContent>
       </Card>
+        </>
+      )}
+
+      {/* ===== SHIPMENTS TAB ===== */}
+      {activeTab === "shipments" && (
+        <Card className="bg-slate-900/40 border-amber-500/20">
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2 text-sm font-black uppercase tracking-widest">
+              <Truck className="h-4 w-4 text-amber-400" /> Shipments & Supplier Intelligence
+            </CardTitle>
+            <CardDescription className="text-[10px] text-slate-500 uppercase tracking-widest font-black">
+              {shipments.length} shipments on record · Click any row for full P&amp;L, item performance, and supplier recommendation
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {shipments.length === 0 ? (
+              <p className="text-sm text-slate-500">No shipments recorded.</p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="text-[10px] uppercase tracking-widest text-slate-500 font-black border-b border-slate-800">
+                      <th className="text-left py-2 pr-3">Supplier</th>
+                      <th className="text-left py-2 pr-3">Shipment #</th>
+                      <th className="text-left py-2 pr-3">Date</th>
+                      <th className="text-right py-2 pr-3">Total Cost</th>
+                      <th className="text-right py-2 pr-3">Items</th>
+                      <th className="text-right py-2 pr-3">Qty</th>
+                      <th className="text-right py-2">Pieces</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {shipments.map((s) => (
+                      <tr key={s.id} onClick={() => openShipmentModal(s.id)}
+                        className="border-b border-slate-800/50 hover:bg-slate-800/40 cursor-pointer transition-colors">
+                        <td className="py-2 pr-3 font-bold text-white">{s.supplier}</td>
+                        <td className="py-2 pr-3 text-slate-400 font-mono">{s.shipmentNumber}</td>
+                        <td className="py-2 pr-3 text-slate-400">{s.date ? new Date(s.date).toLocaleDateString() : "—"}</td>
+                        <td className="py-2 pr-3 text-right font-mono text-amber-400">${s.totalCost.toLocaleString()}</td>
+                        <td className="py-2 pr-3 text-right font-mono text-slate-300">{s.itemCount}</td>
+                        <td className="py-2 pr-3 text-right font-mono text-slate-300">{s.totalQuantity}</td>
+                        <td className="py-2 text-right font-mono text-slate-500">{s.manifestPieces}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* ===== SHIPMENT DETAIL MODAL ===== */}
+      {shipmentModal.open && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => setShipmentModal({ open: false, shipmentId: "", data: null, loading: false })}>
+          <div className="bg-slate-900 border border-slate-700 rounded-xl p-6 max-w-5xl w-full mx-4 max-h-[90vh] overflow-y-auto shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            {shipmentModal.loading ? (
+              <div className="flex items-center justify-center py-12">
+                <RefreshCw className="h-6 w-6 animate-spin text-slate-500" />
+                <span className="ml-3 text-sm text-slate-500">Loading shipment intelligence...</span>
+              </div>
+            ) : shipmentModal.data ? (
+              <>
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-sm font-black uppercase tracking-widest text-white flex items-center gap-2">
+                    <Truck className="h-4 w-4 text-amber-400" /> {shipmentModal.data.supplier} — {shipmentModal.data.summary.shipmentNumber}
+                  </h3>
+                  <div className="flex items-center gap-2">
+                    <button onClick={async () => {
+                      const data = shipmentModal.data;
+                      if (!data) return;
+                      const { generatePdf } = await import("@/lib/flectere/reporting");
+                      const sections = [
+                        { heading: `Shipment: ${data.supplier} — ${data.summary.shipmentNumber}`, body: `Date: ${data.date ? new Date(data.date).toLocaleDateString() : "N/A"} | Supplier: ${data.supplier}` },
+                        { heading: "Cost Breakdown", body: `Purchase: $${data.summary.purchasePrice.toLocaleString()} | Shipping: $${data.summary.shippingCost.toLocaleString()} | Duty: $${data.summary.dutyCost.toLocaleString()} | Misc: $${data.summary.miscCost.toLocaleString()} | Total: $${data.totalCost.toLocaleString()}` },
+                        { heading: "Performance Summary", body: `Revenue: $${Math.round(data.performance.totalRevenue).toLocaleString()} | Gross Profit: $${Math.round(data.performance.grossProfit).toLocaleString()} | ROI: ${data.performance.roi.toFixed(1)}% | Sell-Through: ${data.performance.sellThrough.toFixed(1)}% | Days Since Receipt: ${data.performance.daysSinceReceipt}` },
+                        { heading: "Overhead Contribution", body: `Contribution: $${Math.round(data.performance.overheadContribution).toLocaleString()} (${data.performance.overheadContributionPct.toFixed(1)}% of monthly overhead)` },
+                        { heading: "Items", body: "", table: { headers: ["Item", "Category", "Sold", "Left", "Revenue", "Profit", "Sell-Through"], rows: data.performance.items.map((i: any) => [i.name, i.category, String(i.soldQty), String(i.currentQty), `$${Math.round(i.revenue).toLocaleString()}`, `$${Math.round(i.grossProfit).toLocaleString()}`, `${i.sellThrough.toFixed(1)}%`]) } },
+                        { heading: "Fast Movers", body: data.performance.fastMovers.length > 0 ? data.performance.fastMovers.map((i: any) => `${i.name} (${i.dailyVelocity.toFixed(2)}/day)`).join(", ") : "None" },
+                        { heading: "Slow Movers", body: data.performance.slowMovers.length > 0 ? data.performance.slowMovers.map((i: any) => `${i.name} (${i.sellThrough.toFixed(1)}% sell-through)`).join(", ") : "None" },
+                        { heading: "Supplier Recommendation", body: `${data.performance.supplierRecommendation.toUpperCase()}: ${data.performance.recommendationReason}` },
+                      ];
+                      await generatePdf(`Shipment_${data.summary.shipmentNumber}`, sections);
+                    }} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-rose-600/10 border border-rose-500/20 text-rose-300 text-[10px] font-black uppercase tracking-wider hover:bg-rose-600/20 transition-all">
+                      <Download className="h-3 w-3" /> PDF
+                    </button>
+                    <button onClick={() => setShipmentModal({ open: false, shipmentId: "", data: null, loading: false })} className="p-1 rounded hover:bg-slate-800 text-slate-500 hover:text-white transition-colors"><X className="h-4 w-4" /></button>
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  {/* Cost + Performance KPI row */}
+                  <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                    <div className="p-3 rounded-lg bg-slate-800/20 border border-slate-700/30">
+                      <p className="text-[9px] uppercase font-black text-slate-500 tracking-widest">Total Cost</p>
+                      <p className="text-lg font-black font-mono text-amber-400">${Math.round(shipmentModal.data.totalCost).toLocaleString()}</p>
+                    </div>
+                    <div className="p-3 rounded-lg bg-slate-800/20 border border-slate-700/30">
+                      <p className="text-[9px] uppercase font-black text-slate-500 tracking-widest">Revenue Generated</p>
+                      <p className="text-lg font-black font-mono text-emerald-400">${Math.round(shipmentModal.data.performance.totalRevenue).toLocaleString()}</p>
+                    </div>
+                    <div className="p-3 rounded-lg bg-slate-800/20 border border-slate-700/30">
+                      <p className="text-[9px] uppercase font-black text-slate-500 tracking-widest">Gross Profit</p>
+                      <p className={`text-lg font-black font-mono ${shipmentModal.data.performance.grossProfit >= 0 ? "text-emerald-400" : "text-rose-400"}`}>${Math.round(shipmentModal.data.performance.grossProfit).toLocaleString()}</p>
+                    </div>
+                    <div className="p-3 rounded-lg bg-slate-800/20 border border-slate-700/30">
+                      <p className="text-[9px] uppercase font-black text-slate-500 tracking-widest">ROI</p>
+                      <p className={`text-lg font-black font-mono ${shipmentModal.data.performance.roi >= 0 ? "text-emerald-400" : "text-rose-400"}`}>{shipmentModal.data.performance.roi.toFixed(1)}%</p>
+                    </div>
+                    <div className="p-3 rounded-lg bg-slate-800/20 border border-slate-700/30">
+                      <p className="text-[9px] uppercase font-black text-slate-500 tracking-widest">Sell-Through</p>
+                      <p className="text-lg font-black font-mono text-sky-400">{shipmentModal.data.performance.sellThrough.toFixed(1)}%</p>
+                    </div>
+                  </div>
+
+                  {/* Items table */}
+                  <div>
+                    <p className="text-[10px] uppercase font-black text-slate-500 tracking-widest mb-2">Item Performance ({shipmentModal.data.performance.items.length} items)</p>
+                    <div className="overflow-x-auto max-h-[300px] overflow-y-auto">
+                      <table className="w-full text-[10px]">
+                        <thead className="sticky top-0 bg-slate-900">
+                          <tr className="text-[9px] uppercase tracking-widest text-slate-500 font-black border-b border-slate-800">
+                            <th className="text-left py-1.5 pr-2">Item</th>
+                            <th className="text-left py-1.5 pr-2">Category</th>
+                            <th className="text-right py-1.5 pr-2">Orig</th>
+                            <th className="text-right py-1.5 pr-2">Sold</th>
+                            <th className="text-right py-1.5 pr-2">Left</th>
+                            <th className="text-right py-1.5 pr-2">Revenue</th>
+                            <th className="text-right py-1.5 pr-2">Profit</th>
+                            <th className="text-right py-1.5 pr-2">Sell-Thru</th>
+                            <th className="text-right py-1.5 pr-2">Velocity</th>
+                            <th className="text-right py-1.5">Mover</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {shipmentModal.data.performance.items.map((item) => (
+                            <tr key={item.itemId} className="border-b border-slate-800/30 hover:bg-slate-800/20">
+                              <td className="py-1.5 pr-2 text-white font-bold truncate max-w-[140px]">{item.name}</td>
+                              <td className="py-1.5 pr-2 text-slate-400">{item.category}</td>
+                              <td className="py-1.5 pr-2 text-right text-slate-400">{item.originalQty}</td>
+                              <td className="py-1.5 pr-2 text-right text-slate-300">{item.soldQty}</td>
+                              <td className="py-1.5 pr-2 text-right text-slate-300">{item.currentQty}</td>
+                              <td className="py-1.5 pr-2 text-right text-emerald-400 font-mono">${Math.round(item.revenue).toLocaleString()}</td>
+                              <td className="py-1.5 pr-2 text-right font-mono" style={{ color: item.grossProfit >= 0 ? "#10b981" : "#f43f5e" }}>${Math.round(item.grossProfit).toLocaleString()}</td>
+                              <td className="py-1.5 pr-2 text-right text-sky-400">{item.sellThrough.toFixed(1)}%</td>
+                              <td className="py-1.5 pr-2 text-right text-slate-400">{item.dailyVelocity.toFixed(2)}/d</td>
+                              <td className="py-1.5 text-right">
+                                {item.isFastMover ? <span className="text-emerald-400 font-black">Fast</span> : item.isSlowMover ? <span className="text-rose-400 font-black">Slow</span> : <span className="text-slate-600">—</span>}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  {/* Fast + Slow movers */}
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <div className="p-3 rounded-lg bg-emerald-500/5 border border-emerald-500/10">
+                      <p className="text-[10px] uppercase font-black text-emerald-400 tracking-widest mb-2">Fast Movers</p>
+                      {shipmentModal.data.performance.fastMovers.length === 0 ? (
+                        <p className="text-xs text-slate-500">No fast-moving items identified.</p>
+                      ) : (
+                        <div className="space-y-1">
+                          {shipmentModal.data.performance.fastMovers.slice(0, 8).map((i) => (
+                            <div key={i.itemId} className="flex justify-between text-xs">
+                              <span className="text-slate-300 truncate">{i.name}</span>
+                              <span className="text-emerald-400 font-mono">{i.dailyVelocity.toFixed(2)}/d · {i.sellThrough.toFixed(0)}%</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    <div className="p-3 rounded-lg bg-rose-500/5 border border-rose-500/10">
+                      <p className="text-[10px] uppercase font-black text-rose-400 tracking-widest mb-2">Slow Movers</p>
+                      {shipmentModal.data.performance.slowMovers.length === 0 ? (
+                        <p className="text-xs text-slate-500">No slow-moving items identified.</p>
+                      ) : (
+                        <div className="space-y-1">
+                          {shipmentModal.data.performance.slowMovers.slice(0, 8).map((i) => (
+                            <div key={i.itemId} className="flex justify-between text-xs">
+                              <span className="text-slate-300 truncate">{i.name}</span>
+                              <span className="text-rose-400 font-mono">{i.sellThrough.toFixed(1)}% · {i.currentQty} left</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Overhead contribution */}
+                  <div className="p-3 rounded-lg bg-indigo-500/5 border border-indigo-500/10">
+                    <p className="text-[10px] uppercase font-black text-indigo-400 tracking-widest mb-1">Overhead Contribution</p>
+                    <p className="text-sm text-slate-300">
+                      This shipment generated <span className="text-emerald-400 font-bold">${Math.round(shipmentModal.data.performance.overheadContribution).toLocaleString()}</span> in revenue toward overhead,
+                      covering <span className="text-indigo-400 font-bold">{shipmentModal.data.performance.overheadContributionPct.toFixed(1)}%</span> of monthly overhead costs.
+                      {shipmentModal.data.performance.overheadContributionPct > 100
+                        ? " Revenue exceeds overhead contribution — this is a strong shipment."
+                        : " Below 100% means other shipments or revenue streams must compensate."}
+                    </p>
+                  </div>
+
+                  {/* Supplier recommendation */}
+                  <div className={`p-4 rounded-lg border ${shipmentModal.data.performance.supplierRecommendation === "keep" ? "bg-emerald-500/5 border-emerald-500/20" : shipmentModal.data.performance.supplierRecommendation === "review" ? "bg-amber-500/5 border-amber-500/20" : "bg-rose-500/5 border-rose-500/20"}`}>
+                    <p className="text-[10px] uppercase font-black tracking-widest mb-1" style={{ color: shipmentModal.data.performance.supplierRecommendation === "keep" ? "#10b981" : shipmentModal.data.performance.supplierRecommendation === "review" ? "#f59e0b" : "#f43f5e" }}>
+                      Supplier Recommendation: {shipmentModal.data.performance.supplierRecommendation.toUpperCase()}
+                    </p>
+                    <p className="text-sm text-slate-300">{shipmentModal.data.performance.recommendationReason}</p>
+                  </div>
+                </div>
+              </>
+            ) : (
+              <p className="text-sm text-rose-400 text-center py-8">Failed to load shipment data.</p>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* ===== ML RESULTS MODAL ===== */}
       {showPythonModal && (

@@ -24,6 +24,7 @@ import {
   getWeekOverWeek,
   getDataQuality,
 } from "@/lib/flectere/data";
+import { getAllShipments } from "@/lib/flectere/shipments";
 import { FlectereDashboard } from "./FlectereDashboard";
 
 export default async function FlecterePage() {
@@ -49,6 +50,7 @@ export default async function FlecterePage() {
     trajectory,
     wow,
     dataQuality,
+    shipments,
   ] = await Promise.all([
     getDashboardData(60),
     getFinancials(),
@@ -71,6 +73,7 @@ export default async function FlecterePage() {
     getRevenueExpenseProfitTrajectoryData(),
     getWeekOverWeek(),
     getDataQuality(),
+    getAllShipments(),
   ]);
 
   const sales = db.sales || [];
@@ -120,6 +123,7 @@ export default async function FlecterePage() {
         trajectory={trajectory}
         wow={wow}
         dataQuality={dataQuality}
+        shipments={shipments}
       />
     </div>
   );
