@@ -418,8 +418,8 @@ export function FlectereDashboard(props: FlectereDashboardProps) {
         ))}
       </div>
 
-      {/* ===== TAB CONTENT: OVERVIEW / SALES / INVENTORY / ANALYTICS (shared) ===== */}
-      {activeTab !== "shipments" && (
+      {/* ===== OVERVIEW CONTENT ===== */}
+      {activeTab === "overview" && (
         <>
           {/* ===== EXECUTIVE SUMMARY ===== */}
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
@@ -649,6 +649,12 @@ export function FlectereDashboard(props: FlectereDashboardProps) {
           </CardContent>
         </Card>
       )}
+        </>
+      )}
+
+      {/* ===== SALES & PRODUCTS TAB ===== */}
+      {activeTab === "sales" && (
+        <>
 
       {/* ===== BEST SELLERS + STOCK VALUES ===== */}
       <div className="grid gap-6 lg:grid-cols-2">
@@ -786,6 +792,12 @@ export function FlectereDashboard(props: FlectereDashboardProps) {
           </CardContent>
         </Card>
       </div>
+        </>
+      )}
+
+      {/* ===== OVERVIEW CONTENT (2) ===== */}
+      {activeTab === "overview" && (
+        <>
 
       {/* ===== SALES VS OVERHEADS ===== */}
       {overheads?.global?.length > 0 && (
@@ -810,6 +822,12 @@ export function FlectereDashboard(props: FlectereDashboardProps) {
           </CardContent>
         </Card>
       )}
+        </>
+      )}
+
+      {/* ===== INVENTORY & STOCK TAB ===== */}
+      {activeTab === "inventory" && (
+        <>
 
       {/* ===== DEEP ANALYSIS GRID ===== */}
       <div className="grid gap-6 lg:grid-cols-2">
@@ -892,6 +910,12 @@ export function FlectereDashboard(props: FlectereDashboardProps) {
           </CardContent>
         </Card>
       )}
+        </>
+      )}
+
+      {/* ===== ML ANALYTICS TAB ===== */}
+      {activeTab === "analytics" && (
+        <>
 
       {/* ===== PYTHON ML ANALYTICS ===== */}
       <Card className="bg-slate-900/40 border-violet-500/20">
@@ -968,6 +992,12 @@ export function FlectereDashboard(props: FlectereDashboardProps) {
           </div>
         </CardContent>
       </Card>
+        </>
+      )}
+
+      {/* ===== SALES & PRODUCTS TAB (2) ===== */}
+      {activeTab === "sales" && (
+        <>
 
       {/* ===== SHOP COMPARISON ===== */}
       {shopComparison.length > 0 && (
@@ -1007,6 +1037,12 @@ export function FlectereDashboard(props: FlectereDashboardProps) {
           </CardContent>
         </Card>
       )}
+        </>
+      )}
+
+      {/* ===== OVERVIEW CONTENT (3) ===== */}
+      {activeTab === "overview" && (
+        <>
 
       {/* ===== PER-SHOP OVERHEAD ===== */}
       {overheads && (
@@ -1035,6 +1071,12 @@ export function FlectereDashboard(props: FlectereDashboardProps) {
           </CardContent>
         </Card>
       )}
+        </>
+      )}
+
+      {/* ===== INTEGRATIONS TAB ===== */}
+      {activeTab === "integrations" && (
+        <>
 
       {/* ===== EXTERNAL API CONNECTORS ===== */}
       <Card className={`border ${connectorMetrics.length > 0 ? "border-cyan-500/30" : "border-slate-700/50"} bg-slate-900/40`}>
