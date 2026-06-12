@@ -54,3 +54,6 @@ test-results/
 
 # android build artifacts
 android/.kotlin/
+
+# standalone Python intelligence server (separate git repo)
+/uvicorn_intelligence/
