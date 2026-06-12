@@ -1278,10 +1278,11 @@ export function FlectereDashboard(props: FlectereDashboardProps) {
                     <Truck className="h-4 w-4 text-amber-400" /> {shipmentModal.data.supplier} — {shipmentModal.data.summary.shipmentNumber}
                   </h3>
                   <div className="flex items-center gap-2">
-                    <button onClick={() => {
-                      const data = shipmentModal.data;
-                      if (!data) return;
+                    <button onClick={async () => {
                       try {
+                        await ensurePdfModules();
+                        const data = shipmentModal.data;
+                        if (!data) return;
                         const sections = [
                           { heading: `Shipment: ${data.supplier} — ${data.summary.shipmentNumber}`, body: `Date: ${data.date ? new Date(data.date).toLocaleDateString() : "N/A"} | Supplier: ${data.supplier}` },
                           { heading: "Cost Breakdown", body: `Purchase: $${data.summary.purchasePrice.toLocaleString()} | Shipping: $${data.summary.shippingCost.toLocaleString()} | Duty: $${data.summary.dutyCost.toLocaleString()} | Misc: $${data.summary.miscCost.toLocaleString()} | Total: $${data.totalCost.toLocaleString()}` },
@@ -1561,7 +1562,7 @@ function renderPythonPayload(kind: string, payload: any) {
     return <p className="text-sm text-slate-500">No structured data available.</p>;
   }
 
-  // Handle array payloads (e.g. anomaly list, velocity list)
+  // Top-level array payload — render as item list
   if (Array.isArray(payload)) {
     const entries = payload.slice(0, 20);
     if (entries.length === 0) return <p className="text-sm text-slate-500">Empty result set.</p>;
@@ -1588,19 +1589,35 @@ function renderPythonPayload(kind: string, payload: any) {
     );
   }
 
-  // Object payload — render as metric tiles
-  const entries = Object.entries(payload).filter(([k]) => !k.startsWith("_"));
-  if (entries.length === 0) return <p className="text-sm text-slate-500">No metrics available.</p>;
-  return (
-    <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-      {entries.slice(0, 24).map(([key, val]) => {
+  // Object payload — extract array fields and scalar fields
+  const arrayFields: [string, any[]][] = [];
+  const scalarFields: [string, any][] = [];
+
+  const collectFields = (obj: any, prefix = "") => {
+    for (const [key, val] of Object.entries(obj)) {
+      if (key.startsWith("_")) continue;
+      const label = prefix ? `${prefix}.${key}` : key;
+      if (Array.isArray(val)) {
+        arrayFields.push([label, val]);
+      } else if (typeof val === "object" && val !== null) {
+        collectFields(val, label);
+      } else {
+        scalarFields.push([label, val]);
+      }
+    }
+  };
+  collectFields(payload);
+
+  // Render scalar keys as metric tiles
+  const scalarContent = scalarFields.length > 0 ? (
+    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      {scalarFields.slice(0, 20).map(([key, val]) => {
         const display = typeof val === "number"
           ? (key.includes("amount") || key.includes("price") || key.includes("revenue") || key.includes("value") || key.includes("cost") || key.includes("budget")
             ? `$${Math.round(val).toLocaleString()}`
             : key.includes("pct") || key.includes("rate") ? `${(val * 100).toFixed(1)}%`
             : key.includes("count") || key.includes("total") ? val.toLocaleString()
             : String(val))
-          : typeof val === "object" ? JSON.stringify(val).slice(0, 60)
           : String(val).slice(0, 40);
         return (
           <div key={key} className="p-3 rounded-lg bg-slate-800/20 border border-slate-700/30">
@@ -1609,6 +1626,50 @@ function renderPythonPayload(kind: string, payload: any) {
           </div>
         );
       })}
+    </div>
+  ) : null;
+
+  // Render array fields as item lists
+  const arrayContent = arrayFields.length > 0 ? (
+    <div className="space-y-4">
+      {arrayFields.slice(0, 6).map(([label, arr]) => {
+        const items = arr.slice(0, 20);
+        if (items.length === 0) return null;
+        const sampleKeys = Object.keys(items[0] || {}).slice(0, 5);
+        return (
+          <div key={label}>
+            <p className="text-[10px] uppercase font-black text-slate-500 tracking-widest mb-2">{label.replace(/_/g, " ")} ({arr.length})</p>
+            <div className="space-y-1 max-h-[300px] overflow-y-auto">
+              {items.map((item: any, i: number) => (
+                <div key={i} className="flex items-center justify-between py-1 px-2 rounded bg-slate-800/20 border border-slate-700/30 hover:bg-slate-800/40">
+                  <span className="text-xs text-slate-300 truncate min-w-0 flex-1">{item.name || item.item || item.item_name || item.description || `#${i + 1}`}</span>
+                  <div className="flex items-center gap-2 shrink-0 text-xs font-mono">
+                    {sampleKeys.filter((k) => k !== "name" && k !== "item" && k !== "item_name" && k !== "description").slice(0, 3).map((k) => {
+                      const v = item[k];
+                      const display = typeof v === "number"
+                        ? (k.includes("amount") || k.includes("price") || k.includes("revenue") || k.includes("value") || k.includes("cost")
+                          ? `$${Math.round(v).toLocaleString()}` : String(Math.round(v)))
+                        : String(v).slice(0, 16);
+                      return <span key={k} className="text-slate-400 text-[10px]">{display}</span>;
+                    })}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  ) : null;
+
+  if (!scalarContent && !arrayContent) {
+    return <p className="text-sm text-slate-500">No metrics or data available.</p>;
+  }
+
+  return (
+    <div className="space-y-4">
+      {scalarContent}
+      {arrayContent}
     </div>
   );
 }
