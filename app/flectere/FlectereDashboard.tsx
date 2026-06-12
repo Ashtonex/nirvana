@@ -1301,7 +1301,7 @@ export function FlectereDashboard(props: FlectereDashboardProps) {
                           { heading: "Cost Breakdown", body: `Purchase: $${data.summary.purchasePrice.toLocaleString()} | Shipping: $${data.summary.shippingCost.toLocaleString()} | Duty: $${data.summary.dutyCost.toLocaleString()} | Misc: $${data.summary.miscCost.toLocaleString()} | Total: $${data.totalCost.toLocaleString()}` },
                           { heading: "Performance Summary", body: `Revenue: $${Math.round(data.performance.totalRevenue).toLocaleString()} | Gross Profit: $${Math.round(data.performance.grossProfit).toLocaleString()} | ROI: ${data.performance.roi.toFixed(1)}% | Sell-Through: ${data.performance.sellThrough.toFixed(1)}% | Days Since Receipt: ${data.performance.daysSinceReceipt}` },
                           { heading: "Overhead Contribution", body: `Contribution: $${Math.round(data.performance.overheadContribution).toLocaleString()} (${data.performance.overheadContributionPct.toFixed(1)}% of monthly overhead)` },
-                          { heading: "Items", body: "", table: { headers: ["Item", "Category", "Sold", "Left", "Revenue", "Profit", "Sell-Through"], rows: data.performance.items.map((i: any) => [i.name, i.category, String(i.soldQty), String(i.currentQty), `$${Math.round(i.revenue).toLocaleString()}`, `$${Math.round(i.grossProfit).toLocaleString()}`, `${i.sellThrough.toFixed(1)}%`]) } },
+                          { heading: "Items", body: "", table: { headers: ["Item", "Category", "Unit Cost", "Orig", "Sold", "Left", "Revenue", "Profit", "Sell-Through"], rows: data.performance.items.map((i: any) => [i.name, i.category, `$${Math.round(i.unitCost).toLocaleString()}`, String(i.originalQty), String(i.soldQty), String(i.currentQty), `$${Math.round(i.revenue).toLocaleString()}`, `$${Math.round(i.grossProfit).toLocaleString()}`, `${i.sellThrough.toFixed(1)}%`]) } },
                           { heading: "Fast Movers", body: data.performance.fastMovers.length > 0 ? data.performance.fastMovers.map((i: any) => `${i.name} (${i.dailyVelocity.toFixed(2)}/day)`).join(", ") : "None" },
                           { heading: "Slow Movers", body: data.performance.slowMovers.length > 0 ? data.performance.slowMovers.map((i: any) => `${i.name} (${i.sellThrough.toFixed(1)}% sell-through)`).join(", ") : "None" },
                           { heading: "Supplier Recommendation", body: `${data.performance.supplierRecommendation.toUpperCase()}: ${data.performance.recommendationReason}` },
@@ -1677,7 +1677,13 @@ function renderPythonPayload(kind: string, payload: any) {
   ) : null;
 
   if (!scalarContent && !arrayContent) {
-    return <p className="text-sm text-slate-500">No metrics or data available.</p>;
+    const raw = typeof payload === "object" ? JSON.stringify(payload, null, 2).slice(0, 2000) : String(payload).slice(0, 2000);
+    return (
+      <div>
+        <p className="text-sm text-slate-500 mb-2">Raw payload:</p>
+        <pre className="text-[10px] text-slate-400 font-mono whitespace-pre-wrap bg-slate-800/30 p-3 rounded max-h-[400px] overflow-y-auto">{raw}</pre>
+      </div>
+    );
   }
 
   return (
