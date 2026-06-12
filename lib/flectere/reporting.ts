@@ -11,7 +11,8 @@ export function exportCsv(headers: string[], rows: string[][], filename: string)
 
 export async function generatePdf(
   title: string,
-  sections: { heading: string; body: string; table?: { headers: string[]; rows: string[][] } }[]
+  sections: { heading: string; body: string; table?: { headers: string[]; rows: string[][] }; payload?: any }[],
+  chartImages?: { img: string; heading: string }[]
 ) {
   const { default: jsPDF } = await import("jspdf");
   await import("jspdf-autotable");
@@ -27,30 +28,51 @@ export async function generatePdf(
     y += 8;
   };
 
-  const addSubtitle = (text: string) => {
-    if (y > 270) { doc.addPage(); y = 20; }
-    doc.setFontSize(9);
-    doc.setTextColor(100);
-    doc.text(text, pageW / 2, y, { align: "center" });
-    y += 6;
+  const addText = (text: string, size = 9, color?: number[]) => {
+    if (y > 275) { doc.addPage(); y = 20; }
+    doc.setFontSize(size);
+    if (color) doc.setTextColor(color[0], color[1], color[2]);
+    const lines = doc.splitTextToSize(text, pageW - 28);
+    doc.text(lines, 14, y);
+    y += lines.length * 4.5 + 3;
     doc.setTextColor(0);
   };
 
   addTitle(title);
-  addSubtitle(`Nirvana Intelligence · Generated ${new Date().toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}`);
+  addText(`Nirvana Intelligence · Generated ${new Date().toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}`, 9, [100, 100, 100]);
 
   for (const section of sections) {
     if (y > 260) { doc.addPage(); y = 20; }
-    doc.setFontSize(13);
+
+    // Section heading
+    doc.setFontSize(12);
     doc.setFont("helvetica", "bold");
     doc.text(section.heading, 14, y);
     y += 6;
     doc.setFont("helvetica", "normal");
-    doc.setFontSize(10);
-    const lines = doc.splitTextToSize(section.body, pageW - 28);
-    doc.text(lines, 14, y);
-    y += lines.length * 5 + 4;
 
+    // Body text
+    if (section.body) {
+      doc.setFontSize(9);
+      const lines = doc.splitTextToSize(section.body, pageW - 28);
+      doc.text(lines, 14, y);
+      y += lines.length * 4.5 + 3;
+    }
+
+    // Payload (ML results) — render as key-value pairs
+    if (section.payload && typeof section.payload === "object") {
+      doc.setFontSize(8);
+      const entries = Object.entries(section.payload).slice(0, 30);
+      for (const [key, val] of entries) {
+        if (y > 270) { doc.addPage(); y = 20; }
+        const display = typeof val === "object" ? JSON.stringify(val).slice(0, 80) : String(val);
+        doc.text(`  ${key.replace(/_/g, " ")}: ${display}`, 14, y);
+        y += 4;
+      }
+      y += 3;
+    }
+
+    // Table
     if (section.table && section.table.headers.length > 0) {
       if (y > 250) { doc.addPage(); y = 20; }
       (doc as any).autoTable({
@@ -58,13 +80,36 @@ export async function generatePdf(
         head: [section.table.headers],
         body: section.table.rows,
         theme: "striped",
-        headStyles: { fillColor: [79, 70, 229] },
-        styles: { fontSize: 8, cellPadding: 2 },
+        headStyles: { fillColor: [79, 70, 229], fontSize: 8 },
+        styles: { fontSize: 7, cellPadding: 1.5 },
         margin: { left: 14, right: 14 },
       });
-      y = (doc as any).lastAutoTable.finalY + 8;
+      y = (doc as any).lastAutoTable.finalY + 6;
     }
   }
+
+  // Chart images
+  if (chartImages) {
+    for (const chart of chartImages) {
+      if (y > 250) { doc.addPage(); y = 20; }
+      doc.setFontSize(11);
+      doc.setFont("helvetica", "bold");
+      doc.text(chart.heading, 14, y);
+      y += 5;
+      doc.setFont("helvetica", "normal");
+      try {
+        const imgW = pageW - 28;
+        const imgH = (imgW * 9) / 16;
+        doc.addImage(chart.img, "PNG", 14, y, imgW, imgH);
+        y += imgH + 6;
+      } catch { /* skip broken image */ }
+    }
+  }
+
+  // Footer
+  doc.setFontSize(7);
+  doc.setTextColor(150);
+  doc.text(`Nirvana Flectere BI · Page ${(doc as any).internal?.getNumberOfPages?.() || 1}`, pageW / 2, 288, { align: "center" });
 
   doc.save(`${title.replace(/\s+/g, "_").toLowerCase()}.pdf`);
 }

@@ -89,6 +89,10 @@ export function FlectereDashboard(props: FlectereDashboardProps) {
   const [pythonRunning, setPythonRunning] = useState(false);
   const [pythonResult, setPythonResult] = useState<string | null>(null);
   const [pythonKind, setPythonKind] = useState<string>("inventory_velocity");
+  const [showPythonModal, setShowPythonModal] = useState(false);
+  const [allPythonResults, setAllPythonResults] = useState<Record<string, any>>({});
+  const [activePythonTab, setActivePythonTab] = useState<string>("inventory_velocity");
+  const chartRef = useRef<HTMLDivElement>(null);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => { setMounted(true); }, []);
@@ -112,6 +116,12 @@ export function FlectereDashboard(props: FlectereDashboardProps) {
     ? salesHistory.reduce((s, d) => s + d.revenue, 0) / salesHistory.length : 0;
   const projectedMonthly = avgDailyRevenue * 30;
   const deadStockValue = deadStock.reduce((s, d) => s + d.value, 0);
+  const mid = Math.floor(salesHistory.length / 2);
+  const firstHalf = salesHistory.slice(0, mid);
+  const secondHalf = salesHistory.slice(mid);
+  const firstHalfRev = firstHalf.reduce((s, d) => s + d.revenue, 0);
+  const secondHalfRev = secondHalf.reduce((s, d) => s + d.revenue, 0);
+  const benchmarkGrowth = firstHalfRev > 0 ? ((secondHalfRev - firstHalfRev) / firstHalfRev) * 100 : 0;
 
   const bestSellersData = useMemo(() => {
     return bestSellers.slice(0, 8).map((item, i) => ({
@@ -177,16 +187,55 @@ export function FlectereDashboard(props: FlectereDashboardProps) {
   }, []);
 
   const handleExportPdf = useCallback(async () => {
-    const sections = [
-      { heading: "Executive Summary", body: `All-Time Revenue: $${allTimeRevenue.toLocaleString()} | Inventory Value: $${totalInventoryValue.toLocaleString()} | Growth: ${trends.growth.toFixed(1)}% | Employees: ${employeeCount}` },
-      { heading: "Sales History (60d)", body: `Avg Daily Revenue: $${Math.round(avgDailyRevenue).toLocaleString()} | Projected Monthly: $${Math.round(projectedMonthly).toLocaleString()}`, table: { headers: ["Date", "Revenue", "Profit"], rows: salesHistory.map((d) => [`${d.date}`, `$${d.revenue.toLocaleString()}`, `$${d.profit.toLocaleString()}`]) } },
-      { heading: "Forecast", body: `Trend: ${forecast.trend} | Projected Next 30d: $${Math.round(forecast.projectedNext30).toLocaleString()} | Confidence: ${(forecast.confidence * 100).toFixed(0)}%` },
+    const sections: any[] = [
+      { heading: "Nirvana Flectere — Full Intelligence Report", body: `Generated on ${new Date().toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}` },
+      { heading: "Executive Summary", body: `All-Time Revenue: $${allTimeRevenue.toLocaleString()} across ${salesCount} transactions | Inventory Value: $${totalInventoryValue.toLocaleString()} | Growth (30d): ${trends.growth.toFixed(1)}% | Employees: ${employeeCount} across ${SHOP_OPTIONS.length} shops` },
+      { heading: "Daily Revenue (60d)", body: `Avg Daily: $${Math.round(avgDailyRevenue).toLocaleString()} | Projected Monthly: $${Math.round(projectedMonthly).toLocaleString()} | Week-over-Week: ${wow.growth >= 0 ? "+" : ""}${wow.growth.toFixed(1)}%`, table: { headers: ["Date", "Revenue", "Profit"], rows: salesHistory.map((d) => [`${d.date}`, `$${d.revenue.toLocaleString()}`, `$${d.profit.toLocaleString()}`]) } },
+      { heading: "Forecast", body: `Trend: ${forecast.trend} | Projected Next 30d: $${Math.round(forecast.projectedNext30).toLocaleString()} | Confidence: ${(forecast.confidence * 100).toFixed(0)}% | Slope: $${forecast.slope.toFixed(2)}/day` },
     ];
     if (bestSellersData.length > 0) {
       sections.push({ heading: "Best Sellers (30d)", body: "", table: { headers: ["#", "Item", "Units", "Revenue", "Margin"], rows: bestSellersData.map((b) => [`${b.rank}`, b.name, `${b.qty}`, `$${b.revenue.toLocaleString()}`, `${b.margin}%`]) } });
     }
-    await generatePdf("Flectere Report", sections);
-  }, [allTimeRevenue, totalInventoryValue, trends, employeeCount, avgDailyRevenue, projectedMonthly, salesHistory, forecast, bestSellersData]);
+    sections.push({ heading: "Gross Margin & Turnover", body: `Gross Margin: ${grossMargin.marginPct}% ($${grossMargin.grossProfit.toLocaleString()} profit) | Inventory Turnover: ${inventoryTurnover.overall}x annualized | Cash Runway: ${cashFlow.runway >= 999 ? "∞" : `${cashFlow.runway.toFixed(1)} months`}` });
+    if (paymentMethods.length > 0) {
+      sections.push({ heading: "Payment Methods (90d)", body: "", table: { headers: ["Method", "Total", "Transactions", "%"], rows: paymentMethods.map((p) => [p.method, `$${p.total.toLocaleString()}`, String(p.count), `${p.percentage}%`]) } });
+    }
+    if (categoryBreakdown.length > 0) {
+      sections.push({ heading: "Inventory by Category", body: "", table: { headers: ["Category", "Units", "Cost Value"], rows: categoryBreakdown.slice(0, 8).map((c) => [c.category, String(c.unitCount), `$${Math.round(c.totalCost).toLocaleString()}`]) } });
+    }
+    if (deadStock.length > 0) {
+      sections.push({ heading: "Dead Stock (60d+ no sale)", body: `${deadStock.length} items worth $${Math.round(deadStockValue).toLocaleString()}`, table: { headers: ["Item", "Units", "Value", "Days"], rows: deadStock.slice(0, 10).map((d) => [d.itemName, String(d.quantity), `$${Math.round(d.value).toLocaleString()}`, String(d.daysInStock)]) } });
+    }
+    if (reorderSuggestions.length > 0) {
+      sections.push({ heading: "Reorder Suggestions", body: "", table: { headers: ["Item", "Stock Left", "Days to Zero", "Reorder Qty"], rows: reorderSuggestions.slice(0, 10).map((r) => [r.itemName, String(r.currentStock), String(r.daysToZero), String(r.suggestedReorder)]) } });
+    }
+    if (shopComparison.length > 0) {
+      sections.push({ heading: "Shop Comparison (60d)", body: "", table: { headers: ["Shop", "Revenue", "Sales", "Avg Ticket", "Top Item"], rows: shopComparison.map((s) => [s.shopName, `$${s.revenue.toLocaleString()}`, String(s.salesCount), `$${s.averageTicket.toLocaleString()}`, `${s.topItem} (${s.topItemQty})`]) } });
+    }
+    if (inventoryTurnover.byCategory.length > 0) {
+      sections.push({ heading: "Inventory Turnover by Category", body: "", table: { headers: ["Category", "Turnover", "Days to Turn"], rows: inventoryTurnover.byCategory.map((c) => [c.category, `${c.turnover}x`, String(c.daysToTurn)]) } });
+    }
+    sections.push({ heading: "Period Benchmarking", body: `First half: $${Math.round(firstHalfRev).toLocaleString()} | Second half: $${Math.round(secondHalfRev).toLocaleString()} | Change: ${benchmarkGrowth >= 0 ? "+" : ""}${benchmarkGrowth.toFixed(1)}%` });
+    sections.push({ heading: "Data Quality", body: `Sales records: ${dataQuality.totalSales} | Inventory items: ${dataQuality.totalInventory} | Employees: ${dataQuality.totalEmployees} | Shops: ${dataQuality.totalShops} | Last sale: ${dataQuality.lastSaleDate ? new Date(dataQuality.lastSaleDate).toLocaleDateString() : "N/A"}` });
+
+    const engineNames: Record<string, string> = {
+      inventory_velocity: "Inventory Velocity", demand_forecast: "Demand Forecast",
+      expense_anomaly: "Expense Anomaly", capital_allocation: "Capital Allocation", operations_overview: "Operations Overview",
+    };
+    for (const [kind, result] of Object.entries(allPythonResults)) {
+      if (result?.ok && result?.payload) {
+        sections.push({
+          heading: `ML: ${engineNames[kind] || kind}`,
+          body: result.summary || "",
+          payload: result.payload,
+        });
+      }
+    }
+
+    const chartEl = chartRef.current;
+    const chartCanvas = chartEl ? await import("html2canvas").then((h2c) => h2c.default(chartEl, { backgroundColor: "#0f172a", scale: 2 }).then((c) => c.toDataURL("image/png")).catch(() => null)).catch(() => null) : null;
+    await generatePdf("Flectere_Full_Report", sections, chartCanvas ? [{ img: chartCanvas, heading: "Revenue Chart (60d)" }] : []);
+  }, [allTimeRevenue, totalInventoryValue, trends, employeeCount, avgDailyRevenue, projectedMonthly, salesHistory, forecast, bestSellersData, grossMargin, inventoryTurnover, cashFlow, paymentMethods, categoryBreakdown, deadStock, deadStockValue, reorderSuggestions, shopComparison, firstHalfRev, secondHalfRev, benchmarkGrowth, dataQuality, allPythonResults, wow]);
 
   const handleExportCsv = useCallback(() => {
     const headers = ["Date", "Revenue", "Profit"];
@@ -218,6 +267,7 @@ export function FlectereDashboard(props: FlectereDashboardProps) {
   const runPythonAnalytics = useCallback(async (kind: string) => {
     setPythonRunning(true);
     setPythonResult(null);
+    setShowPythonModal(false);
     try {
       const res = await fetch("/api/analytics/run", {
         method: "POST",
@@ -226,11 +276,27 @@ export function FlectereDashboard(props: FlectereDashboardProps) {
       });
       if (!res.ok) throw new Error(`Server error ${res.status}`);
       const data = await res.json();
-      const result = data.results?.[0];
-      if (result?.ok) {
-        setPythonResult(`${kind} — ${result.summary || "Done"}`);
+      if (kind === "all") {
+        const results: Record<string, any> = {};
+        (data.results || []).forEach((r: any) => {
+          results[r.kind] = r;
+        });
+        setAllPythonResults(results);
+        setActivePythonTab("inventory_velocity");
+        setShowPythonModal(true);
+        const okCount = (data.results || []).filter((r: any) => r.ok).length;
+        const total = (data.results || []).length;
+        setPythonResult(`${okCount}/${total} engines completed`);
       } else {
-        setPythonResult(`${kind} — Error: ${result?.error || "Unknown"}`);
+        const result = data.results?.[0];
+        if (result?.ok) {
+          setAllPythonResults((prev) => ({ ...prev, [kind]: result }));
+          setActivePythonTab(kind);
+          setShowPythonModal(true);
+          setPythonResult(`${kind} — ${result.summary || "Done"}`);
+        } else {
+          setPythonResult(`${kind} — Error: ${result?.error || "Unknown"}`);
+        }
       }
     } catch (err: any) {
       setPythonResult(`${kind} — ${err.message}`);
@@ -245,14 +311,6 @@ export function FlectereDashboard(props: FlectereDashboardProps) {
       setDrillDown({ open: true, date: data.activePayload[0].payload.date, data: data.activePayload[0].payload });
     }
   }, []);
-
-  // --- Compute benchmarking from salesHistory ---
-  const mid = Math.floor(salesHistory.length / 2);
-  const firstHalf = salesHistory.slice(0, mid);
-  const secondHalf = salesHistory.slice(mid);
-  const firstHalfRev = firstHalf.reduce((s, d) => s + d.revenue, 0);
-  const secondHalfRev = secondHalf.reduce((s, d) => s + d.revenue, 0);
-  const benchmarkGrowth = firstHalfRev > 0 ? ((secondHalfRev - firstHalfRev) / firstHalfRev) * 100 : 0;
 
   const cashFlowData = cashFlow.daily.filter((d) => d.day % 2 === 0 || d.day === cashFlow.daily.length);
 
@@ -381,7 +439,7 @@ export function FlectereDashboard(props: FlectereDashboardProps) {
       </Card>
 
       {/* ===== REVENUE TREND + FORECAST ===== */}
-      <div className="grid gap-6 lg:grid-cols-3">
+      <div ref={chartRef} className="grid gap-6 lg:grid-cols-3">
         <Card className="lg:col-span-2 bg-slate-900/40 border-emerald-500/20">
           <CardHeader className="pb-3">
             <CardTitle className="flex items-center gap-2 text-sm font-black uppercase tracking-widest">
@@ -802,28 +860,49 @@ export function FlectereDashboard(props: FlectereDashboardProps) {
             <Brain className="h-4 w-4 text-violet-400" /> Python ML Analytics Engine
           </CardTitle>
           <CardDescription className="text-[10px] text-slate-500 uppercase tracking-widest font-black">
-            Run demand forecast, expense anomaly detection, inventory velocity, or capital allocation
+            Run all 5 engines simultaneously or pick one — results open in a detail modal with PDF download
           </CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-3">
           <div className="flex flex-wrap items-center gap-2">
             <select className="bg-slate-800 rounded px-3 py-1.5 text-xs text-white font-mono border border-slate-700" value={pythonKind} onChange={(e) => setPythonKind(e.target.value)}>
               <option value="inventory_velocity">Inventory Velocity</option>
               <option value="demand_forecast">Demand Forecast</option>
               <option value="expense_anomaly">Expense Anomaly</option>
               <option value="capital_allocation">Capital Allocation</option>
+              <option value="operations_overview">Operations Overview</option>
             </select>
             <button onClick={() => runPythonAnalytics(pythonKind)} disabled={pythonRunning}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-violet-600/20 border border-violet-500/30 text-violet-300 text-[10px] font-black uppercase tracking-wider hover:bg-violet-600/30 transition-all disabled:opacity-40">
               {pythonRunning ? <RefreshCw className="h-3 w-3 animate-spin" /> : <Zap className="h-3 w-3" />}
-              {pythonRunning ? "Running..." : "Run"}
+              {pythonRunning ? "Running..." : "Run Selected"}
             </button>
+            <button onClick={() => runPythonAnalytics("all")} disabled={pythonRunning}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-violet-600/20 border border-violet-500/30 text-violet-300 text-[10px] font-black uppercase tracking-wider hover:bg-violet-600/30 transition-all disabled:opacity-40">
+              <RefreshCw className={`h-3 w-3 ${pythonRunning ? "animate-spin" : ""}`} />
+              Run All 5
+            </button>
+            {Object.keys(allPythonResults).length > 0 && (
+              <button onClick={() => { setShowPythonModal(true); setActivePythonTab(pythonKind); }}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600/20 border border-emerald-500/30 text-emerald-300 text-[10px] font-black uppercase tracking-wider hover:bg-emerald-600/30 transition-all">
+                <Eye className="h-3 w-3" /> View Results
+              </button>
+            )}
             {pythonResult && (
               <span className={`text-[10px] font-mono ${pythonResult.includes("Error") ? "text-rose-400" : "text-emerald-400"}`}>
                 {pythonResult}
               </span>
             )}
           </div>
+          {Object.keys(allPythonResults).length > 0 && (
+            <div className="flex flex-wrap gap-2 text-[9px] text-slate-500">
+              {Object.entries(allPythonResults).map(([k, r]) => (
+                <span key={k} className={`px-2 py-0.5 rounded-full border ${r.ok ? "border-emerald-500/20 text-emerald-400" : "border-rose-500/20 text-rose-400"}`}>
+                  {k.replace(/_/g, " ")}: {r.ok ? "OK" : "Failed"}
+                </span>
+              ))}
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -1047,6 +1126,80 @@ export function FlectereDashboard(props: FlectereDashboardProps) {
         </CardContent>
       </Card>
 
+      {/* ===== ML RESULTS MODAL ===== */}
+      {showPythonModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => setShowPythonModal(false)}>
+          <div className="bg-slate-900 border border-slate-700 rounded-xl p-6 max-w-4xl w-full mx-4 max-h-[90vh] overflow-y-auto shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-sm font-black uppercase tracking-widest text-white flex items-center gap-2">
+                <Brain className="h-4 w-4 text-violet-400" /> ML Analytics Results
+              </h3>
+              <div className="flex items-center gap-2">
+                <button onClick={async () => {
+                  const h2c = (await import("html2canvas")).default;
+                  const mlCard = document.querySelector("#ml-results-content");
+                  let mlChart: string | null = null;
+                  if (mlCard instanceof HTMLElement) {
+                    mlChart = await h2c(mlCard, { backgroundColor: "#0f172a", scale: 2 }).then((c) => c.toDataURL("image/png")).catch(() => null);
+                  }
+                  const sections: any[] = [];
+                  for (const [kind, result] of Object.entries(allPythonResults)) {
+                    if (result?.ok && result?.payload) {
+                      sections.push({ heading: kind.replace(/_/g, " ").replace(/\b\w/g, (c: string) => c.toUpperCase()), body: result.summary || "", payload: result.payload });
+                    }
+                  }
+                  const { generatePdf } = await import("@/lib/flectere/reporting");
+                  await generatePdf("ML_Analytics_Report", sections, mlChart ? [{ img: mlChart, heading: "ML Results Overview" }] : []);
+                }} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-rose-600/10 border border-rose-500/20 text-rose-300 text-[10px] font-black uppercase tracking-wider hover:bg-rose-600/20 transition-all">
+                  <Download className="h-3 w-3" /> PDF
+                </button>
+                <button onClick={() => setShowPythonModal(false)} className="p-1 rounded hover:bg-slate-800 text-slate-500 hover:text-white transition-colors"><X className="h-4 w-4" /></button>
+              </div>
+            </div>
+            <div id="ml-results-content" className="space-y-4">
+              {Object.keys(allPythonResults).length === 0 ? (
+                <p className="text-sm text-slate-500 text-center py-8">Run an ML engine to see results here.</p>
+              ) : (
+                <>
+                  {/* Kind tabs */}
+                  <div className="flex flex-wrap gap-1 border-b border-slate-800 pb-2">
+                    {Object.entries(allPythonResults).map(([kind, result]) => (
+                      <button key={kind} onClick={() => setActivePythonTab(kind)}
+                        className={`px-3 py-1.5 rounded-t text-[10px] font-black uppercase tracking-wider transition-all ${activePythonTab === kind
+                          ? "bg-violet-600/20 text-violet-300 border border-violet-500/30 border-b-transparent"
+                          : "text-slate-500 hover:text-slate-300 border border-transparent"
+                        } ${!result?.ok ? "opacity-40" : ""}`}>
+                        {kind.replace(/_/g, " ")}
+                        {result?.ok ? " ✓" : " ✗"}
+                      </button>
+                    ))}
+                  </div>
+                  {/* Active tab content */}
+                  {(() => {
+                    const activeResult = allPythonResults[activePythonTab];
+                    if (!activeResult) return <p className="text-sm text-slate-500">No data for this engine.</p>;
+                    if (!activeResult.ok) return <p className="text-sm text-rose-400">Error: {activeResult.error || "Unknown"}</p>;
+                    const payload = activeResult.payload;
+                    if (!payload) return <p className="text-sm text-slate-500">No payload returned.</p>;
+                    return (
+                      <div className="space-y-3">
+                        {activeResult.summary && (
+                          <div className="p-3 rounded-lg bg-slate-800/30 border border-slate-700/50">
+                            <p className="text-[10px] uppercase font-black text-slate-500 tracking-widest mb-1">Summary</p>
+                            <p className="text-sm text-white">{activeResult.summary}</p>
+                          </div>
+                        )}
+                        {renderPythonPayload(activePythonTab, payload)}
+                      </div>
+                    );
+                  })()}
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ===== DRILL-DOWN MODAL ===== */}
       {drillDown.open && drillDown.data && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => setDrillDown({ open: false })}>
@@ -1095,6 +1248,63 @@ export function FlectereDashboard(props: FlectereDashboardProps) {
           </div>
         </CardContent>
       </Card>
+    </div>
+  );
+}
+
+function renderPythonPayload(kind: string, payload: any) {
+  if (!payload || typeof payload !== "object") {
+    return <p className="text-sm text-slate-500">No structured data available.</p>;
+  }
+
+  // Handle array payloads (e.g. anomaly list, velocity list)
+  if (Array.isArray(payload)) {
+    const entries = payload.slice(0, 20);
+    if (entries.length === 0) return <p className="text-sm text-slate-500">Empty result set.</p>;
+    const keys = Object.keys(entries[0] || {}).slice(0, 6);
+    return (
+      <div className="space-y-1.5 max-h-[400px] overflow-y-auto">
+        {entries.map((item: any, i: number) => (
+          <div key={i} className="flex items-center justify-between py-1.5 px-2 rounded bg-slate-800/20 border border-slate-700/30 hover:bg-slate-800/40">
+            <span className="text-xs text-slate-300 truncate min-w-0 flex-1">{item.name || item.item || item.item_name || `#${i + 1}`}</span>
+            <div className="flex items-center gap-3 shrink-0 text-xs font-mono">
+              {keys.filter((k) => k !== "name" && k !== "item" && k !== "item_name" && k !== "itemId" && k !== "item_id").slice(0, 4).map((k) => {
+                const v = item[k];
+                const display = typeof v === "number"
+                  ? (k.includes("amount") || k.includes("price") || k.includes("revenue") || k.includes("value") || k.includes("cost")
+                    ? `$${Math.round(v).toLocaleString()}`
+                    : k.includes("pct") || k.includes("rate") ? `${(v * 100).toFixed(1)}%` : String(v))
+                  : String(v).slice(0, 20);
+                return <span key={k} className="text-slate-400">{display}</span>;
+              })}
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  // Object payload — render as metric tiles
+  const entries = Object.entries(payload).filter(([k]) => !k.startsWith("_"));
+  if (entries.length === 0) return <p className="text-sm text-slate-500">No metrics available.</p>;
+  return (
+    <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+      {entries.slice(0, 24).map(([key, val]) => {
+        const display = typeof val === "number"
+          ? (key.includes("amount") || key.includes("price") || key.includes("revenue") || key.includes("value") || key.includes("cost") || key.includes("budget")
+            ? `$${Math.round(val).toLocaleString()}`
+            : key.includes("pct") || key.includes("rate") ? `${(val * 100).toFixed(1)}%`
+            : key.includes("count") || key.includes("total") ? val.toLocaleString()
+            : String(val))
+          : typeof val === "object" ? JSON.stringify(val).slice(0, 60)
+          : String(val).slice(0, 40);
+        return (
+          <div key={key} className="p-3 rounded-lg bg-slate-800/20 border border-slate-700/30">
+            <p className="text-[9px] uppercase font-black text-slate-500 tracking-widest truncate">{key.replace(/_/g, " ")}</p>
+            <p className="text-sm font-black font-mono text-white mt-0.5 truncate">{display}</p>
+          </div>
+        );
+      })}
     </div>
   );
 }
