@@ -132,7 +132,13 @@ export function FlectereDashboard(props: FlectereDashboardProps) {
         currentRevenue: trends.currentPeriodRevenue,
         previousRevenue: trends.previousPeriodRevenue,
         deadStockCount: deadStock.length, deadStockValue,
+        deadStockDetails: deadStock.map(d => ({
+          name: d.itemName, qty: d.quantity, value: d.value, days: d.daysInStock,
+        })),
         reorderCount: reorderSuggestions.length,
+        reorderDetails: reorderSuggestions.map(r => ({
+          name: r.itemName, stock: r.currentStock, daysToZero: r.daysToZero, suggested: r.suggestedReorder,
+        })),
         premiumValue, breakEvenValue, leanValue,
         bestSellers: bestSellersData,
         forecastTrend: forecast.trend, forecastProjected: forecast.projectedNext30,
@@ -140,7 +146,7 @@ export function FlectereDashboard(props: FlectereDashboardProps) {
       });
       setInsights(result);
     } catch { setInsights([]); } finally { setInsightsLoading(false); }
-  }, [allTimeRevenue, salesCount, employeeCount, totalInventoryValue, avgDailyRevenue, trends, deadStock.length, deadStockValue, reorderSuggestions.length, premiumValue, breakEvenValue, leanValue, bestSellersData, forecast]);
+  }, [allTimeRevenue, salesCount, employeeCount, totalInventoryValue, avgDailyRevenue, trends, deadStock, deadStockValue, reorderSuggestions, premiumValue, breakEvenValue, leanValue, bestSellersData, forecast]);
 
   const refreshConnectors = useCallback(async () => {
     const enabled = connectors.filter((c) => c.enabled && c.baseUrl);
@@ -322,7 +328,7 @@ export function FlectereDashboard(props: FlectereDashboardProps) {
         <KpiCard icon={<DollarSign className="h-4 w-4 text-emerald-400" />} label="All-Time Revenue" value={`$${allTimeRevenue.toLocaleString()}`} sub={`${salesCount} transactions`} />
         <KpiCard icon={<Package className="h-4 w-4 text-sky-400" />} label="Inventory Value" value={`$${totalInventoryValue.toLocaleString()}`} sub={`Lean $${leanValue.toLocaleString()}`} />
         <KpiCard icon={<BarChart3 className="h-4 w-4 text-orange-400" />} label="Avg Daily Revenue (60d)" value={`$${Math.round(avgDailyRevenue).toLocaleString()}`} sub={`Proj. monthly $${Math.round(projectedMonthly).toLocaleString()}`} />
-        <KpiCard icon={<TrendingUp className="h-4 w-4 text-rose-400" />} label="Growth (30d vs prev)" value={`${trends.growth >= 0 ? "+" : ""}${trends.growth.toFixed(1)}%`} sub={`$${trends.currentPeriodRevenue.toLocaleString()} vs $${trends.previousPeriodRevenue.toLocaleString()}`} />
+        <KpiCard icon={<TrendingUp className="h-4 w-4 text-rose-400" />} label="Growth (30d vs prev)" value={`${trends.growth >= 0 ? "+" : ""}${trends.growth.toFixed(1)}%`} sub={`$${trends.currentPeriodRevenue.toLocaleString()} vs $${trends.previousPeriodRevenue.toLocaleString()}`} note={trends.growth < 0 ? "Revenue decreased — check if any shop or category underperformed" : `${trends.growth > 10 ? "Strong growth vs prior period" : "Stable performance"}`} />
         <KpiCard icon={<Users className="h-4 w-4 text-violet-400" />} label="Workforce" value={String(employeeCount)} sub="employees across shops" />
       </div>
 
@@ -330,8 +336,8 @@ export function FlectereDashboard(props: FlectereDashboardProps) {
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <KpiCard icon={<Activity className="h-4 w-4 text-emerald-400" />} label="Gross Margin (60d)" value={`${grossMargin.marginPct}%`} sub={`$${grossMargin.grossProfit.toLocaleString()} profit`} />
         <KpiCard icon={<Layers className="h-4 w-4 text-cyan-400" />} label="Inventory Turnover" value={`${inventoryTurnover.overall}x`} sub="Annualized rate" />
-        <KpiCard icon={<TrendingUp className="h-4 w-4 text-indigo-400" />} label="Week-over-Week" value={`${wow.growth >= 0 ? "+" : ""}${wow.growth.toFixed(1)}%`} sub={`$${Math.round(wow.currentWeekRevenue).toLocaleString()} vs $${Math.round(wow.previousWeekRevenue).toLocaleString()}`} />
-        <KpiCard icon={<DollarSign className="h-4 w-4 text-amber-400" />} label="Cash Runway" value={`${cashFlow.runway >= 999 ? "∞" : cashFlow.runway.toFixed(0) + " months"}`} sub={`Net projected: ${cashFlow.netProjected >= 0 ? "+" : ""}$${cashFlow.netProjected.toLocaleString()}`} />
+        <KpiCard icon={<TrendingUp className="h-4 w-4 text-indigo-400" />} label="Week-over-Week" value={`${wow.growth >= 0 ? "+" : ""}${wow.growth.toFixed(1)}%`} sub={`$${Math.round(wow.currentWeekRevenue).toLocaleString()} vs $${Math.round(wow.previousWeekRevenue).toLocaleString()}`} note={wow.growth < 0 ? "Down from last week — daily fluctuations are normal; look for trends over multiple weeks" : undefined} />
+        <KpiCard icon={<DollarSign className="h-4 w-4 text-amber-400" />} label="Cash Runway" value={`${cashFlow.runway >= 999 ? "∞" : cashFlow.runway.toFixed(0) + " months"}`} sub={`Net projected: ${cashFlow.netProjected >= 0 ? "+" : ""}$${cashFlow.netProjected.toLocaleString()}`} note={cashFlow.runway === 0 ? "Expenses exceed revenue — review cost structure and pricing" : undefined} />
       </div>
 
       {/* ===== AI INSIGHTS ===== */}
@@ -426,6 +432,9 @@ export function FlectereDashboard(props: FlectereDashboardProps) {
               <div className="text-xs text-slate-500 space-y-1">
                 <p>Slope: ${forecast.slope.toFixed(2)}/day · Confidence: {(forecast.confidence * 100).toFixed(0)}%</p>
               </div>
+              {forecast.trend === "down" && (
+                <p className="text-[9px] text-slate-600 mt-1">The model projects declining revenue based on recent trends. This is a statistical estimate — review upcoming promotions, events, or seasonal patterns that could change the trajectory.</p>
+              )}
               {forecast.nextMonthPoints.length > 0 && (
                 <div className="h-[100px]">
                   <ResponsiveContainer width="100%" height={100}>
@@ -464,6 +473,9 @@ export function FlectereDashboard(props: FlectereDashboardProps) {
                     {benchmarkGrowth >= 0 ? "+" : ""}{benchmarkGrowth.toFixed(1)}%
                   </span>
                 </div>
+                {benchmarkGrowth < 0 && (
+                  <p className="text-[9px] text-slate-600 mt-1">Revenue declined in the second half vs first half. This could signal seasonality, changing demand, or operational issues worth investigating.</p>
+                )}
               </div>
             </CardContent>
           </Card>
@@ -480,6 +492,9 @@ export function FlectereDashboard(props: FlectereDashboardProps) {
             <CardDescription className="text-[10px] text-slate-500 uppercase tracking-widest font-black">
               Month-to-date revenue vs expenses · Runway: {cashFlow.runway >= 999 ? "∞" : `${cashFlow.runway.toFixed(1)} months`} · {cashFlow.daysWithData} days with data
             </CardDescription>
+            {cashFlow.netProjected < 0 && (
+              <p className="text-[9px] text-slate-600 mt-1">Expenses are outpacing revenue this month. Review discretionary spending and identify which cost categories are driving the overage.</p>
+            )}
           </CardHeader>
           <CardContent className="space-y-3">
             <div className="flex items-center gap-2 text-[9px]">
@@ -910,7 +925,7 @@ export function FlectereDashboard(props: FlectereDashboardProps) {
               <CardTitle className="flex items-center gap-2 text-sm font-black uppercase tracking-widest">
                 <Radio className={`h-4 w-4 ${connectorMetrics.length > 0 ? "text-cyan-400" : "text-slate-500"}`} /> External API Connectors
               </CardTitle>
-              <CardDescription className="text-[10px] text-slate-500 uppercase tracking-widest font-black">Pull data from Shopify, PayPal, or any REST API</CardDescription>
+              <CardDescription className="text-[10px] text-slate-500 uppercase tracking-widest font-black">Pull data from Shopify, PayPal, or any REST API · Templates use placeholder URLs — replace with real Base URL, Endpoint, and API key before enabling</CardDescription>
             </div>
             <div className="flex items-center gap-2">
               <button onClick={() => setShowConnectorConfig(!showConnectorConfig)}
@@ -1084,7 +1099,7 @@ export function FlectereDashboard(props: FlectereDashboardProps) {
   );
 }
 
-function KpiCard({ icon, label, value, sub }: { icon: React.ReactNode; label: string; value: string; sub?: string }) {
+function KpiCard({ icon, label, value, sub, note }: { icon: React.ReactNode; label: string; value: string; sub?: string; note?: string }) {
   return (
     <Card className="bg-slate-900/40 border-slate-700/50">
       <CardHeader className="pb-1">
@@ -1095,6 +1110,7 @@ function KpiCard({ icon, label, value, sub }: { icon: React.ReactNode; label: st
       <CardContent>
         <p className="text-xl font-black font-mono text-white">{value}</p>
         {sub && <p className="text-[10px] text-slate-600 font-bold uppercase mt-0.5">{sub}</p>}
+        {note && <p className="text-[9px] text-slate-600/70 mt-0.5 italic">{note}</p>}
       </CardContent>
     </Card>
   );
