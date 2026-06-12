@@ -14,9 +14,15 @@ let _autoTableReady = false;
 
 export async function ensurePdfModules() {
   if (!_jsPDF) {
-    const mod = await import("jspdf");
-    _jsPDF = mod.default;
-    await import("jspdf-autotable");
+    const [jsPdfMod, autoTableMod] = await Promise.all([
+      import("jspdf"),
+      import("jspdf-autotable"),
+    ]);
+    _jsPDF = jsPdfMod.default;
+    // jspdf-autotable v5 only attaches via window.jsPDF; manually apply
+    if (autoTableMod.applyPlugin) {
+      autoTableMod.applyPlugin(_jsPDF);
+    }
     _autoTableReady = true;
   }
 }
