@@ -1,6 +1,3 @@
-import jsPDF from "jspdf";
-import "jspdf-autotable";
-
 export function exportCsv(headers: string[], rows: string[][], filename: string) {
   const csv = [headers.join(","), ...rows.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(","))].join("\n");
   const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
@@ -12,12 +9,25 @@ export function exportCsv(headers: string[], rows: string[][], filename: string)
   URL.revokeObjectURL(url);
 }
 
+let _jsPDF: any = null;
+let _autoTableReady = false;
+
+export async function ensurePdfModules() {
+  if (!_jsPDF) {
+    const mod = await import("jspdf");
+    _jsPDF = mod.default;
+    await import("jspdf-autotable");
+    _autoTableReady = true;
+  }
+}
+
 export function generatePdf(
   title: string,
   sections: { heading: string; body: string; table?: { headers: string[]; rows: string[][] }; payload?: any }[],
   chartImages?: { img: string; heading: string }[]
 ) {
-  const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+  if (!_jsPDF) throw new Error("jsPDF not loaded yet. Call ensurePdfModules() first.");
+  const doc = new _jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
 
   const pageW = doc.internal.pageSize.getWidth();
   let y = 20;

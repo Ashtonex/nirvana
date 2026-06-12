@@ -29,7 +29,7 @@ import { generateAiInsights } from "@/lib/flectere/ai-analysis";
 import {
   loadConnectors, saveConnectors, getDefaultConnectors,
 } from "@/lib/flectere/api-connectors";
-import { exportCsv, generatePdf, sendEmailReport } from "@/lib/flectere/reporting";
+import { exportCsv, generatePdf, sendEmailReport, ensurePdfModules } from "@/lib/flectere/reporting";
 
 
 const CHART_COLORS = ["#10b981", "#38bdf8", "#f97316", "#a78bfa", "#f43f5e", "#eab308", "#14b8a6", "#8b5cf6"];
@@ -109,6 +109,8 @@ export function FlectereDashboard(props: FlectereDashboardProps) {
     }
     return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
   }, [autoRefresh]);
+
+  useEffect(() => { ensurePdfModules(); }, []);
 
   const {
     allTimeRevenue, totalInventoryValue, employeeCount, salesCount,
@@ -238,8 +240,9 @@ export function FlectereDashboard(props: FlectereDashboardProps) {
     }
 
     const chartEl = chartRef.current;
+    await ensurePdfModules();
     const chartCanvas = chartEl ? await import("html2canvas").then((h2c) => h2c.default(chartEl, { backgroundColor: "#0f172a", scale: 2 }).then((c) => c.toDataURL("image/png")).catch(() => null)).catch(() => null) : null;
-    await generatePdf("Flectere_Full_Report", sections, chartCanvas ? [{ img: chartCanvas, heading: "Revenue Chart (60d)" }] : []);
+    generatePdf("Flectere_Full_Report", sections, chartCanvas ? [{ img: chartCanvas, heading: "Revenue Chart (60d)" }] : []);
   }, [allTimeRevenue, totalInventoryValue, trends, employeeCount, avgDailyRevenue, projectedMonthly, salesHistory, forecast, bestSellersData, grossMargin, inventoryTurnover, cashFlow, paymentMethods, categoryBreakdown, deadStock, deadStockValue, reorderSuggestions, shopComparison, firstHalfRev, secondHalfRev, benchmarkGrowth, dataQuality, allPythonResults, wow]);
 
   const handleExportCsv = useCallback(() => {
@@ -1275,10 +1278,10 @@ export function FlectereDashboard(props: FlectereDashboardProps) {
                     <Truck className="h-4 w-4 text-amber-400" /> {shipmentModal.data.supplier} — {shipmentModal.data.summary.shipmentNumber}
                   </h3>
                   <div className="flex items-center gap-2">
-                    <button onClick={async () => {
+                    <button onClick={() => {
+                      const data = shipmentModal.data;
+                      if (!data) return;
                       try {
-                        const data = shipmentModal.data;
-                        if (!data) return;
                         const sections = [
                           { heading: `Shipment: ${data.supplier} — ${data.summary.shipmentNumber}`, body: `Date: ${data.date ? new Date(data.date).toLocaleDateString() : "N/A"} | Supplier: ${data.supplier}` },
                           { heading: "Cost Breakdown", body: `Purchase: $${data.summary.purchasePrice.toLocaleString()} | Shipping: $${data.summary.shippingCost.toLocaleString()} | Duty: $${data.summary.dutyCost.toLocaleString()} | Misc: $${data.summary.miscCost.toLocaleString()} | Total: $${data.totalCost.toLocaleString()}` },
@@ -1289,7 +1292,7 @@ export function FlectereDashboard(props: FlectereDashboardProps) {
                           { heading: "Slow Movers", body: data.performance.slowMovers.length > 0 ? data.performance.slowMovers.map((i: any) => `${i.name} (${i.sellThrough.toFixed(1)}% sell-through)`).join(", ") : "None" },
                           { heading: "Supplier Recommendation", body: `${data.performance.supplierRecommendation.toUpperCase()}: ${data.performance.recommendationReason}` },
                         ];
-                        await generatePdf(`Shipment_${data.summary.shipmentNumber}`, sections);
+                        generatePdf(`Shipment_${data.summary.shipmentNumber}`, sections);
                       } catch (e) {
                         console.error("Shipment PDF failed:", e);
                       }
@@ -1450,8 +1453,7 @@ export function FlectereDashboard(props: FlectereDashboardProps) {
                       sections.push({ heading: kind.replace(/_/g, " ").replace(/\b\w/g, (c: string) => c.toUpperCase()), body: result.summary || "", payload: result.payload });
                     }
                   }
-                  const { generatePdf } = await import("@/lib/flectere/reporting");
-                  await generatePdf("ML_Analytics_Report", sections, mlChart ? [{ img: mlChart, heading: "ML Results Overview" }] : []);
+                  generatePdf("ML_Analytics_Report", sections, mlChart ? [{ img: mlChart, heading: "ML Results Overview" }] : []);
                 }} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-rose-600/10 border border-rose-500/20 text-rose-300 text-[10px] font-black uppercase tracking-wider hover:bg-rose-600/20 transition-all">
                   <Download className="h-3 w-3" /> PDF
                 </button>
