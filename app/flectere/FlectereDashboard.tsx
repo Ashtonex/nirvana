@@ -1276,20 +1276,23 @@ export function FlectereDashboard(props: FlectereDashboardProps) {
                   </h3>
                   <div className="flex items-center gap-2">
                     <button onClick={async () => {
-                      const data = shipmentModal.data;
-                      if (!data) return;
-                      const { generatePdf } = await import("@/lib/flectere/reporting");
-                      const sections = [
-                        { heading: `Shipment: ${data.supplier} — ${data.summary.shipmentNumber}`, body: `Date: ${data.date ? new Date(data.date).toLocaleDateString() : "N/A"} | Supplier: ${data.supplier}` },
-                        { heading: "Cost Breakdown", body: `Purchase: $${data.summary.purchasePrice.toLocaleString()} | Shipping: $${data.summary.shippingCost.toLocaleString()} | Duty: $${data.summary.dutyCost.toLocaleString()} | Misc: $${data.summary.miscCost.toLocaleString()} | Total: $${data.totalCost.toLocaleString()}` },
-                        { heading: "Performance Summary", body: `Revenue: $${Math.round(data.performance.totalRevenue).toLocaleString()} | Gross Profit: $${Math.round(data.performance.grossProfit).toLocaleString()} | ROI: ${data.performance.roi.toFixed(1)}% | Sell-Through: ${data.performance.sellThrough.toFixed(1)}% | Days Since Receipt: ${data.performance.daysSinceReceipt}` },
-                        { heading: "Overhead Contribution", body: `Contribution: $${Math.round(data.performance.overheadContribution).toLocaleString()} (${data.performance.overheadContributionPct.toFixed(1)}% of monthly overhead)` },
-                        { heading: "Items", body: "", table: { headers: ["Item", "Category", "Sold", "Left", "Revenue", "Profit", "Sell-Through"], rows: data.performance.items.map((i: any) => [i.name, i.category, String(i.soldQty), String(i.currentQty), `$${Math.round(i.revenue).toLocaleString()}`, `$${Math.round(i.grossProfit).toLocaleString()}`, `${i.sellThrough.toFixed(1)}%`]) } },
-                        { heading: "Fast Movers", body: data.performance.fastMovers.length > 0 ? data.performance.fastMovers.map((i: any) => `${i.name} (${i.dailyVelocity.toFixed(2)}/day)`).join(", ") : "None" },
-                        { heading: "Slow Movers", body: data.performance.slowMovers.length > 0 ? data.performance.slowMovers.map((i: any) => `${i.name} (${i.sellThrough.toFixed(1)}% sell-through)`).join(", ") : "None" },
-                        { heading: "Supplier Recommendation", body: `${data.performance.supplierRecommendation.toUpperCase()}: ${data.performance.recommendationReason}` },
-                      ];
-                      await generatePdf(`Shipment_${data.summary.shipmentNumber}`, sections);
+                      try {
+                        const data = shipmentModal.data;
+                        if (!data) return;
+                        const sections = [
+                          { heading: `Shipment: ${data.supplier} — ${data.summary.shipmentNumber}`, body: `Date: ${data.date ? new Date(data.date).toLocaleDateString() : "N/A"} | Supplier: ${data.supplier}` },
+                          { heading: "Cost Breakdown", body: `Purchase: $${data.summary.purchasePrice.toLocaleString()} | Shipping: $${data.summary.shippingCost.toLocaleString()} | Duty: $${data.summary.dutyCost.toLocaleString()} | Misc: $${data.summary.miscCost.toLocaleString()} | Total: $${data.totalCost.toLocaleString()}` },
+                          { heading: "Performance Summary", body: `Revenue: $${Math.round(data.performance.totalRevenue).toLocaleString()} | Gross Profit: $${Math.round(data.performance.grossProfit).toLocaleString()} | ROI: ${data.performance.roi.toFixed(1)}% | Sell-Through: ${data.performance.sellThrough.toFixed(1)}% | Days Since Receipt: ${data.performance.daysSinceReceipt}` },
+                          { heading: "Overhead Contribution", body: `Contribution: $${Math.round(data.performance.overheadContribution).toLocaleString()} (${data.performance.overheadContributionPct.toFixed(1)}% of monthly overhead)` },
+                          { heading: "Items", body: "", table: { headers: ["Item", "Category", "Sold", "Left", "Revenue", "Profit", "Sell-Through"], rows: data.performance.items.map((i: any) => [i.name, i.category, String(i.soldQty), String(i.currentQty), `$${Math.round(i.revenue).toLocaleString()}`, `$${Math.round(i.grossProfit).toLocaleString()}`, `${i.sellThrough.toFixed(1)}%`]) } },
+                          { heading: "Fast Movers", body: data.performance.fastMovers.length > 0 ? data.performance.fastMovers.map((i: any) => `${i.name} (${i.dailyVelocity.toFixed(2)}/day)`).join(", ") : "None" },
+                          { heading: "Slow Movers", body: data.performance.slowMovers.length > 0 ? data.performance.slowMovers.map((i: any) => `${i.name} (${i.sellThrough.toFixed(1)}% sell-through)`).join(", ") : "None" },
+                          { heading: "Supplier Recommendation", body: `${data.performance.supplierRecommendation.toUpperCase()}: ${data.performance.recommendationReason}` },
+                        ];
+                        await generatePdf(`Shipment_${data.summary.shipmentNumber}`, sections);
+                      } catch (e) {
+                        console.error("Shipment PDF failed:", e);
+                      }
                     }} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-rose-600/10 border border-rose-500/20 text-rose-300 text-[10px] font-black uppercase tracking-wider hover:bg-rose-600/20 transition-all">
                       <Download className="h-3 w-3" /> PDF
                     </button>
