@@ -15,9 +15,9 @@ const JOBS: Record<AnalyticsKind, any> = {
 
 async function runJob(kind: AnalyticsKind, baseUrl: string, incomingHeaders: Headers) {
   try {
-    const bridgeUrl = `${baseUrl}/api/py/analytics/run?kind=${kind}`;
+    const intelligenceUrl = process.env.INTELLIGENCE_URL || baseUrl;
+    const bridgeUrl = `${intelligenceUrl}/api/py/analytics/run?kind=${kind}`;
     
-    // Forward the cookie to bypass Vercel Deployment Protection on previews
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
     };
@@ -25,7 +25,6 @@ async function runJob(kind: AnalyticsKind, baseUrl: string, incomingHeaders: Hea
     const cookie = incomingHeaders.get("cookie");
     if (cookie) headers["cookie"] = cookie;
     
-    // Also forward Vercel protection bypass header if present
     const bypass = incomingHeaders.get("x-vercel-protection-bypass");
     if (bypass) headers["x-vercel-protection-bypass"] = bypass;
 
