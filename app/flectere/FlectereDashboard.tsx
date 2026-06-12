@@ -970,6 +970,19 @@ export function FlectereDashboard(props: FlectereDashboardProps) {
               ))}
             </div>
           )}
+          {/* Inline results: show anomaly/velocity details below the Run buttons */}
+          {Object.entries(allPythonResults).map(([kind, r]) => {
+            if (!r?.ok || !r?.payload) return null;
+            return (
+              <div key={kind} className="border-t border-slate-800 pt-3 mt-2">
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-[10px] uppercase font-black text-slate-500 tracking-widest">{kind.replace(/_/g, " ")} Results</p>
+                  <p className="text-[10px] text-slate-600">{r.summary || "Completed"}</p>
+                </div>
+                {renderPythonPayload(kind, r.payload)}
+              </div>
+            );
+          })}
         </CardContent>
       </Card>
 
@@ -1294,8 +1307,9 @@ export function FlectereDashboard(props: FlectereDashboardProps) {
                           { heading: "Supplier Recommendation", body: `${data.performance.supplierRecommendation.toUpperCase()}: ${data.performance.recommendationReason}` },
                         ];
                         generatePdf(`Shipment_${data.summary.shipmentNumber}`, sections);
-                      } catch (e) {
+                      } catch (e: any) {
                         console.error("Shipment PDF failed:", e);
+                        alert(`PDF Error: ${e.message || e}`);
                       }
                     }} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-rose-600/10 border border-rose-500/20 text-rose-300 text-[10px] font-black uppercase tracking-wider hover:bg-rose-600/20 transition-all">
                       <Download className="h-3 w-3" /> PDF
