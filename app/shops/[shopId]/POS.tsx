@@ -35,43 +35,6 @@ import {
     History,
     Sparkles,
     Coins,
-"use client";
-
-import React, { useState, useTransition, useEffect, useMemo, useDeferredValue } from "react";
-import { isSavingsOrBlackboxTransferEntry } from "@/lib/transfer-classification";
-import {
-    Card,
-    CardContent,
-    CardHeader,
-    CardTitle,
-    CardDescription,
-    Button,
-    Input,
-    Badge
-} from "@/components/ui";
-import {
-    Minus,
-    Plus,
-    ShoppingCart,
-    Trash2,
-    Search,
-    Truck,
-    Receipt,
-    X,
-    LayoutGrid,
-    FileText,
-    Users,
-    AlertCircle,
-    ShieldAlert,
-    ShieldCheck,
-    Settings,
-    BadgeCheck,
-    TrendingUp,
-    RefreshCcw,
-    Skull,
-    History,
-    Sparkles,
-    Coins,
     PackagePlus,
     ClipboardList,
     ArrowRightLeft,
