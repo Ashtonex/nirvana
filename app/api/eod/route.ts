@@ -1217,8 +1217,8 @@ export async function POST(req: Request) {
         score
       };
     })
-    .filter((r) => r.sales30d > 0)
-    .sort((a, b) => b.score - a.score)
+    .filter((r: any) => r.sales30d > 0)
+    .sort((a: any, b: any) => b.score - a.score)
     .slice(0, 5);
 
   // Oracle suggestions (deterministic, no external AI required)
