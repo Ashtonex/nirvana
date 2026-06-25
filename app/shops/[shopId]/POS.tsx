@@ -315,7 +315,7 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
     const [isOpsPostModalOpen, setIsOpsPostModalOpen] = useState(false);
     const [opsPostAmount, setOpsPostAmount] = useState("");
     const [opsPostNotes, setOpsPostNotes] = useState("");
-    const [opsPostKind, setOpsPostKind] = useState<"eod_deposit" | "savings_deposit" | "blackbox" | "overhead_contribution" | "rent" | "utilities" | "wifi" | "zesa" | "salaries" | "stockvel_deposit" | "round_deposit">("eod_deposit");
+    const [opsPostKind, setOpsPostKind] = useState<"eod_deposit" | "savings_deposit" | "blackbox" | "overhead_contribution" | "rent" | "utilities" | "wifi" | "zesa" | "salaries">("eod_deposit");
 
     // Direct operations posting (bypassing drawer)
     const [isDirectOpsModalOpen, setIsDirectOpsModalOpen] = useState(false);
@@ -2776,13 +2776,9 @@ Generated via NIRVANA POS`;
                                 <option value="zesa">ZESA</option>
                                 <option value="salaries">Salaries</option>
                             </optgroup>
-                            <optgroup label="🟣 Club Accounts">
-                                <option value="stockvel_deposit">Stockvel</option>
-                                <option value="round_deposit">Round</option>
-                            </optgroup>
                         </select>
                         <p className="text-[10px] mt-1">
-                            {["eod_deposit", "savings_deposit", "blackbox", "stockvel_deposit", "round_deposit"].includes(opsPostKind)
+                            {["eod_deposit", "savings_deposit", "blackbox"].includes(opsPostKind)
                                 ? <span className="text-emerald-400">↑ This increases the Operations Vault balance</span>
                                 : <span className="text-amber-400">↑ This increases this shop&apos;s overhead tracker balance</span>}
                         </p>
@@ -2881,8 +2877,6 @@ Generated via NIRVANA POS`;
                                     <option value="blackbox">Black Box</option>
                                     <option value="overhead_contribution">Overhead Contribution</option>
                                     <option value="invest_deposit">Invest Deposit</option>
-                                    <option value="stockvel_deposit">Stockvel Deposit</option>
-                                    <option value="round_deposit">Round Deposit</option>
                                     <option value="capital_injection">Capital Injection</option>
                                     <option value="other_income">Other Income</option>
                                     <option value="adjustment">Adjustment</option>
@@ -2892,8 +2886,6 @@ Generated via NIRVANA POS`;
                                     <option value="overhead_payment">Overhead Payment</option>
                                     <option value="savings_withdrawal">Savings Withdrawal</option>
                                     <option value="invest_withdrawal">Invest Withdrawal</option>
-                                    <option value="stockvel_withdrawal">Stockvel Withdrawal</option>
-                                    <option value="round_withdrawal">Round Withdrawal</option>
                                     <option value="stock_orders">Stock Orders</option>
                                     <option value="order_payment">Order Payment</option>
                                     <option value="business_expense">Business Expense</option>

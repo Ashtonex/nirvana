@@ -118,7 +118,7 @@ export function OperationsConsole({
   initialState: OpsState;
   initialLedger: LedgerEntry[];
 }) {
-  const [activeTab, setActiveTab] = useState<"metrics" | "ledger" | "handshakes" | "stockvel" | "audit">("metrics");
+  const [activeTab, setActiveTab] = useState<"metrics" | "ledger" | "audit">("metrics");
   const [state, setState] = useState<OpsState>(initialState);
   const [ledger, setLedger] = useState<LedgerEntry[]>(initialLedger);
   const [handshakes, setHandshakes] = useState<HandshakeEntry[]>([]);
@@ -378,12 +378,7 @@ export function OperationsConsole({
         <Button onClick={() => setActiveTab("ledger")} variant="ghost" className={cn("px-4 py-2 border-b-2 rounded-none text-xs font-black uppercase", activeTab === "ledger" ? "border-primary text-primary bg-primary/5" : "border-transparent text-slate-400")}>
           <History className="w-4 h-4 mr-2" /> Ledger Log
         </Button>
-        <Button onClick={() => setActiveTab("handshakes")} variant="ghost" className={cn("px-4 py-2 border-b-2 rounded-none text-xs font-black uppercase", activeTab === "handshakes" ? "border-primary text-primary bg-primary/5" : "border-transparent text-slate-400")}>
-          <Handshake className="w-4 h-4 mr-2" /> Handshakes
-        </Button>
-        <Button onClick={() => setActiveTab("stockvel")} variant="ghost" className={cn("px-4 py-2 border-b-2 rounded-none text-xs font-black uppercase", activeTab === "stockvel" ? "border-primary text-primary bg-primary/5" : "border-transparent text-slate-400")}>
-          <Activity className="w-4 h-4 mr-2" /> Stockvel & Rounds
-        </Button>
+
         <Button onClick={() => setActiveTab("audit")} variant="ghost" className={cn("px-4 py-2 border-b-2 rounded-none text-xs font-black uppercase", activeTab === "audit" ? "border-primary text-primary bg-primary/5" : "border-transparent text-slate-400")}>
           <Brain className="w-4 h-4 mr-2" /> Money Audit Brain
         </Button>
@@ -410,8 +405,6 @@ export function OperationsConsole({
                   { name: "Overheads Tracker", amount: state.accounts?.overhead || 0, color: "bg-amber-500", desc: "Per-shop overhead contributions minus overhead payments" },
                   { name: "Invest (Perfume Capital)", amount: state.accounts?.invest || 0, color: "bg-sky-500", desc: "Active Perfume capital pools" },
                   { name: "Nirvana Tees", amount: state.accounts?.tshirts || 0, color: "bg-violet-500", desc: "T-Shirt compounding cycle pool" },
-                  { name: "Stockvel Pool", amount: state.accounts?.stockvel || 0, color: "bg-pink-500", desc: "Active shop stockvel balances" },
-                  { name: "Round Pool", amount: state.accounts?.round || 0, color: "bg-rose-500", desc: "Round contributions" },
                 ].map((pool) => (
                   <div key={pool.name} className="flex items-center justify-between p-3 bg-slate-900/20 rounded-lg border border-slate-800/80">
                     <div className="flex items-center gap-3">
@@ -620,94 +613,7 @@ export function OperationsConsole({
         </Card>
       )}
 
-      {activeTab === "handshakes" && (
-        <div className="grid gap-6 grid-cols-1 lg:grid-cols-2">
-          {/* Handshake Creator */}
-          <Card className="bg-slate-950/60 border-slate-800">
-            <CardHeader>
-              <CardTitle className="text-md font-black uppercase italic">Create Cash Handshake</CardTitle>
-              <CardDescription className="text-[10px] text-slate-500">Initiate cash transit transfers between shops. Requires recipient acknowledgement.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <form onSubmit={createHandshake} className="space-y-3">
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="text-[9px] font-black uppercase text-slate-500">Source Shop</label>
-                    <select value={hsFrom} onChange={e => setHsFrom(e.target.value)} className="w-full bg-slate-950 border border-slate-800 text-white px-3 py-2 rounded-md mt-1 text-xs font-bold" required>
-                      <option value="">Select...</option>
-                      {shops.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="text-[9px] font-black uppercase text-slate-500">Destination Shop</label>
-                    <select value={hsTo} onChange={e => setHsTo(e.target.value)} className="w-full bg-slate-950 border border-slate-800 text-white px-3 py-2 rounded-md mt-1 text-xs font-bold" required>
-                      <option value="">Select...</option>
-                      {shops.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-                    </select>
-                  </div>
-                </div>
 
-                <div>
-                  <label className="text-[9px] font-black uppercase text-slate-500">Transit Amount (USD)</label>
-                  <Input type="number" placeholder="0.00" value={hsAmount} onChange={e => setHsAmount(e.target.value)} className="bg-slate-950 border-slate-800 text-xs font-mono font-bold mt-1 text-white" step="0.01" required />
-                </div>
-
-                <div>
-                  <label className="text-[9px] font-black uppercase text-slate-500">Audit Notes</label>
-                  <Input placeholder="e.g. Transported by manager John" value={hsNotes} onChange={e => setHsNotes(e.target.value)} className="bg-slate-950 border-slate-800 text-xs mt-1 text-white" />
-                </div>
-
-                <Button type="submit" className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-black uppercase italic tracking-wider h-10 mt-2">
-                  Initiate Transit Handshake
-                </Button>
-              </form>
-            </CardContent>
-          </Card>
-
-          {/* Handshake List */}
-          <Card className="bg-slate-950/60 border-slate-800">
-            <CardHeader>
-              <CardTitle className="text-md font-black uppercase italic">Pending Transits & History</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3 max-h-[400px] overflow-y-auto pr-2">
-              {handshakes.map(h => (
-                <div key={h.id} className="p-3 bg-slate-900/20 rounded-lg border border-slate-800 flex items-center justify-between text-xs">
-                  <div>
-                    <div className="flex items-center gap-2 mb-1.5">
-                      <span className="font-black text-white uppercase">{h.from_shop}</span>
-                      <ArrowRightLeft className="w-3.5 h-3.5 text-slate-500" />
-                      <span className="font-black text-white uppercase">{h.to_shop}</span>
-                    </div>
-                    <div className="font-mono text-sm font-black text-sky-400">${Number(h.amount).toFixed(2)}</div>
-                    {h.notes && <p className="text-[10px] text-slate-500 mt-1 italic">Notes: {h.notes}</p>}
-                    <p className="text-[9px] text-slate-600 mt-1">Initiated: {new Date(h.created_at).toLocaleTimeString()}</p>
-                  </div>
-                  <div className="text-right">
-                    {h.status === 'pending' ? (
-                      <Button size="sm" onClick={() => acknowledgeHandshake(h.id)} className="bg-amber-600 hover:bg-amber-500 font-black uppercase text-[10px] h-8">
-                        Acknowledge Recv
-                      </Button>
-                    ) : (
-                      <Badge className="bg-emerald-500/10 text-emerald-400 border-emerald-500/20 text-[8px] font-black uppercase">
-                        Received
-                      </Badge>
-                    )}
-                  </div>
-                </div>
-              ))}
-              {handshakes.length === 0 && (
-                <div className="text-center py-8 text-slate-500 italic">No handshakes registered yet.</div>
-              )}
-            </CardContent>
-          </Card>
-        </div>
-      )}
-
-      {activeTab === "stockvel" && (
-        <div className="grid gap-6 grid-cols-1">
-          <StockvelPanel ledger={ledger} onRefresh={refreshData} />
-        </div>
-      )}
 
       {activeTab === "audit" && (
         <Card className="bg-slate-950/60 border-slate-800">
