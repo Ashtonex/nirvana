@@ -17,7 +17,7 @@ export async function GET(req: Request) {
     const limit = Math.min(500, Math.max(1, Number(url.searchParams.get("limit") || 100)));
     const month = url.searchParams.get("month") || undefined;
     const requestedShopId = url.searchParams.get("shopId") || undefined;
-    const shopId = actor?.type === "staff" && !isPrivilegedRole(actor.role) ? actor.shopId || undefined : requestedShopId;
+    const shopId = requestedShopId;
     const period = (url.searchParams.get("period") as any) || undefined;
     
     const rows = await listOperationsLedgerEntries(limit, { month, shopId, period });
@@ -77,6 +77,14 @@ export async function POST(req: Request) {
         "stockvel_withdrawal",
         "round_deposit",
         "round_withdrawal",
+        "stock_orders",
+        "order_payment",
+        "capital_injection",
+        "business_expense",
+        "other_expense",
+        "other_income",
+        "transport",
+        "adjustment",
       ];
       if (!allowedKinds.includes(kind)) {
         return NextResponse.json({ error: "Forbidden" }, { status: 403 });

@@ -138,15 +138,16 @@ export async function GET(req: Request) {
     })();
 
     // Parallel Fetching
-    const [salesRes, ledgerRes, lowStockRes, allInventoryRes, thirtyDaySalesRes, sevenDaySalesRes, opsLedgerRes, investDepositsRes] = await Promise.all([
+    const [salesRes, ledgerRes, lowStockRes, allInventoryRes, thirtyDaySalesRes, sevenDaySalesRes, opsLedgerRes, investDepositsRes, investWithdrawalsRes] = await Promise.all([
       supabaseAdmin.from("sales").select("id, total_with_tax, total_before_tax, tax, discount_applied, payment_method, date, item_name, quantity").eq("shop_id", shopId).gte("date", since).lte("date", until).order('date', { ascending: false }).limit(5000).then((r: any) => r, (e: any) => ({ data: [] })),
       supabaseAdmin.from("ledger_entries").select("id,category,amount,date,description,employee_id").eq("shop_id", shopId).gte("date", since).lte("date", until).order('date', { ascending: false }).limit(5000).then((r: any) => r, (e: any) => ({ data: [] })),
-      supabaseAdmin.from("inventory_allocations").select("item_id, quantity").eq("shop_id", shopId).lte("quantity", 5).order("quantity", { ascending: true }).limit(15).then((r: any) => r, (e: any) => ({ data: [] })),
+      supabaseAdmin.from("inventory_allocations").select("item_id, quantity").eq("shop_id", shopId).lte("quantity", 5).order("quantity", { ascending: true }).limit(50).then((r: any) => r, (e: any) => ({ data: [] })),
       supabaseAdmin.from("inventory_items").select("id, name, category, landed_cost, price").limit(1000).then((r: any) => r, (e: any) => ({ data: [] })),
       supabaseAdmin.from("sales").select("item_id, quantity").eq("shop_id", shopId).gte("date", new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()).limit(2000).then((r: any) => r, (e: any) => ({ data: [] })),
       supabaseAdmin.from("sales").select("item_name, total_with_tax, date").eq("shop_id", shopId).gte("date", since7).lte("date", until).order('date', { ascending: false }).limit(10000).then((r: any) => r, (e: any) => ({ data: [] })),
-      supabaseAdmin.from("operations_ledger").select("amount, created_at, notes, shop_id, effective_date").eq("shop_id", shopId).gte("effective_date", date ? `${date}T00:00:00` : since).lte("effective_date", date ? `${date}T23:59:59` : until).then((r: any) => r, (e: any) => ({ data: [] })),
+      supabaseAdmin.from("operations_ledger").select("amount, kind, title, notes, shop_id, effective_date").eq("shop_id", shopId).gte("effective_date", date ? `${date}T00:00:00` : since).lte("effective_date", date ? `${date}T23:59:59` : until).then((r: any) => r, (e: any) => ({ data: [] })),
       supabaseAdmin.from("invest_deposits").select("amount, created_at, shop_id, deposited_by").eq("shop_id", shopId).gte("created_at", since).lte("created_at", until).order('created_at', { ascending: false }).limit(5000).then((r: any) => r, (e: any) => ({ data: [] })),
+      supabaseAdmin.from("invest_deposits").select("withdrawn_amount, withdrawn_at, shop_id, withdrawn_by, withdraw_title").eq("shop_id", shopId).gte("withdrawn_at", since).lte("withdrawn_at", until).order('withdrawn_at', { ascending: false }).limit(5000).then((r: any) => r, (e: any) => ({ data: [] })),
     ]);
 
     const sales = salesRes.data || [];
@@ -157,12 +158,14 @@ export async function GET(req: Request) {
     const sevenDaySales = sevenDaySalesRes.data || [];
     const opsLedger = opsLedgerRes.data || [];
     const investDeposits = investDepositsRes.data || [];
+    const investWithdrawals = investWithdrawalsRes.data || [];
 
     const todayDateStr = date ? new Date(`${date}T12:00:00Z`).toISOString().split('T')[0] : new Date().toISOString().split('T')[0];
     const todayOpsLedger = opsLedger.filter((l: any) =>
-      l.effective_date === todayDateStr && l.notes?.includes("Auto-routed from POS expense")
+      l.effective_date === todayDateStr
     );
     const todayInvestDeposits = investDeposits;
+    const todayInvestWithdrawals = investWithdrawals;
 
     const todayDate = date ? new Date(`${date}T12:00:00Z`) : new Date();
     const isSaturday = todayDate.getUTCDay() === 6;
@@ -523,15 +526,26 @@ export async function GET(req: Request) {
 
     // 2. STOCK INTELLIGENCE
 
-    // Restock Alerts (Low stock <= 5)
+    // Compute 30-day sales map for priority scoring
+    const sales30dMap = new Map<string, number>();
+    recentSales.forEach((s: any) => {
+      const prev = sales30dMap.get(s.item_id) || 0;
+      sales30dMap.set(s.item_id, prev + Number(s.quantity || 0));
+    });
+
+    // Restock Alerts (Low stock <= 5) with priority score = 30-day sales / (quantity + 0.1)
     const lowIds = lowAllocs.map((a: any) => a.item_id);
     const restockItems = allInventory
       .filter((i: any) => lowIds.includes(i.id))
       .map((i: any) => {
         const alloc = lowAllocs.find((a: any) => a.item_id === i.id);
-        return { name: i.name, category: i.category, qty: Number(alloc?.quantity || 0) };
+        const qty = Number(alloc?.quantity || 0);
+        const s30 = sales30dMap.get(i.id) || 0;
+        const score = s30 / (qty + 0.1);
+        return { name: i.name, category: i.category, qty, sales30d: s30, score };
       })
-      .sort((a: any, b: any) => a.qty - b.qty);
+      .filter((r: any) => r.sales30d > 0) // Filter out items with 0 sales
+      .sort((a: any, b: any) => b.score - a.score);
 
     // Dead Stock (Zero sales in 30 days, cost > $20)
     const itemsWithRecentSales = new Set(recentSales.map((s: any) => s.item_id));
@@ -663,7 +677,7 @@ export async function GET(req: Request) {
     drawText("Restock Watchlist (Low stock <= 5):", 10, true);
     if (restockItems.length === 0) drawText("None. No low-stock items detected.", 9, false, rgb(0.5, 0.5, 0.5));
     else {
-      restockItems.slice(0, 5).forEach((i: any) => drawText(`- ${i.name} (${i.category}) - Qty: ${i.qty}`, 9));
+      restockItems.slice(0, 5).forEach((i: any) => drawText(`- ${i.name} (${i.category}) - Qty: ${i.qty} | 30D Sales: ${i.sales30d} | Score: ${i.score.toFixed(1)}`, 9));
       if (restockItems.length > 5) drawText(`...and ${restockItems.length - 5} more items.`, 8, false, rgb(0.4, 0.4, 0.4));
     }
     y -= 10;
@@ -699,6 +713,41 @@ export async function GET(req: Request) {
         drawText(`- ${t}  ${desc}  (-$${Number(e.amount || 0).toFixed(2)})${routeTag}`, 8);
       });
       if (posExpenses.length > 10) drawText(`...and ${posExpenses.length - 10} more expenses`, 8, false, rgb(0.4, 0.4, 0.4));
+    }
+    y -= 6;
+
+    // Operations & Invest Activity
+    ensureSpace(140);
+    const totalOpsAdditions = (todayOpsLedger || []).filter((l: any) => Number(l.amount || 0) > 0).reduce((sum: number, l: any) => sum + Number(l.amount || 0), 0);
+    const totalOpsDeductions = (todayOpsLedger || []).filter((l: any) => Number(l.amount || 0) < 0).reduce((sum: number, l: any) => sum + Math.abs(Number(l.amount || 0)), 0);
+    const totalInvestDepositsVal = (todayInvestDeposits || []).reduce((sum: number, d: any) => sum + Number(d.amount || 0), 0);
+    const totalInvestWithdrawalsVal = (todayInvestWithdrawals || []).reduce((sum: number, d: any) => sum + Number(d.withdrawn_amount || 0), 0);
+
+    drawText("OPERATIONS & INVEST ACTIVITY (TODAY)", 10, true, rgb(0.1, 0.5, 0.3));
+    drawText(`- Operations Additions: +$${totalOpsAdditions.toFixed(2)} | Deductions: -$${totalOpsDeductions.toFixed(2)}`, 9);
+    drawText(`- Perfume Invest Deposits: +$${totalInvestDepositsVal.toFixed(2)} | Withdrawals: -$${totalInvestWithdrawalsVal.toFixed(2)}`, 9);
+    
+    if (todayOpsLedger.length > 0) {
+      drawText("Operations Details:", 9, true);
+      todayOpsLedger.forEach((l: any) => {
+        const sign = Number(l.amount || 0) >= 0 ? "+" : "";
+        drawText(`  * [OPS] ${l.kind || 'adjustment'}: ${sign}$${Number(l.amount || 0).toFixed(2)} (${l.title || l.notes || '-'})`, 8);
+      });
+    }
+    if (todayInvestDeposits.length > 0) {
+      drawText("Invest Deposits:", 9, true);
+      todayInvestDeposits.forEach((d: any) => {
+        drawText(`  * [INVEST DEP] Perfume Deposit: +$${Number(d.amount || 0).toFixed(2)} (by ${d.deposited_by || 'Staff'})`, 8);
+      });
+    }
+    if (todayInvestWithdrawals.length > 0) {
+      drawText("Invest Withdrawals:", 9, true);
+      todayInvestWithdrawals.forEach((w: any) => {
+        drawText(`  * [INVEST WDR] Perfume Withdrawal: -$${Number(w.withdrawn_amount || 0).toFixed(2)} (${w.withdraw_title || 'Capital withdrawal'})`, 8);
+      });
+    }
+    if (todayOpsLedger.length === 0 && todayInvestDeposits.length === 0 && todayInvestWithdrawals.length === 0) {
+      drawText("No Operations or Invest activity recorded today.", 9, false, rgb(0.5, 0.5, 0.5));
     }
     y -= 6;
 

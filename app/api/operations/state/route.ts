@@ -19,7 +19,8 @@ export async function GET() {
   }
 
   try {
-    const actorShopId = actor?.type === "staff" && !isPrivilegedRole(actor.role) ? actor.shopId : null;
+    // Operations dashboard shows the collective effort of all shops, so we do not restrict to shopId
+    const actorShopId = null;
     const { data: opsState } = await supabaseAdmin
       .from("operations_state")
       .select("*")

@@ -1,11 +1,10 @@
 export const dynamic = "force-dynamic";
 
 import { redirect } from "next/navigation";
-import { requirePrivilegedActor, requireStaffActor, isPrivilegedRole } from "@/lib/apiAuth";
+import { requirePrivilegedActor, requireStaffActor } from "@/lib/apiAuth";
 import { supabaseAdmin } from "@/lib/supabase";
 import { getOperationsComputedBalance, getOperationsState, listOperationsLedgerEntries } from "@/lib/operations";
 import { OperationsConsole } from "@/components/OperationsConsole";
-
 
 function monthKeyUTC(d = new Date()) {
   const y = d.getUTCFullYear();
@@ -25,15 +24,21 @@ export default async function OperationsPage() {
     redirect("/login");
   }
 
-  const actorShopId = actor?.type === "staff" && !isPrivilegedRole(actor.role) ? actor.shopId : null;
+  // Ensure role is owner, admin, or manager
+  const role = String(actor.type === "owner_cookie" ? "owner" : actor.role).toLowerCase();
+  if (role !== "owner" && role !== "admin" && role !== "manager") {
+    redirect("/login");
+  }
 
   const currentMonth = monthKeyUTC(new Date());
 
+  // Operations page shows collective stats for all shops
   let shops: any[] = [];
   try {
-    let query = supabaseAdmin.from("shops").select("id,name,expenses").order("id", { ascending: true });
-    if (actorShopId) query = query.eq("id", actorShopId);
-    const { data } = await query;
+    const { data } = await supabaseAdmin
+      .from("shops")
+      .select("id,name,expenses")
+      .order("id", { ascending: true });
     shops = data || [];
   } catch {
     shops = [];
@@ -46,7 +51,7 @@ export default async function OperationsPage() {
     const [computed, state, ledgerRows] = await Promise.all([
       getOperationsComputedBalance(),
       getOperationsState(),
-      listOperationsLedgerEntries(50, actorShopId ? { shopId: actorShopId } : undefined),
+      listOperationsLedgerEntries(100), // Collective ledger entries (no shop limit)
     ]);
 
     opsState = {
@@ -56,8 +61,8 @@ export default async function OperationsPage() {
       delta: Number((state as any)?.actual_balance || 0) - computed,
     };
     ledger = ledgerRows;
-  } catch {
-    // Tables might not exist yet until migrations are applied.
+  } catch (e) {
+    console.error("Operations fetch error:", e);
   }
 
   return (
@@ -75,4 +80,3 @@ export default async function OperationsPage() {
     </div>
   );
 }
-

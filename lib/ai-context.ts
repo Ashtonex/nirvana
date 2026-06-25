@@ -66,6 +66,5 @@ const PAGE_CONTEXT: Record<string, string> = {
     "/inventory": "User is in the INVENTORY MANAGER. Focus on: Stock levels, Adding new items (Shipments), and Stocktakes.",
     "/shops": "User is viewing SHOP PERFORMANCE. Focus on: Individual shop revenue and stock allocation.",
     "/employees": "User is in the STAFF REGISTRY. Focus on: Employee performance, Sales Leaderboard, and Conversion Rates.",
-    "/finance": "User is in the FINANCE HUB. Focus on: Global Expenses, Profit Margins, and Ledgers.",
-    "/transfers": "User is in STOCK TRANSFERS. Focus on: Moving stock between shops to balance inventory."
+    "/finance": "User is in the FINANCE HUB. Focus on: Global Expenses, Profit Margins, and Ledgers."
 };

@@ -57,3 +57,6 @@ android/.kotlin/
 
 # standalone Python intelligence server (separate git repo)
 /uvicorn_intelligence/
+
+# scratch directory for local temp copies
+/scratch

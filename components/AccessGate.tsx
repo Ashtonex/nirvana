@@ -99,12 +99,10 @@ export function AccessGate({ children }: { children: React.ReactNode }) {
       pathname.startsWith("/intelligence/") ||
       pathname === "/finance/oracle" ||
       pathname.startsWith("/finance/") ||
-      pathname === "/operations" ||
-      pathname.startsWith("/operations/") ||
       pathname === "/invest" ||
       pathname.startsWith("/invest/") ||
-      pathname === "/logic" ||
-      pathname.startsWith("/logic/") ||
+      pathname === "/operations" ||
+      pathname.startsWith("/operations/") ||
       pathname === "/tshirts" ||
       pathname.startsWith("/tshirts/");
     

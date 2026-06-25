@@ -1064,25 +1064,38 @@ export async function POST(req: Request) {
 
   const { data: todayOpsLedger } = await supabaseAdmin
     .from('operations_ledger')
-    .select('amount, created_at, notes')
+    .select('amount, kind, title, notes, created_at')
     .eq('shop_id', shopId)
     .gte('created_at', since)
     .then((r: any) => r, () => ({ data: [] as any[] }));
-  const { data: todayInvestRouting } = await supabaseAdmin
+
+  const { data: todayInvestDeposits } = await supabaseAdmin
     .from('invest_deposits')
-    .select('amount, created_at')
+    .select('amount, created_at, deposited_by')
     .eq('shop_id', shopId)
     .gte('created_at', since)
+    .then((r: any) => r, () => ({ data: [] as any[] }));
+
+  const { data: todayInvestWithdrawals } = await supabaseAdmin
+    .from('invest_deposits')
+    .select('withdrawn_amount, withdrawn_at, withdrawn_by, withdraw_title')
+    .eq('shop_id', shopId)
+    .gte('withdrawn_at', since)
     .then((r: any) => r, () => ({ data: [] as any[] }));
 
   const routedToOps = (e: any) => (todayOpsLedger || []).some((r: any) =>
     Number(r.amount) === Number(e.amount) &&
     Math.abs(new Date(r.created_at).getTime() - new Date(e.date).getTime()) < 60000
   );
-  const routedToInvest = (e: any) => (todayInvestRouting || []).some((r: any) =>
+  const routedToInvest = (e: any) => (todayInvestDeposits || []).some((r: any) =>
     Number(r.amount) === Number(e.amount) &&
     Math.abs(new Date(r.created_at).getTime() - new Date(e.date).getTime()) < 60000
   );
+
+  const totalOpsAdditions = (todayOpsLedger || []).filter((l: any) => Number(l.amount || 0) > 0).reduce((sum: number, l: any) => sum + Number(l.amount || 0), 0);
+  const totalOpsDeductions = (todayOpsLedger || []).filter((l: any) => Number(l.amount || 0) < 0).reduce((sum: number, l: any) => sum + Math.abs(Number(l.amount || 0)), 0);
+  const totalInvestDepositsVal = (todayInvestDeposits || []).reduce((sum: number, d: any) => sum + Number(d.amount || 0), 0);
+  const totalInvestWithdrawalsVal = (todayInvestWithdrawals || []).reduce((sum: number, d: any) => sum + Number(d.withdrawn_amount || 0), 0);
 
   const openingRows = ledgerRows
     .filter((l: any) => l.category === "Cash Drawer Opening")
@@ -1152,27 +1165,61 @@ export async function POST(req: Request) {
 
   const avg7 = dailyPulse.length ? dailyPulse.reduce((s, d) => s + Number(d.gross || 0), 0) / dailyPulse.length : 0;
 
-  // Low stock (<= 5) for this shop
-  const { data: lowAllocs } = await supabaseAdmin
+  // Fetch ALL allocations <= 5 for this shop
+  const { data: lowAllocsAll } = await supabaseAdmin
     .from("inventory_allocations")
     .select("item_id, quantity")
     .eq("shop_id", shopId)
-    .lte("quantity", 5)
-    .order("quantity", { ascending: true })
-    .limit(5);
+    .lte("quantity", 5);
 
-  const lowIds = (lowAllocs || []).map((a: any) => a.item_id).filter(Boolean);
+  const lowAllocs = lowAllocsAll || [];
+  const lowIds = lowAllocs.map((a: any) => a.item_id).filter(Boolean);
+
   type LowItem = { id: string; name?: string | null; category?: string | null };
   const lowItems: LowItem[] = lowIds.length
     ? (((await supabaseAdmin.from("inventory_items").select("id,name,category").in("id", lowIds)).data as LowItem[]) || [])
     : [];
 
   const lowItemMap = new Map<string, LowItem>(lowItems.map((i) => [i.id, i]));
-  type RestockItem = { itemId: string; name: string; category: string; qty: number };
-  const restock: RestockItem[] = (lowAllocs || []).map((a: any) => {
-    const it = lowItemMap.get(a.item_id);
-    return { itemId: a.item_id, name: it?.name || a.item_id, category: it?.category || "", qty: Number(a.quantity || 0) };
+
+  // Query 30-day sales volume for these specific items in this shop
+  const since30d = startOfDaysBackUTC(30);
+  const { data: sales30d } = lowIds.length
+    ? await supabaseAdmin
+        .from("sales")
+        .select("item_id, quantity")
+        .eq("shop_id", shopId)
+        .in("item_id", lowIds)
+        .gte("date", since30d)
+    : { data: [] };
+
+  const salesMap = new Map<string, number>();
+  (sales30d || []).forEach((s: any) => {
+    const prev = salesMap.get(s.item_id) || 0;
+    salesMap.set(s.item_id, prev + Number(s.quantity || 0));
   });
+
+  // Calculate priority score: 30-day sales / (quantity + 0.1)
+  // Filter out items with 0 sales (dead stock), sort by score descending
+  type RestockItem = { itemId: string; name: string; category: string; qty: number; sales30d: number; score: number };
+  const restock: RestockItem[] = lowAllocs
+    .map((a: any) => {
+      const it = lowItemMap.get(a.item_id);
+      const s30 = salesMap.get(a.item_id) || 0;
+      const qty = Number(a.quantity || 0);
+      const score = s30 / (qty + 0.1);
+      return {
+        itemId: a.item_id,
+        name: it?.name || a.item_id,
+        category: it?.category || "",
+        qty,
+        sales30d: s30,
+        score
+      };
+    })
+    .filter((r) => r.sales30d > 0)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 5);
 
   // Oracle suggestions (deterministic, no external AI required)
   const oracle: string[] = [];
@@ -1242,13 +1289,70 @@ export async function POST(req: Request) {
               </tbody>
             </table>
 
+            <h3 style="margin:18px 0 8px;">💼 Operations & Invest Activity Today</h3>
+            <div style="background:#f1f5f9;padding:12px;border-radius:8px;margin-bottom:12px;font-size:11px;color:#1e293b;">
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+                <div>
+                  <p style="margin:4px 0;"><b>Operations Additions:</b> $${totalOpsAdditions.toFixed(2)}</p>
+                  <p style="margin:4px 0;"><b>Operations Deductions:</b> $${totalOpsDeductions.toFixed(2)}</p>
+                </div>
+                <div>
+                  <p style="margin:4px 0;"><b>Perfume Invest Deposits:</b> $${totalInvestDepositsVal.toFixed(2)}</p>
+                  <p style="margin:4px 0;"><b>Perfume Invest Withdrawals:</b> $${totalInvestWithdrawalsVal.toFixed(2)}</p>
+                </div>
+              </div>
+            </div>
+            <table style="width:100%;border-collapse:collapse;font-size:11px;margin-bottom:16px;">
+              <thead>
+                <tr>
+                  <th style="text-align:left;border-bottom:1px solid #cbd5e1;padding:6px;color:#475569;">Time/Type</th>
+                  <th style="text-align:left;border-bottom:1px solid #cbd5e1;padding:6px;color:#475569;">Category/Kind</th>
+                  <th style="text-align:left;border-bottom:1px solid #cbd5e1;padding:6px;color:#475569;">Description/Title</th>
+                  <th style="text-align:right;border-bottom:1px solid #cbd5e1;padding:6px;color:#475569;">Amount</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${(todayOpsLedger.length === 0 && todayInvestDeposits.length === 0 && todayInvestWithdrawals.length === 0) 
+                  ? '<tr><td colspan="4" style="padding:12px;text-align:center;color:#64748b;">No Operations or Invest activity recorded today</td></tr>'
+                  : [
+                      ...(todayOpsLedger || []).map((l: any) => `
+                        <tr>
+                          <td style="padding:6px;border-bottom:1px solid #e2e8f0;color:#059669;font-weight:bold;">OPS</td>
+                          <td style="padding:6px;border-bottom:1px solid #e2e8f0;">${l.kind || 'adjustment'}</td>
+                          <td style="padding:6px;border-bottom:1px solid #e2e8f0;">${l.title || l.notes || '-'}</td>
+                          <td style="padding:6px;border-bottom:1px solid #e2e8f0;text-align:right;font-weight:bold;color:${Number(l.amount) >= 0 ? '#10b981' : '#ef4444'};">${Number(l.amount) >= 0 ? '+' : ''}$${Number(l.amount).toFixed(2)}</td>
+                        </tr>
+                      `),
+                      ...(todayInvestDeposits || []).map((d: any) => `
+                        <tr>
+                          <td style="padding:6px;border-bottom:1px solid #e2e8f0;color:#0891b2;font-weight:bold;">INVEST DEP</td>
+                          <td style="padding:6px;border-bottom:1px solid #e2e8f0;">Perfume Deposit</td>
+                          <td style="padding:6px;border-bottom:1px solid #e2e8f0;">Deposited by ${d.deposited_by || 'Staff'}</td>
+                          <td style="padding:6px;border-bottom:1px solid #e2e8f0;text-align:right;font-weight:bold;color:#10b981;">+$${Number(d.amount).toFixed(2)}</td>
+                        </tr>
+                      `),
+                      ...(todayInvestWithdrawals || []).map((w: any) => `
+                        <tr>
+                          <td style="padding:6px;border-bottom:1px solid #e2e8f0;color:#4f46e5;font-weight:bold;">INVEST WDR</td>
+                          <td style="padding:6px;border-bottom:1px solid #e2e8f0;">Perfume Withdrawal</td>
+                          <td style="padding:6px;border-bottom:1px solid #e2e8f0;">${w.withdraw_title || 'Capital withdrawal'}</td>
+                          <td style="padding:6px;border-bottom:1px solid #e2e8f0;text-align:right;font-weight:bold;color:#ef4444;">-$${Number(w.withdrawn_amount).toFixed(2)}</td>
+                        </tr>
+                      `)
+                    ].join("")
+                }
+              </tbody>
+            </table>
+
             <h3 style="margin:18px 0 8px;">📉 Low Stock (Restock Watchlist)</h3>
-            <table style="width:100%;border-collapse:collapse;font-size:11px;">
+            <table style="width:100%;border-collapse:collapse;font-size:11px;margin-bottom:16px;">
               <thead>
                 <tr>
                   <th style="text-align:left;border-bottom:1px solid #cbd5e1;padding:6px;">Item</th>
                   <th style="text-align:left;border-bottom:1px solid #cbd5e1;padding:6px;">Category</th>
                   <th style="text-align:right;border-bottom:1px solid #cbd5e1;padding:6px;">Qty</th>
+                  <th style="text-align:right;border-bottom:1px solid #cbd5e1;padding:6px;">30D Sales</th>
+                  <th style="text-align:right;border-bottom:1px solid #cbd5e1;padding:6px;">Score</th>
                 </tr>
               </thead>
               <tbody>
@@ -1257,8 +1361,10 @@ export async function POST(req: Request) {
                     <td style="padding:6px;border-bottom:1px solid #e2e8f0;">${r.name}</td>
                     <td style="padding:6px;border-bottom:1px solid #e2e8f0;color:#64748b;">${r.category || '-'}</td>
                     <td style="padding:6px;border-bottom:1px solid #e2e8f0;text-align:right;">${r.qty}</td>
+                    <td style="padding:6px;border-bottom:1px solid #e2e8f0;text-align:right;">${r.sales30d}</td>
+                    <td style="padding:6px;border-bottom:1px solid #e2e8f0;text-align:right;font-weight:bold;color:#f59e0b;">${r.score.toFixed(1)}</td>
                   </tr>
-                `).join("") : '<tr><td colspan="3" style="padding:12px;text-align:center;color:#64748b;">No low-stock items (<= 5) found</td></tr>'}
+                `).join("") : '<tr><td colspan="5" style="padding:12px;text-align:center;color:#64748b;">No low-stock items (<= 5) found</td></tr>'}
               </tbody>
             </table>
 

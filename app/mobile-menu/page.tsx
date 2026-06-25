@@ -25,7 +25,6 @@ const menuItems = [
     { name: 'Kipasa Shop', href: '/shops/kipasa', icon: Store, color: 'text-pink-500', bg: 'bg-pink-500/10' },
     { name: 'Dub Dub Shop', href: '/shops/dubdub', icon: Store, color: 'text-rose-500', bg: 'bg-rose-500/10' },
     { name: 'Trade Center', href: '/shops/tradecenter', icon: Store, color: 'text-indigo-500', bg: 'bg-indigo-500/10' },
-    { name: 'Transfers', href: '/transfers', icon: RefreshCcw, color: 'text-cyan-500', bg: 'bg-cyan-500/10' },
     { name: 'Leaderboard', href: '/employees/leaderboard', icon: Trophy, color: 'text-yellow-500', bg: 'bg-yellow-500/10' },
     { name: 'Security', href: '/admin/audit', icon: ShieldCheck, color: 'text-red-500', bg: 'bg-red-500/10' },
 ];

@@ -35,6 +35,43 @@ import {
     History,
     Sparkles,
     Coins,
+"use client";
+
+import React, { useState, useTransition, useEffect, useMemo, useDeferredValue } from "react";
+import { isSavingsOrBlackboxTransferEntry } from "@/lib/transfer-classification";
+import {
+    Card,
+    CardContent,
+    CardHeader,
+    CardTitle,
+    CardDescription,
+    Button,
+    Input,
+    Badge
+} from "@/components/ui";
+import {
+    Minus,
+    Plus,
+    ShoppingCart,
+    Trash2,
+    Search,
+    Truck,
+    Receipt,
+    X,
+    LayoutGrid,
+    FileText,
+    Users,
+    AlertCircle,
+    ShieldAlert,
+    ShieldCheck,
+    Settings,
+    BadgeCheck,
+    TrendingUp,
+    RefreshCcw,
+    Skull,
+    History,
+    Sparkles,
+    Coins,
     PackagePlus,
     ClipboardList,
     ArrowRightLeft,
@@ -42,7 +79,8 @@ import {
     MessageSquare,
     LogOut,
     Printer,
-    Heart
+    Heart,
+    Warehouse
 } from "lucide-react";
 import {
     recordSale,
@@ -315,6 +353,14 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
     const [opsPostAmount, setOpsPostAmount] = useState("");
     const [opsPostNotes, setOpsPostNotes] = useState("");
     const [opsPostKind, setOpsPostKind] = useState<"eod_deposit" | "savings_deposit" | "blackbox" | "overhead_contribution" | "rent" | "utilities" | "wifi" | "zesa" | "salaries" | "stockvel_deposit" | "round_deposit">("eod_deposit");
+
+    // Direct operations posting (bypassing drawer)
+    const [isDirectOpsModalOpen, setIsDirectOpsModalOpen] = useState(false);
+    const [directOpsAmount, setDirectOpsAmount] = useState("");
+    const [directOpsNotes, setDirectOpsNotes] = useState("");
+    const [directOpsType, setDirectOpsType] = useState<"deposit" | "withdrawal">("deposit");
+    const [directOpsKind, setDirectOpsKind] = useState("eod_deposit");
+    const [directOpsCategory, setDirectOpsCategory] = useState("");
 
     // Auto-detect overhead keywords in notes
     useEffect(() => {
@@ -620,6 +666,48 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
                 alert("Posted to Operations successfully.");
             } catch (e: any) {
                 alert(e?.message || "Failed to post to Operations.");
+            }
+        });
+    };
+
+    const handleDirectPostToOperations = async () => {
+        const val = parseFloat(directOpsAmount);
+        if (isNaN(val) || val <= 0) {
+            alert("Please provide a valid amount.");
+            return;
+        }
+        if (!directOpsNotes.trim()) {
+            alert("Please provide a description/notes.");
+            return;
+        }
+
+        startTransition(async () => {
+            try {
+                const finalAmount = directOpsType === "deposit" ? val : -val;
+                const payload = {
+                    amount: finalAmount,
+                    kind: directOpsKind,
+                    title: directOpsNotes,
+                    notes: `Direct POS Entry (${shopId})`,
+                    overheadCategory: directOpsCategory || null,
+                    shopId: shopId,
+                };
+                const res = await fetch("/api/operations/ledger", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    credentials: "include",
+                    body: JSON.stringify(payload),
+                });
+                if (!res.ok) {
+                    const err = await res.json();
+                    throw new Error(err.error || "Failed to submit operations transaction");
+                }
+                setIsDirectOpsModalOpen(false);
+                setDirectOpsAmount("");
+                setDirectOpsNotes("");
+                alert("Operations transaction recorded successfully.");
+            } catch (e: any) {
+                alert(e?.message || "Failed to post operations transaction.");
             }
         });
     };
@@ -1611,6 +1699,22 @@ Generated via NIRVANA POS`;
 
                     <Button
                         onClick={() => {
+                            setDirectOpsAmount("");
+                            setDirectOpsNotes("");
+                            setDirectOpsType("deposit");
+                            setDirectOpsKind("eod_deposit");
+                            setDirectOpsCategory("");
+                            setIsDirectOpsModalOpen(true);
+                        }}
+                        variant="outline"
+                        className="h-10 px-3 border-violet-500/30 text-violet-200 hover:bg-violet-500/10 text-[10px] font-black uppercase italic flex items-center gap-2"
+                        title="Direct Operations Deposit or Deduction"
+                    >
+                        <ArrowRightLeft className="h-4 w-4" /> Direct Ops
+                    </Button>
+
+                    <Button
+                        onClick={() => {
                             setReturnStatus("");
                             setIsReturnModalOpen(true);
                         }}
@@ -1731,23 +1835,25 @@ Generated via NIRVANA POS`;
                         >
                             <ClipboardList className="mr-2 h-4 w-4" /> Stocktake Audit
                         </Button>
-                        <Button
-                            className="w-full bg-sky-900 hover:bg-sky-800 border border-sky-500/30 text-sky-400 text-[10px] font-black uppercase italic tracking-widest"
-                            onClick={() => {
-                                setIsManagerToolsOpen(false);
-                                window.location.href = "/invest";
-                            }}
-                        >
-                            <Coins className="mr-2 h-4 w-4" /> Perfume Deposits
-                        </Button>
+                        {(shopId === "kipasa" || shopId === "dubdub") && (
+                            <Button
+                                className="w-full bg-slate-800 hover:bg-slate-700 text-[10px] font-black uppercase italic tracking-widest"
+                                onClick={() => {
+                                    setIsManagerToolsOpen(false);
+                                    window.location.href = `/invest?shopId=${shopId}`;
+                                }}
+                            >
+                                <Coins className="mr-2 h-4 w-4" /> Perfume Deposits
+                            </Button>
+                        )}
                         <Button
                             className="w-full bg-slate-800 hover:bg-slate-700 text-[10px] font-black uppercase italic tracking-widest"
                             onClick={() => {
                                 setIsManagerToolsOpen(false);
-                                window.location.href = "/transfers";
+                                window.location.href = "/operations";
                             }}
                         >
-                            <ArrowRightLeft className="mr-2 h-4 w-4" /> Cash Transfers
+                            <Warehouse className="mr-2 h-4 w-4" /> Operations Console
                         </Button>
                         <div className="text-[10px] font-bold uppercase text-slate-400">
                             If you cannot see these pages, your staff role must be Manager/Admin/Owner.
@@ -2717,31 +2823,6 @@ Generated via NIRVANA POS`;
                                 ? <span className="text-emerald-400">↑ This increases the Operations Vault balance</span>
                                 : <span className="text-amber-400">↑ This increases this shop&apos;s overhead tracker balance</span>}
                         </p>
-                    </div>
-
-                    <div>
-                        <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Notes (optional)</label>
-                        <Input
-                            placeholder="e.g. Bank deposit / safe drop / transport to HQ"
-                            className="bg-slate-950 border-slate-800 mt-1 placeholder:text-slate-700 font-bold h-12"
-                            value={opsPostNotes}
-                            onChange={(e) => setOpsPostNotes(e.target.value)}
-                        />
-                    </div>
-
-                    <Button
-                        className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-black uppercase italic tracking-wider h-12 mt-4"
-                        onClick={handlePostToOperations}
-                        disabled={isPending}
-                    >
-                        {isPending ? "Posting..." : "Post to Operations"}
-                    </Button>
-                </div>
-            </Modal>
-
-            <Modal
-                isOpen={isEodShareModalOpen}
-                onClose={() => {
                     setIsEodShareModalOpen(false);
                     if (eodShareUrl) {
                         try { URL.revokeObjectURL(eodShareUrl); } catch { }

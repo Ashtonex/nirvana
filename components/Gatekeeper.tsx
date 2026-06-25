@@ -49,7 +49,7 @@ export function Gatekeeper({ children }: { children: React.ReactNode }) {
     if (role === "owner") return;
 
     const allowedPrefixes = role === "manager"
-      ? [shopPath, "/chat", "/transfers", "/tshirts"]
+      ? [shopPath, "/chat", "/tshirts", "/invest", "/operations"]
       : [shopPath, "/chat"];
 
     const ok = allowedPrefixes.some((p) => pathname === p || pathname.startsWith(`${p}/`));

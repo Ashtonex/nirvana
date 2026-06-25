@@ -84,7 +84,11 @@ def _chart_base64(account_totals: pd.DataFrame, daily: pd.DataFrame) -> str | No
 def _safe_records(df: pd.DataFrame, limit: int = 50) -> list[dict]:
     if df.empty:
         return []
-    out = df.head(limit).replace({np.nan: None}).to_dict(orient="records")
+    df_copy = df.copy()
+    for col in df_copy.columns:
+        if pd.api.types.is_datetime64_any_dtype(df_copy[col]):
+            df_copy[col] = df_copy[col].dt.strftime("%Y-%m-%dT%H:%M:%SZ").fillna("")
+    out = df_copy.head(limit).replace({np.nan: None}).to_dict(orient="records")
     return out
 
 
