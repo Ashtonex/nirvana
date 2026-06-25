@@ -2786,6 +2786,163 @@ Generated via NIRVANA POS`;
                                 ? <span className="text-emerald-400">↑ This increases the Operations Vault balance</span>
                                 : <span className="text-amber-400">↑ This increases this shop&apos;s overhead tracker balance</span>}
                         </p>
+                        <div>
+                            <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Notes / Details</label>
+                            <Input
+                                placeholder="e.g. Weekly vault drop, rent cash deposit"
+                                className="bg-slate-950 border-slate-800 mt-1 placeholder:text-slate-700 font-bold h-12"
+                                value={opsPostNotes}
+                                onChange={(e) => setOpsPostNotes(e.target.value)}
+                            />
+                        </div>
+
+                        <Button
+                            className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-black uppercase italic tracking-wider h-12 mt-4"
+                            onClick={handlePostToOperations}
+                            disabled={isPending}
+                        >
+                            {isPending ? "Posting..." : "Post to Operations"}
+                        </Button>
+                    </div>
+                </Modal>
+
+            {/* Direct Operations Modal */}
+            <Modal
+                isOpen={isDirectOpsModalOpen}
+                onClose={() => setIsDirectOpsModalOpen(false)}
+                title="Direct Operations Entry"
+            >
+                <div className="space-y-4 pt-2">
+                    <p className="text-sm text-slate-400 font-medium">
+                        Allows posting transactions directly to the Operations ledger, bypassing the cash drawer. Useful for bank transfers, card payments, or owner adjustments.
+                    </p>
+
+                    <div className="grid grid-cols-2 gap-2">
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setDirectOpsType("deposit");
+                                setDirectOpsKind("eod_deposit");
+                            }}
+                            className={`p-3 rounded-lg border text-xs font-black uppercase tracking-wider transition-all ${
+                                directOpsType === "deposit"
+                                    ? 'bg-emerald-500/20 border-emerald-500 text-emerald-400'
+                                    : 'bg-slate-950 border-slate-800 text-slate-500'
+                            }`}
+                        >
+                            Deposit
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setDirectOpsType("withdrawal");
+                                setDirectOpsKind("overhead_payment");
+                            }}
+                            className={`p-3 rounded-lg border text-xs font-black uppercase tracking-wider transition-all ${
+                                directOpsType === "withdrawal"
+                                    ? 'bg-rose-500/20 border-rose-500 text-rose-400'
+                                    : 'bg-slate-950 border-slate-800 text-slate-500'
+                            }`}
+                        >
+                            Withdrawal
+                        </button>
+                    </div>
+
+                    <div>
+                        <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Amount</label>
+                        <div className="relative mt-1">
+                            <span className="absolute left-3 top-[10px] text-slate-500 font-mono font-bold text-lg">$</span>
+                            <Input
+                                type="number"
+                                placeholder="0.00"
+                                step="0.01"
+                                className={`pl-8 bg-slate-950 text-lg font-mono font-black h-12 ${
+                                    directOpsType === "deposit" ? 'border-emerald-500/30 text-emerald-300' : 'border-rose-500/30 text-rose-300'
+                                }`}
+                                value={directOpsAmount}
+                                onChange={(e) => setDirectOpsAmount(e.target.value)}
+                            />
+                        </div>
+                    </div>
+
+                    <div>
+                        <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Transaction Kind / Pool</label>
+                        <select
+                            value={directOpsKind}
+                            onChange={(e) => setDirectOpsKind(e.target.value)}
+                            className="w-full bg-slate-950 border border-slate-800 text-white px-3 py-2 rounded-md mt-1 font-bold font-mono text-sm"
+                        >
+                            {directOpsType === "deposit" ? (
+                                <>
+                                    <option value="eod_deposit">EOD Deposit</option>
+                                    <option value="savings_deposit">Savings Deposit</option>
+                                    <option value="blackbox">Black Box</option>
+                                    <option value="overhead_contribution">Overhead Contribution</option>
+                                    <option value="invest_deposit">Invest Deposit</option>
+                                    <option value="stockvel_deposit">Stockvel Deposit</option>
+                                    <option value="round_deposit">Round Deposit</option>
+                                    <option value="capital_injection">Capital Injection</option>
+                                    <option value="other_income">Other Income</option>
+                                    <option value="adjustment">Adjustment</option>
+                                </>
+                            ) : (
+                                <>
+                                    <option value="overhead_payment">Overhead Payment</option>
+                                    <option value="savings_withdrawal">Savings Withdrawal</option>
+                                    <option value="invest_withdrawal">Invest Withdrawal</option>
+                                    <option value="stockvel_withdrawal">Stockvel Withdrawal</option>
+                                    <option value="round_withdrawal">Round Withdrawal</option>
+                                    <option value="stock_orders">Stock Orders</option>
+                                    <option value="order_payment">Order Payment</option>
+                                    <option value="business_expense">Business Expense</option>
+                                    <option value="transport">Transport</option>
+                                    <option value="other_expense">Other Expense</option>
+                                    <option value="adjustment">Adjustment</option>
+                                </>
+                            )}
+                        </select>
+                    </div>
+
+                    {(directOpsKind.includes("overhead") || directOpsKind.includes("expense") || directOpsKind === "adjustment") && (
+                        <div>
+                            <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Overhead Category (Optional)</label>
+                            <select
+                                value={directOpsCategory}
+                                onChange={(e) => setDirectOpsCategory(e.target.value)}
+                                className="w-full bg-slate-950 border border-slate-800 text-white px-3 py-2 rounded-md mt-1 font-bold"
+                            >
+                                <option value="">-- None --</option>
+                                <option value="rent">Rent</option>
+                                <option value="salaries">Salaries</option>
+                                <option value="utilities">Utilities</option>
+                                <option value="misc">Miscellaneous</option>
+                            </select>
+                        </div>
+                    )}
+
+                    <div>
+                        <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Description / Notes</label>
+                        <Input
+                            placeholder="e.g. Card payment fee, bank transfer restock"
+                            className="bg-slate-950 border-slate-800 mt-1 placeholder:text-slate-700 font-bold h-12"
+                            value={directOpsNotes}
+                            onChange={(e) => setDirectOpsNotes(e.target.value)}
+                        />
+                    </div>
+
+                    <Button
+                        className="w-full bg-violet-600 hover:bg-violet-700 text-white font-black uppercase italic tracking-wider h-12 mt-4"
+                        onClick={handleDirectPostToOperations}
+                        disabled={isPending}
+                    >
+                        {isPending ? "Posting..." : "Submit Direct Entry"}
+                    </Button>
+                </div>
+            </Modal>
+
+            <Modal
+                isOpen={isEodShareModalOpen}
+                onClose={() => {
                     setIsEodShareModalOpen(false);
                     if (eodShareUrl) {
                         try { URL.revokeObjectURL(eodShareUrl); } catch { }
