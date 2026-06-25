@@ -2786,25 +2786,27 @@ Generated via NIRVANA POS`;
                                 ? <span className="text-emerald-400">↑ This increases the Operations Vault balance</span>
                                 : <span className="text-amber-400">↑ This increases this shop&apos;s overhead tracker balance</span>}
                         </p>
-                        <div>
-                            <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Notes / Details</label>
-                            <Input
-                                placeholder="e.g. Weekly vault drop, rent cash deposit"
-                                className="bg-slate-950 border-slate-800 mt-1 placeholder:text-slate-700 font-bold h-12"
-                                value={opsPostNotes}
-                                onChange={(e) => setOpsPostNotes(e.target.value)}
-                            />
-                        </div>
-
-                        <Button
-                            className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-black uppercase italic tracking-wider h-12 mt-4"
-                            onClick={handlePostToOperations}
-                            disabled={isPending}
-                        >
-                            {isPending ? "Posting..." : "Post to Operations"}
-                        </Button>
                     </div>
-                </Modal>
+
+                    <div>
+                        <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Notes / Details</label>
+                        <Input
+                            placeholder="e.g. Weekly vault drop, rent cash deposit"
+                            className="bg-slate-950 border-slate-800 mt-1 placeholder:text-slate-700 font-bold h-12"
+                            value={opsPostNotes}
+                            onChange={(e) => setOpsPostNotes(e.target.value)}
+                        />
+                    </div>
+
+                    <Button
+                        className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-black uppercase italic tracking-wider h-12 mt-4"
+                        onClick={handlePostToOperations}
+                        disabled={isPending}
+                    >
+                        {isPending ? "Posting..." : "Post to Operations"}
+                    </Button>
+                </div>
+            </Modal>
 
             {/* Direct Operations Modal */}
             <Modal
