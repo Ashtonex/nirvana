@@ -705,7 +705,7 @@ export function OperationsConsole({
 
       {activeTab === "stockvel" && (
         <div className="grid gap-6 grid-cols-1">
-          <StockvelPanel shops={shops} />
+          <StockvelPanel ledger={ledger} onRefresh={refreshData} />
         </div>
       )}
 
