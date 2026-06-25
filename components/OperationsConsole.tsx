@@ -618,7 +618,7 @@ export function OperationsConsole({
       {activeTab === "audit" && (
         <Card className="bg-slate-950/60 border-slate-800">
           <CardContent className="pt-6">
-            <MoneyAuditBrain />
+            <MoneyAuditBrain shops={shops} />
           </CardContent>
         </Card>
       )}
