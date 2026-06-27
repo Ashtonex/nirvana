@@ -2,6 +2,7 @@
 
 import React, { useState, useTransition, useEffect, useMemo, useDeferredValue } from "react";
 import { isSavingsOrBlackboxTransferEntry } from "@/lib/transfer-classification";
+import { useRouter } from "next/navigation";
 import {
     Card,
     CardContent,
@@ -125,10 +126,10 @@ type LaybyQuote = {
 
 export default function POS({ shopId, inventory, db }: { shopId: string, inventory: any[], db: any }) {
     const [cart, setCart] = useState<{ item: any, quantity: number, price: number }[]>([]);
-    const [lastCheckoutInventory, setLastCheckoutInventory] = useState<any[]>([]);
     const [searchTerm, setSearchTerm] = useState("");
     const deferredSearchTerm = useDeferredValue(searchTerm);
     const [isPending, startTransition] = useTransition();
+    const router = useRouter();
 
     // Local inventory state so POS can immediately sell ad-hoc items without a page reload.
     const [inventoryState, setInventoryState] = useState<any[]>(() => inventory || []);
@@ -143,9 +144,8 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
         
         return inventoryState.filter((item: any) => {
             // Get quantity allocated to this shop
-            const checkoutItem = lastCheckoutInventory.find(i => i.id === item.id);
             const allocation = item.allocations?.find((a: any) => a.shopId === shopId);
-            const qtyAtShop = checkoutItem ? checkoutItem.quantity : (allocation ? allocation.quantity : 0);
+            const qtyAtShop = allocation ? allocation.quantity : 0;
 
             // Hide products with zero stock in POS listings (only ad-hoc or services can have zero check bypass)
             const isServiceOrAdhoc = item.id?.startsWith("service_") || item.id?.startsWith("adhoc");
@@ -164,7 +164,7 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
             return (item.name?.toLowerCase().includes(query) ||
                 item.category?.toLowerCase().includes(query));
         });
-    }, [inventoryState, deferredSearchTerm, shopId, lastCheckoutInventory]);
+    }, [inventoryState, deferredSearchTerm, shopId]);
 
     // POS Modes
     const [posMode, setPosMode] = useState<'sale' | 'quote' | 'layby'>('sale');
@@ -1192,7 +1192,6 @@ Generated via NIRVANA POS`;
                 }
 
                 // Shared cleanup for all modes
-                setLastCheckoutInventory(inventoryState);
                 setCart([]);
                 setClientName("");
                 setClientEmail("");
@@ -1209,6 +1208,9 @@ Generated via NIRVANA POS`;
                         console.error("Auto-print failed:", printErr);
                     }
                 }
+
+                // Force Next.js router to fetch the latest server data so navigation shows correct DB state
+                router.refresh();
             } catch (error) {
                 console.error('Checkout failed:', error);
                 alert(`Checkout failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -2020,9 +2022,8 @@ Generated via NIRVANA POS`;
                     <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
                         {filteredInventory.map((item) => {
                             // Show shop allocation instead of total global stock
-                            const checkoutItem = lastCheckoutInventory.find(i => i.id === item.id);
                             const allocation = item.allocations?.find((a: any) => a.shopId === shopId);
-                            const qtyAtShop = checkoutItem ? checkoutItem.quantity : (allocation ? allocation.quantity : 0);
+                            const qtyAtShop = allocation ? allocation.quantity : 0;
                             const totalNetworkStock = item.quantity || 0;
 
                             const dynamicOverhead = totalShopStock > 0 ? (shopExpenses as number) / totalShopStock : 0;
