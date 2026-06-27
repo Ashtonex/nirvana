@@ -137,19 +137,37 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
         setInventoryState(inventory || []);
     }, [inventory]);
 
+    // Group inventory items by name to support FIFO shipment restocking without duplicating UI items
+    const groupedInventory = useMemo(() => {
+        const grouped = new Map<string, any>();
+        for (const item of inventoryState) {
+            const name = item.name || "Unknown";
+            const existing = grouped.get(name);
+            const allocation = item.allocations?.find((a: any) => a.shopId === shopId);
+            const qtyAtShop = allocation ? Number(allocation.quantity || 0) : 0;
+            
+            if (existing) {
+                existing.quantity += Number(item.quantity || 0);
+                existing.shopQuantity += qtyAtShop;
+            } else {
+                grouped.set(name, {
+                    ...item,
+                    shopQuantity: qtyAtShop
+                });
+            }
+        }
+        return Array.from(grouped.values());
+    }, [inventoryState, shopId]);
+
     // Optimized search results using deferred value and memoization
     const filteredInventory = useMemo(() => {
         const query = deferredSearchTerm.toLowerCase().trim();
         if (!query) return [];
         
-        return inventoryState.filter((item: any) => {
-            // Get quantity allocated to this shop
-            const allocation = item.allocations?.find((a: any) => a.shopId === shopId);
-            const qtyAtShop = allocation ? allocation.quantity : 0;
-
+        return groupedInventory.filter((item: any) => {
             // Hide products with zero stock in POS listings (only ad-hoc or services can have zero check bypass)
             const isServiceOrAdhoc = item.id?.startsWith("service_") || item.id?.startsWith("adhoc");
-            if (qtyAtShop <= 0 && !isServiceOrAdhoc) {
+            if (item.shopQuantity <= 0 && !isServiceOrAdhoc) {
                 return false;
             }
 
@@ -164,7 +182,7 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
             return (item.name?.toLowerCase().includes(query) ||
                 item.category?.toLowerCase().includes(query));
         });
-    }, [inventoryState, deferredSearchTerm, shopId]);
+    }, [groupedInventory, deferredSearchTerm, shopId]);
 
     // POS Modes
     const [posMode, setPosMode] = useState<'sale' | 'quote' | 'layby'>('sale');
@@ -371,9 +389,9 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
         .slice(0, 3)
         .map(([id]) => id);
 
-    const topSellers = inventoryState.filter(item => topSellerIds.includes(item.id));
-    // Fallback if no sales yet: just show first 3
-    const defaultDisplayItems = topSellers.length >= 1 ? topSellers : inventoryState.slice(0, 3);
+    const topSellers = groupedInventory.filter(item => topSellerIds.includes(item.id));
+
+    const defaultDisplayItems = topSellers.length >= 1 ? topSellers : groupedInventory.slice(0, 3);
 
     // Calculate Cash Drawer Math
     const ledger = db.ledger || [];
@@ -824,9 +842,9 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
 
         startTransition(async () => {
             try {
-                // Try to find the product in inventory
-                const existingItem = inventoryState.find((item: any) =>
-                    item.name.toLowerCase() === quickSale.name.toLowerCase()
+                // Try to find the product in grouped inventory
+                const existingItem = groupedInventory.find((item: any) =>
+                    item.name?.toLowerCase() === quickSale.name.toLowerCase()
                 );
 
                 if (existingItem) {

@@ -635,107 +635,124 @@ export async function recordSale(sale: any) {
         console.warn(`⚠️ Multiple identical sales detected for ${sale.clientName}: ${identicalSales.length} times today. Recording anyway.`);
     }
 
-    const { error: saleError } = await supabaseAdmin.from('sales').insert({
-        id: saleId, shop_id: sale.shopId, item_id: sale.itemId, item_name: sale.itemName,
-        quantity: sale.quantity, unit_price: sale.unitPrice, total_before_tax: subtotalAfterDiscount,
-        tax, total_with_tax: totalWithTax, date: timestamp, employee_id: sale.employeeId, client_name: sale.clientName,
-        payment_method: sale.paymentMethod || 'cash',
-        discount_applied: discount
-    });
-
-    if (saleError) {
-        console.error('[recordSale] Database Error:', saleError);
-        throw new Error(`Failed to record sale: ${saleError.message}`);
-    }
-
     const isService = sale.itemId?.startsWith('service_');
 
-    if (!isService && sale.itemId) {
-        // Decrement shop-level allocation — direct select+update (no RPC dependency)
-        const { data: currentAlloc } = await supabaseAdmin
-            .from('inventory_allocations')
-            .select('quantity')
-            .eq('item_id', sale.itemId)
-            .eq('shop_id', sale.shopId)
-            .maybeSingle();
-
-        if (currentAlloc !== null && currentAlloc !== undefined) {
-            const newAllocQty = Math.max(0, Number((currentAlloc as any).quantity || 0) - sale.quantity);
-            const { error: allocUpdateErr } = await supabaseAdmin
-                .from('inventory_allocations')
-                .update({ quantity: newAllocQty })
-                .eq('item_id', sale.itemId)
-                .eq('shop_id', sale.shopId);
-            if (allocUpdateErr) {
-                console.error('[recordSale] Failed to decrement allocation:', allocUpdateErr.message);
-            }
-        } else {
-            // Allocation doesn't exist - create it first with master quantity, then decrement
-            const { data: masterItem } = await supabaseAdmin
-                .from('inventory_items')
-                .select('quantity')
-                .eq('id', sale.itemId)
-                .maybeSingle();
-            
-            if (masterItem) {
-                const masterQty = Number((masterItem as any).quantity || 0);
-                const initialAllocQty = Math.max(0, masterQty - sale.quantity);
-                
-                const { error: insertErr } = await supabaseAdmin
-                    .from('inventory_allocations')
-                    .insert({
-                        item_id: sale.itemId,
-                        shop_id: sale.shopId,
-                        quantity: initialAllocQty
-                    });
-                
-                if (insertErr) {
-                    console.error('[recordSale] Failed to create allocation:', insertErr.message);
-                } else {
-                    console.log('[recordSale] Created allocation for item', sale.itemId, 'at shop', sale.shopId, 'with quantity', initialAllocQty);
-                }
-            } else {
-                console.error('[recordSale] Master item not found for allocation creation:', sale.itemId);
-            }
-        }
-
-        // Decrement global inventory item quantity directly
-        const { data: currentItem } = await supabaseAdmin
+    if (isService) {
+        const { error: saleError } = await supabaseAdmin.from('sales').insert({
+            id: saleId, shop_id: sale.shopId, item_id: sale.itemId, item_name: sale.itemName,
+            quantity: sale.quantity, unit_price: sale.unitPrice, total_before_tax: subtotalAfterDiscount,
+            tax, total_with_tax: totalWithTax, date: timestamp, employee_id: sale.employeeId, client_name: sale.clientName,
+            payment_method: sale.paymentMethod || 'cash',
+            discount_applied: discount
+        });
+        if (saleError) throw new Error(`Failed to record service sale: ${saleError.message}`);
+    } else if (sale.itemName) {
+        // FIFO Inventory Deduction
+        const { data: matchingItems } = await supabaseAdmin
             .from('inventory_items')
-            .select('quantity, name')
-            .eq('id', sale.itemId)
-            .maybeSingle();
+            .select('id, quantity, name, date_added')
+            .eq('name', sale.itemName)
+            .order('date_added', { ascending: true });
 
-        if (currentItem !== null && currentItem !== undefined) {
-            const newItemQty = Math.max(0, Number((currentItem as any).quantity || 0) - sale.quantity);
-            const { error: itemUpdateErr } = await supabaseAdmin
-                .from('inventory_items')
-                .update({ quantity: newItemQty })
-                .eq('id', sale.itemId);
-            if (itemUpdateErr) {
-                console.error('[recordSale] Failed to decrement inventory_items:', itemUpdateErr.message);
-            }
+        if (!matchingItems || matchingItems.length === 0) {
+            // Fallback to basic insert if item not found
+            await supabaseAdmin.from('sales').insert({
+                id: saleId, shop_id: sale.shopId, item_id: sale.itemId, item_name: sale.itemName,
+                quantity: sale.quantity, unit_price: sale.unitPrice, total_before_tax: subtotalAfterDiscount,
+                tax, total_with_tax: totalWithTax, date: timestamp, employee_id: sale.employeeId, client_name: sale.clientName,
+                payment_method: sale.paymentMethod || 'cash',
+                discount_applied: discount
+            });
+        } else {
+            let remainingQtyToSell = sale.quantity;
+            let firstSaleRowInserted = false;
 
-            // Alert if depleted after the update
-            if (newItemQty <= 0) {
-                try {
-                    await sendEmail({
-                        to: ORACLE_RECIPIENT,
-                        subject: `[ALERT] Stock Depleted: ${(currentItem as any).name}`,
-                        html: `<p>Product "${(currentItem as any).name}" has 0 units remaining after a sale at ${sale.shopId}.</p>`
+            for (const item of matchingItems) {
+                if (remainingQtyToSell <= 0) break;
+
+                const { data: alloc } = await supabaseAdmin
+                    .from('inventory_allocations')
+                    .select('quantity')
+                    .eq('item_id', item.id)
+                    .eq('shop_id', sale.shopId)
+                    .maybeSingle();
+
+                const allocQty = alloc ? Number((alloc as any).quantity || 0) : 0;
+                
+                // If it's the very last item in the list, we allow negative deduction if needed to fulfill the sale
+                const isLastItem = item.id === matchingItems[matchingItems.length - 1].id;
+                
+                let qtyToDeduct = 0;
+                if (allocQty > 0) {
+                    qtyToDeduct = Math.min(remainingQtyToSell, allocQty);
+                } else if (isLastItem && remainingQtyToSell > 0) {
+                    qtyToDeduct = remainingQtyToSell; // Force deduct from newest shipment
+                }
+
+                if (qtyToDeduct > 0) {
+                    const fractionalRatio = qtyToDeduct / sale.quantity;
+                    
+                    const chunkSaleId = firstSaleRowInserted ? Math.random().toString(36).substring(2, 9) : saleId;
+                    firstSaleRowInserted = true;
+
+                    // 1. Insert Sales row for this chunk
+                    await supabaseAdmin.from('sales').insert({
+                        id: chunkSaleId, shop_id: sale.shopId, item_id: item.id, item_name: sale.itemName,
+                        quantity: qtyToDeduct, 
+                        unit_price: sale.unitPrice, 
+                        total_before_tax: subtotalAfterDiscount * fractionalRatio,
+                        tax: tax * fractionalRatio, 
+                        total_with_tax: totalWithTax * fractionalRatio, 
+                        date: timestamp, 
+                        employee_id: sale.employeeId, 
+                        client_name: sale.clientName,
+                        payment_method: sale.paymentMethod || 'cash',
+                        discount_applied: discount * fractionalRatio
                     });
-                } catch (e) {
-                    console.error('[Email] Stock depleted alert failed:', (e as any)?.message || e);
+
+                    // 2. Decrement shop allocation
+                    const newAllocQty = Math.max(0, allocQty - qtyToDeduct);
+                    if (alloc) {
+                        await supabaseAdmin.from('inventory_allocations').update({ quantity: newAllocQty }).eq('item_id', item.id).eq('shop_id', sale.shopId);
+                    } else {
+                        await supabaseAdmin.from('inventory_allocations').insert({ item_id: item.id, shop_id: sale.shopId, quantity: Math.max(0, Number(item.quantity || 0) - qtyToDeduct) });
+                    }
+
+                    // 3. Decrement global inventory item quantity
+                    const newItemQty = Math.max(0, Number(item.quantity || 0) - qtyToDeduct);
+                    await supabaseAdmin.from('inventory_items').update({ quantity: newItemQty }).eq('id', item.id);
+
+                    if (newItemQty <= 0) {
+                        try {
+                            await sendEmail({
+                                to: ORACLE_RECIPIENT,
+                                subject: `[ALERT] Stock Depleted: ${item.name}`,
+                                html: `<p>Product "${item.name}" (Shipment ID: ${item.id}) has 0 units remaining after a sale at ${sale.shopId}.</p>`
+                            });
+                        } catch (e) {
+                            console.error('[Email] Stock depleted alert failed');
+                        }
+                    }
+
+                    remainingQtyToSell -= qtyToDeduct;
                 }
             }
-        } else {
-            // RPC fallback
-            const rpcResult = await supabaseAdmin.rpc('decrement_inventory', {
-                item_id: sale.itemId,
-                qty: sale.quantity
-            });
-            if (rpcResult.error) {
-                console.error('[recordSale] RPC decrement_inventory failed:', rpcResult.error.message);
+
+            // If somehow we still have remaining qty (no allocations at all), fallback deduct from the first item
+            if (remainingQtyToSell > 0) {
+                const fallbackItem = matchingItems[0];
+                await supabaseAdmin.from('sales').insert({
+                    id: firstSaleRowInserted ? Math.random().toString(36).substring(2, 9) : saleId, 
+                    shop_id: sale.shopId, item_id: fallbackItem.id, item_name: sale.itemName,
+                    quantity: remainingQtyToSell, unit_price: sale.unitPrice, 
+                    total_before_tax: subtotalAfterDiscount * (remainingQtyToSell/sale.quantity),
+                    tax: tax * (remainingQtyToSell/sale.quantity), 
+                    total_with_tax: totalWithTax * (remainingQtyToSell/sale.quantity), 
+                    date: timestamp, employee_id: sale.employeeId, client_name: sale.clientName,
+                    payment_method: sale.paymentMethod || 'cash', discount_applied: discount * (remainingQtyToSell/sale.quantity)
+                });
+                
+                await supabaseAdmin.rpc('decrement_inventory', { item_id: fallbackItem.id, qty: remainingQtyToSell });
             }
         }
     }

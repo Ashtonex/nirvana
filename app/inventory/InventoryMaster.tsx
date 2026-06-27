@@ -148,9 +148,34 @@ export default function InventoryMaster({ db }: { db: any }) {
     const [selectedShopsForAdHoc, setSelectedShopsForAdHoc] = useState<string[]>([]);
 
     // Filter inventory based on search
-    const filteredInventory = inventory.filter((item: any) =>
-        item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        item.category.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    // Group inventory by name to provide a unified view and support FIFO restocking
+    const groupedInventory = useMemo(() => {
+        const grouped = new Map<string, any>();
+        for (const item of inventory) {
+            const name = item.name || "Unknown";
+            const existing = grouped.get(name);
+            if (existing) {
+                existing.quantity += Number(item.quantity || 0);
+                existing.landedCost = Math.max(existing.landedCost || 0, Number(item.landed_cost || item.landedCost || 0));
+                // Use oldest date for total stock age tracking
+                if (new Date(item.date_added || item.dateAdded) < new Date(existing.dateAdded)) {
+                    existing.dateAdded = item.date_added || item.dateAdded;
+                }
+            } else {
+                grouped.set(name, {
+                    ...item,
+                    dateAdded: item.date_added || item.dateAdded,
+                    landedCost: Number(item.landed_cost || item.landedCost || 0)
+                });
+            }
+        }
+        return Array.from(grouped.values());
+    }, [inventory]);
+
+    // Search-first approach: Hide list until searched
+    const filteredInventory = searchTerm.trim() === "" ? [] : groupedInventory.filter((item: any) =>
+        item.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        item.category?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         (item.sku && item.sku.toLowerCase().includes(searchTerm.toLowerCase()))
     );
 
@@ -542,6 +567,14 @@ export default function InventoryMaster({ db }: { db: any }) {
     const updateItem = (index: number, field: string, value: any) => {
         const newItems = [...items];
         const item = { ...newItems[index], [field]: value };
+
+        // Auto-fill category if picking an existing item from the datalist
+        if (field === 'name') {
+            const existing = groupedInventory.find(i => i.name?.toLowerCase() === String(value).toLowerCase());
+            if (existing) {
+                item.category = existing.category;
+            }
+        }
 
         const q = Number(item.quantity) || 0;
         const up = Number(item.unitPurchasePrice) || 0;
@@ -1076,7 +1109,13 @@ export default function InventoryMaster({ db }: { db: any }) {
                                                 <div className="grid grid-cols-12 gap-4 items-end">
                                                     <div className="col-span-4 space-y-2">
                                                         <label className="text-[10px] font-black text-slate-500 uppercase text-xs">Name</label>
-                                                        <Input value={item.name} onChange={e => updateItem(idx, 'name', e.target.value)} className="h-10 bg-slate-900 border-slate-800" />
+                                                        <Input 
+                                                            list="inventory-names"
+                                                            value={item.name} 
+                                                            onChange={e => updateItem(idx, 'name', e.target.value)} 
+                                                            className="h-10 bg-slate-900 border-slate-800" 
+                                                            placeholder="Type or select existing..."
+                                                        />
                                                     </div>
                                                     <div className="col-span-2 space-y-2">
                                                         <label className="text-[10px] font-black text-slate-500 uppercase text-xs">Qty</label>
@@ -1202,15 +1241,22 @@ export default function InventoryMaster({ db }: { db: any }) {
                             </div>
 
                             {/* Results info */}
-                            <div className="text-xs font-bold text-slate-500">
-                                Showing {filteredInventory.length} of {inventory.length} products
-                            </div>
+                            {searchTerm && (
+                                <div className="text-xs font-bold text-slate-500">
+                                    Found {filteredInventory.length} products
+                                </div>
+                            )}
 
                             {/* Inventory List */}
-                            <div className="divide-y divide-slate-800">
-                                {filteredInventory.length === 0 ? (
-                                    <div className="text-center py-10 text-slate-500">
-                                        {searchTerm ? "No products match your search" : "No inventory items"}
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                {searchTerm.trim() === "" ? (
+                                    <div className="col-span-full flex flex-col items-center justify-center py-20 text-slate-500">
+                                        <Search className="h-12 w-12 text-slate-800 mb-4" />
+                                        <p className="text-lg font-black uppercase tracking-widest text-slate-700">Search to view inventory</p>
+                                    </div>
+                                ) : filteredInventory.length === 0 ? (
+                                    <div className="col-span-full text-center py-10 text-slate-500">
+                                        No products match your search
                                     </div>
                                 ) : (
                                     filteredInventory.map((item: any) => {
@@ -1328,6 +1374,13 @@ export default function InventoryMaster({ db }: { db: any }) {
                                     })
                                 )}
                             </div>
+                            
+                            {/* Datalist for existing products */}
+                            <datalist id="inventory-names">
+                                {groupedInventory.map((item: any) => (
+                                    <option key={item.id} value={item.name} />
+                                ))}
+                            </datalist>
                         </CardContent>
                     </Card>
                 </div>
