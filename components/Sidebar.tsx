@@ -25,7 +25,8 @@ import {
     Cpu,
     Zap,
     Brain,
-    Shirt
+    Shirt,
+    Activity
 } from 'lucide-react';
 import { useAuth } from '@/components/AuthProvider';
 import { useStaff } from '@/components/StaffProvider';
@@ -44,6 +45,8 @@ const navItems = [
     { name: 'Nirvana Tees', href: '/tshirts', icon: Shirt },
     { name: 'Inventory Master', href: '/inventory', icon: Package },
     { name: 'Stocktake Audit', href: '/inventory/stocktake', icon: ClipboardList },
+    { name: 'Operations', href: '/operations', icon: Activity },
+    { name: 'Invest', href: '/invest', icon: HandCoins },
     { name: 'POS Audit', href: '/admin/pos-audit', icon: ShieldCheck },
     { name: 'Security Audit', href: '/admin/audit', icon: ShieldCheck },
     { name: 'The Oracle', href: '/finance/oracle', icon: Flame },
@@ -71,7 +74,7 @@ export default function Sidebar() {
     // Staff should only see POS. No sidebar navigation.
     const staffRole = String(staff?.role || "").toLowerCase();
     const isPrivilegedStaff = !ownerUser && (staffRole === "owner" || staffRole === "admin");
-    const isOwnerViaCookie = isPrivilegedStaff && staffRole === "owner";
+    const isOwnerViaCookie = !ownerUser && staffRole === "owner";
     if (staff && !ownerUser && !isPrivilegedStaff) return null;
 
     const handleLogout = async () => {
@@ -106,6 +109,10 @@ export default function Sidebar() {
             <nav className="flex-1 space-y-1 px-3 py-4 overflow-y-auto">
                 {navItems.map((item) => {
                     const isActive = pathname === item.href;
+                    // Managers only see Inventory and Stocktake Audit
+                    if (staffRole === "manager" && !['/inventory', '/inventory/stocktake'].includes(item.href)) {
+                        return null;
+                    }
                     return (
                         <Link
                             key={item.name}

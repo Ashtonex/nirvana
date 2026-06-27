@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo, useRef, memo } from "react";
+import Link from "next/link";
 import { Badge, Button, Card, CardContent, CardDescription, CardHeader, CardTitle, Input } from "@/components/ui";
-import { Coins, Loader2, Trash2, ArrowRightLeft, DollarSign, History, TrendingUp, TrendingDown, Warehouse, Upload, Download, Plus, Minus, Activity, Users, Shield, Handshake, LogOut, Wifi, WifiOff, Edit, X, Brain } from "lucide-react";
+import { Coins, Loader2, Trash2, ArrowRightLeft, DollarSign, History, TrendingUp, TrendingDown, Warehouse, Upload, Download, Plus, Minus, Activity, Users, Shield, Handshake, LogOut, Wifi, WifiOff, Edit, X, Brain, HandCoins } from "lucide-react";
 import { cn } from "@/components/ui";
 import { StockvelPanel } from "@/components/StockvelPanel";
 import { MoneyAuditBrain } from "@/components/MoneyAuditBrain";
@@ -317,6 +318,34 @@ export function OperationsConsole({
 
   return (
     <div className="space-y-6">
+      {/* Interconnect Banner */}
+      <Link href="/invest" className="block">
+        <div className="group relative overflow-hidden rounded-xl border border-sky-500/30 bg-gradient-to-r from-sky-950/40 via-indigo-950/40 to-slate-950/40 p-5 transition-all duration-300 hover:border-sky-400/60 hover:shadow-[0_0_30px_rgba(56,189,248,0.15)] hover:-translate-y-0.5">
+          <div className="absolute inset-0 bg-sky-500/5 opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
+          <div className="absolute right-0 top-0 h-full w-1/3 bg-gradient-to-l from-sky-500/10 to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100 blur-xl" />
+          
+          <div className="relative z-10 flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-sky-500/10 border border-sky-500/20 text-sky-400 shadow-[0_0_15px_rgba(56,189,248,0.2)] transition-transform duration-300 group-hover:scale-110 group-hover:bg-sky-500/20">
+                <HandCoins className="h-6 w-6" />
+              </div>
+              <div>
+                <h3 className="text-lg font-black uppercase italic tracking-wider text-sky-400 group-hover:text-sky-300 transition-colors">
+                  Perfume Capital Pool
+                </h3>
+                <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mt-0.5">
+                  Access Reinvestments & Stock Capital Allocation
+                </p>
+              </div>
+            </div>
+            
+            <div className="flex items-center gap-2 text-[10px] font-black uppercase text-sky-400 opacity-80 transition-opacity group-hover:opacity-100">
+              Go to Invest <ArrowRightLeft className="h-4 w-4" />
+            </div>
+          </div>
+        </div>
+      </Link>
+
       {/* Metrics Snapshots */}
       <div className="grid gap-4 grid-cols-1 md:grid-cols-4">
         <Card className="bg-slate-950/60 border-slate-800">

@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { Badge, Button, Card, CardContent, CardDescription, CardHeader, CardTitle, Input } from "@/components/ui";
-import { Coins, TrendingUp, AlertTriangle, ShieldCheck, Wallet, ArrowDownRight, ArrowUpRight, BarChart3, RefreshCcw } from "lucide-react";
+import { Coins, TrendingUp, AlertTriangle, ShieldCheck, Wallet, ArrowDownRight, ArrowUpRight, BarChart3, RefreshCcw, Activity, ArrowRightLeft } from "lucide-react";
 
 export function InvestConsole({ shopId }: { shopId?: string | null }) {
   const [busy, setBusy] = useState(false);
@@ -154,6 +155,34 @@ export function InvestConsole({ shopId }: { shopId?: string | null }) {
 
   return (
     <div className="space-y-6">
+      {/* Interconnect Banner */}
+      <Link href="/operations" className="block">
+        <div className="group relative overflow-hidden rounded-xl border border-emerald-500/30 bg-gradient-to-r from-emerald-950/40 via-teal-950/40 to-slate-950/40 p-5 transition-all duration-300 hover:border-emerald-400/60 hover:shadow-[0_0_30px_rgba(52,211,153,0.15)] hover:-translate-y-0.5">
+          <div className="absolute inset-0 bg-emerald-500/5 opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
+          <div className="absolute right-0 top-0 h-full w-1/3 bg-gradient-to-l from-emerald-500/10 to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100 blur-xl" />
+          
+          <div className="relative z-10 flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 shadow-[0_0_15px_rgba(52,211,153,0.2)] transition-transform duration-300 group-hover:scale-110 group-hover:bg-emerald-500/20">
+                <Activity className="h-6 w-6" />
+              </div>
+              <div>
+                <h3 className="text-lg font-black uppercase italic tracking-wider text-emerald-400 group-hover:text-emerald-300 transition-colors">
+                  Operations Master Vault
+                </h3>
+                <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mt-0.5">
+                  Return to Main Cash Pool & Ledger
+                </p>
+              </div>
+            </div>
+            
+            <div className="flex items-center gap-2 text-[10px] font-black uppercase text-emerald-400 opacity-80 transition-opacity group-hover:opacity-100">
+              Go to Operations <ArrowRightLeft className="h-4 w-4" />
+            </div>
+          </div>
+        </div>
+      </Link>
+
       {/* Metrics Row */}
       <div className="grid gap-4 grid-cols-1 md:grid-cols-3">
         <Card className="bg-slate-950/60 border-slate-800">
