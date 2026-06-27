@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { requirePrivilegedActor } from "@/lib/apiAuth";
+import { requirePrivilegedActor, requireStaffActor } from "@/lib/apiAuth";
 import { supabaseAdmin } from "@/lib/supabase";
 
 export const runtime = "nodejs";
@@ -22,7 +22,16 @@ type BulkWithdrawResult = {
 
 export async function POST(req: Request) {
   try {
-    const actor = await requirePrivilegedActor();
+    let actor: any;
+    try {
+      actor = await requirePrivilegedActor();
+    } catch {
+      actor = await requireStaffActor();
+      const role = String(actor.role).toLowerCase();
+      if (role !== "manager" && role !== "lead_manager" && role !== "lead manager") {
+        throw new Error("Forbidden");
+      }
+    }
     const body = await req.json().catch(() => ({}));
 
     const amount = Number(body?.amount);

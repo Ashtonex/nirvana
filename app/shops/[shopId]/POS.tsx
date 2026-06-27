@@ -996,7 +996,7 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
                     if (isOffline) {
                         // Save each cart item to offline queue
                         for (const entry of cart) {
-                            const isUntracked = entry.item.id.startsWith('QUICK_');
+                            const isUntracked = entry.item.id.startsWith('QUICK_') || entry.item.id.startsWith('service_') || entry.item.id.startsWith('adhoc');
                             const netPrice = entry.price / (1 + taxRate);
                             const grossPrice = entry.price;
                             const lineNet = netPrice * entry.quantity;
@@ -1058,7 +1058,7 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
                     } else {
                         // Online mode - use server actions as before
                         for (const entry of cart) {
-                            const isUntracked = entry.item.id.startsWith('QUICK_');
+                            const isUntracked = entry.item.id.startsWith('QUICK_') || entry.item.id.startsWith('service_') || entry.item.id.startsWith('adhoc');
                             const netPrice = entry.price / (1 + taxRate);
                             const grossPrice = entry.price;
                             const lineNet = netPrice * entry.quantity;
@@ -1510,19 +1510,7 @@ Generated via NIRVANA POS`;
                         </Button>
                     )}
 
-                    <Button
-                        onClick={() => setIsAddProductModalOpen(true)}
-                        className="bg-violet-600 hover:bg-violet-500 text-[10px] font-black uppercase italic h-10 px-3 flex items-center gap-2"
-                    >
-                        <PackagePlus className="h-4 w-4" /> Add Ad-hoc
-                    </Button>
 
-                    <Button
-                        onClick={() => setIsQuickSaleModalOpen(true)}
-                        className="bg-sky-600 hover:bg-sky-500 text-[10px] font-black uppercase italic h-10 px-3 flex items-center gap-2"
-                    >
-                        <ShoppingCart className="h-4 w-4" /> Quick Sale
-                    </Button>
 
                     <Button
                         onClick={() => window.location.reload()}
@@ -1825,6 +1813,15 @@ Generated via NIRVANA POS`;
                             }}
                         >
                             <ClipboardList className="mr-2 h-4 w-4" /> Stocktake Audit
+                        </Button>
+                        <Button
+                            className="w-full bg-slate-800 hover:bg-slate-700 text-[10px] font-black uppercase italic tracking-widest"
+                            onClick={() => {
+                                setIsManagerToolsOpen(false);
+                                window.location.href = "/admin/inventory-manager";
+                            }}
+                        >
+                            <PackagePlus className="mr-2 h-4 w-4" /> Master Inventory
                         </Button>
                         {(shopId === "kipasa" || shopId === "dubdub") && (
                             <Button

@@ -1645,10 +1645,6 @@ export async function getPosAuditReport(input: { shopId: string; dateYYYYMMDD: s
     if (!shopId) throw new Error("Missing shopId");
     if (!day) throw new Error("Missing date");
 
-    if (actor.kind === "staff" && actor.shopId && actor.shopId !== shopId) {
-        throw new Error("Forbidden");
-    }
-
     return computePosAuditReport({ shopId, dateYYYYMMDD: day });
 }
 

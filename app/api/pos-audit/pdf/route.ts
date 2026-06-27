@@ -57,11 +57,7 @@ async function requireManagerForShop(shopId: string) {
   if (!staff?.id) throw new Error("Unauthorized");
   if (!isManagerRole(String((staff as any).role || ""))) throw new Error("Forbidden");
 
-  // Managers can only export their own shop unless admin/owner role.
-  const role = String((staff as any).role || "").toLowerCase();
-  const isAdminLike = role === "admin" || role === "owner";
-  if (!isAdminLike && String((staff as any).shop_id || "") !== shopId) throw new Error("Forbidden");
-
+  // Managers can export for any shop since they have manager privileges.
   return { kind: "staff" as const };
 }
 
@@ -94,7 +90,7 @@ export async function GET(req: Request) {
       y = 800;
     };
 
-    const drawText = (txt: string, size = 11, bold = false, color = rgb(1, 1, 1)) => {
+    const drawText = (txt: string, size = 11, bold = false, color = rgb(0.1, 0.1, 0.1)) => {
       ensureSpace(size + 8);
       page.drawText(winAnsiSafe(txt), { x: 40, y, size, font: bold ? fontBold : font, color });
       y -= size + 6;
@@ -102,13 +98,13 @@ export async function GET(req: Request) {
 
     const drawKV = (k: string, v: string) => {
       ensureSpace(18);
-      page.drawText(winAnsiSafe(k), { x: 40, y, size: 10, font: fontBold, color: rgb(0.7, 0.7, 0.7) });
-      page.drawText(winAnsiSafe(v), { x: 260, y, size: 10, font, color: rgb(1, 1, 1) });
+      page.drawText(winAnsiSafe(k), { x: 40, y, size: 10, font: fontBold, color: rgb(0.4, 0.4, 0.4) });
+      page.drawText(winAnsiSafe(v), { x: 260, y, size: 10, font, color: rgb(0.1, 0.1, 0.1) });
       y -= 16;
     };
 
     drawText(`POS FINANCE AUDIT — ${shopId.toUpperCase()}`, 18, true);
-    drawText(`Date: ${report.date}  |  Generated: ${new Date(report.generatedAt).toLocaleString()}`, 10, false, rgb(0.7, 0.7, 0.7));
+    drawText(`Date: ${report.date}  |  Generated: ${new Date(report.generatedAt).toLocaleString()}`, 10, false, rgb(0.4, 0.4, 0.4));
     y -= 6;
 
     drawText("Opening vs Expected", 12, true);
@@ -121,7 +117,7 @@ export async function GET(req: Request) {
     if ((report.flags || []).length) {
       drawText("Flags", 12, true);
       for (const f of report.flags) {
-        const col = f.severity === "critical" ? rgb(1, 0.4, 0.4) : f.severity === "warn" ? rgb(1, 0.75, 0.4) : rgb(0.75, 0.75, 0.75);
+        const col = f.severity === "critical" ? rgb(0.8, 0, 0) : f.severity === "warn" ? rgb(0.7, 0.4, 0) : rgb(0.4, 0.4, 0.4);
         drawText(`${f.code}: ${f.message}`, 9, false, col);
       }
       y -= 6;
@@ -143,7 +139,7 @@ export async function GET(req: Request) {
     const sales = (report.sales || []).slice(0, 40);
     for (const s of sales) {
       const line = `${new Date(s.timestamp).toLocaleTimeString()} | ${s.employeeName || s.employeeId || "SYSTEM"} | ${s.itemName} x${s.qty} | ${money(s.totalWithTax)} | ${String(s.paymentMethod || "").toUpperCase()}`;
-      drawText(line.slice(0, 120), 8, false, rgb(0.85, 0.9, 1));
+      drawText(line.slice(0, 120), 8, false, rgb(0.1, 0.2, 0.4));
     }
     y -= 8;
 
@@ -151,7 +147,7 @@ export async function GET(req: Request) {
     const exps = (report.expenses || []).slice(0, 40);
     for (const e of exps) {
       const line = `${new Date(e.timestamp).toLocaleTimeString()} | ${e.employeeName || e.employeeId || "Unknown"} | ${e.category} | ${money(e.amount)} | ${String(e.description || "")}`;
-      drawText(line.slice(0, 120), 8, false, rgb(1, 0.9, 0.85));
+      drawText(line.slice(0, 120), 8, false, rgb(0.4, 0.2, 0.1));
     }
 
     const bytes = await pdf.save();
