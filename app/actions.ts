@@ -1901,10 +1901,19 @@ export async function getOracleMasterPulse(daysLimit = 60) {
             categoryBreakdown[cat] = (categoryBreakdown[cat] || 0) + Number(s.total_with_tax || 0);
         });
 
-        // ORACLE BURN RATE: POS expenses ONLY (ledger_entries, not operations_ledger)
-        const totalExpenses = ledger
-            .filter((l: any) => l.type === 'expense')
+        // ORACLE BURN RATE (HYBRID LOGIC): 
+        // 1. True POS expenses (excluding internal transfers)
+        const IGNORED_CATEGORIES = ['Blackbox', 'Savings', 'Tithe', 'Overhead', 'Cash Drawer Adjustment'];
+        const posExpenses = ledger
+            .filter((l: any) => l.type === 'expense' && !IGNORED_CATEGORIES.includes(l.category || ''))
             .reduce((sum: number, l: any) => sum + Number(l.amount || 0), 0);
+
+        // 2. Actual overhead payouts from operations_ledger
+        const opsExpenses = operations
+            .filter((o: any) => o.kind === 'overhead_payment')
+            .reduce((sum: number, o: any) => sum + Number(o.amount || 0), 0);
+
+        const totalExpenses = posExpenses + opsExpenses;
 
         // Process Shop Performance: deposits come from operations (for visibility)
         shops.forEach((shop: any) => {

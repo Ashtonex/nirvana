@@ -98,9 +98,19 @@ export async function GET() {
       categoryBreakdown[cat] = (categoryBreakdown[cat] || 0) + Number(s.total_with_tax || 0);
     });
 
-    const totalExpenses = ledger
-      .filter((l: LedgerRow) => l.type === 'expense')
+    // ORACLE BURN RATE (HYBRID LOGIC): 
+    // 1. True POS expenses (excluding internal transfers)
+    const IGNORED_CATEGORIES = ['Blackbox', 'Savings', 'Tithe', 'Overhead', 'Cash Drawer Adjustment'];
+    const posExpenses = ledger
+      .filter((l: LedgerRow) => l.type === 'expense' && !IGNORED_CATEGORIES.includes(l.category || ''))
       .reduce((sum: number, l: LedgerRow) => sum + Number(l.amount || 0), 0);
+
+    // 2. Actual overhead payouts from operations_ledger
+    const opsExpenses = operations
+      .filter((o: OperationRow) => o.kind === 'overhead_payment')
+      .reduce((sum: number, o: OperationRow) => sum + Number(o.amount || 0), 0);
+
+    const totalExpenses = posExpenses + opsExpenses;
 
     // Process Shop Performance: deposits from operations (for visibility) but burn rate excludes ops
     shops.forEach((shop: ShopRow) => {
