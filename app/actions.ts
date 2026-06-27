@@ -28,7 +28,7 @@ type ActorCtx =
 
 function isManagerRole(role: string | null | undefined) {
     const r = String(role || "").toLowerCase();
-    return r === "owner" || r === "admin" || r === "manager" || r === "lead_manager" || r === "lead manager";
+    return r === "owner" || r === "admin" || r.includes("manager");
 }
 
 async function getActorFromCookies(): Promise<ActorCtx | null> {
@@ -1749,13 +1749,13 @@ export async function recordPosExpense(
                 updated_at: new Date().toISOString()
             });
     } else if (shouldRouteToOverhead) {
-        // POS expenses can draw down the shop's overhead account without visiting Operations.
+        // POS expenses titled Rent/Utilities are contributions TO the operations pool (saving money for bills).
         await supabaseAdmin.from('operations_ledger').insert({
-            amount: -amount,
-            kind: "overhead_payment",
+            amount: amount,
+            kind: "overhead_contribution",
             shop_id: shopId,
             title: description,
-            notes: `Auto-routed from POS expense: Overhead payment`,
+            notes: `Auto-routed from POS expense: Overhead contribution`,
             overhead_category: detectOverheadCategoryFromText(description) || "misc",
             employee_id: employeeId,
             effective_date: timestamp.split('T')[0],
@@ -2216,8 +2216,13 @@ export async function postDrawerToOperations(input: { shopId: string; amount: nu
     const shopId = String(input?.shopId || "").trim();
     const amount = Number(input?.amount);
     const notes = input?.notes ? String(input.notes) : "";
+    
+    // Check if this is an overhead PAYMENT (paying bills from the POS Direct Ops modal)
+    const isOverheadPayment = ["rent", "utilities", "wifi", "zesa", "salaries", "overhead_contribution"].includes(input?.kind || "");
+    const opsAmount = isOverheadPayment ? -amount : amount;
+
     const normalized = normalizeOperationsLedgerInput({
-        amount,
+        amount: opsAmount,
         kind: input?.kind || "eod_deposit",
         title: input?.kind || "eod_deposit",
         notes,
@@ -2237,7 +2242,7 @@ export async function postDrawerToOperations(input: { shopId: string; amount: nu
         .from("operations_ledger")
         .select("*")
         .eq("shop_id", shopId)
-        .eq("amount", amount)
+        .eq("amount", opsAmount)
         .eq("kind", kind)
         .gte("created_at", `${today}T00:00:00.000Z`)
         .lt("created_at", `${today}T23:59:59.999Z`);
@@ -2270,10 +2275,10 @@ export async function postDrawerToOperations(input: { shopId: string; amount: nu
         }
 
         await createOperationsLedgerEntry({
-            amount,
+            amount: opsAmount,
             kind,
             shopId,
-            title: ({eod_deposit:"EOD Transfer",savings_deposit:"Savings Deposit",blackbox:"Black Box Deposit",overhead_contribution:"Overhead Contribution",stockvel_deposit:"Stockvel Deposit",round_deposit:"Round Deposit"})[kind] || "Operations Transfer",
+            title: ({eod_deposit:"EOD Transfer",savings_deposit:"Savings Deposit",blackbox:"Black Box Deposit",overhead_contribution:"Overhead Contribution",overhead_payment:"Overhead Payment",stockvel_deposit:"Stockvel Deposit",round_deposit:"Round Deposit"})[kind] || "Operations Transfer",
             notes: notes ? `POS → Operations: ${notes}` : "Auto-posted from POS Drawer",
             effectiveDate: dayStamp,
             employeeId: actor.id,

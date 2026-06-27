@@ -1820,7 +1820,7 @@ Generated via NIRVANA POS`;
                             className="w-full bg-slate-800 hover:bg-slate-700 text-[10px] font-black uppercase italic tracking-widest"
                             onClick={() => {
                                 setIsManagerToolsOpen(false);
-                                window.location.href = "/admin/inventory-manager";
+                                window.location.href = "/inventory";
                             }}
                         >
                             <PackagePlus className="mr-2 h-4 w-4" /> Master Inventory
