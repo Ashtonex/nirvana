@@ -80,9 +80,28 @@ export function normalizeOperationsLedgerInput(input: {
   overheadCategory?: string | null;
 }) {
   const amount = Number(input.amount || 0);
-  const rawKind = normalizeOperationsKind(input.kind || "adjustment");
+  let rawKind = normalizeOperationsKind(input.kind || "adjustment");
   const title = input.title ? String(input.title) : null;
   const notes = input.notes ? String(input.notes) : null;
+  
+  // --- HARD-WIRED AUTOMATED KEYWORD SCANNER ---
+  // Force overrides based on keywords in title or notes (e.g., from POS)
+  const combinedText = normalizeOperationsText(`${rawKind} ${title || ""} ${notes || ""}`);
+  
+  if (/\b(stock|stock orders|buying stock)\b/.test(combinedText)) {
+    rawKind = "stock_orders";
+  } else if (/\b(rent)\b/.test(combinedText)) {
+    rawKind = "rent";
+  } else if (/\b(salaries|salary|wages)\b/.test(combinedText)) {
+    rawKind = "salaries";
+  } else if (/\b(utilities|utility|wifi|internet|water|electricity)\b/.test(combinedText)) {
+    rawKind = "utilities";
+  } else if (/\b(savings|saving)\b/.test(combinedText)) {
+    rawKind = "savings_deposit";
+  } else if (/\b(blackbox|black box)\b/.test(combinedText)) {
+    rawKind = "blackbox";
+  }
+  // --------------------------------------------
   const account = classifyOperationsAccount({ amount, kind: rawKind, title, notes });
   const overheadCategory = input.overheadCategory || detectOverheadCategoryFromText(`${rawKind} ${title || ""} ${notes || ""}`);
 
@@ -101,6 +120,8 @@ export function normalizeOperationsLedgerInput(input: {
     kind = amount < 0 ? "round_withdrawal" : "round_deposit";
   } else if (account === "invest") {
     kind = amount < 0 ? "invest_withdrawal" : "invest_deposit";
+  } else if (rawKind === "stock_orders") {
+    kind = "stock_orders";
   }
 
   return {

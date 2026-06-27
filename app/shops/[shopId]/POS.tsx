@@ -1443,6 +1443,17 @@ Generated via NIRVANA POS`;
     // Search results are now memoized and deferred using useMemo and useDeferredValue at the top of the component
     // const filteredInventory = ... was here
 
+    // --- NEW CAPITAL METRICS CALCULATIONS ---
+    // Rent balance for this specific shop
+    const shopRentBalance = useMemo(() => {
+        return opsLedger
+            .filter((r) => String(r.overhead_category || "").toLowerCase() === "rent")
+            .reduce((sum, r) => sum + Number(r.amount || 0), 0);
+    }, [opsLedger]);
+
+    const shopInvestBalance = investBalance?.availableBalance || 0;
+    // ----------------------------------------
+
     return (
         <div className="grid gap-4 md:gap-6 md:grid-cols-12 grid-cols-1">
             <div className="md:col-span-8 col-span-1 space-y-4 md:space-y-6">
@@ -1472,6 +1483,23 @@ Generated via NIRVANA POS`;
                 )}
 
                 <div className="flex flex-wrap items-center gap-2">
+                    {/* NEW CAPITAL METRICS */}
+                    <div className="flex items-center gap-3 w-full sm:w-auto bg-slate-900/50 p-2 rounded-xl border border-slate-800">
+                        <div className="flex flex-col px-2">
+                            <span className="text-[9px] uppercase font-black text-slate-500 tracking-wider">Rent Pool</span>
+                            <span className={cn("text-sm font-black italic", shopRentBalance < 0 ? "text-rose-400" : "text-emerald-400")}>
+                                ${shopRentBalance.toFixed(2)}
+                            </span>
+                        </div>
+                        <div className="w-px h-8 bg-slate-800" />
+                        <div className="flex flex-col px-2">
+                            <span className="text-[9px] uppercase font-black text-slate-500 tracking-wider">Invest Capital</span>
+                            <span className={cn("text-sm font-black italic", shopInvestBalance < 0 ? "text-rose-400" : "text-violet-400")}>
+                                ${shopInvestBalance.toFixed(2)}
+                            </span>
+                        </div>
+                    </div>
+
                     {canUseManagerTools && (
                         <Button
                             onClick={() => setIsManagerToolsOpen(true)}

@@ -1,12 +1,16 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase";
-import { requirePrivilegedActor } from "@/lib/apiAuth";
+import { requirePrivilegedActor, requireStaffActor } from "@/lib/apiAuth";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(req: Request) {
   try {
-    await requirePrivilegedActor();
+    try {
+      await requirePrivilegedActor();
+    } catch {
+      await requireStaffActor();
+    }
   } catch {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
