@@ -44,8 +44,11 @@ export default function PosAuditPage() {
     setError("");
     startTransition(async () => {
       try {
-        const r = await getPosAuditReport({ shopId, dateYYYYMMDD: date });
-        setReport(r);
+        const result = await getPosAuditReport({ shopId, dateYYYYMMDD: date });
+        if (result && result.success === false) {
+          throw new Error(result.error);
+        }
+        setReport(result.data || result);
       } catch (e: any) {
         setReport(null);
         setError(e?.message || "Failed to generate report");

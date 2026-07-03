@@ -1655,14 +1655,20 @@ export async function updateCashDrawerClosing(input: {
 }
 
 export async function getPosAuditReport(input: { shopId: string; dateYYYYMMDD: string }) {
-    const actor = await requireManagerOrOwner();
-    const shopId = String(input?.shopId || "").trim();
-    const day = String(input?.dateYYYYMMDD || "").trim();
+    try {
+        const actor = await requireManagerOrOwner();
+        const shopId = String(input?.shopId || "").trim();
+        const day = String(input?.dateYYYYMMDD || "").trim();
 
-    if (!shopId) throw new Error("Missing shopId");
-    if (!day) throw new Error("Missing date");
+        if (!shopId) throw new Error("Missing shopId");
+        if (!day) throw new Error("Missing date");
 
-    return computePosAuditReport({ shopId, dateYYYYMMDD: day });
+        const report = await computePosAuditReport({ shopId, dateYYYYMMDD: day });
+        return { success: true, data: report };
+    } catch (e: any) {
+        console.error('[getPosAuditReport] Failed:', e?.message || e);
+        return { success: false, error: e?.message || "Failed to generate report" };
+    }
 }
 
 export async function recordPosExpense(
