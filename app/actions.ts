@@ -80,11 +80,21 @@ async function getActorFromCookies(): Promise<ActorCtx | null> {
     if (!session) return null;
     if (session.expires_at && new Date(session.expires_at).getTime() < Date.now()) return null;
 
-    const { data: staff } = await supabaseAdmin
+    let { data: staff } = await supabaseAdmin
         .from("employees")
         .select("id,name,surname,shop_id,role,is_active,active")
         .eq("id", session.employee_id)
         .maybeSingle();
+
+    if (!staff?.id) {
+        const empId = String(session.employee_id);
+        const { data: staff2 } = await supabaseAdmin
+            .from("employees")
+            .select("id,name,surname,shop_id,role,is_active,active")
+            .eq("id", empId)
+            .maybeSingle();
+        staff = staff2;
+    }
 
     if (!staff?.id) return null;
     const active = Boolean((staff as any).is_active ?? (staff as any).active ?? true);
