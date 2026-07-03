@@ -18,7 +18,7 @@ function winAnsiSafe(text: any) {
 
 function isManagerRole(role: string | null | undefined) {
   const r = String(role || "").toLowerCase();
-  return r === "owner" || r === "admin" || r === "manager" || r === "lead_manager" || r === "lead manager";
+  return r === "owner" || r === "admin" || r.includes("manager");
 }
 
 function ymd(date: Date) {

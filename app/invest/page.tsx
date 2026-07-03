@@ -18,7 +18,7 @@ export default async function InvestPage({ searchParams }: { searchParams: Promi
 
   // Ensure role is owner, admin, or manager
   const role = String(actor.type === "owner_cookie" ? "owner" : actor.role).toLowerCase();
-  if (role !== "owner" && role !== "admin" && role !== "manager" && role !== "lead_manager" && role !== "lead manager") {
+  if (role !== "owner" && role !== "admin" && !role.includes("manager")) {
     redirect("/login");
   }
 

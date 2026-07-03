@@ -26,7 +26,7 @@ export default async function OperationsPage() {
 
   // Ensure role is owner, admin, or manager
   const role = String(actor.type === "owner_cookie" ? "owner" : actor.role).toLowerCase();
-  if (role !== "owner" && role !== "admin" && role !== "manager") {
+  if (role !== "owner" && role !== "admin" && !role.includes("manager")) {
     redirect("/login");
   }
 

@@ -82,15 +82,11 @@ export function AccessGate({ children }: { children: React.ReactNode }) {
     const onCommandCenter = pathname === "/";
 
     const r = String(staffRole || "").toLowerCase();
-    const isManager =
-      r === "manager" ||
-      r === "lead_manager" ||
-      r === "lead manager" ||
-      r === "admin" ||
-      r === "owner";
+    const isManager = r.includes("manager") || r === "admin" || r === "owner";
 
     const managerAllowed =
       pathname === "/inventory/stocktake" ||
+      pathname === "/inventory" ||
       pathname === "/admin/audit" ||
       pathname === "/admin/settings" ||
       pathname === "/admin/pos-audit" ||

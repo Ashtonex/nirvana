@@ -14,7 +14,7 @@ type Actor = {
 
 function isManagerRole(role: string): boolean {
   const r = String(role || "").toLowerCase();
-  return r === "manager" || r === "owner" || r === "admin";
+  return r === "owner" || r === "admin" || r.includes("manager");
 }
 
 async function getActorFromCookies(): Promise<Actor | null> {

@@ -265,7 +265,7 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
 
     const canUseManagerTools = (() => {
         const r = String(staffRole || "").toLowerCase();
-        return r === "owner" || r === "admin" || r === "manager" || r === "lead_manager" || r === "lead manager";
+        return r === "owner" || r === "admin" || r.includes("manager");
     })();
     const [isManagerToolsOpen, setIsManagerToolsOpen] = useState(false);
 

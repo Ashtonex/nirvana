@@ -1,0 +1,448 @@
+{
+  "totalWatches": 230,
+  "byShop": {
+    "kipasa": 139,
+    "dubdub": 90,
+    "tradecenter": 1
+  },
+  "byShopByMonth": {
+    "kipasa": {
+      "2026-04": 29,
+      "2026-03": 31,
+      "2026-05": 44,
+      "2026-06": 35
+    },
+    "dubdub": {
+      "2026-04": 17,
+      "2026-03": 24,
+      "2026-05": 15,
+      "2026-01": 5,
+      "2026-06": 29
+    },
+    "tradecenter": {
+      "2026-05": 1
+    }
+  },
+  "juneReport": {
+    "totalSales": 1378,
+    "totalQuantity": 64,
+    "salesByShop": {
+      "kipasa": {
+        "quantity": 35,
+        "revenue": 591
+      },
+      "dubdub": {
+        "quantity": 29,
+        "revenue": 787
+      }
+    },
+    "itemsSold": [
+      {
+        "date": "2026-06-29T15:55:49.777+00:00",
+        "item": "watch $25",
+        "shop": "kipasa",
+        "quantity": 2,
+        "revenue": 50
+      },
+      {
+        "date": "2026-06-27T15:09:25.531+00:00",
+        "item": "watch $5",
+        "shop": "kipasa",
+        "quantity": 1,
+        "revenue": 5
+      },
+      {
+        "date": "2026-06-27T15:21:00.314+00:00",
+        "item": "watch $35",
+        "shop": "dubdub",
+        "quantity": 2,
+        "revenue": 70
+      },
+      {
+        "date": "2026-06-01T15:24:48.444+00:00",
+        "item": "watch $35",
+        "shop": "kipasa",
+        "quantity": 1,
+        "revenue": 35
+      },
+      {
+        "date": "2026-06-01T00:00:00+00:00",
+        "item": "watch box",
+        "shop": "dubdub",
+        "quantity": 1,
+        "revenue": 5
+      },
+      {
+        "date": "2026-06-02T15:00:06.12+00:00",
+        "item": "watch $5",
+        "shop": "dubdub",
+        "quantity": 1,
+        "revenue": 5
+      },
+      {
+        "date": "2026-06-02T15:06:31.532+00:00",
+        "item": "Repairs (necklace,watch,bracelet, etc)",
+        "shop": "kipasa",
+        "quantity": 1,
+        "revenue": 2
+      },
+      {
+        "date": "2026-06-02T00:00:00+00:00",
+        "item": "watch $25",
+        "shop": "dubdub",
+        "quantity": 1,
+        "revenue": 25
+      },
+      {
+        "date": "2026-06-04T14:53:24.174+00:00",
+        "item": "watch $20",
+        "shop": "dubdub",
+        "quantity": 1,
+        "revenue": 20
+      },
+      {
+        "date": "2026-06-04T15:05:11.823+00:00",
+        "item": " Watch $100",
+        "shop": "dubdub",
+        "quantity": 1,
+        "revenue": 100
+      },
+      {
+        "date": "2026-06-04T15:48:59.236+00:00",
+        "item": "watch $10",
+        "shop": "kipasa",
+        "quantity": 1,
+        "revenue": 10
+      },
+      {
+        "date": "2026-06-05T14:40:13.547+00:00",
+        "item": "Watch Battery",
+        "shop": "dubdub",
+        "quantity": 2,
+        "revenue": 4
+      },
+      {
+        "date": "2026-06-04T00:00:00+00:00",
+        "item": "Repairs (necklace,watch,bracelet, etc)",
+        "shop": "kipasa",
+        "quantity": 1,
+        "revenue": 2
+      },
+      {
+        "date": "2026-06-05T15:51:09.553+00:00",
+        "item": "watch $25",
+        "shop": "kipasa",
+        "quantity": 1,
+        "revenue": 25
+      },
+      {
+        "date": "2026-06-05T15:54:23.901+00:00",
+        "item": "watch $5",
+        "shop": "kipasa",
+        "quantity": 1,
+        "revenue": 5
+      },
+      {
+        "date": "2026-06-05T16:12:08.209+00:00",
+        "item": "Repairs (necklace,watch,bracelet, etc)",
+        "shop": "kipasa",
+        "quantity": 1,
+        "revenue": 2
+      },
+      {
+        "date": "2026-06-06T14:52:09.831+00:00",
+        "item": "Watch $60",
+        "shop": "dubdub",
+        "quantity": 1,
+        "revenue": 60
+      },
+      {
+        "date": "2026-06-08T15:51:21.193+00:00",
+        "item": "watch $5",
+        "shop": "kipasa",
+        "quantity": 1,
+        "revenue": 5
+      },
+      {
+        "date": "2026-06-09T14:42:06.298+00:00",
+        "item": "Smart Watch $50",
+        "shop": "dubdub",
+        "quantity": 1,
+        "revenue": 50
+      },
+      {
+        "date": "2026-06-09T14:42:07.974+00:00",
+        "item": "watch $35",
+        "shop": "dubdub",
+        "quantity": 1,
+        "revenue": 35
+      },
+      {
+        "date": "2026-06-09T14:42:09.462+00:00",
+        "item": "watch box",
+        "shop": "dubdub",
+        "quantity": 1,
+        "revenue": 5
+      },
+      {
+        "date": "2026-06-29T06:44:14.571+00:00",
+        "item": "Watch Repairs",
+        "shop": "dubdub",
+        "quantity": 1,
+        "revenue": 0
+      },
+      {
+        "date": "2026-06-09T15:05:29.869+00:00",
+        "item": "Smart Watch $40",
+        "shop": "kipasa",
+        "quantity": 1,
+        "revenue": 40
+      },
+      {
+        "date": "2026-06-10T14:30:02.409+00:00",
+        "item": "Watch $15",
+        "shop": "dubdub",
+        "quantity": 1,
+        "revenue": 15
+      },
+      {
+        "date": "2026-06-10T14:37:32.464+00:00",
+        "item": "watch $25",
+        "shop": "kipasa",
+        "quantity": 1,
+        "revenue": 25
+      },
+      {
+        "date": "2026-06-13T14:01:04.786+00:00",
+        "item": "watch $20",
+        "shop": "dubdub",
+        "quantity": 1,
+        "revenue": 20
+      },
+      {
+        "date": "2026-06-13T14:01:22.107+00:00",
+        "item": "watch $35",
+        "shop": "dubdub",
+        "quantity": 1,
+        "revenue": 35
+      },
+      {
+        "date": "2026-06-15T14:40:41.248+00:00",
+        "item": "watch $5",
+        "shop": "dubdub",
+        "quantity": 2,
+        "revenue": 10
+      },
+      {
+        "date": "2026-06-16T15:13:53.298+00:00",
+        "item": "watch $35",
+        "shop": "kipasa",
+        "quantity": 1,
+        "revenue": 35
+      },
+      {
+        "date": "2026-06-16T15:24:57.65+00:00",
+        "item": "Watch Repairs",
+        "shop": "kipasa",
+        "quantity": 1,
+        "revenue": 1
+      },
+      {
+        "date": "2026-06-17T15:14:42.387+00:00",
+        "item": "Watch $60",
+        "shop": "dubdub",
+        "quantity": 1,
+        "revenue": 60
+      },
+      {
+        "date": "2026-06-17T15:29:56.333+00:00",
+        "item": "watch $5",
+        "shop": "kipasa",
+        "quantity": 1,
+        "revenue": 5
+      },
+      {
+        "date": "2026-06-18T13:23:32.3+00:00",
+        "item": "Smart Watch $10",
+        "shop": "dubdub",
+        "quantity": 1,
+        "revenue": 10
+      },
+      {
+        "date": "2026-06-18T15:05:55.578+00:00",
+        "item": "watch box",
+        "shop": "kipasa",
+        "quantity": 1,
+        "revenue": 5
+      },
+      {
+        "date": "2026-06-18T15:11:46.413+00:00",
+        "item": "watch $5",
+        "shop": "kipasa",
+        "quantity": 1,
+        "revenue": 5
+      },
+      {
+        "date": "2026-06-18T15:09:57.68+00:00",
+        "item": "watch box",
+        "shop": "kipasa",
+        "quantity": 2,
+        "revenue": 0
+      },
+      {
+        "date": "2026-06-19T14:51:37.533+00:00",
+        "item": "Smart Watch $50",
+        "shop": "dubdub",
+        "quantity": 1,
+        "revenue": 50
+      },
+      {
+        "date": "2026-06-19T14:52:17.839+00:00",
+        "item": "watch $25",
+        "shop": "dubdub",
+        "quantity": 1,
+        "revenue": 25
+      },
+      {
+        "date": "2026-06-19T14:53:15.854+00:00",
+        "item": "watch $5",
+        "shop": "dubdub",
+        "quantity": 1,
+        "revenue": 5
+      },
+      {
+        "date": "2026-06-19T15:07:15.769+00:00",
+        "item": " Watch $100",
+        "shop": "kipasa",
+        "quantity": 1,
+        "revenue": 100
+      },
+      {
+        "date": "2026-06-20T12:08:33.282+00:00",
+        "item": "watch $10",
+        "shop": "kipasa",
+        "quantity": 1,
+        "revenue": 10
+      },
+      {
+        "date": "2026-06-20T13:27:03.127+00:00",
+        "item": "watch $85",
+        "shop": "kipasa",
+        "quantity": 1,
+        "revenue": 85
+      },
+      {
+        "date": "2026-06-20T14:25:43.531+00:00",
+        "item": "Watch $50 Avaitor Anadigital Round Black Face and Bezel",
+        "shop": "dubdub",
+        "quantity": 1,
+        "revenue": 48
+      },
+      {
+        "date": "2026-06-20T14:29:16.43+00:00",
+        "item": "Smart Watch $30",
+        "shop": "dubdub",
+        "quantity": 1,
+        "revenue": 30
+      },
+      {
+        "date": "2026-06-21T13:23:56.273+00:00",
+        "item": "watch $85",
+        "shop": "dubdub",
+        "quantity": 1,
+        "revenue": 85
+      },
+      {
+        "date": "2026-06-22T13:36:35.757+00:00",
+        "item": "watch $5",
+        "shop": "dubdub",
+        "quantity": 1,
+        "revenue": 5
+      },
+      {
+        "date": "2026-06-22T15:29:43.655+00:00",
+        "item": "watch $5",
+        "shop": "kipasa",
+        "quantity": 2,
+        "revenue": 10
+      },
+      {
+        "date": "2026-06-22T15:29:55.449+00:00",
+        "item": "Watch Battery",
+        "shop": "kipasa",
+        "quantity": 1,
+        "revenue": 1
+      },
+      {
+        "date": "2026-06-23T14:15:59.322+00:00",
+        "item": "Smart Watch $10",
+        "shop": "dubdub",
+        "quantity": 1,
+        "revenue": 10
+      },
+      {
+        "date": "2026-06-24T15:02:40.891+00:00",
+        "item": "watch $5",
+        "shop": "kipasa",
+        "quantity": 1,
+        "revenue": 5
+      },
+      {
+        "date": "2026-06-24T15:04:48.857+00:00",
+        "item": "watch $5",
+        "shop": "kipasa",
+        "quantity": 1,
+        "revenue": 5
+      },
+      {
+        "date": "2026-06-24T15:04:50.874+00:00",
+        "item": "watch $25",
+        "shop": "kipasa",
+        "quantity": 1,
+        "revenue": 25
+      },
+      {
+        "date": "2026-06-25T15:31:03.704+00:00",
+        "item": "watch $5",
+        "shop": "kipasa",
+        "quantity": 1,
+        "revenue": 5
+      },
+      {
+        "date": "2026-06-25T15:33:46.157+00:00",
+        "item": "Watch Battery",
+        "shop": "kipasa",
+        "quantity": 1,
+        "revenue": 1
+      },
+      {
+        "date": "2026-06-26T15:47:24.675+00:00",
+        "item": "watch $20",
+        "shop": "kipasa",
+        "quantity": 1,
+        "revenue": 20
+      },
+      {
+        "date": "2026-06-26T15:47:26.696+00:00",
+        "item": "watch box",
+        "shop": "kipasa",
+        "quantity": 1,
+        "revenue": 2
+      },
+      {
+        "date": "2026-06-26T15:47:28.802+00:00",
+        "item": "watch $35",
+        "shop": "kipasa",
+        "quantity": 1,
+        "revenue": 30
+      },
+      {
+        "date": "2026-06-26T15:47:45.467+00:00",
+        "item": "Watch $80",
+        "shop": "kipasa",
+        "quantity": 1,
+        "revenue": 35
+      }
+    ]
+  }
+}

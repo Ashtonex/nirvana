@@ -48,7 +48,8 @@ async function getActor(): Promise<Actor | null> {
     if (!staff) return null;
 
     const name = `${staff.name} ${staff.surname || ""}`.trim();
-    const role = (staff.role as string)?.toLowerCase() === "manager" ? "manager" : "staff";
+    const roleString = String(staff.role || "").toLowerCase();
+    const role = roleString.includes("manager") || roleString === "owner" || roleString === "admin" ? "manager" : "staff";
     
     return { id: staff.id, name, role, shop_id: staff.shop_id };
   }

@@ -81,7 +81,7 @@ async function getActor(req: Request): Promise<Actor | null> {
 function canIssueReturn(actor: Actor) {
   if (actor.role === "owner") return true;
   // Best default: managers only.
-  return String(actor.employee_role).toLowerCase() === "manager";
+  return String(actor.employee_role).toLowerCase().includes("manager");
 }
 
 export async function POST(req: Request) {

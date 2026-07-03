@@ -1,0 +1,1753 @@
+{
+  "totalSales": 14976,
+  "byShop": {
+    "kipasa": {
+      "total": 5950.5,
+      "byCategory": {
+        "Uncategorized": {
+          "revenue": 5950.5,
+          "quantity": 600
+        }
+      },
+      "byProduct": {
+        "9mm Handgun": {
+          "revenue": 350,
+          "quantity": 2
+        },
+        "Glock 17 $175": {
+          "revenue": 345,
+          "quantity": 2
+        },
+        "Ring $50": {
+          "revenue": 200,
+          "quantity": 6
+        },
+        "P29 Classic ": {
+          "revenue": 200,
+          "quantity": 1
+        },
+        "Hamper $10": {
+          "revenue": 180,
+          "quantity": 5
+        },
+        "watch $25": {
+          "revenue": 125,
+          "quantity": 5
+        },
+        "Pellet Gun 9mm": {
+          "revenue": 125,
+          "quantity": 1
+        },
+        "Wallet $20": {
+          "revenue": 120,
+          "quantity": 6
+        },
+        "Engraving ": {
+          "revenue": 109,
+          "quantity": 18
+        },
+        "watch $35": {
+          "revenue": 100,
+          "quantity": 3
+        },
+        "Thermal Cup $10": {
+          "revenue": 100,
+          "quantity": 14
+        },
+        " Watch $100": {
+          "revenue": 100,
+          "quantity": 1
+        },
+        "Perfume $50": {
+          "revenue": 100,
+          "quantity": 2
+        },
+        "Kipasa": {
+          "revenue": 90,
+          "quantity": 4
+        },
+        "watch $85": {
+          "revenue": 85,
+          "quantity": 1
+        },
+        "Baton Stick $10": {
+          "revenue": 80,
+          "quantity": 8
+        },
+        "Necklace $10": {
+          "revenue": 80,
+          "quantity": 8
+        },
+        "Perfume $10": {
+          "revenue": 80,
+          "quantity": 10
+        },
+        "Gym Gloves $10": {
+          "revenue": 80,
+          "quantity": 8
+        },
+        "Sling Bag": {
+          "revenue": 75,
+          "quantity": 6
+        },
+        "dog leash $15": {
+          "revenue": 75,
+          "quantity": 5
+        },
+        "teddy $30 - 35": {
+          "revenue": 70,
+          "quantity": 2
+        },
+        "Perfume $70": {
+          "revenue": 70,
+          "quantity": 1
+        },
+        "Cotton Road Hand Bag $20": {
+          "revenue": 60,
+          "quantity": 3
+        },
+        "Handcuffs $20": {
+          "revenue": 60,
+          "quantity": 3
+        },
+        "Necklace ": {
+          "revenue": 60,
+          "quantity": 9
+        },
+        "Perfume $30": {
+          "revenue": 60,
+          "quantity": 2
+        },
+        "Zim T-Shirt": {
+          "revenue": 60,
+          "quantity": 3
+        },
+        "reuben barwe ": {
+          "revenue": 60,
+          "quantity": 2
+        },
+        "Perfume (Ameerat Al Arab) $30": {
+          "revenue": 60,
+          "quantity": 2
+        },
+        "reuben barwe -zim flag": {
+          "revenue": 58,
+          "quantity": 3
+        },
+        "Flower Bouqet $30 - $40": {
+          "revenue": 56,
+          "quantity": 3
+        },
+        "Keyholder $5": {
+          "revenue": 55,
+          "quantity": 11
+        },
+        "watch $5": {
+          "revenue": 50,
+          "quantity": 10
+        },
+        "Leather Wallet $25 (A8)": {
+          "revenue": 50,
+          "quantity": 2
+        },
+        "Biker Masks": {
+          "revenue": 50,
+          "quantity": 3
+        },
+        "Taser AM-800 100P Electric Shock": {
+          "revenue": 50,
+          "quantity": 1
+        },
+        "Codex bulltes $1": {
+          "revenue": 45,
+          "quantity": 45
+        },
+        "Taser $15 (AM-958 60P)": {
+          "revenue": 45,
+          "quantity": 3
+        },
+        "Cap $10": {
+          "revenue": 40,
+          "quantity": 4
+        },
+        "Stanley Cup $50": {
+          "revenue": 40,
+          "quantity": 1
+        },
+        "Cotton Road Handbag $40": {
+          "revenue": 40,
+          "quantity": 1
+        },
+        "Smart Watch $40": {
+          "revenue": 40,
+          "quantity": 1
+        },
+        "Taser AM-288 60P Electric Shock": {
+          "revenue": 40,
+          "quantity": 3
+        },
+        "Taser AM-928 60P Electric Shock": {
+          "revenue": 40,
+          "quantity": 3
+        },
+        "Perfume $40": {
+          "revenue": 40,
+          "quantity": 1
+        },
+        "Cotton Road handbag $40": {
+          "revenue": 40,
+          "quantity": 1
+        },
+        "4 Headed Massager": {
+          "revenue": 40,
+          "quantity": 1
+        },
+        "pepper spray (keyholder)": {
+          "revenue": 40,
+          "quantity": 7
+        },
+        "Taser AM-1101 60P Electric Shock": {
+          "revenue": 40,
+          "quantity": 4
+        },
+        "pepper spray $10": {
+          "revenue": 35,
+          "quantity": 4
+        },
+        "Taser $10": {
+          "revenue": 35,
+          "quantity": 4
+        },
+        "Watch $80": {
+          "revenue": 35,
+          "quantity": 1
+        },
+        "Rizla $1": {
+          "revenue": 33,
+          "quantity": 33
+        },
+        "Gift Bag -97M": {
+          "revenue": 32,
+          "quantity": 9
+        },
+        "Hellium": {
+          "revenue": 31,
+          "quantity": 3
+        },
+        "Ring $5": {
+          "revenue": 30,
+          "quantity": 5
+        },
+        "Bracelet $5": {
+          "revenue": 30,
+          "quantity": 6
+        },
+        "Duffle Bag $15, $35,$40": {
+          "revenue": 30,
+          "quantity": 1
+        },
+        "Taser AM-958 60P Electric Shock": {
+          "revenue": 30,
+          "quantity": 2
+        },
+        "Wallet $15 (SP11)": {
+          "revenue": 30,
+          "quantity": 2
+        },
+        "Gym Gloves (N145158) $5": {
+          "revenue": 30,
+          "quantity": 6
+        },
+        "Bracelet $10": {
+          "revenue": 30,
+          "quantity": 3
+        },
+        "Pepper Spray 110ML(200P)": {
+          "revenue": 30,
+          "quantity": 6
+        },
+        "gun holster": {
+          "revenue": 30,
+          "quantity": 2
+        },
+        "Pendulum $30": {
+          "revenue": 30,
+          "quantity": 1
+        },
+        "Portable Travel Case": {
+          "revenue": 30,
+          "quantity": 1
+        },
+        "Wallet $30": {
+          "revenue": 30,
+          "quantity": 1
+        },
+        "Hipflask Set $25": {
+          "revenue": 25,
+          "quantity": 1
+        },
+        "Cap $5": {
+          "revenue": 25,
+          "quantity": 5
+        },
+        "Binoculars $25": {
+          "revenue": 25,
+          "quantity": 1
+        },
+        "Stanley Cup $30": {
+          "revenue": 25,
+          "quantity": 1
+        },
+        "dog tags": {
+          "revenue": 25,
+          "quantity": 3
+        },
+        "engraved boards $20": {
+          "revenue": 25,
+          "quantity": 1
+        },
+        "Ear Rings $2": {
+          "revenue": 21,
+          "quantity": 11
+        },
+        "Ring $10": {
+          "revenue": 20,
+          "quantity": 2
+        },
+        "Necklace $5": {
+          "revenue": 20,
+          "quantity": 6
+        },
+        "Perfume $20": {
+          "revenue": 20,
+          "quantity": 1
+        },
+        "watch $10": {
+          "revenue": 20,
+          "quantity": 2
+        },
+        "Swiss Knife $20": {
+          "revenue": 20,
+          "quantity": 1
+        },
+        "Chocolates": {
+          "revenue": 20,
+          "quantity": 1
+        },
+        "taser bullets": {
+          "revenue": 20,
+          "quantity": 2
+        },
+        "binoculars $25": {
+          "revenue": 20,
+          "quantity": 1
+        },
+        "Scarf $10": {
+          "revenue": 20,
+          "quantity": 4
+        },
+        "Paper Hats": {
+          "revenue": 20,
+          "quantity": 3
+        },
+        "Cotton Road Handbag $10": {
+          "revenue": 20,
+          "quantity": 2
+        },
+        "Diffuser ": {
+          "revenue": 20,
+          "quantity": 1
+        },
+        "Wooden Pen": {
+          "revenue": 20,
+          "quantity": 1
+        },
+        "Water Bag": {
+          "revenue": 20,
+          "quantity": 1
+        },
+        "Taser AM-1138 50P Electric Shock": {
+          "revenue": 20,
+          "quantity": 1
+        },
+        "Biking Gloves $20": {
+          "revenue": 20,
+          "quantity": 1
+        },
+        "engraved boards $15": {
+          "revenue": 20,
+          "quantity": 1
+        },
+        "Cardholder $10": {
+          "revenue": 20,
+          "quantity": 2
+        },
+        "watch $20": {
+          "revenue": 20,
+          "quantity": 1
+        },
+        "Glasses $20": {
+          "revenue": 20,
+          "quantity": 1
+        },
+        "Bracelet $20": {
+          "revenue": 20,
+          "quantity": 1
+        },
+        "Gift bag $3": {
+          "revenue": 18,
+          "quantity": 6
+        },
+        "Gift Bag -25M": {
+          "revenue": 16,
+          "quantity": 6
+        },
+        "Gift Card $2": {
+          "revenue": 16,
+          "quantity": 8
+        },
+        "Color Smoke Bombs": {
+          "revenue": 15,
+          "quantity": 2
+        },
+        "Taser $15 (AM-110160P)": {
+          "revenue": 15,
+          "quantity": 1
+        },
+        "gift bag $5": {
+          "revenue": 15,
+          "quantity": 3
+        },
+        "Bracelet $15": {
+          "revenue": 15,
+          "quantity": 1
+        },
+        "Gym Gloves $15": {
+          "revenue": 15,
+          "quantity": 1
+        },
+        "Leather Belt $15": {
+          "revenue": 15,
+          "quantity": 1
+        },
+        "wooden plaque $15": {
+          "revenue": 15,
+          "quantity": 1
+        },
+        "Glass Beer Mug": {
+          "revenue": 15,
+          "quantity": 1
+        },
+        "Ring $15": {
+          "revenue": 15,
+          "quantity": 1
+        },
+        "Monopoly $15": {
+          "revenue": 15,
+          "quantity": 1
+        },
+        "Cardholder $15": {
+          "revenue": 15,
+          "quantity": 1
+        },
+        "Crusher $12": {
+          "revenue": 12,
+          "quantity": 1
+        },
+        "Chess $10": {
+          "revenue": 12,
+          "quantity": 1
+        },
+        "gift bag $2": {
+          "revenue": 10,
+          "quantity": 5
+        },
+        "Gift Box $5": {
+          "revenue": 10,
+          "quantity": 2
+        },
+        "Cups $10": {
+          "revenue": 10,
+          "quantity": 1
+        },
+        "Stanley Lid": {
+          "revenue": 10,
+          "quantity": 2
+        },
+        "Leather Belt $10": {
+          "revenue": 10,
+          "quantity": 1
+        },
+        "Hamper": {
+          "revenue": 10,
+          "quantity": 1
+        },
+        "Compass $5": {
+          "revenue": 10,
+          "quantity": 2
+        },
+        "Ladies Sunhat": {
+          "revenue": 10,
+          "quantity": 1
+        },
+        "Crusher $10": {
+          "revenue": 10,
+          "quantity": 1
+        },
+        "Stanley Cup $10": {
+          "revenue": 10,
+          "quantity": 1
+        },
+        "weed roller $10": {
+          "revenue": 10,
+          "quantity": 1
+        },
+        "Stanley Accessories $10": {
+          "revenue": 10,
+          "quantity": 1
+        },
+        "dog muzzle": {
+          "revenue": 10,
+          "quantity": 1
+        },
+        "baton stick $30": {
+          "revenue": 10,
+          "quantity": 1
+        },
+        "Pet Shampoo (N606436)": {
+          "revenue": 10,
+          "quantity": 2
+        },
+        "Pellets $10": {
+          "revenue": 10,
+          "quantity": 1
+        },
+        "Hat (N145097) $10": {
+          "revenue": 10,
+          "quantity": 3
+        },
+        "Cocktail Shaker $10": {
+          "revenue": 10,
+          "quantity": 1
+        },
+        "Tactical Wallet $5": {
+          "revenue": 10,
+          "quantity": 2
+        },
+        "Whip": {
+          "revenue": 10,
+          "quantity": 1
+        },
+        "Glass Trophy 5": {
+          "revenue": 10,
+          "quantity": 2
+        },
+        "Gift Card $4": {
+          "revenue": 10,
+          "quantity": 1
+        },
+        "Glasses $10": {
+          "revenue": 10,
+          "quantity": 1
+        },
+        "Passport Cover ": {
+          "revenue": 10,
+          "quantity": 1
+        },
+        "travel pillow": {
+          "revenue": 10,
+          "quantity": 1
+        },
+        "Orzak $5": {
+          "revenue": 10,
+          "quantity": 2
+        },
+        "Bush Sun hats": {
+          "revenue": 10,
+          "quantity": 1
+        },
+        "whistle": {
+          "revenue": 9,
+          "quantity": 3
+        },
+        "gift bag $8": {
+          "revenue": 8,
+          "quantity": 1
+        },
+        "Basket ": {
+          "revenue": 8,
+          "quantity": 2
+        },
+        "Balloons": {
+          "revenue": 7,
+          "quantity": 26
+        },
+        "watch box": {
+          "revenue": 7,
+          "quantity": 4
+        },
+        "dog collar 1": {
+          "revenue": 7,
+          "quantity": 1
+        },
+        "Repairs (necklace,watch,bracelet, etc)": {
+          "revenue": 6,
+          "quantity": 3
+        },
+        "Wrapping Paper": {
+          "revenue": 5,
+          "quantity": 7
+        },
+        "fascinator 1": {
+          "revenue": 5,
+          "quantity": 1
+        },
+        "rasta badge": {
+          "revenue": 5,
+          "quantity": 1
+        },
+        "Pet Grooming tool Kit": {
+          "revenue": 5,
+          "quantity": 1
+        },
+        "lighter $5": {
+          "revenue": 5,
+          "quantity": 1
+        },
+        "CO2 Gas Tanks": {
+          "revenue": 5,
+          "quantity": 5
+        },
+        "Dog Brushe": {
+          "revenue": 5,
+          "quantity": 1
+        },
+        "crusher $5": {
+          "revenue": 5,
+          "quantity": 1
+        },
+        "Gym Gloves $5": {
+          "revenue": 5,
+          "quantity": 1
+        },
+        "Copper Bacelet": {
+          "revenue": 5,
+          "quantity": 1
+        },
+        "Portable Towel ": {
+          "revenue": 5,
+          "quantity": 1
+        },
+        "zim flag": {
+          "revenue": 5,
+          "quantity": 1
+        },
+        "truth or dare": {
+          "revenue": 5,
+          "quantity": 1
+        },
+        "Gold Trophy": {
+          "revenue": 5,
+          "quantity": 1
+        },
+        "Glass Case": {
+          "revenue": 5,
+          "quantity": 1
+        },
+        "Wallet $5": {
+          "revenue": 5,
+          "quantity": 1
+        },
+        "Roses $2": {
+          "revenue": 4,
+          "quantity": 4
+        },
+        "Wrapping": {
+          "revenue": 4,
+          "quantity": 4
+        },
+        "Crusher $3": {
+          "revenue": 3,
+          "quantity": 1
+        },
+        "Pre Rolled Cones": {
+          "revenue": 3,
+          "quantity": 3
+        },
+        "Keyholder $3": {
+          "revenue": 3,
+          "quantity": 1
+        },
+        "Gift Card $1": {
+          "revenue": 2,
+          "quantity": 3
+        },
+        "Gift Box $1": {
+          "revenue": 2,
+          "quantity": 1
+        },
+        "Ring $2": {
+          "revenue": 2,
+          "quantity": 2
+        },
+        "playing cards": {
+          "revenue": 2,
+          "quantity": 2
+        },
+        "Necklace $2": {
+          "revenue": 2,
+          "quantity": 1
+        },
+        "Watch Battery": {
+          "revenue": 2,
+          "quantity": 2
+        },
+        "Piercings": {
+          "revenue": 2,
+          "quantity": 2
+        },
+        "Straw": {
+          "revenue": 1,
+          "quantity": 1
+        },
+        "Watch Repairs": {
+          "revenue": 1,
+          "quantity": 1
+        },
+        "Gift Card $0.50": {
+          "revenue": 0.5,
+          "quantity": 1
+        },
+        "Cards D2": {
+          "revenue": 0,
+          "quantity": 4
+        },
+        "RETURN: Ring $50": {
+          "revenue": 0,
+          "quantity": 3
+        },
+        "RETURN: Scarf $10": {
+          "revenue": 0,
+          "quantity": 1
+        },
+        "RETURN: Cards D2": {
+          "revenue": 0,
+          "quantity": 3
+        },
+        "RETURN: Thermal Cup $10": {
+          "revenue": 0,
+          "quantity": 2
+        },
+        "RETURN: Taser $10": {
+          "revenue": -5,
+          "quantity": 1
+        },
+        "RETURN: Rizla $1": {
+          "revenue": -6,
+          "quantity": 6
+        },
+        "RETURN: Gym Gloves $10": {
+          "revenue": -10,
+          "quantity": 1
+        },
+        "RETURN: Hamper $10": {
+          "revenue": -25,
+          "quantity": 1
+        },
+        "RETURN: Flower Bouqet $30 - $40": {
+          "revenue": -28,
+          "quantity": 1
+        },
+        "RETURN: Baton Stick $10": {
+          "revenue": -60,
+          "quantity": 6
+        }
+      }
+    },
+    "dubdub": {
+      "total": 8316,
+      "byCategory": {
+        "Uncategorized": {
+          "revenue": 8316,
+          "quantity": 719
+        }
+      },
+      "byProduct": {
+        "Perfume $30": {
+          "revenue": 420,
+          "quantity": 14
+        },
+        "Pellet Gun $350": {
+          "revenue": 350,
+          "quantity": 1
+        },
+        "Ring $50": {
+          "revenue": 250,
+          "quantity": 5
+        },
+        "Taser $75": {
+          "revenue": 225,
+          "quantity": 3
+        },
+        "Pellet Gun $400": {
+          "revenue": 200,
+          "quantity": 1
+        },
+        "Vape $10": {
+          "revenue": 190,
+          "quantity": 20
+        },
+        "Vape $12": {
+          "revenue": 180,
+          "quantity": 15
+        },
+        "Air Pump (NB10)": {
+          "revenue": 150,
+          "quantity": 1
+        },
+        "Rizla $1": {
+          "revenue": 148,
+          "quantity": 146
+        },
+        "watch $35": {
+          "revenue": 140,
+          "quantity": 4
+        },
+        "Perfume $70": {
+          "revenue": 140,
+          "quantity": 2
+        },
+        "Handcuffs (DO007)  $20": {
+          "revenue": 120,
+          "quantity": 6
+        },
+        "Watch $60": {
+          "revenue": 120,
+          "quantity": 2
+        },
+        "accoustic guitar $100": {
+          "revenue": 120,
+          "quantity": 1
+        },
+        "Perfume (Pandora Perfume) $30": {
+          "revenue": 120,
+          "quantity": 4
+        },
+        "Perfume $10": {
+          "revenue": 110,
+          "quantity": 11
+        },
+        "Perfume $20": {
+          "revenue": 110,
+          "quantity": 6
+        },
+        "Taser $20": {
+          "revenue": 100,
+          "quantity": 5
+        },
+        "Perfume $50": {
+          "revenue": 100,
+          "quantity": 2
+        },
+        " Watch $100": {
+          "revenue": 100,
+          "quantity": 1
+        },
+        "Smart Watch $50": {
+          "revenue": 100,
+          "quantity": 2
+        },
+        "Taser AM-1138 50P Electric Shock": {
+          "revenue": 95,
+          "quantity": 2
+        },
+        "Pellets $10": {
+          "revenue": 90,
+          "quantity": 9
+        },
+        "Vape $15 ": {
+          "revenue": 90,
+          "quantity": 6
+        },
+        "watch $85": {
+          "revenue": 85,
+          "quantity": 1
+        },
+        "Perfume $40": {
+          "revenue": 80,
+          "quantity": 2
+        },
+        "Taser AM-288 60P Electric Shock": {
+          "revenue": 75,
+          "quantity": 1
+        },
+        "Vape $25": {
+          "revenue": 75,
+          "quantity": 3
+        },
+        "Wallet $15 (SP11)": {
+          "revenue": 75,
+          "quantity": 5
+        },
+        "Taser (stun gun AM 002 30P) $75": {
+          "revenue": 75,
+          "quantity": 1
+        },
+        "Walkie Talkie $75": {
+          "revenue": 75,
+          "quantity": 1
+        },
+        "baton stick $30": {
+          "revenue": 74,
+          "quantity": 9
+        },
+        "Taser $10": {
+          "revenue": 70,
+          "quantity": 7
+        },
+        "Ring $10": {
+          "revenue": 65,
+          "quantity": 6
+        },
+        "Crusher $10": {
+          "revenue": 65,
+          "quantity": 6
+        },
+        "Keyholder $5": {
+          "revenue": 65,
+          "quantity": 13
+        },
+        "Taser $15": {
+          "revenue": 60,
+          "quantity": 4
+        },
+        "Wallet $30": {
+          "revenue": 60,
+          "quantity": 2
+        },
+        "Taser $45": {
+          "revenue": 60,
+          "quantity": 1
+        },
+        "teddy $30 - 35": {
+          "revenue": 60,
+          "quantity": 2
+        },
+        "Guitar Belt ": {
+          "revenue": 60,
+          "quantity": 4
+        },
+        "reuben barwe -zim flag": {
+          "revenue": 60,
+          "quantity": 2
+        },
+        "Crusher $20": {
+          "revenue": 55,
+          "quantity": 3
+        },
+        "Gym Gloves (N145148 D-99) $10": {
+          "revenue": 55,
+          "quantity": 6
+        },
+        "Necklace $5": {
+          "revenue": 55,
+          "quantity": 11
+        },
+        "Vape $18": {
+          "revenue": 54,
+          "quantity": 3
+        },
+        "Necklace $10": {
+          "revenue": 50,
+          "quantity": 5
+        },
+        "watch $25": {
+          "revenue": 50,
+          "quantity": 2
+        },
+        "Cap $10": {
+          "revenue": 50,
+          "quantity": 5
+        },
+        "Watch $50 Avaitor Anadigital Round Black Face and Bezel": {
+          "revenue": 48,
+          "quantity": 1
+        },
+        "Taser $15 (AM-958 60P)": {
+          "revenue": 45,
+          "quantity": 3
+        },
+        "Gym Gloves $10": {
+          "revenue": 40,
+          "quantity": 4
+        },
+        "watch $20": {
+          "revenue": 40,
+          "quantity": 2
+        },
+        "melodica": {
+          "revenue": 40,
+          "quantity": 1
+        },
+        "zim jersey": {
+          "revenue": 40,
+          "quantity": 2
+        },
+        "mbira ": {
+          "revenue": 40,
+          "quantity": 1
+        },
+        "Couples Hand-cuffs": {
+          "revenue": 40,
+          "quantity": 2
+        },
+        "Handcuffs $20": {
+          "revenue": 40,
+          "quantity": 2
+        },
+        "Crusher $12": {
+          "revenue": 36,
+          "quantity": 3
+        },
+        "Pepper Spray 110ML(200P)": {
+          "revenue": 35,
+          "quantity": 5
+        },
+        "Drum Stick $5": {
+          "revenue": 35,
+          "quantity": 7
+        },
+        "Guitar Bag $20": {
+          "revenue": 35,
+          "quantity": 2
+        },
+        "reuben barwe ": {
+          "revenue": 35,
+          "quantity": 2
+        },
+        "Shot Cups $2": {
+          "revenue": 34,
+          "quantity": 17
+        },
+        "Game Pad $30": {
+          "revenue": 30,
+          "quantity": 1
+        },
+        "Cardholder $10": {
+          "revenue": 30,
+          "quantity": 3
+        },
+        "Monocular": {
+          "revenue": 30,
+          "quantity": 2
+        },
+        "Knight Ornament $15": {
+          "revenue": 30,
+          "quantity": 2
+        },
+        "Pellets $15": {
+          "revenue": 30,
+          "quantity": 2
+        },
+        "weed roller $12": {
+          "revenue": 30,
+          "quantity": 3
+        },
+        "Perfume (Ameerat Al Arab) $30": {
+          "revenue": 30,
+          "quantity": 1
+        },
+        "Gym Gloves $15": {
+          "revenue": 30,
+          "quantity": 2
+        },
+        "Leather Belt $15": {
+          "revenue": 30,
+          "quantity": 2
+        },
+        "Tambourine $10": {
+          "revenue": 30,
+          "quantity": 2
+        },
+        "Perfume $5": {
+          "revenue": 30,
+          "quantity": 3
+        },
+        "Baton Stick $10": {
+          "revenue": 30,
+          "quantity": 3
+        },
+        "6 String Guitar Strings (Acoustic)": {
+          "revenue": 30,
+          "quantity": 3
+        },
+        "Hat (N145097) $10": {
+          "revenue": 30,
+          "quantity": 3
+        },
+        "Dog Harness": {
+          "revenue": 30,
+          "quantity": 1
+        },
+        "Hipflask $10": {
+          "revenue": 30,
+          "quantity": 3
+        },
+        "mic condenser": {
+          "revenue": 30,
+          "quantity": 1
+        },
+        "Get Churched $15": {
+          "revenue": 30,
+          "quantity": 2
+        },
+        "Microphone ": {
+          "revenue": 30,
+          "quantity": 1
+        },
+        "Taser AM-800 100P Electric Shock": {
+          "revenue": 30,
+          "quantity": 3
+        },
+        "binoculars $15": {
+          "revenue": 30,
+          "quantity": 2
+        },
+        "Massage Gun": {
+          "revenue": 30,
+          "quantity": 1
+        },
+        "Smart Watch $30": {
+          "revenue": 30,
+          "quantity": 1
+        },
+        "vape juice $10": {
+          "revenue": 27,
+          "quantity": 3
+        },
+        "Bike Ornament $20": {
+          "revenue": 25,
+          "quantity": 1
+        },
+        "watch $5": {
+          "revenue": 25,
+          "quantity": 5
+        },
+        "Leather Wallet $25 (A8)": {
+          "revenue": 25,
+          "quantity": 1
+        },
+        "Jeep Knife": {
+          "revenue": 25,
+          "quantity": 1
+        },
+        "Taser AM-1101 60P Electric Shock": {
+          "revenue": 25,
+          "quantity": 2
+        },
+        "Engraving ": {
+          "revenue": 25,
+          "quantity": 5
+        },
+        "Gym Gloves (N145158) $5": {
+          "revenue": 25,
+          "quantity": 5
+        },
+        "guitar stand": {
+          "revenue": 25,
+          "quantity": 1
+        },
+        "Cap $12": {
+          "revenue": 24,
+          "quantity": 2
+        },
+        "Binoculars $25": {
+          "revenue": 24,
+          "quantity": 1
+        },
+        "Ear Rings $2": {
+          "revenue": 22,
+          "quantity": 11
+        },
+        "Wallet $25": {
+          "revenue": 20,
+          "quantity": 1
+        },
+        "Wallet $10 (L61)": {
+          "revenue": 20,
+          "quantity": 2
+        },
+        "zim pins": {
+          "revenue": 20,
+          "quantity": 10
+        },
+        "Couple Set": {
+          "revenue": 20,
+          "quantity": 1
+        },
+        "Rubix Cube $5": {
+          "revenue": 20,
+          "quantity": 4
+        },
+        "Quicksand Ornament $20": {
+          "revenue": 20,
+          "quantity": 1
+        },
+        "lighter $5": {
+          "revenue": 20,
+          "quantity": 4
+        },
+        "Knuckleduster $10": {
+          "revenue": 20,
+          "quantity": 2
+        },
+        "elbox and knee pads (kids)": {
+          "revenue": 20,
+          "quantity": 1
+        },
+        "darts 5": {
+          "revenue": 20,
+          "quantity": 1
+        },
+        "Guitar String $10": {
+          "revenue": 20,
+          "quantity": 2
+        },
+        "Guitar Head ": {
+          "revenue": 20,
+          "quantity": 1
+        },
+        "Vape $20": {
+          "revenue": 20,
+          "quantity": 1
+        },
+        "Bracelet $10": {
+          "revenue": 20,
+          "quantity": 2
+        },
+        "Wallet $20": {
+          "revenue": 20,
+          "quantity": 1
+        },
+        "Scarf $10": {
+          "revenue": 20,
+          "quantity": 2
+        },
+        "Bass Guitar String Set": {
+          "revenue": 20,
+          "quantity": 1
+        },
+        "4th String Bass Guitar ": {
+          "revenue": 20,
+          "quantity": 1
+        },
+        "Wooden Plaque $20": {
+          "revenue": 20,
+          "quantity": 1
+        },
+        "Taser AM-1132 50P Electric Shock": {
+          "revenue": 20,
+          "quantity": 1
+        },
+        "Cups $10": {
+          "revenue": 20,
+          "quantity": 2
+        },
+        "Smart Watch $10": {
+          "revenue": 20,
+          "quantity": 2
+        },
+        "Hammer : Multi Tool": {
+          "revenue": 20,
+          "quantity": 1
+        },
+        "jack to jack": {
+          "revenue": 20,
+          "quantity": 1
+        },
+        "jenga": {
+          "revenue": 20,
+          "quantity": 1
+        },
+        "Hipflask Set $20": {
+          "revenue": 20,
+          "quantity": 1
+        },
+        "Zim T-Shirt": {
+          "revenue": 20,
+          "quantity": 1
+        },
+        "Knight Ornament $20": {
+          "revenue": 20,
+          "quantity": 1
+        },
+        "Cards": {
+          "revenue": 19,
+          "quantity": 6
+        },
+        "Wallet $5": {
+          "revenue": 15,
+          "quantity": 3
+        },
+        "Scarf $5": {
+          "revenue": 15,
+          "quantity": 2
+        },
+        "Bracelet $15": {
+          "revenue": 15,
+          "quantity": 1
+        },
+        "Vape $5": {
+          "revenue": 15,
+          "quantity": 3
+        },
+        "Bracelet $5": {
+          "revenue": 15,
+          "quantity": 3
+        },
+        "buzzed": {
+          "revenue": 15,
+          "quantity": 1
+        },
+        "Magnetic Chess Set(KK72)": {
+          "revenue": 15,
+          "quantity": 1
+        },
+        "Wallet $15": {
+          "revenue": 15,
+          "quantity": 1
+        },
+        "pepper spray $10": {
+          "revenue": 15,
+          "quantity": 2
+        },
+        "Necklace $15": {
+          "revenue": 15,
+          "quantity": 1
+        },
+        "Watch $15": {
+          "revenue": 15,
+          "quantity": 1
+        },
+        "ChessBoard $25": {
+          "revenue": 15,
+          "quantity": 1
+        },
+        "Food Warmer ": {
+          "revenue": 15,
+          "quantity": 1
+        },
+        "Scrabble $15": {
+          "revenue": 15,
+          "quantity": 1
+        },
+        "wooden plaque $15": {
+          "revenue": 15,
+          "quantity": 1
+        },
+        "Ring $15": {
+          "revenue": 15,
+          "quantity": 1
+        },
+        "Crusher $15": {
+          "revenue": 15,
+          "quantity": 1
+        },
+        "Cardholder $15": {
+          "revenue": 15,
+          "quantity": 1
+        },
+        "Piercings": {
+          "revenue": 13,
+          "quantity": 13
+        },
+        "Necklace ": {
+          "revenue": 13,
+          "quantity": 3
+        },
+        "Crusher $3": {
+          "revenue": 12,
+          "quantity": 4
+        },
+        "vape juice 3": {
+          "revenue": 12,
+          "quantity": 3
+        },
+        "Violin Strings": {
+          "revenue": 10,
+          "quantity": 1
+        },
+        "Paper Hats": {
+          "revenue": 10,
+          "quantity": 2
+        },
+        "Necklaces $5(C105)": {
+          "revenue": 10,
+          "quantity": 2
+        },
+        "watch box": {
+          "revenue": 10,
+          "quantity": 2
+        },
+        "Hats $10": {
+          "revenue": 10,
+          "quantity": 1
+        },
+        "Compass $5": {
+          "revenue": 10,
+          "quantity": 2
+        },
+        "these cards will get you drunk": {
+          "revenue": 10,
+          "quantity": 2
+        },
+        "Gift Box $5": {
+          "revenue": 10,
+          "quantity": 2
+        },
+        "weed roller $10": {
+          "revenue": 10,
+          "quantity": 1
+        },
+        "Glass Trophy $10": {
+          "revenue": 10,
+          "quantity": 1
+        },
+        "pepper spray (keyholder)": {
+          "revenue": 10,
+          "quantity": 2
+        },
+        "Dart Arrows $10": {
+          "revenue": 10,
+          "quantity": 1
+        },
+        "Gentlemans Hat": {
+          "revenue": 10,
+          "quantity": 1
+        },
+        "Charcoal Stick": {
+          "revenue": 10,
+          "quantity": 1
+        },
+        "guitar capo": {
+          "revenue": 10,
+          "quantity": 1
+        },
+        "smoking pipe $10": {
+          "revenue": 10,
+          "quantity": 1
+        },
+        "Zim Scarf 13192": {
+          "revenue": 10,
+          "quantity": 1
+        },
+        "Wallet $10 (L55)": {
+          "revenue": 10,
+          "quantity": 1
+        },
+        "vape juice $5": {
+          "revenue": 10,
+          "quantity": 2
+        },
+        "Leather Belt $10": {
+          "revenue": 10,
+          "quantity": 1
+        },
+        "dog collar 1": {
+          "revenue": 10,
+          "quantity": 2
+        },
+        "dog leash $10": {
+          "revenue": 10,
+          "quantity": 1
+        },
+        "hat $5": {
+          "revenue": 10,
+          "quantity": 2
+        },
+        "gift bag $5": {
+          "revenue": 10,
+          "quantity": 2
+        },
+        "taser bullets": {
+          "revenue": 10,
+          "quantity": 1
+        },
+        "Walking Stick $10": {
+          "revenue": 10,
+          "quantity": 1
+        },
+        "Monopoly $10": {
+          "revenue": 10,
+          "quantity": 1
+        },
+        "Whip": {
+          "revenue": 10,
+          "quantity": 1
+        },
+        "Guitar Bridge": {
+          "revenue": 10,
+          "quantity": 1
+        },
+        "wooden plaque $20": {
+          "revenue": 10,
+          "quantity": 1
+        },
+        "Hamper $10": {
+          "revenue": 10,
+          "quantity": 1
+        },
+        "Bracelet $3": {
+          "revenue": 8,
+          "quantity": 2
+        },
+        "dog muzzle": {
+          "revenue": 7,
+          "quantity": 1
+        },
+        "Ring $2": {
+          "revenue": 6,
+          "quantity": 3
+        },
+        "rasta badge": {
+          "revenue": 6,
+          "quantity": 3
+        },
+        "football club pin": {
+          "revenue": 6,
+          "quantity": 2
+        },
+        "Gift Box $1": {
+          "revenue": 5,
+          "quantity": 1
+        },
+        "ring box": {
+          "revenue": 5,
+          "quantity": 1
+        },
+        "Knife(A0950/AA2Y)": {
+          "revenue": 5,
+          "quantity": 1
+        },
+        "Dog Brushe": {
+          "revenue": 5,
+          "quantity": 1
+        },
+        "Hipflask $5": {
+          "revenue": 5,
+          "quantity": 1
+        },
+        "Wrapping Paper": {
+          "revenue": 5,
+          "quantity": 10
+        },
+        "Gift Box $15": {
+          "revenue": 5,
+          "quantity": 1
+        },
+        "Ear Rings $5": {
+          "revenue": 5,
+          "quantity": 1
+        },
+        "Drum kicker": {
+          "revenue": 5,
+          "quantity": 1
+        },
+        "Pepper Spray (110ml - 200P) $3": {
+          "revenue": 5,
+          "quantity": 1
+        },
+        "rasta flag": {
+          "revenue": 5,
+          "quantity": 1
+        },
+        "Sex Dice": {
+          "revenue": 5,
+          "quantity": 1
+        },
+        "saxophone reeds $5": {
+          "revenue": 5,
+          "quantity": 1
+        },
+        "zim flag": {
+          "revenue": 5,
+          "quantity": 1
+        },
+        "gym gloves short finger": {
+          "revenue": 5,
+          "quantity": 1
+        },
+        "gym gloves long finger2": {
+          "revenue": 5,
+          "quantity": 1
+        },
+        "Pen $5": {
+          "revenue": 5,
+          "quantity": 1
+        },
+        "Tactical Wallet $5": {
+          "revenue": 5,
+          "quantity": 1
+        },
+        "Sling Shot": {
+          "revenue": 5,
+          "quantity": 1
+        },
+        "Shot Cups $3": {
+          "revenue": 4,
+          "quantity": 2
+        },
+        "Watch Battery": {
+          "revenue": 4,
+          "quantity": 2
+        },
+        "gift box $2": {
+          "revenue": 3,
+          "quantity": 1
+        },
+        "Gift bag $3": {
+          "revenue": 3,
+          "quantity": 1
+        },
+        "Keyholder $3": {
+          "revenue": 3,
+          "quantity": 1
+        },
+        "Gift Bag -25M": {
+          "revenue": 3,
+          "quantity": 1
+        },
+        "bandana": {
+          "revenue": 2,
+          "quantity": 2
+        },
+        "Cards D2": {
+          "revenue": 2,
+          "quantity": 1
+        },
+        "gift bag $2": {
+          "revenue": 2,
+          "quantity": 1
+        },
+        "Roses $2": {
+          "revenue": 2,
+          "quantity": 1
+        },
+        "Pen $3": {
+          "revenue": 1,
+          "quantity": 1
+        },
+        "gift bag  $1": {
+          "revenue": 1,
+          "quantity": 1
+        },
+        "Wrapping": {
+          "revenue": 1,
+          "quantity": 2
+        },
+        "Necklace $1": {
+          "revenue": 1,
+          "quantity": 1
+        },
+        "playing cards": {
+          "revenue": 1,
+          "quantity": 1
+        },
+        "Watch Repairs": {
+          "revenue": 0,
+          "quantity": 1
+        }
+      }
+    },
+    "tshirts": {
+      "total": 127.5,
+      "byCategory": {
+        "Uncategorized": {
+          "revenue": 127.5,
+          "quantity": 37
+        }
+      },
+      "byProduct": {
+        "Plain T-Shirt": {
+          "revenue": 77,
+          "quantity": 23
+        },
+        "Plain Golf T-Shirt (ATA)": {
+          "revenue": 35,
+          "quantity": 8
+        },
+        "Plain Golf T-Shirt": {
+          "revenue": 15.5,
+          "quantity": 6
+        }
+      }
+    },
+    "tradecenter": {
+      "total": 582,
+      "byCategory": {
+        "Uncategorized": {
+          "revenue": 582,
+          "quantity": 212
+        }
+      },
+      "byProduct": {
+        "Candy": {
+          "revenue": 96,
+          "quantity": 152
+        },
+        "Vape $15 ": {
+          "revenue": 90,
+          "quantity": 6
+        },
+        "Vape $10": {
+          "revenue": 70,
+          "quantity": 7
+        },
+        "Vape $20": {
+          "revenue": 60,
+          "quantity": 3
+        },
+        "Crusher $15": {
+          "revenue": 55,
+          "quantity": 3
+        },
+        "Vape $25": {
+          "revenue": 55,
+          "quantity": 2
+        },
+        "Vape $35": {
+          "revenue": 35,
+          "quantity": 1
+        },
+        "Vape $12": {
+          "revenue": 32,
+          "quantity": 3
+        },
+        "Vape $30": {
+          "revenue": 30,
+          "quantity": 1
+        },
+        "Vape $18": {
+          "revenue": 18,
+          "quantity": 1
+        },
+        "Vape $5": {
+          "revenue": 15,
+          "quantity": 2
+        },
+        "Chocolates": {
+          "revenue": 15,
+          "quantity": 21
+        },
+        "Rizla $1": {
+          "revenue": 9,
+          "quantity": 8
+        },
+        "Steel Straws XG004": {
+          "revenue": 2,
+          "quantity": 2
+        }
+      }
+    }
+  }
+}

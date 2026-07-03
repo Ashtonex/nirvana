@@ -73,7 +73,7 @@ export default function Sidebar() {
 
     // Staff should only see POS. No sidebar navigation.
     const staffRole = String(staff?.role || "").toLowerCase();
-    const isPrivilegedStaff = !ownerUser && (staffRole === "owner" || staffRole === "admin");
+    const isPrivilegedStaff = !ownerUser && (staffRole === "owner" || staffRole === "admin" || staffRole.includes("manager"));
     const isOwnerViaCookie = !ownerUser && staffRole === "owner";
     if (staff && !ownerUser && !isPrivilegedStaff) return null;
 
@@ -109,8 +109,8 @@ export default function Sidebar() {
             <nav className="flex-1 space-y-1 px-3 py-4 overflow-y-auto">
                 {navItems.map((item) => {
                     const isActive = pathname === item.href;
-                    // Managers only see Inventory and Stocktake Audit
-                    if (staffRole === "manager" && !['/inventory', '/inventory/stocktake'].includes(item.href)) {
+                    // Managers only see specific allowed routes
+                    if (staffRole.includes("manager") && !['/inventory', '/inventory/stocktake', '/admin/pos-audit', '/operations', '/invest'].includes(item.href)) {
                         return null;
                     }
                     return (

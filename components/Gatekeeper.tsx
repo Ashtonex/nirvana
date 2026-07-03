@@ -48,7 +48,7 @@ export function Gatekeeper({ children }: { children: React.ReactNode }) {
 
     if (role === "owner") return;
 
-    const allowedPrefixes = role === "manager"
+    const allowedPrefixes = role.includes("manager")
       ? [shopPath, "/chat", "/tshirts", "/invest", "/operations"]
       : [shopPath, "/chat"];
 
