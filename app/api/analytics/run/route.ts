@@ -17,11 +17,16 @@ async function runJob(kind: AnalyticsKind, baseUrl: string, incomingHeaders: Hea
   try {
     let intelligenceUrl = process.env.INTELLIGENCE_URL || baseUrl;
     if (!/^https?:\/\//i.test(intelligenceUrl)) intelligenceUrl = `https://${intelligenceUrl}`;
-    const bridgeUrl = `${intelligenceUrl}/api/py/analytics/run?kind=${kind}`;
+    const bridgeUrl = `${intelligenceUrl}/api/py/analytics/run`;
     
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
     };
+    
+    const apiKey = process.env.INTELLIGENCE_API_KEY;
+    if (apiKey) {
+      headers["X-API-KEY"] = apiKey;
+    }
     
     const cookie = incomingHeaders.get("cookie");
     if (cookie) headers["cookie"] = cookie;
@@ -31,7 +36,8 @@ async function runJob(kind: AnalyticsKind, baseUrl: string, incomingHeaders: Hea
 
     const res = await fetch(bridgeUrl, { 
       method: "POST",
-      headers
+      headers,
+      body: JSON.stringify({ kind })
     });
     
     if (!res.ok) {
