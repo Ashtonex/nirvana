@@ -1196,16 +1196,88 @@ Generated via NIRVANA POS`;
                         employeeId: selectedEmployeeId || "system"
                     });
 
+                    // Generate PDF for the Quotation
+                    const { default: jsPDF } = await import('jspdf');
+                    const { default: autoTable } = await import('jspdf-autotable');
+                    const doc = new jsPDF() as any;
+
+                    doc.setFontSize(20);
+                    doc.text(`QUOTATION #QT-${quoteId}`, 14, 22);
+                    doc.setFontSize(12);
+                    doc.text(`${shop?.name || 'NIRVANA STORE'}`, 14, 30);
+                    doc.text(`Date: ${new Date().toLocaleDateString()}`, 14, 36);
+
+                    doc.text(`Client: ${clientName || 'Walk-in Customer'}`, 14, 46);
+                    if (clientPhone) doc.text(`Phone: ${clientPhone}`, 14, 52);
+                    if (clientEmail) doc.text(`Email: ${clientEmail}`, 14, 58);
+
+                    const tableColumn = ["Item", "Qty", "Unit Price ($)", "Total ($)"];
+                    const tableRows = quoteItems.map(item => [
+                        item.name,
+                        item.quantity,
+                        item.unitPrice,
+                        item.total
+                    ]);
+
+                    autoTable(doc, {
+                        startY: 65,
+                        head: [tableColumn],
+                        body: tableRows,
+                        theme: 'striped',
+                        headStyles: { fillColor: [41, 128, 185] },
+                    });
+
+                    const finalY = doc.lastAutoTable?.finalY || 65;
+                    doc.text(`Subtotal: $${totalBeforeTax.toFixed(2)}`, 14, finalY + 10);
+                    doc.text(`Tax (15.5%): $${totalTax.toFixed(2)}`, 14, finalY + 16);
+                    doc.setFontSize(14);
+                    doc.text(`TOTAL: $${totalWithTax.toFixed(2)}`, 14, finalY + 24);
+
+                    doc.setFontSize(10);
+                    doc.text("Valid for 7 days.", 14, finalY + 34);
+                    const preparedBy = selectedEmployeeId ? employees.find((e: any) => e.id === selectedEmployeeId)?.name || 'Staff' : 'Nirvana Staff';
+                    doc.text(`Prepared by: ${preparedBy}`, 14, finalY + 40);
+
+                    const pdfBlob = doc.output('blob');
+                    const pdfFile = new File([pdfBlob], `Quotation_QT-${quoteId}.pdf`, { type: 'application/pdf' });
+
                     // Share to WhatsApp
                     const waUrl = `https://wa.me/${clientPhone ? clientPhone.replace(/\D/g, '') : ''}?text=${encodeURIComponent(quoteText)}`;
                     
-                    // If there's a phone number, try to open WhatsApp directly, otherwise show the quote
-                    if (clientPhone) {
-                        window.open(waUrl, '_blank', 'noopener,noreferrer');
-                    } else {
-                        // Copy to clipboard if no phone
-                        await navigator.clipboard.writeText(quoteText);
-                        alert(`Quotation #QT-${quoteId} copied to clipboard! Send to customer manually.`);
+                    let shared = false;
+                    try {
+                        const nav: any = navigator;
+                        if (nav?.canShare?.({ files: [pdfFile] }) && nav?.share) {
+                            await nav.share({
+                                title: `Quotation #QT-${quoteId}`,
+                                text: quoteText,
+                                files: [pdfFile],
+                            });
+                            shared = true;
+                        }
+                    } catch (e) {
+                        console.error('Share sheet failed:', e);
+                    }
+
+                    if (!shared) {
+                        // Fallback: download PDF and open WhatsApp
+                        const blobUrl = URL.createObjectURL(pdfBlob);
+                        const link = document.createElement('a');
+                        link.href = blobUrl;
+                        link.download = pdfFile.name;
+                        document.body.appendChild(link);
+                        link.click();
+                        document.body.removeChild(link);
+                        setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
+
+                        // If there's a phone number, try to open WhatsApp directly, otherwise show the quote
+                        if (clientPhone) {
+                            window.open(waUrl, '_blank', 'noopener,noreferrer');
+                        } else {
+                            // Copy to clipboard if no phone
+                            await navigator.clipboard.writeText(quoteText);
+                            alert(`Quotation #QT-${quoteId} copied to clipboard and PDF downloaded! Send to customer manually.`);
+                        }
                     }
                 }
 
