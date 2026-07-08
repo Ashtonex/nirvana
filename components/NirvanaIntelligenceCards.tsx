@@ -263,11 +263,27 @@ export function NirvanaIntelligenceCards() {
             <div className={cn("text-2xl font-black italic uppercase", expenseAnomalies.length > 0 ? "text-amber-400" : "text-emerald-400")}>
               {expenseAnomalies.length > 0 ? `${expenseAnomalies.length} Flagged` : "Nominal"}
             </div>
-            <p className="text-[10px] text-slate-500 mt-2">
-              {expenseAnomalies.length > 0
-                ? `${expenseAnomalies.length} spending anomalies detected.`
-                : "No spending anomalies detected in the last snapshot."}
-            </p>
+            
+            {expenseAnomalies.length > 0 ? (
+              <div className="mt-3 space-y-2 max-h-[140px] overflow-y-auto pr-1">
+                {expenseAnomalies.map((anomaly, idx) => (
+                  <div key={idx} className="bg-slate-900/60 rounded-md p-2 border border-amber-500/20">
+                    <div className="flex justify-between items-start">
+                      <span className="text-[11px] font-bold text-slate-200 truncate pr-2" title={anomaly.label}>{anomaly.label || 'Unknown'}</span>
+                      <span className="text-[11px] font-mono font-black text-rose-400">${Number(anomaly.amount).toLocaleString()}</span>
+                    </div>
+                    <div className="flex justify-between items-center mt-1">
+                      <span className="text-[9px] font-black text-amber-500/70 uppercase tracking-wider">{anomaly.employee_name || 'System'}</span>
+                      <span className="text-[9px] font-bold text-slate-500">{anomaly.date ? new Date(anomaly.date).toLocaleDateString() : 'N/A'}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-[10px] text-slate-500 mt-2">
+                No spending anomalies detected in the last snapshot.
+              </p>
+            )}
           </CardContent>
         </Card>
       </div>
