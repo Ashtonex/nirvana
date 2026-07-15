@@ -1,4 +1,5 @@
 services:
+  # Next.js Node Web Service
   - type: web
     name: nirvana
     env: node
@@ -22,4 +23,33 @@ services:
       - key: RESEND_API_KEY
         sync: false
       - key: EOD_REPORT_RECIPIENT
+        sync: false
+      - key: INTELLIGENCE_URL
+        fromService:
+          type: web
+          name: nirvana-intelligence
+          property: hostport
+      - key: INTELLIGENCE_API_KEY
+        sync: false
+
+  # Python FastAPI Intelligence Service
+  - type: web
+    name: nirvana-intelligence
+    env: python
+    region: oregon
+    plan: free
+    rootDir: .
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn intelligence.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /
+    envVars:
+      - key: NEXT_PUBLIC_SUPABASE_URL
+        sync: false
+      - key: NEXT_PUBLIC_SUPABASE_ANON_KEY
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: DATABASE_URL
+        sync: false
+      - key: INTELLIGENCE_API_KEY
         sync: false

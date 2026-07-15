@@ -1,8 +1,19 @@
-from fastapi import FastAPI, Query
+import os
+from fastapi import FastAPI, Query, Depends, HTTPException, Security
+from fastapi.security import APIKeyHeader
 from fastapi.middleware.cors import CORSMiddleware
 from intelligence.models.inventory_forecast import run_sales_forecast, calculate_inventory_velocity
 from intelligence.models.finance_optimizer import optimize_capital_allocation
 from analytics.nirvana_analytics import demand_forecast, expense_anomaly, inventory_velocity, capital_allocation, operations_overview
+
+API_KEY_NAME = "X-API-KEY"
+api_key_header = APIKeyHeader(name=API_KEY_NAME, auto_error=False)
+
+def get_api_key(api_key_header: str = Security(api_key_header)):
+    expected_key = os.getenv("INTELLIGENCE_API_KEY")
+    if expected_key and api_key_header != expected_key:
+        raise HTTPException(status_code=401, detail="Invalid API Key")
+    return api_key_header
 
 app = FastAPI(title="Nirvana Intelligence API")
 
@@ -26,7 +37,7 @@ async def root():
         }
     }
 
-@app.post("/api/py/analytics/run")
+@app.post("/api/py/analytics/run", dependencies=[Depends(get_api_key)])
 async def run_analytics_job(kind: str = Query("all")):
     """
     Triggers the high-power analytics snapshots and saves results to DB.
@@ -85,7 +96,7 @@ async def run_analytics_job(kind: str = Query("all")):
             
     return {"success": all(r["ok"] for r in results), "results": results}
 
-@app.get("/api/py/forecast/sales")
+@app.get("/api/py/forecast/sales", dependencies=[Depends(get_api_key)])
 async def get_sales_forecast(
     days: int = Query(90, description="History window in days"),
     horizon: int = Query(14, description="Forecast horizon in days"),
@@ -96,14 +107,14 @@ async def get_sales_forecast(
     """
     return run_sales_forecast(days=days, horizon=horizon, shop_id=shopId)
 
-@app.get("/api/py/inventory/velocity")
+@app.get("/api/py/inventory/velocity", dependencies=[Depends(get_api_key)])
 async def get_inventory_velocity():
     """
     Returns how fast products are selling per shop.
     """
     return calculate_inventory_velocity()
 
-@app.get("/api/py/finance/optimize")
+@app.get("/api/py/finance/optimize", dependencies=[Depends(get_api_key)])
 async def get_finance_optimization():
     """
     Returns mathematical optimization for capital allocation.
