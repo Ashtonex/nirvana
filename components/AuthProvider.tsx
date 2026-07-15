@@ -3,10 +3,46 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { createClient, SupabaseClient, User } from '@supabase/supabase-js';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-export const supabaseAuth: SupabaseClient = createClient(supabaseUrl, supabaseAnonKey);
+function createMockSupabaseClient() {
+    const message = "[SupabaseAuth] Environment variables are not configured. This client is a no-op placeholder used to allow builds to succeed.";
+    return {
+        from() {
+            return {
+                select() {
+                    return {
+                        eq() {
+                            return {
+                                maybeSingle: async () => ({ data: null, error: null })
+                            };
+                        }
+                    };
+                }
+            };
+        },
+        auth: {
+            async getSession() {
+                return { data: { session: null } };
+            },
+            onAuthStateChange() {
+                return { data: { subscription: { unsubscribe: () => {} } } };
+            },
+            async signInWithPassword() {
+                throw new Error(message);
+            },
+            async signOut() {
+                throw new Error(message);
+            }
+        }
+    } as any;
+}
+
+export const supabaseAuth: SupabaseClient =
+    supabaseUrl && supabaseAnonKey
+        ? createClient(supabaseUrl, supabaseAnonKey)
+        : createMockSupabaseClient();
 
 interface AuthContextType {
     user: User | null;
