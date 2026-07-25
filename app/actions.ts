@@ -3280,12 +3280,18 @@ export async function getMonthlyReportData(
         : [shopId].filter(Boolean);
 
     // Fetch all relevant data for the month (+ previous month for comparison)
-    const [salesRes, ledgerRes, shopRes, settingsRes, prevSalesRes, prevPeriodSalesRes, prevPeriodLedgerRes] = await Promise.all([
+    const [salesRes, ledgerRes, operationsLedgerRes, investDepositsRes, shopRes, settingsRes, prevSalesRes, prevPeriodSalesRes, prevPeriodLedgerRes] = await Promise.all([
         shopIds.length
             ? supabaseAdmin.from("sales").select("*").in("shop_id", shopIds).gte("date", startOfMonth).lte("date", endOfMonth).order('date', { ascending: false }).limit(20000)
             : Promise.resolve({ data: [] } as any),
         shopIds.length
             ? supabaseAdmin.from("ledger_entries").select("*").in("shop_id", shopIds).gte("date", startOfMonth).lte("date", endOfMonth).order('date', { ascending: false }).limit(20000)
+            : Promise.resolve({ data: [] } as any),
+        shopIds.length
+            ? supabaseAdmin.from("operations_ledger").select("*").in("shop_id", shopIds).gte("created_at", startOfMonth).lte("created_at", endOfMonth).order('created_at', { ascending: false }).limit(20000)
+            : Promise.resolve({ data: [] } as any),
+        shopIds.length
+            ? supabaseAdmin.from("invest_deposits").select("*").in("shop_id", shopIds).lte("deposited_at", endOfMonth).limit(20000)
             : Promise.resolve({ data: [] } as any),
         isGlobal ? Promise.resolve({ data: null } as any) : supabaseAdmin.from("shops").select("*").eq("id", shopId).single(),
         supabaseAdmin.from("oracle_settings").select("*").single(),
@@ -3302,6 +3308,8 @@ export async function getMonthlyReportData(
 
     const sales = salesRes.data || [];
     const ledger = ledgerRes.data || [];
+    const operationsLedger = operationsLedgerRes.data || [];
+    const investDeposits = investDepositsRes.data || [];
     const shop = shopRes.data;
     const settings = settingsRes.data;
     const prevSalesClients = new Set((prevSalesRes.data || []).map((s: any) => String(s.client_name || "").toLowerCase()).filter(Boolean));
@@ -3400,6 +3408,13 @@ export async function getMonthlyReportData(
         }, 0)
         : Number((shopEx as any)?.rent || 0) + Number((shopEx as any)?.salaries || 0);
 
+    const expectedRent = isGlobal
+        ? (globalShops || []).reduce((sum: number, s: any) => {
+            const ex = (s as any)?.expenses || {};
+            return sum + Number(ex.rent || 0);
+        }, 0)
+        : Number((shopEx as any)?.rent || 0);
+
     const variableCostsBase = isGlobal
         ? (globalShops || []).reduce((sum: number, s: any) => {
             const ex = (s as any)?.expenses || {};
@@ -3447,6 +3462,172 @@ export async function getMonthlyReportData(
     const expenseCategories = Object.entries(expenseByCategory)
         .map(([category, amount]) => ({ category, amount }))
         .sort((a: any, b: any) => Number(b.amount || 0) - Number(a.amount || 0));
+
+    const textOf = (row: any) => `${row?.category || ""} ${row?.kind || ""} ${row?.description || ""} ${row?.title || ""} ${row?.notes || ""}`.toLowerCase();
+    const absAmount = (row: any) => Math.abs(Number(row?.amount || 0));
+    const opsByPool = (pool: string) => operationsLedger.filter((row: any) => String(row?.metadata?.fundingPool || row?.metadata?.funding_pool || "").toLowerCase() === pool);
+    const positiveOps = operationsLedger.filter((row: any) => Number(row?.amount || 0) > 0);
+    const negativeOps = operationsLedger.filter((row: any) => Number(row?.amount || 0) < 0);
+    const monthInvestDeposits = investDeposits.filter((row: any) => {
+        const depositedAt = String(row?.deposited_at || "");
+        return depositedAt >= startOfMonth && depositedAt <= endOfMonth;
+    });
+    const monthInvestWithdrawals = investDeposits.filter((row: any) => {
+        const withdrawnAt = String(row?.withdrawn_at || "");
+        return withdrawnAt && withdrawnAt >= startOfMonth && withdrawnAt <= endOfMonth;
+    });
+
+    const rentReserveIn = positiveOps
+        .filter((row: any) => String(row?.kind || "").toLowerCase() === "overhead_contribution" || String(row?.metadata?.fundingPool || "").toLowerCase() === "overhead")
+        .reduce((sum: number, row: any) => sum + Number(row.amount || 0), 0);
+    const rentPaid = negativeOps
+        .filter((row: any) => (String(row?.kind || "").toLowerCase() === "overhead_payment" || String(row?.metadata?.fundingPool || "").toLowerCase() === "overhead") && !/stock|inventory|purchase|supplier|restock|reorder|wholesale|bulk order|procurement|perfume|china|harare order|mozambique|tshirt|tshirts|shirt|shirts|rings|hats|sa order|sa_delivery|sa deliveries|harare delivery|city stock|platinum mothers/.test(textOf(row)))
+        .reduce((sum: number, row: any) => sum + absAmount(row), 0);
+    const savingsIn = positiveOps
+        .filter((row: any) => ["savings_deposit", "blackbox"].includes(String(row?.kind || "").toLowerCase()) || String(row?.metadata?.fundingPool || "").toLowerCase() === "savings")
+        .reduce((sum: number, row: any) => sum + Number(row.amount || 0), 0);
+    const savingsOut = negativeOps
+        .filter((row: any) => String(row?.kind || "").toLowerCase() === "savings_withdrawal" || String(row?.metadata?.fundingPool || "").toLowerCase() === "savings")
+        .reduce((sum: number, row: any) => sum + absAmount(row), 0);
+    const isPerfumesInvestTransfer = (row: any) => String(row?.category || "").toLowerCase() === "perfume" || /\bperfumes?\b/.test(textOf(row)) && !/\b(stock|inventory|purchase|supplier|restock|reorder|wholesale|bulk order|procurement|order)\b/.test(textOf(row));
+    const isStockText = (row: any) => {
+        const kind = String(row?.kind || "").toLowerCase();
+        const operationType = String(row?.metadata?.operationType || "").toLowerCase();
+        if (kind === "stock_orders" || operationType === "stock_orders" || String(row?.category || "").toLowerCase() === "stock orders") return true;
+        if (isPerfumesInvestTransfer(row)) return false;
+        return /stock|inventory|purchase|supplier|restock|reorder|wholesale|bulk order|procurement|china|harare order|mozambique|tshirt|tshirts|shirt|shirts|rings|hats|sa order|sa_delivery|sa deliveries|harare delivery|city stock|citystock|platinum mothers/.test(textOf(row));
+    };
+    const isSalaryText = (row: any) => /salary|salaries|wage|wages|payroll|ashton salaries/.test(textOf(row));
+    const isPersonalText = (row: any) => /personal|owner|drawing|withdrawal|household|family|home|lunch|pampers|diaper|medical|aunt|uncle|linda|maxine|priscilla|eddie|freedom|dutch/.test(textOf(row));
+    const isGroceryText = (row: any) => /grocer|supermarket|food|rice|sugar|cooking oil|bread|milk|meat|vegetable|snack|drink/.test(textOf(row));
+    const isTitheText = (row: any) => /tithe|offering|church|donation|charity/.test(textOf(row));
+    const isReserveText = (row: any) => /\brent\b|\bremt\b|overhead|salary|salaries|wage|wages|payroll|ashton salaries/.test(textOf(row)) || ["Overhead", "Savings", "Blackbox", "Transfer"].includes(String(row?.category || ""));
+    const stockOrders = negativeOps
+        .filter((row: any) => isStockText(row))
+        .reduce((sum: number, row: any) => sum + absAmount(row), 0)
+        + expenseLedger.filter((row: any) => isStockText(row)).reduce((sum: number, row: any) => sum + absAmount(row), 0);
+    const perfumesInvestTransfers = expenseLedger.filter((row: any) => isPerfumesInvestTransfer(row)).reduce((sum: number, row: any) => sum + absAmount(row), 0);
+    const salariesPaid = expenseLedger.filter((row: any) => isSalaryText(row)).reduce((sum: number, row: any) => sum + absAmount(row), 0);
+    const groceries = expenseLedger.filter((row: any) => !isPerfumesInvestTransfer(row) && isGroceryText(row)).reduce((sum: number, row: any) => sum + absAmount(row), 0);
+    const tithes = expenseLedger.filter((row: any) => !isPerfumesInvestTransfer(row) && isTitheText(row)).reduce((sum: number, row: any) => sum + absAmount(row), 0);
+    const personalUse = expenseLedger.filter((row: any) => !isPerfumesInvestTransfer(row) && isPersonalText(row) && !isGroceryText(row) && !isTitheText(row)).reduce((sum: number, row: any) => sum + absAmount(row), 0);
+    const cleanOperatingExpenseRows = expenseLedger.filter((row: any) => {
+        const category = String(row?.category || "").toLowerCase();
+        if (category.includes("cash drawer") || category.includes("lay-by")) return false;
+        if (isStockText(row) || isReserveText(row) || isPersonalText(row) || isGroceryText(row) || isTitheText(row)) return false;
+        return String(row?.type || "").toLowerCase() === "expense" || category === "pos expense";
+    });
+    const isExplicitOperatingOverhead = (row: any) => /zesa|wifi|utility|utilities|electric|electricity|water|internet|accountant|accounting|fuel|transport|repair|maintenance|cleaning|security|rates|municipal|insurance|pos\b|receipt|stationery|supplies/.test(textOf(row));
+    const actualOverheadPayments = negativeOps
+        .filter((row: any) => String(row?.kind || "").toLowerCase() === "overhead_payment" && !isStockText(row) && !isReserveText(row) && isExplicitOperatingOverhead(row))
+        .reduce((sum: number, row: any) => sum + absAmount(row), 0);
+    const correctedOperatingExpenses = cleanOperatingExpenseRows.reduce((sum: number, row: any) => sum + absAmount(row), 0) + actualOverheadPayments;
+    const investIn = monthInvestDeposits.reduce((sum: number, row: any) => sum + Number(row.amount || 0), 0);
+    const investOut = monthInvestWithdrawals.reduce((sum: number, row: any) => sum + Number(row.withdrawn_amount || 0), 0);
+    const otherCashUses = cleanOperatingExpenseRows.reduce((sum: number, row: any) => sum + absAmount(row), 0);
+    const operatingCashReceipts = revenue;
+    const operatingCashPayments = correctedOperatingExpenses;
+    const netOperatingCashFlow = operatingCashReceipts - operatingCashPayments;
+    const investingCashFlow = investOut - investIn - stockOrders;
+    const personalGroceriesAndTithes = personalUse + groceries + tithes;
+    const grossCashAfterRentAndStock = operatingCashReceipts - expectedRent - stockOrders;
+    const actualCashProfit = grossCashAfterRentAndStock - correctedOperatingExpenses - salariesPaid - personalGroceriesAndTithes;
+    const rentPoolSurplusCommitted = rentReserveIn - expectedRent;
+    const unrestrictedCashAfterPoolAllocations = actualCashProfit - rentPoolSurplusCommitted - perfumesInvestTransfers;
+    const unrestrictedCashAfterRentPoolAllocation = unrestrictedCashAfterPoolAllocations;
+    const cashSurplusAfterRent = operatingCashReceipts - expectedRent;
+    const distributableCashSurplus = actualCashProfit;
+    const financingCashFlow = savingsIn - savingsOut + rentReserveIn - rentPaid;
+    const netCashFlow = netOperatingCashFlow + investingCashFlow + financingCashFlow;
+
+    const investAvailable = investDeposits.reduce((sum: number, row: any) => sum + Number(row.amount || 0) - Number(row.withdrawn_amount || 0), 0);
+    const operationsSavingsBalance = opsByPool("savings").reduce((sum: number, row: any) => sum + Number(row.amount || 0), 0);
+    const rentPoolBalance = opsByPool("overhead").reduce((sum: number, row: any) => sum + Number(row.amount || 0), 0);
+    const estimatedCash = Math.max(0, operatingCashReceipts - variableCosts - salariesPaid - personalUse - savingsIn - rentReserveIn - investIn - stockOrders - groceries - tithes + savingsOut + rentPaid + investOut);
+    const totalAssets = estimatedCash + currentInvValue + Math.max(0, operationsSavingsBalance) + Math.max(0, rentPoolBalance) + Math.max(0, investAvailable);
+    const currentLiabilities = Math.max(0, fixedCosts - rentPaid);
+    const ownerEquity = totalAssets - currentLiabilities;
+
+    const financialStatements = {
+        incomeStatement: {
+            revenue,
+            revenuePreTax,
+            taxCollected: tax,
+            estimatedCOGS,
+            grossProfit,
+            fixedCosts,
+            variableCosts: correctedOperatingExpenses,
+            operatingExpenses: correctedOperatingExpenses,
+            netIncome: grossProfit - correctedOperatingExpenses,
+            cashOperatingSurplus: netOperatingCashFlow,
+            lessExpectedRent: expectedRent,
+            lessStockOrders: stockOrders,
+            grossCashAfterRentAndStock,
+            lessSalariesPaid: salariesPaid,
+            lessPersonalGroceriesAndTithes: personalGroceriesAndTithes,
+            actualCashProfit,
+            rentSetAside: rentReserveIn,
+            rentPoolSurplusCommitted,
+            perfumesInvestTransfers,
+            unrestrictedCashAfterPoolAllocations,
+            unrestrictedCashAfterRentPoolAllocation,
+            lessAssumedOverheadsAndSalaries: 0,
+            distributableCashSurplus,
+        },
+        balanceSheet: {
+            cashAndDrawerEstimate: estimatedCash,
+            inventoryAsset: currentInvValue,
+            operationsSavings: operationsSavingsBalance,
+            rentPool: rentPoolBalance,
+            perfumesInvestPool: investAvailable,
+            totalAssets,
+            unpaidFixedObligations: currentLiabilities,
+            ownerEquity,
+        },
+        cashFlowStatement: {
+            operating: {
+                cashReceiptsFromCustomers: operatingCashReceipts,
+                cashPaidForOperatingCosts: operatingCashPayments,
+                groceries,
+                tithes,
+                otherCashUses,
+                netOperatingCashFlow,
+            },
+            investing: {
+                stockOrders,
+                investDeposits: investIn,
+                perfumesInvestTransfers,
+                investWithdrawals: investOut,
+                netInvestingCashFlow: investingCashFlow,
+            },
+            financing: {
+                savingsDeposits: savingsIn,
+                savingsWithdrawals: savingsOut,
+                rentReserveSetAside: rentReserveIn,
+                rentPayments: rentPaid,
+            rentPoolSurplusCommitted,
+            perfumesInvestTransfers,
+            unrestrictedCashAfterPoolAllocations,
+            assumedOverheadsAndSalaries: 0,
+            unrestrictedCashAfterRentPoolAllocation,
+            netFinancingCashFlow: financingCashFlow,
+            },
+            netCashFlow,
+        },
+        cashUses: [
+            { name: "Operating expenses", amount: operatingCashPayments },
+            { name: "Actual rent cost", amount: expectedRent },
+            { name: "Salaries paid/set aside", amount: salariesPaid },
+            { name: "Personal, groceries and tithes", amount: personalGroceriesAndTithes },
+            { name: "Stock orders", amount: stockOrders },
+            { name: "Perfumes/invest pool transfers", amount: perfumesInvestTransfers },
+            { name: "Savings deposits", amount: savingsIn },
+            { name: "Rent reserve set aside", amount: rentReserveIn },
+            { name: "Invest/perfume deposits", amount: investIn },
+            { name: "Groceries", amount: groceries },
+            { name: "Tithes", amount: tithes },
+        ].sort((a: any, b: any) => Number(b.amount || 0) - Number(a.amount || 0)),
+    };
 
     const salesByShop = (sales || []).reduce((acc: Record<string, any[]>, s: any) => {
         const sid = String(s?.shop_id || "");
@@ -3525,12 +3706,25 @@ export async function getMonthlyReportData(
             grossProfit,
             grossMargin,
             fixedCosts,
-            variableCosts,
-            operatingExpenses,
+            variableCosts: correctedOperatingExpenses,
+            operatingExpenses: correctedOperatingExpenses,
+            cashOperatingSurplus: netOperatingCashFlow,
+            cashSurplusAfterRent,
+            grossCashAfterRentAndStock,
+            salariesPaid,
+            personalGroceriesAndTithes,
+            actualCashProfit,
+            rentSetAside: rentReserveIn,
+            rentPoolSurplusCommitted,
+            perfumesInvestTransfers,
+            unrestrictedCashAfterPoolAllocations,
+            unrestrictedCashAfterRentPoolAllocation,
+            assumedOverheadsAndSalaries: 0,
+            distributableCashSurplus,
             inventoryValue: currentInvValue,
             daysOfInventory,
-            ebitda: grossProfit - operatingExpenses,
-            netProfit: grossProfit - operatingExpenses
+            ebitda: grossProfit - correctedOperatingExpenses,
+            netProfit: grossProfit - correctedOperatingExpenses
         },
         weeks,
         categories: Array.from(catStats.entries()).map(([name, stats]) => ({ name, ...stats })),
@@ -3538,6 +3732,7 @@ export async function getMonthlyReportData(
         turnover,
         perShop,
         expenseCategories,
+        financialStatements,
         comparison,
         shopName: isGlobal ? "Global Synthesis" : (shop?.name || shopId)
     };

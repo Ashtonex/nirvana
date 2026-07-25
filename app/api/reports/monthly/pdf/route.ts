@@ -116,6 +116,16 @@ export async function GET(req: Request) {
       }
     };
 
+    const money = (value: number) => `$${Number(value || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    const drawRows = (rows: Array<[string, number]>, indent = 20) => {
+      rows.forEach(([label, amount]) => {
+        ensureSpace(70);
+        page.drawText(winAnsiSafe(label), { x: margin + indent, y, size: 9, font, color: COLORS.neutral });
+        page.drawText(money(amount), { x: width - margin - 120, y, size: 9, font, color: amount < 0 ? COLORS.expense : COLORS.header });
+        y -= 15;
+      });
+    };
+
     // --- TITLE ---
     drawText("📊 MONTHLY BUSINESS REPORT", 24, true, COLORS.header);
     drawText(`Business: ${winAnsiSafe(data.shopName)}`, 12, true, COLORS.neutral);
@@ -180,17 +190,82 @@ export async function GET(req: Request) {
     });
     y -= 10;
 
-    // 6. RISKS & CHALLENGES
+    // 6. FINANCIAL STATEMENTS
+    ensureSpace(260);
+    sectionHeader("6. Financial Statements");
+    const statements = (data as any).financialStatements;
+    if (statements) {
+        drawText("6.1 Income Statement", 10, true, COLORS.header);
+        drawRows([
+            ["Revenue incl. tax", statements.incomeStatement.revenue],
+            ["Tax collected", statements.incomeStatement.taxCollected],
+            ["Revenue pre-tax", statements.incomeStatement.revenuePreTax],
+            ["Less actual rent cost", -statements.incomeStatement.lessExpectedRent],
+            ["Less stock orders", -Number(statements.incomeStatement.lessStockOrders || 0)],
+            ["Gross cash after rent and stock", Number(statements.incomeStatement.grossCashAfterRentAndStock || 0)],
+            ["Less operating expenses", -statements.incomeStatement.operatingExpenses],
+            ["Less salaries paid/set aside", -Number(statements.incomeStatement.lessSalariesPaid || 0)],
+            ["Less personal, groceries and tithes", -Number(statements.incomeStatement.lessPersonalGroceriesAndTithes || 0)],
+            ["Actual cash profit", Number(statements.incomeStatement.actualCashProfit ?? statements.incomeStatement.distributableCashSurplus ?? 0)],
+            ["Rent set aside memo", Number(statements.incomeStatement.rentSetAside || 0)],
+            ["Rent pool surplus committed", Number(statements.incomeStatement.rentPoolSurplusCommitted || 0)],
+            ["Perfumes/invest pool transfers", Number(statements.incomeStatement.perfumesInvestTransfers || 0)],
+            ["Unrestricted cash after pool allocations", Number(statements.incomeStatement.unrestrictedCashAfterPoolAllocations ?? statements.incomeStatement.unrestrictedCashAfterRentPoolAllocation ?? 0)],
+        ]);
+
+        ensureSpace(240);
+        y -= 10;
+        drawText("6.2 Balance Sheet Snapshot", 10, true, COLORS.header);
+        drawRows([
+            ["Cash and drawer estimate", statements.balanceSheet.cashAndDrawerEstimate],
+            ["Inventory asset", statements.balanceSheet.inventoryAsset],
+            ["Operations savings", statements.balanceSheet.operationsSavings],
+            ["Rent pool", statements.balanceSheet.rentPool],
+            ["Perfumes/invest pool", statements.balanceSheet.perfumesInvestPool],
+            ["Total assets", statements.balanceSheet.totalAssets],
+            ["Unpaid fixed obligations", -statements.balanceSheet.unpaidFixedObligations],
+            ["Owner equity / retained capital", statements.balanceSheet.ownerEquity],
+        ]);
+
+        ensureSpace(260);
+        y -= 10;
+        drawText("6.3 Cash Flow Statement", 10, true, COLORS.header);
+        drawRows([
+            ["Customer cash receipts", statements.cashFlowStatement.operating.cashReceiptsFromCustomers],
+            ["Operating cash payments", -statements.cashFlowStatement.operating.cashPaidForOperatingCosts],
+            ["Net operating cash flow", statements.cashFlowStatement.operating.netOperatingCashFlow],
+            ["Stock orders", -statements.cashFlowStatement.investing.stockOrders],
+            ["Invest/perfume deposits", -statements.cashFlowStatement.investing.investDeposits],
+            ["Perfumes/invest pool transfers", -Number(statements.cashFlowStatement.investing.perfumesInvestTransfers || 0)],
+            ["Invest/perfume withdrawals", statements.cashFlowStatement.investing.investWithdrawals],
+            ["Savings deposits", statements.cashFlowStatement.financing.savingsDeposits],
+            ["Savings withdrawals", -statements.cashFlowStatement.financing.savingsWithdrawals],
+            ["Rent reserve set aside", statements.cashFlowStatement.financing.rentReserveSetAside],
+            ["Rent payments", -statements.cashFlowStatement.financing.rentPayments],
+            ["Rent pool surplus committed", statements.cashFlowStatement.financing.rentPoolSurplusCommitted],
+            ["Unrestricted cash after pool allocations", statements.cashFlowStatement.financing.unrestrictedCashAfterPoolAllocations ?? statements.cashFlowStatement.financing.unrestrictedCashAfterRentPoolAllocation],
+            ["Net cash flow", statements.cashFlowStatement.netCashFlow],
+        ]);
+
+        ensureSpace(130);
+        y -= 10;
+        drawText("6.4 Where Cash Went", 10, true, COLORS.header);
+        (statements.cashUses || []).slice(0, 7).forEach((row: any) => {
+            drawText(`${row.name}: ${money(row.amount)}`, 9, false, COLORS.neutral, margin + 20);
+        });
+    }
+
+    // 7. RISKS & CHALLENGES
     ensureSpace(150);
-    sectionHeader("6. Risks & Challenges");
+    sectionHeader("7. Risks & Challenges");
     if (data.finances.netProfit < 0) drawText("- PROFITABILITY RISK: Expenses exceeding gross profit.", 9, false, COLORS.expense);
     if (data.turnover < 0.3) drawText("- INVENTORY RISK: High capital lock-up in slow-moving stock.", 9, false, COLORS.expense);
     if (data.customers.returning < data.customers.new) drawText("- LOYALTY RISK: Retention rate is lower than acquisition.", 9, false, COLORS.expense);
     if (y > height - margin - 300) drawText("- No major operational risks identified this period.", 9, false, COLORS.neutral);
 
-    // 7. RECOMMENDATIONS
+    // 8. RECOMMENDATIONS
     ensureSpace(150);
-    sectionHeader("7. Recommendations");
+    sectionHeader("8. Recommendations");
     if (data.finances.netProfit < 0) drawText("- Audit top 3 expense categories and reduce non-essential spend immediately.", 9, true, COLORS.header);
     if (data.turnover < 0.5) drawText("- Launch clearance campaign for slow categories to free up working capital.", 9, true, COLORS.header);
     drawText("- Optimize stock levels in high-turnover categories.", 9, true, COLORS.header);
