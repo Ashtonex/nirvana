@@ -61,6 +61,12 @@ export function detectOverheadCategoryFromText(value: unknown): OverheadCategory
 
 export function classifyOperationsAccount(entry: OperationsLedgerRow): OperationsAccount {
   const kind = normalizeOperationsKind(entry.kind);
+  const metadata = entry.metadata && typeof entry.metadata === "object" ? entry.metadata as Record<string, unknown> : {};
+  const fundingPool = normalizeOperationsText(metadata.fundingPool || metadata.funding_pool || metadata.pool || "");
+  if (["savings", "operations savings", "operations"].includes(fundingPool)) return "savings";
+  if (["overhead", "rent", "rent overhead", "rent / overhead"].includes(fundingPool)) return "overhead";
+  if (["invest", "perfumes", "perfume", "perfumes invest", "perfumes / invest"].includes(fundingPool)) return "invest";
+
   const text = normalizeOperationsText(`${entry.kind || ""} ${entry.title || ""} ${entry.notes || ""}`);
 
   if (kind.startsWith("stockvel") || /^stockvel\b/.test(text)) return "stockvel";
@@ -211,6 +217,7 @@ export function getOperationsVaultImpact(entry: OperationsLedgerRow) {
   const kind = normalizeOperationsKind(entry.kind);
 
   if (!Number.isFinite(amount) || amount === 0) return 0;
+  if (account === "invest") return 0;
 
   if (amount > 0 && isVaultDepositKind(kind) && account !== "overhead") {
     return amount;
@@ -227,7 +234,7 @@ export function getOperationsVaultImpact(entry: OperationsLedgerRow) {
 }
 
 export async function getOperationsComputedBalance(month?: string) {
-  let query = supabaseAdmin.from("operations_ledger").select("amount, kind, shop_id");
+  let query = supabaseAdmin.from("operations_ledger").select("amount, kind, shop_id, title, notes, overhead_category, metadata");
 
   if (month) {
     query = query.gte("effective_date", `${month}-01`)
@@ -336,9 +343,132 @@ export async function listOperationsLedgerEntries(limit = 50, filters?: { month?
   }
   
   query = query.order("created_at", { ascending: false }).limit(limit);
-  
+
   const { data, error } = await query;
   if (error) throw new Error(error.message);
   return data || [];
+}
+
+const ALL_BUCKET_KEYS = ["rent", "salaries", "savings_blackbox", "stock", "invest_perfumes", "general"] as const;
+export type ReportBucketKey = typeof ALL_BUCKET_KEYS[number];
+
+export type BucketLocationTotals = { opening: number; inflows: number; outflows: number; closing: number };
+
+export type BucketPeriodReport = {
+  period: { start: string; end: string };
+  locations: string[]; // every shop_id seen (including e.g. "tshirts"), plus the company rollup
+  buckets: Record<ReportBucketKey, {
+    perLocation: Record<string, BucketLocationTotals>;
+    company: BucketLocationTotals;
+  }>;
+  drawerVariance: {
+    perShop: Record<string, { totalVariance: number; countedDays: number }>;
+    company: { totalVariance: number; countedDays: number };
+  };
+};
+
+function emptyTotals(): BucketLocationTotals {
+  return { opening: 0, inflows: 0, outflows: 0, closing: 0 };
+}
+
+// Period report for the 5 enforced fund buckets (+ "general" catch-all), per shop and company-wide,
+// answering "what came in and where did it go" for any date range. Filters by created_at, matching
+// the existing convention in listOperationsLedgerEntries above.
+export async function getBucketPeriodReport(input: { startDate: string; endDate: string; shopId?: string }): Promise<BucketPeriodReport> {
+  const startIso = `${input.startDate}T00:00:00.000Z`;
+  const endIso = `${input.endDate}T23:59:59.999Z`;
+
+  let openingQuery = supabaseAdmin
+    .from("operations_ledger")
+    .select("amount, bucket_key, shop_id")
+    .not("bucket_key", "is", null)
+    .lt("created_at", startIso)
+    .is("deleted_at", null);
+  if (input.shopId) openingQuery = openingQuery.eq("shop_id", input.shopId);
+
+  let movementQuery = supabaseAdmin
+    .from("operations_ledger")
+    .select("amount, bucket_key, shop_id")
+    .not("bucket_key", "is", null)
+    .gte("created_at", startIso)
+    .lte("created_at", endIso)
+    .is("deleted_at", null);
+  if (input.shopId) movementQuery = movementQuery.eq("shop_id", input.shopId);
+
+  const [openingResult, movementResult] = await Promise.all([openingQuery, movementQuery]);
+  if (openingResult.error) throw new Error(openingResult.error.message);
+  if (movementResult.error) throw new Error(movementResult.error.message);
+
+  const locationsSeen = new Set<string>();
+  const buckets = {} as BucketPeriodReport["buckets"];
+  for (const key of ALL_BUCKET_KEYS) {
+    buckets[key] = { perLocation: {}, company: emptyTotals() };
+  }
+
+  const getLocationTotals = (bucket: ReportBucketKey, shopId: string | null) => {
+    const key = shopId || "__company__";
+    if (shopId) locationsSeen.add(shopId);
+    if (!buckets[bucket].perLocation[key]) buckets[bucket].perLocation[key] = emptyTotals();
+    return buckets[bucket].perLocation[key];
+  };
+
+  for (const row of openingResult.data || []) {
+    const bucket = (row.bucket_key as ReportBucketKey) || "general";
+    if (!ALL_BUCKET_KEYS.includes(bucket)) continue;
+    const amount = Number(row.amount || 0);
+    getLocationTotals(bucket, row.shop_id).opening += amount;
+    buckets[bucket].company.opening += amount;
+  }
+
+  for (const row of movementResult.data || []) {
+    const bucket = (row.bucket_key as ReportBucketKey) || "general";
+    if (!ALL_BUCKET_KEYS.includes(bucket)) continue;
+    const amount = Number(row.amount || 0);
+    const totals = getLocationTotals(bucket, row.shop_id);
+    if (amount >= 0) {
+      totals.inflows += amount;
+      buckets[bucket].company.inflows += amount;
+    } else {
+      totals.outflows += amount;
+      buckets[bucket].company.outflows += amount;
+    }
+  }
+
+  for (const key of ALL_BUCKET_KEYS) {
+    for (const totals of Object.values(buckets[key].perLocation)) {
+      totals.closing = totals.opening + totals.inflows + totals.outflows;
+    }
+    buckets[key].company.closing = buckets[key].company.opening + buckets[key].company.inflows + buckets[key].company.outflows;
+  }
+
+  // Drawer-count variance (from the closing-count reconciliation, Phase 4) over the same period.
+  let varianceQuery = supabaseAdmin
+    .from("ledger_entries")
+    .select("shop_id, amount, type")
+    .eq("category", "Cash Drawer Closing Variance")
+    .gte("date", startIso)
+    .lte("date", endIso);
+  if (input.shopId) varianceQuery = varianceQuery.eq("shop_id", input.shopId);
+  const { data: varianceRows, error: varianceError } = await varianceQuery;
+  if (varianceError) throw new Error(varianceError.message);
+
+  const perShopVariance: Record<string, { totalVariance: number; countedDays: number }> = {};
+  let companyVariance = { totalVariance: 0, countedDays: 0 };
+  for (const row of varianceRows || []) {
+    const shop = row.shop_id || "__company__";
+    const signed = row.type === "expense" ? -Number(row.amount || 0) : Number(row.amount || 0);
+    perShopVariance[shop] = perShopVariance[shop] || { totalVariance: 0, countedDays: 0 };
+    perShopVariance[shop].totalVariance += signed;
+    perShopVariance[shop].countedDays += 1;
+    companyVariance.totalVariance += signed;
+    companyVariance.countedDays += 1;
+  }
+
+  return {
+    period: { start: input.startDate, end: input.endDate },
+    locations: Array.from(locationsSeen).sort(),
+    buckets,
+    drawerVariance: { perShop: perShopVariance, company: companyVariance },
+  };
 }
 

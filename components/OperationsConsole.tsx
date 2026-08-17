@@ -119,7 +119,7 @@ export function OperationsConsole({
   initialState: OpsState;
   initialLedger: LedgerEntry[];
 }) {
-  const [activeTab, setActiveTab] = useState<"metrics" | "ledger" | "audit">("metrics");
+  const [activeTab, setActiveTab] = useState<"metrics" | "ledger" | "audit" | "buckets">("metrics");
   const [state, setState] = useState<OpsState>(initialState);
   const [ledger, setLedger] = useState<LedgerEntry[]>(initialLedger);
   const [handshakes, setHandshakes] = useState<HandshakeEntry[]>([]);
@@ -130,6 +130,7 @@ export function OperationsConsole({
   const [isExpense, setIsExpense] = useState(false);
   const [amount, setAmount] = useState("");
   const [category, setCategory] = useState("eod_deposit");
+  const [stockOrderFundingPool, setStockOrderFundingPool] = useState<"savings" | "overhead" | "invest">("savings");
   const [shopId, setShopId] = useState("");
   const [title, setTitle] = useState("");
   const [notes, setNotes] = useState("");
@@ -201,23 +202,36 @@ export function OperationsConsole({
 
     setSubmitting(true);
     try {
-      const finalVal = isExpense ? -rawVal : rawVal;
       const kind = resolveEntryKind(isExpense, category);
       const overheadCategory = resolveOverheadCategory(isExpense, category, title || notes);
+      const endpoint = kind === "stock_orders" ? "/api/cash-pools/transactions" : "/api/operations/ledger";
+      const body = kind === "stock_orders"
+        ? {
+            amount: rawVal,
+            operationType: "stock_orders",
+            fundingPool: stockOrderFundingPool,
+            direction: "withdrawal",
+            shopId: shopId || null,
+            title: title || "Stock Purchases",
+            notes: notes || null,
+            overheadCategory: stockOrderFundingPool === "overhead" ? overheadCategory || "rent" : null,
+            metadata: { manualEntry: true, source: "operations_console" },
+          }
+        : {
+            amount: isExpense ? -rawVal : rawVal,
+            kind,
+            shopId: shopId || null,
+            title: title || (isExpense ? "Expense Outflow" : "Deposit Inflow"),
+            notes: notes || null,
+            overheadCategory,
+            metadata: { manualEntry: true },
+          };
 
-      const res = await fetch("/api/operations/ledger", {
+      const res = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({
-          amount: finalVal,
-          kind,
-          shopId: shopId || null,
-          title: title || (isExpense ? "Expense Outflow" : "Deposit Inflow"),
-          notes: notes || null,
-          overheadCategory,
-          metadata: { manualEntry: true },
-        }),
+        body: JSON.stringify(body),
       });
 
       if (!res.ok) {
@@ -231,6 +245,7 @@ export function OperationsConsole({
       setShopId("");
       setIsExpense(false);
       setCategory("eod_deposit");
+      setStockOrderFundingPool("savings");
       await refreshData();
     } catch (e: any) {
       alert(e.message);
@@ -411,6 +426,9 @@ export function OperationsConsole({
         <Button onClick={() => setActiveTab("audit")} variant="ghost" className={cn("px-4 py-2 border-b-2 rounded-none text-xs font-black uppercase", activeTab === "audit" ? "border-primary text-primary bg-primary/5" : "border-transparent text-slate-400")}>
           <Brain className="w-4 h-4 mr-2" /> Money Audit Brain
         </Button>
+        <Button onClick={() => setActiveTab("buckets")} variant="ghost" className={cn("px-4 py-2 border-b-2 rounded-none text-xs font-black uppercase", activeTab === "buckets" ? "border-primary text-primary bg-primary/5" : "border-transparent text-slate-400")}>
+          <Coins className="w-4 h-4 mr-2" /> Buckets
+        </Button>
       </div>
 
       {/* Tab Panels */}
@@ -538,6 +556,21 @@ export function OperationsConsole({
                       </div>
                     </div>
 
+                    {isExpense && category === "stock_orders" && (
+                      <div>
+                        <label className="text-[9px] font-black uppercase text-slate-500">Stock Order Funding Pool</label>
+                        <select
+                          value={stockOrderFundingPool}
+                          onChange={(e) => setStockOrderFundingPool(e.target.value as "savings" | "overhead" | "invest")}
+                          className="w-full bg-slate-950 border border-slate-800 text-white px-3 py-2 rounded-md mt-1 text-xs font-bold"
+                        >
+                          <option value="savings">Operations Savings</option>
+                          <option value="overhead">Rent / Overhead Pool</option>
+                          <option value="invest">Perfumes / Invest Pool</option>
+                        </select>
+                      </div>
+                    )}
+
                     <div className="grid grid-cols-2 gap-3">
                       <div>
                         <label className="text-[9px] font-black uppercase text-slate-500">Shop Reference (optional)</label>
@@ -650,6 +683,143 @@ export function OperationsConsole({
             <MoneyAuditBrain shops={shops} />
           </CardContent>
         </Card>
+      )}
+
+      {activeTab === "buckets" && <BucketsReportPanel shops={shops} />}
+    </div>
+  );
+}
+
+type BucketTotals = { opening: number; inflows: number; outflows: number; closing: number };
+type BucketReport = {
+  period: { start: string; end: string };
+  locations: string[];
+  buckets: Record<string, { perLocation: Record<string, BucketTotals>; company: BucketTotals }>;
+  drawerVariance: {
+    perShop: Record<string, { totalVariance: number; countedDays: number }>;
+    company: { totalVariance: number; countedDays: number };
+  };
+};
+
+const REPORT_BUCKET_LABELS: Record<string, string> = {
+  rent: "Rent",
+  salaries: "Salaries",
+  savings_blackbox: "Savings/Blackbox",
+  stock: "Stock",
+  invest_perfumes: "Invest/Perfumes",
+  general: "General",
+};
+
+function thisMonthRange() {
+  const now = new Date();
+  const start = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
+  const end = now.toISOString().slice(0, 10);
+  return { start, end };
+}
+
+function BucketsReportPanel({ shops }: { shops: ShopNode[] }) {
+  const defaultRange = thisMonthRange();
+  const [start, setStart] = useState(defaultRange.start);
+  const [end, setEnd] = useState(defaultRange.end);
+  const [report, setReport] = useState<BucketReport | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  const fetchReport = useCallback(async (s: string, e: string) => {
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/operations/report?start=${s}&end=${e}`, { cache: "no-store", credentials: "include" });
+      if (res.ok) setReport(await res.json());
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchReport(start, end);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const shopName = (id: string) => shops.find((s) => s.id === id)?.name || id;
+  const locations = report ? [...report.locations, "__company__"] : [];
+
+  return (
+    <div className="space-y-4">
+      <Card className="bg-slate-950/60 border-slate-800">
+        <CardContent className="pt-6 flex flex-wrap items-end gap-3">
+          <div>
+            <label className="text-[10px] font-black uppercase text-slate-500">Start</label>
+            <Input type="date" value={start} onChange={(e) => setStart(e.target.value)} className="bg-slate-950 border-slate-800 mt-1" />
+          </div>
+          <div>
+            <label className="text-[10px] font-black uppercase text-slate-500">End</label>
+            <Input type="date" value={end} onChange={(e) => setEnd(e.target.value)} className="bg-slate-950 border-slate-800 mt-1" />
+          </div>
+          <Button onClick={() => fetchReport(start, end)} disabled={loading} className="h-10">
+            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Run Report"}
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => {
+              const r = thisMonthRange();
+              setStart(r.start);
+              setEnd(r.end);
+              fetchReport(r.start, r.end);
+            }}
+            className="h-10"
+          >
+            This Month
+          </Button>
+          {report && (
+            <div className="text-[10px] text-slate-500 ml-auto">
+              Drawer variance this period: <span className={cn("font-black", report.drawerVariance.company.totalVariance < 0 ? "text-rose-400" : "text-emerald-400")}>${report.drawerVariance.company.totalVariance.toFixed(2)}</span>
+              {" "}across {report.drawerVariance.company.countedDays} counted close{report.drawerVariance.company.countedDays === 1 ? "" : "s"}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {report && Object.entries(report.buckets).map(([bucketKey, data]) => (
+        <Card key={bucketKey} className="bg-slate-950/60 border-slate-800">
+          <CardHeader>
+            <CardTitle className="text-md font-black uppercase italic">{REPORT_BUCKET_LABELS[bucketKey] || bucketKey}</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="text-left text-slate-500 uppercase text-[10px]">
+                    <th className="py-1 pr-4">Location</th>
+                    <th className="py-1 pr-4 text-right">Opening</th>
+                    <th className="py-1 pr-4 text-right">Inflows</th>
+                    <th className="py-1 pr-4 text-right">Outflows</th>
+                    <th className="py-1 pr-4 text-right">Closing</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {locations.map((loc) => {
+                    const totals = loc === "__company__" ? data.company : data.perLocation[loc];
+                    if (!totals) return null;
+                    return (
+                      <tr key={loc} className={cn("border-t border-slate-900", loc === "__company__" && "font-black text-white")}>
+                        <td className="py-1.5 pr-4">{loc === "__company__" ? "Company Total" : shopName(loc)}</td>
+                        <td className="py-1.5 pr-4 text-right font-mono">${totals.opening.toFixed(2)}</td>
+                        <td className="py-1.5 pr-4 text-right font-mono text-emerald-400">${totals.inflows.toFixed(2)}</td>
+                        <td className="py-1.5 pr-4 text-right font-mono text-rose-400">${totals.outflows.toFixed(2)}</td>
+                        <td className="py-1.5 pr-4 text-right font-mono">${totals.closing.toFixed(2)}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </CardContent>
+        </Card>
+      ))}
+
+      {!report && !loading && (
+        <div className="text-sm text-slate-500 text-center py-8">No data for this period.</div>
       )}
     </div>
   );

@@ -52,6 +52,7 @@ import {
     addNewProductFromPos,
     recordUntrackedSale,
     openCashRegister,
+    closeCashRegister,
     recordPosExpense,
     postDrawerToOperations,
     recordLayby,
@@ -314,6 +315,8 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
 
     // Cash Register Logic
     const [isCashRegisterModalOpen, setIsCashRegisterModalOpen] = useState(false);
+    const [isClosingCountModalOpen, setIsClosingCountModalOpen] = useState(false);
+    const [closingCountAmount, setClosingCountAmount] = useState("");
     const [cashRegisterAmount, setCashRegisterAmount] = useState("");
     const [hasDismissedRegisterModal, setHasDismissedRegisterModal] = useState(false);
 
@@ -342,6 +345,7 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
     const [directOpsType, setDirectOpsType] = useState<"deposit" | "withdrawal">("deposit");
     const [directOpsKind, setDirectOpsKind] = useState("eod_deposit");
     const [directOpsCategory, setDirectOpsCategory] = useState("");
+    const [directOpsFundingPool, setDirectOpsFundingPool] = useState<"savings" | "overhead" | "invest">("savings");
 
     // Auto-detect overhead keywords in notes
     useEffect(() => {
@@ -352,6 +356,17 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
             setOpsPostKind("overhead_contribution");
         }
     }, [opsPostNotes, opsPostKind]);
+
+    // Auto-check "Deposit to Invest" when the expense description mentions perfume — a hint the
+    // human can always override, never the authoritative routing decision (the server only trusts
+    // the checkbox itself, see recordPosExpense in app/actions.ts).
+    useEffect(() => {
+        const desc = expenseDescription.toLowerCase();
+        const hasPerfumeKeyword = desc.includes("perfume") || desc.includes("parfum");
+        if (hasPerfumeKeyword && !expenseToInvest) {
+            setExpenseToInvest(true);
+        }
+    }, [expenseDescription, expenseToInvest]);
 
     // Receipt context & Modal state
     const [activeReceipt, setActiveReceipt] = useState<any | null>(null);
@@ -664,16 +679,17 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
 
         startTransition(async () => {
             try {
-                const finalAmount = directOpsType === "deposit" ? val : -val;
                 const payload = {
-                    amount: finalAmount,
-                    kind: directOpsKind,
-                    title: directOpsNotes,
+                    amount: val,
+                    operationType: directOpsKind,
+                    fundingPool: directOpsFundingPool,
+                    direction: directOpsType,
+                    title: directOpsKind === "stock_orders" ? `Stock Orders - ${directOpsNotes}` : directOpsNotes,
                     notes: `Direct POS Entry (${shopId})`,
                     overheadCategory: directOpsCategory || null,
                     shopId: shopId,
                 };
-                const res = await fetch("/api/operations/ledger", {
+                const res = await fetch("/api/cash-pools/transactions", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     credentials: "include",
@@ -681,14 +697,16 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
                 });
                 if (!res.ok) {
                     const err = await res.json();
-                    throw new Error(err.error || "Failed to submit operations transaction");
+                    throw new Error(err.error || "Failed to submit cash pool transaction");
                 }
                 setIsDirectOpsModalOpen(false);
                 setDirectOpsAmount("");
                 setDirectOpsNotes("");
-                alert("Operations transaction recorded successfully.");
+                setDirectOpsCategory("");
+                setDirectOpsFundingPool("savings");
+                alert("Cash pool transaction recorded successfully.");
             } catch (e: any) {
-                alert(e?.message || "Failed to post operations transaction.");
+                alert(e?.message || "Failed to post cash pool transaction.");
             }
         });
     };
@@ -1308,8 +1326,31 @@ Generated via NIRVANA POS`;
         });
     };
 
-    const handleEndOfDayAndLogout = async () => {
+    // Gate: require a real physical cash count before End of Day can proceed. Mandatory to enter
+    // (can't skip the modal), but never blocks on a mismatch — see closeCashRegister in
+    // app/actions.ts for why blocking here would repeat an earlier, costly mistake.
+    const beginEndOfDay = () => {
         if (!confirm('End of day: generate report and log out?')) return;
+        setClosingCountAmount(Number.isFinite(liveCashInDrawer) ? liveCashInDrawer.toFixed(2) : "");
+        setIsClosingCountModalOpen(true);
+    };
+
+    const handleConfirmClosingCount = async () => {
+        const counted = parseFloat(closingCountAmount);
+        if (isNaN(counted) || counted < 0) {
+            alert("Please enter a valid counted amount.");
+            return;
+        }
+        setIsClosingCountModalOpen(false);
+        try {
+            await closeCashRegister(shopId, liveCashInDrawer, counted);
+        } catch (e) {
+            console.warn("closeCashRegister failed (continuing EOD anyway):", e);
+        }
+        continueEndOfDayAndLogout(counted);
+    };
+
+    const continueEndOfDayAndLogout = async (countedCash: number) => {
         setIsClosingDay(true);
         console.log('Starting EOD process for', shopId);
 
@@ -1457,10 +1498,26 @@ Generated via NIRVANA POS`;
 
             // 3. Post cash to Operations (Master Vault)
             try {
-                const depositRaw = prompt("How much are you posting to Operations (Master Vault) today?", "");
+                // Defaults off the physically counted cash from the closing-count step, not the
+                // computed estimate — that's the whole point of having a real count now.
+                const computedDrawerTotal = Number.isFinite(countedCash) ? countedCash : null;
+                const promptMessage = computedDrawerTotal != null
+                    ? `How much are you posting to Operations (Master Vault) today?\n\nCounted drawer total: $${computedDrawerTotal.toFixed(2)}`
+                    : "How much are you posting to Operations (Master Vault) today?";
+                const depositRaw = prompt(promptMessage, computedDrawerTotal != null ? computedDrawerTotal.toFixed(2) : "");
                 if (depositRaw != null && String(depositRaw).trim() !== "") {
                     const deposit = Number(String(depositRaw).trim());
                     if (Number.isFinite(deposit) && deposit > 0) {
+                        // Flag (but never block) if the entered amount diverges from the computed drawer
+                        // total — surfaces mismatches for later review instead of silently trusting manual entry.
+                        const mismatchTolerance = 5; // small absolute tolerance for rounding/change
+                        const mismatch = computedDrawerTotal != null && Math.abs(deposit - computedDrawerTotal) > mismatchTolerance;
+                        const mismatchNote = mismatch
+                            ? ` | ⚠️ Entered $${deposit.toFixed(2)} differs from computed drawer total $${computedDrawerTotal!.toFixed(2)} by $${Math.abs(deposit - computedDrawerTotal!).toFixed(2)}`
+                            : "";
+                        if (mismatch) {
+                            console.warn(`EOD deposit mismatch for ${shopId}: entered $${deposit.toFixed(2)} vs computed $${computedDrawerTotal!.toFixed(2)}`);
+                        }
                         const postRes = await fetch("/api/operations/ledger", {
                             method: "POST",
                             headers: { "Content-Type": "application/json" },
@@ -1470,6 +1527,7 @@ Generated via NIRVANA POS`;
                                 kind: "eod_deposit",
                                 shopId,
                                 title: `EOD deposit ${dayStamp} (${shopId})`,
+                                notes: mismatchNote || undefined,
                                 effectiveDate: dayStamp,
                             }),
                         });
@@ -1728,7 +1786,7 @@ Generated via NIRVANA POS`;
                     </Button>
 
                     <Button
-                        onClick={handleEndOfDayAndLogout}
+                        onClick={beginEndOfDay}
                         disabled={isClosingDay}
                         variant="outline"
                         className="h-10 px-3 border-rose-500/30 text-rose-400 hover:bg-rose-500/10 text-[10px] font-black uppercase italic flex items-center gap-2"
@@ -1775,6 +1833,7 @@ Generated via NIRVANA POS`;
                             setDirectOpsType("deposit");
                             setDirectOpsKind("eod_deposit");
                             setDirectOpsCategory("");
+                            setDirectOpsFundingPool("savings");
                             setIsDirectOpsModalOpen(true);
                         }}
                         variant="outline"
@@ -2752,6 +2811,56 @@ Generated via NIRVANA POS`;
                 </div>
             </Modal >
 
+            {/* Closing Count Modal — mandatory physical cash count before End of Day proceeds.
+                Never blocks on a mismatch, only records it (see closeCashRegister in actions.ts). */}
+            <Modal
+                isOpen={isClosingCountModalOpen}
+                onClose={() => setIsClosingCountModalOpen(false)}
+                title="Count the Drawer"
+            >
+                <div className="space-y-4 pt-2">
+                    <p className="text-sm text-slate-400 font-medium">Count the physical cash in the drawer before closing out. This gets recorded either way — it's fine if it doesn't match exactly.</p>
+
+                    <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 flex justify-between items-end">
+                        <div className="text-[10px] font-black uppercase text-slate-500 tracking-widest leading-none">Computed Expected Cash</div>
+                        <div className="text-xl font-black font-mono text-white leading-none">${Number.isFinite(liveCashInDrawer) ? liveCashInDrawer.toFixed(2) : "0.00"}</div>
+                    </div>
+
+                    <div>
+                        <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Counted Physical Cash</label>
+                        <div className="relative mt-1">
+                            <span className="absolute left-3 top-[10px] text-slate-500 font-mono font-bold text-lg">$</span>
+                            <Input
+                                type="number"
+                                placeholder="0.00"
+                                step="0.01"
+                                className="pl-8 bg-slate-950 border-violet-500/30 text-lg font-mono font-black h-12"
+                                value={closingCountAmount}
+                                onChange={(e) => setClosingCountAmount(e.target.value)}
+                                autoFocus
+                            />
+                        </div>
+                        {closingCountAmount && parseFloat(closingCountAmount) - liveCashInDrawer !== 0 && !isNaN(parseFloat(closingCountAmount)) && (
+                            <div className={cn(
+                                "text-xs font-black uppercase italic mt-2 p-2 rounded",
+                                parseFloat(closingCountAmount) - liveCashInDrawer > 0 ? "bg-emerald-500/10 text-emerald-400" : "bg-rose-500/10 text-rose-400"
+                            )}>
+                                {parseFloat(closingCountAmount) - liveCashInDrawer > 0 ? "Over By " : "Short By "}
+                                ${Math.abs(parseFloat(closingCountAmount) - liveCashInDrawer).toFixed(2)}
+                            </div>
+                        )}
+                    </div>
+
+                    <Button
+                        className="w-full bg-violet-600 hover:bg-violet-700 text-white font-black uppercase italic tracking-wider h-12 mt-2"
+                        onClick={handleConfirmClosingCount}
+                        disabled={isClosingDay}
+                    >
+                        Confirm & Continue
+                    </Button>
+                </div>
+            </Modal>
+
             {/* Expense Modal */}
             < Modal
                 isOpen={isExpenseModalOpen}
@@ -2937,6 +3046,7 @@ Generated via NIRVANA POS`;
                             onClick={() => {
                                 setDirectOpsType("deposit");
                                 setDirectOpsKind("eod_deposit");
+                                setDirectOpsFundingPool("savings");
                             }}
                             className={`p-3 rounded-lg border text-xs font-black uppercase tracking-wider transition-all ${
                                 directOpsType === "deposit"
@@ -2951,6 +3061,7 @@ Generated via NIRVANA POS`;
                             onClick={() => {
                                 setDirectOpsType("withdrawal");
                                 setDirectOpsKind("overhead_payment");
+                                setDirectOpsFundingPool("overhead");
                             }}
                             className={`p-3 rounded-lg border text-xs font-black uppercase tracking-wider transition-all ${
                                 directOpsType === "withdrawal"
@@ -2983,7 +3094,17 @@ Generated via NIRVANA POS`;
                         <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Transaction Kind / Pool</label>
                         <select
                             value={directOpsKind}
-                            onChange={(e) => setDirectOpsKind(e.target.value)}
+                            onChange={(e) => {
+                                const kind = e.target.value;
+                                setDirectOpsKind(kind);
+                                if (kind === "overhead_payment" || kind === "overhead_contribution") {
+                                    setDirectOpsFundingPool("overhead");
+                                } else if (kind === "invest_withdrawal" || kind === "invest_deposit") {
+                                    setDirectOpsFundingPool("invest");
+                                } else {
+                                    setDirectOpsFundingPool("savings");
+                                }
+                            }}
                             className="w-full bg-slate-950 border border-slate-800 text-white px-3 py-2 rounded-md mt-1 font-bold font-mono text-sm"
                         >
                             {directOpsType === "deposit" ? (
@@ -3013,7 +3134,22 @@ Generated via NIRVANA POS`;
                         </select>
                     </div>
 
-                    {(directOpsKind.includes("overhead") || directOpsKind.includes("expense") || directOpsKind === "adjustment") && (
+                    {directOpsKind === "stock_orders" && (
+                        <div>
+                            <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Stock Order Funding Pool</label>
+                            <select
+                                value={directOpsFundingPool}
+                                onChange={(e) => setDirectOpsFundingPool(e.target.value as "savings" | "overhead" | "invest")}
+                                className="w-full bg-slate-950 border border-slate-800 text-white px-3 py-2 rounded-md mt-1 font-bold"
+                            >
+                                <option value="savings">Operations Savings</option>
+                                <option value="overhead">Rent / Overhead Pool</option>
+                                <option value="invest">Perfumes / Invest Pool</option>
+                            </select>
+                        </div>
+                    )}
+
+                    {(directOpsKind.includes("overhead") || directOpsKind.includes("expense") || directOpsKind === "adjustment" || (directOpsKind === "stock_orders" && directOpsFundingPool === "overhead")) && (
                         <div>
                             <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Overhead Category (Optional)</label>
                             <select

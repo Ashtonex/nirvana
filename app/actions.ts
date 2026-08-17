@@ -10,6 +10,7 @@ import { sendWhatsAppMessage } from "@/lib/twilio";
 import { cookies } from "next/headers";
 import { computePosAuditReport } from "@/lib/posAudit";
 import { createOperationsLedgerEntry, detectOverheadCategoryFromText, isVaultDepositKind, normalizeOperationsLedgerInput } from "@/lib/operations";
+import { postFundTransaction, type BucketKey, type FundDirection } from "@/lib/cash-pools";
 import { getSavingsTransferCategory, isSavingsOrBlackboxTransferEntry } from "@/lib/transfer-classification";
 import { TSHIRTS_SHOP_ID, TSHIRTS_SHOP_NAME, isNirvanaTeeItem } from "@/lib/tshirts";
 
@@ -1442,6 +1443,64 @@ export async function openCashRegister(shopId: string, expectedAmount: number, a
     revalidatePath(`/shops/${shopId}`);
 }
 
+// Real physical-cash-count reconciliation at end of day, mirroring openCashRegister's shape
+// exactly. This is the missing half of the opening/closing pair: getCashDrawerClosing and
+// updateCashDrawerClosing already existed for manual admin correction, but nothing called them
+// during a normal end-of-shift before this — the drawer total the system computed was never
+// actually checked against a physical count. Like openCashRegister, this NEVER throws on a
+// mismatch — entering a count is mandatory (enforced by the calling UI), but a number that
+// doesn't match is recorded as a variance, not rejected. Blocking here would repeat the exact
+// mistake the duplicate-sale/register-opening checks made before (see CODE_AUDIT_FINDINGS.md):
+// treating a plausible real-world event as an error to reject instead of data to record.
+export async function closeCashRegister(shopId: string, expectedAmount: number, actualAmount: number, notes?: string) {
+    if (!shopId) throw new Error("Missing shopId");
+    if (!Number.isFinite(expectedAmount) || !Number.isFinite(actualAmount)) throw new Error("Invalid amount");
+
+    const timestamp = new Date().toISOString();
+    const id = Math.random().toString(36).substring(2, 9);
+    const actor = await getActorFromCookies().catch(() => null);
+
+    await supabaseAdmin.from('ledger_entries').insert([{
+        id,
+        shop_id: shopId,
+        type: 'asset',
+        category: 'Cash Drawer Closing',
+        amount: actualAmount,
+        date: timestamp,
+        description: `Register Closed - Expected: $${expectedAmount.toFixed(2)} | Counted: $${actualAmount.toFixed(2)}${notes ? ` | ${notes}` : ""}`,
+        employee_id: actor?.id || "SYSTEM"
+    }]);
+
+    const variance = actualAmount - expectedAmount;
+    let varianceId: string | null = null;
+    if (Math.abs(variance) > 0.01) {
+        varianceId = Math.random().toString(36).substring(2, 9);
+        await supabaseAdmin.from('ledger_entries').insert([{
+            id: varianceId,
+            shop_id: shopId,
+            type: variance < 0 ? 'expense' : 'income',
+            category: 'Cash Drawer Closing Variance',
+            amount: Math.abs(variance),
+            date: timestamp,
+            description: `Closing count ${variance < 0 ? 'short' : 'over'} by $${Math.abs(variance).toFixed(2)}${notes ? ` | ${notes}` : ""}`,
+            employee_id: actor?.id || "SYSTEM"
+        }]);
+    }
+
+    try {
+        await supabaseAdmin.from("audit_log").insert({
+            id: Math.random().toString(36).substring(2, 9),
+            timestamp,
+            employee_id: actor?.id || "SYSTEM",
+            action: "CASH_DRAWER_CLOSED",
+            details: `${shopId}: closing $${actualAmount.toFixed(2)} (expected $${expectedAmount.toFixed(2)}, variance $${variance.toFixed(2)}) by ${actor?.name || "SYSTEM"}`
+        });
+    } catch { }
+
+    revalidatePath(`/shops/${shopId}`);
+    return { success: true, closingLedgerId: id, variance, varianceId };
+}
+
 export async function getCashDrawerOpening(shopId: string, dateYYYYMMDD: string) {
     const actor = await requireManagerOrOwner();
     const shop = String(shopId || "").trim();
@@ -1728,21 +1787,29 @@ export async function recordPosExpense(
         employee_id: employeeId
     }]);
 
-    // Auto-create Invest deposit for perfume expenses (both deduct from drawer AND post to invest)
-    // Perfume purchases are tracked as both an expense AND an investment
-    if (isPerfumeExpense || options?.toInvest) {
-        await supabaseAdmin.from('invest_deposits').insert({
-            shop_id: shopId,
-            amount: amount,
-            deposited_by: employeeId,
-            deposited_at: timestamp,
+    // Auto-create Invest deposit for perfume expenses (both deduct from drawer AND post to invest).
+    // The server now trusts ONLY the explicit toInvest flag — isPerfumeExpense (keyword match on
+    // "perfume"/"parfum" in the description) is no longer the authoritative decision here; it's
+    // just a UI hint that pre-checks the invest box (see POS.tsx), always overridable by the human.
+    // This is the structural fix for investor capital previously being routed by text-matching
+    // alone: sourceLedgerEntryId links the deposit back to the exact drawer expense it came from.
+    if (options?.toInvest) {
+        await postFundTransaction({
+            amount,
+            direction: "deposit",
+            bucketKey: "invest_perfumes",
+            shopId,
+            title: description || "Invest Deposit",
+            notes: "Auto-routed from POS expense (perfume/invest)",
+            effectiveDate: timestamp.split('T')[0],
+            actor: { type: "staff", employeeId },
+            sourceLedgerEntryId: id,
+            metadata: { source: "pos_expense", posExpenseId: id },
         });
     }
 
     // === OPERATIONS ROUTING ===
     // POS can ONLY ADD to operations (positive amounts). Never deduct.
-    // Vault-increasing kinds: eod_deposit, savings_deposit, blackbox
-    // Overhead-tracker kinds: overhead_contribution (does NOT increase vault)
     const isSavingsTransfer = ["savings", "saving"].some((kw) => descLower.includes(kw)) && !descLower.includes("black");
     const isBlackboxTransfer = ["black box", "blackbox"].some((kw) => descLower.includes(kw));
 
@@ -1752,47 +1819,37 @@ export async function recordPosExpense(
 
     if (shouldRouteToVault && !shouldRouteToOverhead) {
         // Savings, blackbox, or manual "Deposit to Operations" -> vault deposit
-        const opsKind = isSavingsTransfer ? "savings_deposit" : isBlackboxTransfer ? "blackbox" : "eod_deposit";
+        const bucketKey: BucketKey = isSavingsTransfer || isBlackboxTransfer ? "savings_blackbox" : "general";
         const label = isSavingsTransfer ? "Savings deposit" : isBlackboxTransfer ? "Black Box deposit" : "Manual deposit";
 
-        await supabaseAdmin.from('operations_ledger').insert({
-            amount: amount,
-            kind: opsKind,
-            shop_id: shopId,
+        await postFundTransaction({
+            amount,
+            direction: "deposit",
+            bucketKey,
+            isBlackbox: isBlackboxTransfer,
+            shopId,
             title: description,
             notes: `Auto-routed from POS expense: ${label}`,
-            employee_id: employeeId,
-            effective_date: timestamp.split('T')[0],
-            created_at: timestamp,
+            effectiveDate: timestamp.split('T')[0],
+            actor: { type: "staff", employeeId },
+            sourceLedgerEntryId: id,
+            metadata: { source: "pos_expense", posExpenseId: id },
         });
-
-        // Vault deposits update actual_balance
-        const { data: currentState } = await supabaseAdmin
-            .from('operations_state')
-            .select('actual_balance')
-            .eq('id', 1)
-            .maybeSingle();
-
-        const newBalance = Number(currentState?.actual_balance || 0) + amount;
-        await supabaseAdmin
-            .from('operations_state')
-            .upsert({
-                id: 1,
-                actual_balance: newBalance,
-                updated_at: new Date().toISOString()
-            });
     } else if (shouldRouteToOverhead) {
         // POS expenses titled Rent/Utilities are contributions TO the operations pool (saving money for bills).
-        await supabaseAdmin.from('operations_ledger').insert({
-            amount: amount,
-            kind: "overhead_contribution",
-            shop_id: shopId,
+        const detectedCategory = detectOverheadCategoryFromText(description) || "misc";
+        await postFundTransaction({
+            amount,
+            direction: "deposit",
+            bucketKey: detectedCategory === "salaries" ? "salaries" : "rent",
+            overheadCategory: detectedCategory,
+            shopId,
             title: description,
             notes: `Auto-routed from POS expense: Overhead contribution`,
-            overhead_category: detectOverheadCategoryFromText(description) || "misc",
-            employee_id: employeeId,
-            effective_date: timestamp.split('T')[0],
-            created_at: timestamp,
+            effectiveDate: timestamp.split('T')[0],
+            actor: { type: "staff", employeeId },
+            sourceLedgerEntryId: id,
+            metadata: { source: "pos_expense", posExpenseId: id },
         });
     }
 
@@ -2253,23 +2310,34 @@ export async function transferInventory(itemId: string, fromShopId: string, toSh
     revalidatePath("/transfers");
 }
 
+// Maps the POS "Post to Operations" modal's legacy kind selector onto the enforced fund buckets.
+// overhead_contribution has no rent/salaries distinction at the UI level (it predates the split),
+// so it defaults to "rent" — the same convention used by the Phase 5 historical backfill for
+// ambiguous overhead rows. utilities/wifi/zesa fold into "rent" per the approved bucket design.
+const POST_DRAWER_KIND_TO_BUCKET: Record<string, { bucketKey: BucketKey; direction: FundDirection; isBlackbox?: boolean; overheadCategory?: "rent" | "salaries" | "utilities" | "misc" }> = {
+    eod_deposit: { bucketKey: "general", direction: "deposit" },
+    savings_deposit: { bucketKey: "savings_blackbox", direction: "deposit" },
+    blackbox: { bucketKey: "savings_blackbox", direction: "deposit", isBlackbox: true },
+    overhead_contribution: { bucketKey: "rent", direction: "deposit" },
+    rent: { bucketKey: "rent", direction: "withdrawal", overheadCategory: "rent" },
+    utilities: { bucketKey: "rent", direction: "withdrawal", overheadCategory: "utilities" },
+    wifi: { bucketKey: "rent", direction: "withdrawal", overheadCategory: "utilities" },
+    zesa: { bucketKey: "rent", direction: "withdrawal", overheadCategory: "utilities" },
+    salaries: { bucketKey: "salaries", direction: "withdrawal", overheadCategory: "salaries" },
+};
+
+const POST_DRAWER_KIND_LABEL: Record<string, string> = {
+    eod_deposit: "EOD", savings_deposit: "Savings", blackbox: "Black Box", overhead_contribution: "Overhead",
+    rent: "Rent", utilities: "Utilities", wifi: "WiFi", zesa: "Electricity", salaries: "Salaries",
+};
+
 export async function postDrawerToOperations(input: { shopId: string; amount: number; notes?: string; kind?: string; date?: string }) {
     const actor = await requireManagerOrOwner();
     const shopId = String(input?.shopId || "").trim();
     const amount = Number(input?.amount);
     const notes = input?.notes ? String(input.notes) : "";
-    
-    // Check if this is an overhead PAYMENT (paying bills from the POS Direct Ops modal)
-    const isOverheadPayment = ["rent", "utilities", "wifi", "zesa", "salaries", "overhead_contribution"].includes(input?.kind || "");
-    const opsAmount = isOverheadPayment ? -amount : amount;
-
-    const normalized = normalizeOperationsLedgerInput({
-        amount: opsAmount,
-        kind: input?.kind || "eod_deposit",
-        title: input?.kind || "eod_deposit",
-        notes,
-    });
-    const kind = normalized.kind;
+    const requestedKind = input?.kind || "eod_deposit";
+    const bucketMapping = POST_DRAWER_KIND_TO_BUCKET[requestedKind] || POST_DRAWER_KIND_TO_BUCKET.eod_deposit;
 
     if (!shopId) throw new Error("Missing shopId");
     if (!Number.isFinite(amount) || amount <= 0) throw new Error("Invalid amount");
@@ -2284,31 +2352,35 @@ export async function postDrawerToOperations(input: { shopId: string; amount: nu
         .from("operations_ledger")
         .select("*")
         .eq("shop_id", shopId)
-        .eq("amount", opsAmount)
-        .eq("kind", kind)
+        .eq("bucket_key", bucketMapping.bucketKey)
+        .eq("amount", bucketMapping.direction === "deposit" ? amount : -amount)
         .gte("created_at", `${today}T00:00:00.000Z`)
         .lt("created_at", `${today}T23:59:59.999Z`);
 
     if (existingRoutings && existingRoutings.length > 0) {
-        console.warn(`💰 Duplicate operations routing detected: $${amount.toFixed(2)} (${kind}) already routed today at ${new Date(existingRoutings[0].created_at).toLocaleTimeString()}. Allowing multiple deposits.`);
+        console.warn(`💰 Duplicate operations routing detected: $${amount.toFixed(2)} (${bucketMapping.bucketKey}) already routed today at ${new Date(existingRoutings[0].created_at).toLocaleTimeString()}. Allowing multiple deposits.`);
     }
 
-    // PREVENTION: Add error handling
     let drawerLedgerId = "";
     try {
         const timestamp = input.date ? new Date(input.date).toISOString() : new Date().toISOString();
         const dayStamp = timestamp.split("T")[0];
 
         drawerLedgerId = Math.random().toString(36).substring(2, 9);
-        
+
+        // Drawer-side record: cash physically left the shop's till. Separate concern from the
+        // operations-side bucket effect below — this always records the raw positive amount.
         const { error: ledgerError } = await supabaseAdmin.from("ledger_entries").insert([{
             id: drawerLedgerId,
             shop_id: shopId,
-            type: "transfer",
+            // "transfer" was never a valid ledger_entries.type in production (its CHECK constraint
+            // only allows expense/income/asset/liability) — this insert has been failing outright.
+            // "expense" matches the existing convention for cash leaving a shop drawer.
+            type: "expense",
             category: "Operations Transfer",
             amount,
             date: timestamp,
-            description: `Posted to Operations (${({eod_deposit:"EOD",savings_deposit:"Savings",blackbox:"Black Box",overhead_contribution:"Overhead",stockvel_deposit:"Stockvel",round_deposit:"Round"})[kind] || kind})${notes ? ` | ${notes}` : ""}`,
+            description: `Posted to Operations (${POST_DRAWER_KIND_LABEL[requestedKind] || requestedKind})${notes ? ` | ${notes}` : ""}`,
             employee_id: actor.id
         }]);
 
@@ -2316,40 +2388,24 @@ export async function postDrawerToOperations(input: { shopId: string; amount: nu
             throw new Error(`Failed to record ledger entry: ${ledgerError.message}`);
         }
 
-        await createOperationsLedgerEntry({
-            amount: opsAmount,
-            kind,
+        await postFundTransaction({
+            amount,
+            direction: bucketMapping.direction,
+            bucketKey: bucketMapping.bucketKey,
+            isBlackbox: bucketMapping.isBlackbox,
+            overheadCategory: bucketMapping.overheadCategory || null,
             shopId,
-            title: ({eod_deposit:"EOD Transfer",savings_deposit:"Savings Deposit",blackbox:"Black Box Deposit",overhead_contribution:"Overhead Contribution",overhead_payment:"Overhead Payment",stockvel_deposit:"Stockvel Deposit",round_deposit:"Round Deposit"})[kind] || "Operations Transfer",
+            title: POST_DRAWER_KIND_LABEL[requestedKind] ? `${POST_DRAWER_KIND_LABEL[requestedKind]} Transfer` : "Operations Transfer",
             notes: notes ? `POS → Operations: ${notes}` : "Auto-posted from POS Drawer",
             effectiveDate: dayStamp,
-            employeeId: actor.id,
+            actor: { type: actor.kind, employeeId: actor.id },
+            sourceLedgerEntryId: drawerLedgerId,
             metadata: {
                 source: "pos_drawer",
                 drawerLedgerId,
                 postedBy: actor.kind,
             },
         });
-
-        // Update the actual balance in operations_state
-        // Only vault-increasing kinds update actual_balance: eod_deposit, savings_deposit, blackbox
-        // Overhead kinds (overhead_contribution, rent, salaries) do NOT update vault
-        if (isVaultDepositKind(kind)) {
-            const { data: currentState } = await supabaseAdmin
-                .from('operations_state')
-                .select('actual_balance')
-                .eq('id', 1)
-                .maybeSingle();
-            
-            const newBalance = Number(currentState?.actual_balance || 0) + amount;
-            await supabaseAdmin
-                .from('operations_state')
-                .upsert({ 
-                    id: 1, 
-                    actual_balance: newBalance, 
-                    updated_at: timestamp 
-                });
-        }
 
     } catch (error: any) {
         console.error('Drawer posting failed:', error);

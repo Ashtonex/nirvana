@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { requirePrivilegedActor, requireStaffActor } from "@/lib/apiAuth";
+import { postFundTransaction } from "@/lib/cash-pools";
 import { supabaseAdmin } from "@/lib/supabase";
 
 export const runtime = "nodejs";
@@ -64,21 +65,19 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Shop ID required" }, { status: 400 });
     }
 
-    const depositedBy = actor.type === "staff" ? actor.employeeId : "owner";
+    const result = await postFundTransaction({
+      amount,
+      direction: "deposit",
+      bucketKey: "invest_perfumes",
+      shopId,
+      title: String(body?.title || "Invest Deposit"),
+      notes: body?.notes ? String(body.notes) : "Invest deposit",
+      actor,
+      sourceLedgerEntryId: body?.sourceLedgerEntryId ? String(body.sourceLedgerEntryId) : null,
+      metadata: { source: "invest_deposits_api" },
+    });
 
-    const { data, error } = await supabaseAdmin
-      .from("invest_deposits")
-      .insert({
-        shop_id: shopId,
-        amount,
-        deposited_by: depositedBy,
-      })
-      .select("*")
-      .maybeSingle();
-
-    if (error) throw new Error(error.message);
-
-    return NextResponse.json({ success: true, deposit: data });
+    return NextResponse.json({ success: true, deposit: (result as any).deposit, row: (result as any).row });
   } catch (e: any) {
     const msg = e?.message || String(e);
     const status = msg === "Unauthorized" ? 401 : 500;

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { requirePrivilegedActor, requireStaffActor, isPrivilegedRole } from "@/lib/apiAuth";
-import { createOperationsLedgerEntry, getOperationsVaultImpact, listOperationsLedgerEntries, normalizeOperationsLedgerInput } from "@/lib/operations";
+import { listOperationsLedgerEntries } from "@/lib/operations";
+import { postFundTransaction, legacyKindToBucket, type FundDirection } from "@/lib/cash-pools";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -43,24 +44,27 @@ export async function POST(req: Request) {
     }
     const body = await req.json().catch(() => ({}));
 
-    const amount = Number(body?.amount);
-    if (!Number.isFinite(amount) || amount === 0) {
+    const rawAmount = Number(body?.amount);
+    if (!Number.isFinite(rawAmount) || rawAmount === 0) {
       return NextResponse.json({ error: "Invalid amount" }, { status: 400 });
     }
 
-    const normalizedInput = normalizeOperationsLedgerInput({
-      amount,
-      kind: body?.kind || "adjustment",
-      title: body?.title || null,
-      notes: body?.notes || null,
-      overheadCategory: body?.overheadCategory || null,
-    });
-    const kind = normalizedInput.kind;
+    // This route historically took a signed amount (positive = deposit, negative = withdrawal)
+    // rather than an explicit direction field like the Direct Ops modal does.
+    const direction: FundDirection = rawAmount > 0 ? "deposit" : "withdrawal";
+    const kindInput = String(body?.kind || "adjustment").toLowerCase();
     const shopId = body?.shopId ? String(body.shopId) : null;
     const overheadCategory = body?.overheadCategory ? String(body.overheadCategory) : null;
     const title = body?.title ? String(body.title) : null;
     const notes = body?.notes ? String(body.notes) : null;
     const effectiveDate = body?.effectiveDate ? String(body.effectiveDate) : null;
+
+    if (["invest_deposit", "invest_withdrawal", "stock_orders"].includes(kindInput)) {
+      return NextResponse.json(
+        { error: "Use /api/cash-pools/transactions for invest and stock-order pool transactions" },
+        { status: 400 }
+      );
+    }
 
     // If the poster is a non-privileged staff actor, restrict allowed kinds and shop scope
     if (actor?.type === 'staff' && !isPrivilegedRole(actor.role)) {
@@ -71,13 +75,10 @@ export async function POST(req: Request) {
         "blackbox",
         "overhead_contribution",
         "overhead_payment",
-        "invest_deposit",
-        "invest_withdrawal",
         "stockvel_deposit",
         "stockvel_withdrawal",
         "round_deposit",
         "round_withdrawal",
-        "stock_orders",
         "order_payment",
         "capital_injection",
         "business_expense",
@@ -86,7 +87,7 @@ export async function POST(req: Request) {
         "transport",
         "adjustment",
       ];
-      if (!allowedKinds.includes(kind)) {
+      if (!allowedKinds.includes(kindInput)) {
         return NextResponse.json({ error: "Forbidden" }, { status: 403 });
       }
       if (shopId && actor.shopId && shopId !== actor.shopId) {
@@ -94,40 +95,26 @@ export async function POST(req: Request) {
       }
     }
 
-    const row = await createOperationsLedgerEntry({
-      amount,
-      kind,
+    const { bucketKey, isBlackbox } = legacyKindToBucket(kindInput, overheadCategory);
+
+    const result = await postFundTransaction({
+      amount: Math.abs(rawAmount),
+      direction,
+      bucketKey,
+      isBlackbox,
       shopId,
-      overheadCategory: overheadCategory as any,
-      title,
+      title: title || "Operations Ledger Entry",
       notes,
+      overheadCategory: overheadCategory as "rent" | "salaries" | "utilities" | "misc" | null,
       effectiveDate,
-      employeeId: actor.type === "staff" ? actor.employeeId : null,
-      metadata: body?.metadata || {},
+      actor,
+      metadata: {
+        ...(body?.metadata || {}),
+        legacyKind: kindInput,
+      },
     });
 
-    // Only true vault movements change the physical master vault.
-    // Shop overhead contributions/payments stay on the shop overhead tracker until rollover.
-    const vaultImpact = getOperationsVaultImpact({ amount, kind, shop_id: shopId });
-    if (vaultImpact !== 0) {
-      const { supabaseAdmin } = await import('@/lib/supabase');
-      const { data: currentState } = await supabaseAdmin
-        .from('operations_state')
-        .select('actual_balance')
-        .eq('id', 1)
-        .maybeSingle();
-
-      const newBalance = Number(currentState?.actual_balance || 0) + vaultImpact;
-      await supabaseAdmin
-        .from('operations_state')
-        .upsert({ 
-          id: 1, 
-          actual_balance: newBalance, 
-          updated_at: new Date().toISOString() 
-        });
-    }
-
-    return NextResponse.json({ success: true, row });
+    return NextResponse.json({ success: true, row: result.row });
   } catch (e: any) {
     const msg = e?.message || String(e);
     const status = msg === "Unauthorized" ? 401 : msg === "Forbidden" ? 403 : 500;

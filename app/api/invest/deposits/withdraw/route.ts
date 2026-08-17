@@ -1,24 +1,9 @@
 import { NextResponse } from "next/server";
 import { requirePrivilegedActor, requireStaffActor } from "@/lib/apiAuth";
-import { supabaseAdmin } from "@/lib/supabase";
+import { postFundTransaction } from "@/lib/cash-pools";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-type InvestDepositRow = {
-  id: string;
-  shop_id: string;
-  amount: number | string;
-  withdrawn_amount?: number | string | null;
-  status?: string | null;
-};
-
-type BulkWithdrawResult = {
-  id: string;
-  shopId: string;
-  amount: number;
-  deposit: InvestDepositRow | null;
-};
 
 export async function POST(req: Request) {
   try {
@@ -41,121 +26,32 @@ export async function POST(req: Request) {
 
     const title = String(body?.title || "Withdrawal");
     const shopId = body?.shopId ? String(body.shopId) : "";
-    const withdrawnBy = actor.type === "staff" ? actor.employeeId : "owner";
     const depositId = body?.depositId ? String(body.depositId) : "";
-    const withdrawnAt = new Date().toISOString();
 
-    if (depositId) {
-      const { data: deposit, error: fetchError } = await supabaseAdmin
-        .from("invest_deposits")
-        .select("*")
-        .eq("id", depositId)
-        .maybeSingle();
+    const result = await postFundTransaction({
+      amount,
+      direction: "withdrawal",
+      bucketKey: "invest_perfumes",
+      shopId: shopId || null,
+      title,
+      notes: "Invest pool withdrawal",
+      actor,
+      investDepositId: depositId || null,
+      metadata: { source: "invest_deposits_withdraw_api" },
+    });
 
-      if (fetchError || !deposit) {
-        return NextResponse.json({ error: "Deposit not found" }, { status: 404 });
-      }
-
-      const available = Number(deposit.amount) - Number(deposit.withdrawn_amount || 0);
-      if (amount > available) {
-        return NextResponse.json({ error: `Only ${available.toFixed(2)} available` }, { status: 400 });
-      }
-
-      const newWithdrawn = Number(deposit.withdrawn_amount || 0) + amount;
-      const status = newWithdrawn >= Number(deposit.amount) ? "withdrawn" : "partial";
-
-      const { data, error } = await supabaseAdmin
-        .from("invest_deposits")
-        .update({
-          withdrawn_amount: newWithdrawn,
-          withdrawn_at: withdrawnAt,
-          withdrawn_by: withdrawnBy,
-          withdraw_title: title,
-          status,
-        })
-        .eq("id", depositId)
-        .select("*")
-        .maybeSingle();
-
-      if (error) throw new Error(error.message);
-
-      return NextResponse.json({ success: true, deposit: data, mode: "single" });
-    }
-
-    let query = supabaseAdmin
-      .from("invest_deposits")
-      .select("*")
-      .in("status", ["active", "partial"])
-      .order("deposited_at", { ascending: true });
-
-    if (shopId) {
-      query = query.eq("shop_id", shopId);
-    }
-
-    const { data: deposits, error: listError } = await query;
-
-    if (listError) throw new Error(listError.message);
-
-    const rows: InvestDepositRow[] = deposits || [];
-    
-    if (shopId && rows.length === 0) {
-      return NextResponse.json({ error: `No active deposits found for this shop` }, { status: 400 });
-    }
-
-    const totalAvailable = rows.reduce((sum: number, row: InvestDepositRow) => {
-      return sum + (Number(row.amount || 0) - Number(row.withdrawn_amount || 0));
-    }, 0);
-
-    if (amount > totalAvailable) {
-      return NextResponse.json({ error: `Only ${totalAvailable.toFixed(2)} available` }, { status: 400 });
-    }
-
-    let remaining = amount;
-    const affected: BulkWithdrawResult[] = [];
-
-    for (const deposit of rows) {
-      if (remaining <= 0) break;
-
-      const available = Number(deposit.amount || 0) - Number(deposit.withdrawn_amount || 0);
-      if (available <= 0) continue;
-
-      const draw = Math.min(available, remaining);
-      const newWithdrawn = Number(deposit.withdrawn_amount || 0) + draw;
-      const status = newWithdrawn >= Number(deposit.amount || 0) ? "withdrawn" : "partial";
-
-      const { data: updated, error: updateError } = await supabaseAdmin
-        .from("invest_deposits")
-        .update({
-          withdrawn_amount: newWithdrawn,
-          withdrawn_at: withdrawnAt,
-          withdrawn_by: withdrawnBy,
-          withdraw_title: title,
-          status,
-        })
-        .eq("id", deposit.id)
-        .select("*")
-        .maybeSingle();
-
-      if (updateError) throw new Error(updateError.message);
-
-      affected.push({
-        id: deposit.id,
-        shopId: deposit.shop_id,
-        amount: draw,
-        deposit: updated,
-      });
-      remaining -= draw;
-    }
-
+    const r = result as any;
     return NextResponse.json({
       success: true,
-      mode: "bulk",
-      affected,
-      totalWithdrawn: amount,
+      mode: r.mode,
+      deposit: r.deposit,
+      affected: r.affected,
+      totalWithdrawn: r.totalWithdrawn,
+      row: r.row,
     });
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e);
-    const status = msg === "Unauthorized" ? 401 : 500;
+    const status = msg === "Unauthorized" ? 401 : msg === "Forbidden" ? 403 : msg.includes("not found") ? 404 : msg.includes("available") ? 400 : 500;
     return NextResponse.json({ error: msg }, { status });
   }
 }
