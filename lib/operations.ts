@@ -273,6 +273,45 @@ export async function setOperationsActualBalance(actualBalance: number) {
   if (error) throw new Error(error.message);
 }
 
+export type OperationsBucketKey = "rent" | "salaries" | "savings_blackbox" | "stock" | "invest_perfumes" | "general";
+
+export function deriveBucketKey(
+  kind: unknown,
+  overheadCategory?: unknown,
+  account?: unknown
+): OperationsBucketKey {
+  const k = normalizeOperationsKind(kind);
+  const oh = overheadCategory ? String(overheadCategory).toLowerCase().trim() : null;
+  const acc = account ? String(account).toLowerCase().trim() : null;
+
+  if (k === "invest_deposit" || k === "invest_withdrawal" || acc === "invest" || k.includes("invest")) {
+    return "invest_perfumes";
+  }
+  if (k === "stock_orders" || k === "stock_contribution" || k.startsWith("stock")) {
+    return "stock";
+  }
+  if (
+    isSavingsOrBlackboxOperationsKind(k) ||
+    acc === "savings" ||
+    k === "blackbox" ||
+    k === "savings_deposit" ||
+    k === "savings_withdrawal"
+  ) {
+    return "savings_blackbox";
+  }
+  if (
+    isShopOverheadKind(k) ||
+    acc === "overhead" ||
+    oh === "rent" ||
+    oh === "salaries" ||
+    oh === "utilities" ||
+    oh === "misc"
+  ) {
+    return oh === "salaries" ? "salaries" : "rent";
+  }
+  return "general";
+}
+
 export async function createOperationsLedgerEntry(input: {
   amount: number;
   kind: OperationsLedgerKind | string;
@@ -283,17 +322,20 @@ export async function createOperationsLedgerEntry(input: {
   effectiveDate?: string | null; // YYYY-MM-DD
   employeeId?: string | null;
   metadata?: Record<string, unknown>;
+  bucketKey?: OperationsBucketKey | string | null;
 }) {
   const normalized = normalizeOperationsLedgerInput(input);
+  const bucketKey = (input.bucketKey as OperationsBucketKey) || deriveBucketKey(normalized.kind, normalized.overheadCategory, normalized.account);
   const row: Record<string, unknown> = {
     amount: normalized.amount,
     kind: normalized.kind,
     shop_id: input.shopId ?? null,
     overhead_category: normalized.overheadCategory ?? null,
+    bucket_key: bucketKey,
     title: normalized.title,
     notes: normalized.notes,
     employee_id: input.employeeId ?? null,
-    metadata: { ...(input.metadata ?? {}), account: normalized.account },
+    metadata: { ...(input.metadata ?? {}), account: normalized.account, bucketKey },
   };
 
   if (input.effectiveDate) row.effective_date = input.effectiveDate;

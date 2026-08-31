@@ -60,6 +60,7 @@ export async function POST(request: NextRequest) {
         kind: "vault_baseline",
         amount: drift,
         shop_id: null,
+        bucket_key: "general",
         notes: `Baseline reset: computed was $${computedVault.toFixed(2)}, actual was $${actualVault.toFixed(2)}. Inserted $${drift.toFixed(2)} to balance. Drift reset to 0 on ${now.toISOString()}`,
         effective_date: now.toISOString(),
         created_at: now.toISOString(),
