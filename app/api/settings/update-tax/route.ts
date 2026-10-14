@@ -1,8 +1,14 @@
 import { NextResponse } from 'next/server';
 import { updateGlobalSettings } from '../../../actions';
 import { revalidatePath } from 'next/cache';
+import { requireOwnerAccess } from '@/lib/api-auth';
 
 export async function POST(request: Request) {
+    const ownerAccess = await requireOwnerAccess(request);
+    if (!ownerAccess.ok) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     try {
         const formData = await request.formData();
         

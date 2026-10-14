@@ -1,5 +1,6 @@
 import { supabaseAdmin } from "@/lib/supabase";
 import { revalidatePath } from "next/cache";
+import { getOperationsVaultImpact } from "@/lib/operations";
 
 export type AuditFinding = {
   id: string;
@@ -103,7 +104,10 @@ export async function runMoneyAudit(daysBack = 30): Promise<MoneyAuditResult> {
 
   const netFlow = totalSales - totalExpenses + opsIncome - opsExpenses;
   const actualVault = Number(opsState?.actual_balance || 0);
-  const computedVault = opsLedger.reduce((sum: number, o: any) => sum + Number(o.amount || 0), 0);
+  // Use the same vault-impact logic as lib/operations.ts (getOperationsComputedBalance) so this
+  // audit's notion of "computed vault" matches the app's own — otherwise invest rows and
+  // overhead entries get double-counted here in ways the real balance calc deliberately excludes.
+  const computedVault = opsLedger.reduce((sum: number, o: any) => sum + getOperationsVaultImpact(o), 0);
   const vaultDrift = actualVault - computedVault;
 
   if (Math.abs(vaultDrift) > 10) {

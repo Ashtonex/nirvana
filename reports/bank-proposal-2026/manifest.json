@@ -1,0 +1,73 @@
+{
+  "manifest_version": "1.0",
+  "skill": "capital-markets-issuance",
+  "artifact_mode": "native_document",
+  "output_dir": "G:\\work\\ATMCAPPROJECTS\\nirvana\\reports\\bank-proposal-2026",
+  "first_read": {
+    "path": "G:\\work\\ATMCAPPROJECTS\\nirvana\\reports\\bank-proposal-2026\\Inventivee_Harvest_BancABC_Funding_Proposal.docx",
+    "role": "primary human deliverable",
+    "why": "Editable lender proposal with financial evidence and repayment illustration"
+  },
+  "primary_human_deliverable": "G:\\work\\ATMCAPPROJECTS\\nirvana\\reports\\bank-proposal-2026\\Inventivee_Harvest_BancABC_Funding_Proposal.docx",
+  "human_deliverables": [
+    {
+      "path": "G:\\work\\ATMCAPPROJECTS\\nirvana\\reports\\bank-proposal-2026\\Inventivee_Harvest_BancABC_Funding_Proposal.docx",
+      "role": "human_deliverable",
+      "artifact_type": "native_document",
+      "description": "Funding proposal",
+      "user_visible_default": true,
+      "contains_new_analysis": true
+    }
+  ],
+  "companion_deliverables": [],
+  "support_artifacts": [
+    {
+      "path": "source_extract.json",
+      "role": "support_artifact",
+      "artifact_type": "json",
+      "description": "Financial evidence or calculation backup",
+      "user_visible_default": false,
+      "contains_new_analysis": false,
+      "support_reason": "Audit trail and reproducibility",
+      "user_requested_machine_readable": false
+    },
+    {
+      "path": "cashflow_support.csv",
+      "role": "support_artifact",
+      "artifact_type": "csv",
+      "description": "Financial evidence or calculation backup",
+      "user_visible_default": false,
+      "contains_new_analysis": true,
+      "support_reason": "Audit trail and reproducibility",
+      "user_requested_machine_readable": false
+    },
+    {
+      "path": "calculation_summary.json",
+      "role": "support_artifact",
+      "artifact_type": "json",
+      "description": "Financial evidence or calculation backup",
+      "user_visible_default": false,
+      "contains_new_analysis": true,
+      "support_reason": "Audit trail and reproducibility",
+      "user_requested_machine_readable": false
+    }
+  ],
+  "agent_artifacts": [],
+  "support_artifacts_user_visible_default": false,
+  "blocked_or_partial_status": {
+    "status": "partial",
+    "reason": "Proposal drafted; external submission requires factual completion",
+    "missing_inputs": [
+      "Tender award and payment terms",
+      "Confirmed uses split",
+      "Borrower ownership and eligibility",
+      "Security and liabilities",
+      "Reconciled financials and actual shop costs"
+    ]
+  },
+  "final_response_guidance": {
+    "lead_with": "primary_human_deliverable",
+    "mention_support_artifacts": "only_briefly_unless_requested"
+  },
+  "discipline_note": "Support artifacts are for audit only."
+}

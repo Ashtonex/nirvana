@@ -1,0 +1,7298 @@
+{
+  "May 2026": {
+    "Kipasa Branch": {
+      "shopId": "kipasa",
+      "shopName": "Kipasa Branch",
+      "month": "May 2026",
+      "incomeStatement": {
+        "grossSalesRevenue": 5331.85,
+        "cogs": 2052.8900000000003,
+        "grossProfit": 3278.96,
+        "grossMarginPercent": 61.49760402111837,
+        "operatingOverhead": 3651,
+        "salaries": 320,
+        "totalOperatingExpenses": 3971,
+        "operatingProfit": -692.04,
+        "personalDrawings": 70,
+        "groceries": 74,
+        "tithes": 0,
+        "nonOperatingExpenses": 144,
+        "netIncome": -836.04
+      },
+      "cashFlowStatement": {
+        "cashReceivedFromSales": 5551.77,
+        "laybyIncomeCollected": 110,
+        "cashPaidOperatingExpenses": 3971,
+        "netCashFromOperatingActivities": 1580.7700000000004,
+        "cashPaidStockPurchases": 243,
+        "cashTransferredToPerfumesPool": 340,
+        "netCashFromInvestingActivities": -583,
+        "cashTransferredToVaultSavings": 530,
+        "cashPersonalDrawingsAndTithes": 144,
+        "netCashFromFinancingActivities": -674,
+        "netChangeInCash": 323.77000000000044,
+        "openingCashDrawerTotal": 3465,
+        "endingCashInDrawer": 3788.7700000000004
+      },
+      "balanceSheet": {
+        "endingCashInDrawer": 3788.7700000000004,
+        "cumulativePerfumeAvailable": 0,
+        "currentInventoryValuation": 0,
+        "totalCurrentAssets": 3788.7700000000004,
+        "cumulativeLaybyLiability": 150,
+        "ownerEquity": 3638.7700000000004,
+        "totalLiabilitiesAndEquity": 3788.7700000000004
+      },
+      "breakdownDetails": {
+        "operatingOverhead": [
+          {
+            "desc": "rent",
+            "amt": 100,
+            "date": "2026-05-09"
+          },
+          {
+            "desc": "rent",
+            "amt": 100,
+            "date": "2026-05-07"
+          },
+          {
+            "desc": "Zesa",
+            "amt": 51,
+            "date": "2026-05-02"
+          },
+          {
+            "desc": "Brush",
+            "amt": 2,
+            "date": "2026-05-02"
+          },
+          {
+            "desc": "Lunch",
+            "amt": 2,
+            "date": "2026-05-02"
+          },
+          {
+            "desc": "Woodwork",
+            "amt": 20,
+            "date": "2026-05-02"
+          },
+          {
+            "desc": "Rent",
+            "amt": 100,
+            "date": "2026-05-02"
+          },
+          {
+            "desc": "Tissue",
+            "amt": 1,
+            "date": "2026-05-02"
+          },
+          {
+            "desc": "Aunt april",
+            "amt": 15,
+            "date": "2026-05-04"
+          },
+          {
+            "desc": "Lunch",
+            "amt": 2,
+            "date": "2026-05-04"
+          },
+          {
+            "desc": "Sa delivery",
+            "amt": 10,
+            "date": "2026-05-05"
+          },
+          {
+            "desc": "Lunch",
+            "amt": 1,
+            "date": "2026-05-05"
+          },
+          {
+            "desc": "Maxine",
+            "amt": 5,
+            "date": "2026-05-06"
+          },
+          {
+            "desc": "Featherduster",
+            "amt": 2,
+            "date": "2026-05-06"
+          },
+          {
+            "desc": "Lunch",
+            "amt": 3,
+            "date": "2026-05-06"
+          },
+          {
+            "desc": "Rubber",
+            "amt": 1,
+            "date": "2026-05-07"
+          },
+          {
+            "desc": "SA_Delivery",
+            "amt": 15,
+            "date": "2026-05-07"
+          },
+          {
+            "desc": "Lunch",
+            "amt": 2,
+            "date": "2026-05-07"
+          },
+          {
+            "desc": "Lunch",
+            "amt": 2,
+            "date": "2026-05-08"
+          },
+          {
+            "desc": "rent",
+            "amt": 100,
+            "date": "2026-05-08"
+          },
+          {
+            "desc": "Uncle dutch",
+            "amt": 1,
+            "date": "2026-05-08"
+          },
+          {
+            "desc": "Lunch",
+            "amt": 1,
+            "date": "2026-05-10"
+          },
+          {
+            "desc": "Car repair",
+            "amt": 10,
+            "date": "2026-05-10"
+          },
+          {
+            "desc": "Rent",
+            "amt": 100,
+            "date": "2026-05-10"
+          },
+          {
+            "desc": "Rent",
+            "amt": 100,
+            "date": "2026-05-09"
+          },
+          {
+            "desc": "SA_Delivery",
+            "amt": 110,
+            "date": "2026-05-09"
+          },
+          {
+            "desc": "Eddie",
+            "amt": 10,
+            "date": "2026-05-09"
+          },
+          {
+            "desc": "Rent",
+            "amt": 100,
+            "date": "2026-05-11"
+          },
+          {
+            "desc": "Freedom",
+            "amt": 10,
+            "date": "2026-05-11"
+          },
+          {
+            "desc": "Lunch",
+            "amt": 2,
+            "date": "2026-05-11"
+          },
+          {
+            "desc": "Power adaptor",
+            "amt": 10,
+            "date": "2026-05-12"
+          },
+          {
+            "desc": "Flower wrapping papers",
+            "amt": 10,
+            "date": "2026-05-12"
+          },
+          {
+            "desc": "Lunch",
+            "amt": 2,
+            "date": "2026-05-12"
+          },
+          {
+            "desc": "Rent",
+            "amt": 100,
+            "date": "2026-05-12"
+          },
+          {
+            "desc": "Woodwork",
+            "amt": 30,
+            "date": "2026-05-13"
+          },
+          {
+            "desc": "Lunch",
+            "amt": 2,
+            "date": "2026-05-13"
+          },
+          {
+            "desc": "Medical : April",
+            "amt": 40,
+            "date": "2026-05-14"
+          },
+          {
+            "desc": "Fuel",
+            "amt": 10,
+            "date": "2026-05-14"
+          },
+          {
+            "desc": "Lunch",
+            "amt": 2,
+            "date": "2026-05-14"
+          },
+          {
+            "desc": "Watch repair",
+            "amt": 4,
+            "date": "2026-05-14"
+          },
+          {
+            "desc": "Rent",
+            "amt": 100,
+            "date": "2026-05-14"
+          },
+          {
+            "desc": "Fuel",
+            "amt": 20,
+            "date": "2026-05-14"
+          },
+          {
+            "desc": "Priscilla",
+            "amt": 5,
+            "date": "2026-05-15"
+          },
+          {
+            "desc": "Tissue",
+            "amt": 1,
+            "date": "2026-05-15"
+          },
+          {
+            "desc": "Lunch",
+            "amt": 1,
+            "date": "2026-05-15"
+          },
+          {
+            "desc": "Rent",
+            "amt": 100,
+            "date": "2026-05-15"
+          },
+          {
+            "desc": "SA_Delivery: Eddie",
+            "amt": 45,
+            "date": "2026-05-16"
+          },
+          {
+            "desc": "Lunch",
+            "amt": 1,
+            "date": "2026-05-16"
+          },
+          {
+            "desc": "Rent",
+            "amt": 100,
+            "date": "2026-05-16"
+          },
+          {
+            "desc": "Platinum mothers",
+            "amt": 500,
+            "date": "2026-05-18"
+          },
+          {
+            "desc": "Lunch",
+            "amt": 2,
+            "date": "2026-05-18"
+          },
+          {
+            "desc": "Float",
+            "amt": 20,
+            "date": "2026-05-18"
+          },
+          {
+            "desc": "Rent",
+            "amt": 100,
+            "date": "2026-05-19"
+          },
+          {
+            "desc": "Dutch",
+            "amt": 80,
+            "date": "2026-05-20"
+          },
+          {
+            "desc": "Woodworks",
+            "amt": 20,
+            "date": "2026-05-20"
+          },
+          {
+            "desc": "Lunch",
+            "amt": 2,
+            "date": "2026-05-20"
+          },
+          {
+            "desc": "Dutch",
+            "amt": 20,
+            "date": "2026-05-20"
+          },
+          {
+            "desc": "Medicals",
+            "amt": 35,
+            "date": "2026-05-21"
+          },
+          {
+            "desc": "Fuel",
+            "amt": 20,
+            "date": "2026-05-21"
+          },
+          {
+            "desc": "Rent",
+            "amt": 160,
+            "date": "2026-05-21"
+          },
+          {
+            "desc": "Medicals",
+            "amt": 1,
+            "date": "2026-05-22"
+          },
+          {
+            "desc": "SA_Delivery",
+            "amt": 20,
+            "date": "2026-05-22"
+          },
+          {
+            "desc": "Cable",
+            "amt": 3,
+            "date": "2026-05-22"
+          },
+          {
+            "desc": "Dutch",
+            "amt": 1,
+            "date": "2026-05-22"
+          },
+          {
+            "desc": "Woodwork Stand",
+            "amt": 10,
+            "date": "2026-05-22"
+          },
+          {
+            "desc": "Lunch",
+            "amt": 2,
+            "date": "2026-05-22"
+          },
+          {
+            "desc": "Rent",
+            "amt": 100,
+            "date": "2026-05-22"
+          },
+          {
+            "desc": "Lunch",
+            "amt": 2,
+            "date": "2026-05-23"
+          },
+          {
+            "desc": "Fuel",
+            "amt": 20,
+            "date": "2026-05-23"
+          },
+          {
+            "desc": "Rent",
+            "amt": 100,
+            "date": "2026-05-23"
+          },
+          {
+            "desc": "Zesa",
+            "amt": 12,
+            "date": "2026-05-25"
+          },
+          {
+            "desc": "Pampers",
+            "amt": 20,
+            "date": "2026-05-25"
+          },
+          {
+            "desc": "Lunch",
+            "amt": 1,
+            "date": "2026-05-25"
+          },
+          {
+            "desc": "Rent",
+            "amt": 100,
+            "date": "2026-05-25"
+          },
+          {
+            "desc": "Airtime",
+            "amt": 2,
+            "date": "2026-05-26"
+          },
+          {
+            "desc": "Medication",
+            "amt": 20,
+            "date": "2026-05-26"
+          },
+          {
+            "desc": "Rent",
+            "amt": 100,
+            "date": "2026-05-26"
+          },
+          {
+            "desc": "Accountant",
+            "amt": 100,
+            "date": "2026-05-27"
+          },
+          {
+            "desc": "Biking repairs",
+            "amt": 20,
+            "date": "2026-05-27"
+          },
+          {
+            "desc": "Uncle dutch",
+            "amt": 10,
+            "date": "2026-05-27"
+          },
+          {
+            "desc": "Lunch",
+            "amt": 2,
+            "date": "2026-05-27"
+          },
+          {
+            "desc": "Rent",
+            "amt": 100,
+            "date": "2026-05-27"
+          },
+          {
+            "desc": "Diapers",
+            "amt": 17,
+            "date": "2026-05-28"
+          },
+          {
+            "desc": "Bike repairs",
+            "amt": 20,
+            "date": "2026-05-28"
+          },
+          {
+            "desc": "Rent",
+            "amt": 100,
+            "date": "2026-05-28"
+          },
+          {
+            "desc": "Fuel",
+            "amt": 20,
+            "date": "2026-05-29"
+          },
+          {
+            "desc": "Zesa",
+            "amt": 12,
+            "date": "2026-05-29"
+          },
+          {
+            "desc": "Tissues",
+            "amt": 1,
+            "date": "2026-05-29"
+          },
+          {
+            "desc": "Tissues",
+            "amt": 1,
+            "date": "2026-05-29"
+          },
+          {
+            "desc": "Lunch",
+            "amt": 2,
+            "date": "2026-05-29"
+          },
+          {
+            "desc": "Rent",
+            "amt": 100,
+            "date": "2026-05-29"
+          },
+          {
+            "desc": "Lunch",
+            "amt": 2,
+            "date": "2026-05-30"
+          },
+          {
+            "desc": "Medication",
+            "amt": 10,
+            "date": "2026-05-30"
+          },
+          {
+            "desc": "Rent",
+            "amt": 100,
+            "date": "2026-05-30"
+          }
+        ],
+        "salaries": [
+          {
+            "desc": "Salaries",
+            "amt": 20,
+            "date": "2026-05-02"
+          },
+          {
+            "desc": "Salaries",
+            "amt": 20,
+            "date": "2026-05-07"
+          },
+          {
+            "desc": "salaries",
+            "amt": 20,
+            "date": "2026-05-12"
+          },
+          {
+            "desc": "Salaries",
+            "amt": 120,
+            "date": "2026-05-13"
+          },
+          {
+            "desc": "Salaries",
+            "amt": 60,
+            "date": "2026-05-18"
+          },
+          {
+            "desc": "Salaries ",
+            "amt": 20,
+            "date": "2026-05-20"
+          },
+          {
+            "desc": "Salaries",
+            "amt": 40,
+            "date": "2026-05-23"
+          },
+          {
+            "desc": "Salaries : ",
+            "amt": 20,
+            "date": "2026-05-27"
+          }
+        ],
+        "perfumeTransfers": [
+          {
+            "desc": "Perfumes",
+            "amt": 50,
+            "date": "2026-05-09"
+          },
+          {
+            "desc": "Perfumes",
+            "amt": 40,
+            "date": "2026-05-02"
+          },
+          {
+            "desc": "Perfume",
+            "amt": 20,
+            "date": "2026-05-07"
+          },
+          {
+            "desc": "Perfume",
+            "amt": 10,
+            "date": "2026-05-10"
+          },
+          {
+            "desc": "Perfumes",
+            "amt": 20,
+            "date": "2026-05-11"
+          },
+          {
+            "desc": "Perfumes",
+            "amt": 40,
+            "date": "2026-05-12"
+          },
+          {
+            "desc": "Perfumes",
+            "amt": 20,
+            "date": "2026-05-15"
+          },
+          {
+            "desc": "Perfumes",
+            "amt": 80,
+            "date": "2026-05-16"
+          },
+          {
+            "desc": "Perfumes",
+            "amt": 20,
+            "date": "2026-05-19"
+          },
+          {
+            "desc": "Perfume",
+            "amt": 30,
+            "date": "2026-05-20"
+          },
+          {
+            "desc": "Perfume",
+            "amt": 10,
+            "date": "2026-05-23"
+          }
+        ],
+        "posStockOrders": [
+          {
+            "desc": "Sa order",
+            "amt": 60,
+            "date": "2026-05-05"
+          },
+          {
+            "desc": "city Stock",
+            "amt": 10,
+            "date": "2026-05-09"
+          },
+          {
+            "desc": "Harare delivery",
+            "amt": 10,
+            "date": "2026-05-19"
+          },
+          {
+            "desc": "City stock walkie talkies",
+            "amt": 130,
+            "date": "2026-05-28"
+          },
+          {
+            "desc": "City stock poormans hats",
+            "amt": 21,
+            "date": "2026-05-28"
+          },
+          {
+            "desc": "City stock dog leashes",
+            "amt": 12,
+            "date": "2026-05-28"
+          }
+        ],
+        "personalAndFamily": [
+          {
+            "desc": "Personal use",
+            "amt": 25,
+            "date": "2026-05-08"
+          },
+          {
+            "desc": "Personal use",
+            "amt": 10,
+            "date": "2026-05-09"
+          },
+          {
+            "desc": "exp | Edited by Owner (owner-1) @ 2026-05-11T07:16:13.260Z | Prev: $240.00: exp",
+            "amt": 0,
+            "date": "2026-05-09"
+          },
+          {
+            "desc": "Linda | Edited by Owner (owner-1) @ 2026-05-12T15:52:47.535Z | Prev: $30.00: Linda",
+            "amt": 35,
+            "date": "2026-05-11"
+          }
+        ],
+        "groceries": [
+          {
+            "desc": "Grocery",
+            "amt": 4,
+            "date": "2026-05-05"
+          },
+          {
+            "desc": "Grocery",
+            "amt": 10,
+            "date": "2026-05-05"
+          },
+          {
+            "desc": "Home groceries",
+            "amt": 10,
+            "date": "2026-05-12"
+          },
+          {
+            "desc": "Groceries",
+            "amt": 30,
+            "date": "2026-05-25"
+          },
+          {
+            "desc": "Home groceries",
+            "amt": 20,
+            "date": "2026-05-26"
+          }
+        ],
+        "tithes": [],
+        "bankVaultSavings": [
+          {
+            "desc": "Blackbox",
+            "amt": 410,
+            "date": "2026-05-12"
+          },
+          {
+            "desc": "Blackbox",
+            "amt": 120,
+            "date": "2026-05-30"
+          }
+        ]
+      }
+    },
+    "Dubdub Outlet": {
+      "shopId": "dubdub",
+      "shopName": "Dubdub Outlet",
+      "month": "May 2026",
+      "incomeStatement": {
+        "grossSalesRevenue": 8762.34,
+        "cogs": 3332.890000000005,
+        "grossProfit": 5429.449999999995,
+        "grossMarginPercent": 61.96347094497583,
+        "operatingOverhead": 2588,
+        "salaries": 0,
+        "totalOperatingExpenses": 2588,
+        "operatingProfit": 2841.4499999999953,
+        "personalDrawings": 80,
+        "groceries": 0,
+        "tithes": 385,
+        "nonOperatingExpenses": 465,
+        "netIncome": 2376.4499999999953
+      },
+      "cashFlowStatement": {
+        "cashReceivedFromSales": 9316.69,
+        "laybyIncomeCollected": 350,
+        "cashPaidOperatingExpenses": 2588,
+        "netCashFromOperatingActivities": 6728.6900000000005,
+        "cashPaidStockPurchases": 0,
+        "cashTransferredToPerfumesPool": 1071.54,
+        "netCashFromInvestingActivities": -1071.54,
+        "cashTransferredToVaultSavings": 4250,
+        "cashPersonalDrawingsAndTithes": 465,
+        "netCashFromFinancingActivities": -4715,
+        "netChangeInCash": 942.1500000000005,
+        "openingCashDrawerTotal": 4956.65,
+        "endingCashInDrawer": 5898.8
+      },
+      "balanceSheet": {
+        "endingCashInDrawer": 5898.8,
+        "cumulativePerfumeAvailable": 0,
+        "currentInventoryValuation": 0,
+        "totalCurrentAssets": 5898.8,
+        "cumulativeLaybyLiability": 420,
+        "ownerEquity": 5478.8,
+        "totalLiabilitiesAndEquity": 5898.8
+      },
+      "breakdownDetails": {
+        "operatingOverhead": [
+          {
+            "desc": "Rent",
+            "amt": 100,
+            "date": "2026-05-09"
+          },
+          {
+            "desc": "Rent ",
+            "amt": 100,
+            "date": "2026-05-01"
+          },
+          {
+            "desc": "Lunch ",
+            "amt": 1,
+            "date": "2026-05-01"
+          },
+          {
+            "desc": "Rent ",
+            "amt": 100,
+            "date": "2026-05-02"
+          },
+          {
+            "desc": "Lunch ",
+            "amt": 2,
+            "date": "2026-05-02"
+          },
+          {
+            "desc": "Drone batteries ",
+            "amt": 1,
+            "date": "2026-05-02"
+          },
+          {
+            "desc": "Lunch",
+            "amt": 1,
+            "date": "2026-05-03"
+          },
+          {
+            "desc": "Rent ",
+            "amt": 100,
+            "date": "2026-05-04"
+          },
+          {
+            "desc": "Lunch ",
+            "amt": 2,
+            "date": "2026-05-04"
+          },
+          {
+            "desc": "Rent",
+            "amt": 100,
+            "date": "2026-05-05"
+          },
+          {
+            "desc": "Lunch",
+            "amt": 1,
+            "date": "2026-05-05"
+          },
+          {
+            "desc": "Electricty",
+            "amt": 40,
+            "date": "2026-05-05"
+          },
+          {
+            "desc": "Lunch ",
+            "amt": 2,
+            "date": "2026-05-06"
+          },
+          {
+            "desc": "Rent ",
+            "amt": 100,
+            "date": "2026-05-06"
+          },
+          {
+            "desc": "Rent",
+            "amt": 100,
+            "date": "2026-05-07"
+          },
+          {
+            "desc": "Lunch",
+            "amt": 2,
+            "date": "2026-05-07"
+          },
+          {
+            "desc": "Rent",
+            "amt": 24,
+            "date": "2026-05-07"
+          },
+          {
+            "desc": "Rent",
+            "amt": 100,
+            "date": "2026-05-08"
+          },
+          {
+            "desc": "Lunch",
+            "amt": 2,
+            "date": "2026-05-08"
+          },
+          {
+            "desc": "Affidavit",
+            "amt": 5,
+            "date": "2026-05-09"
+          },
+          {
+            "desc": "lunch",
+            "amt": 2,
+            "date": "2026-05-09"
+          },
+          {
+            "desc": "Lunch",
+            "amt": 1,
+            "date": "2026-05-10"
+          },
+          {
+            "desc": "Lunch",
+            "amt": 2,
+            "date": "2026-05-11"
+          },
+          {
+            "desc": "Rent",
+            "amt": 100,
+            "date": "2026-05-11"
+          },
+          {
+            "desc": "Rent",
+            "amt": 100,
+            "date": "2026-05-12"
+          },
+          {
+            "desc": "Lunch",
+            "amt": 2,
+            "date": "2026-05-12"
+          },
+          {
+            "desc": "Data",
+            "amt": 10,
+            "date": "2026-05-13"
+          },
+          {
+            "desc": "Lunch",
+            "amt": 2,
+            "date": "2026-05-13"
+          },
+          {
+            "desc": "Rent",
+            "amt": 100,
+            "date": "2026-05-13"
+          },
+          {
+            "desc": "Uncle d",
+            "amt": 100,
+            "date": "2026-05-13"
+          },
+          {
+            "desc": "Rent",
+            "amt": 100,
+            "date": "2026-05-14"
+          },
+          {
+            "desc": "Lunch",
+            "amt": 1,
+            "date": "2026-05-14"
+          },
+          {
+            "desc": "Rent",
+            "amt": 100,
+            "date": "2026-05-15"
+          },
+          {
+            "desc": "Hampers ",
+            "amt": 15,
+            "date": "2026-05-15"
+          },
+          {
+            "desc": "Lunch ",
+            "amt": 2,
+            "date": "2026-05-15"
+          },
+          {
+            "desc": "Lunch ",
+            "amt": 2,
+            "date": "2026-05-16"
+          },
+          {
+            "desc": "Car wash",
+            "amt": 3,
+            "date": "2026-05-16"
+          },
+          {
+            "desc": "Rent ",
+            "amt": 100,
+            "date": "2026-05-16"
+          },
+          {
+            "desc": "Home use",
+            "amt": 40,
+            "date": "2026-05-17"
+          },
+          {
+            "desc": "Lunch ",
+            "amt": 1,
+            "date": "2026-05-17"
+          },
+          {
+            "desc": "Lunch ",
+            "amt": 2,
+            "date": "2026-05-18"
+          },
+          {
+            "desc": "Rent ",
+            "amt": 100,
+            "date": "2026-05-18"
+          },
+          {
+            "desc": "Rent ",
+            "amt": 100,
+            "date": "2026-05-19"
+          },
+          {
+            "desc": "Lunch ",
+            "amt": 1,
+            "date": "2026-05-19"
+          },
+          {
+            "desc": "Lunch ",
+            "amt": 2,
+            "date": "2026-05-20"
+          },
+          {
+            "desc": "Rent ",
+            "amt": 100,
+            "date": "2026-05-20"
+          },
+          {
+            "desc": "Lunch ",
+            "amt": 2,
+            "date": "2026-05-21"
+          },
+          {
+            "desc": "Rent ",
+            "amt": 100,
+            "date": "2026-05-21"
+          },
+          {
+            "desc": "Customer refund ",
+            "amt": 50,
+            "date": "2026-05-21"
+          },
+          {
+            "desc": "Lunch ",
+            "amt": 2,
+            "date": "2026-05-22"
+          },
+          {
+            "desc": "Rent ",
+            "amt": 100,
+            "date": "2026-05-22"
+          },
+          {
+            "desc": "Uncle Dutch ",
+            "amt": 15,
+            "date": "2026-05-23"
+          },
+          {
+            "desc": "Affidavits ",
+            "amt": 2,
+            "date": "2026-05-23"
+          },
+          {
+            "desc": "Lunch",
+            "amt": 2,
+            "date": "2026-05-23"
+          },
+          {
+            "desc": "Rent",
+            "amt": 100,
+            "date": "2026-05-23"
+          },
+          {
+            "desc": "Lunch ",
+            "amt": 1,
+            "date": "2026-05-24"
+          },
+          {
+            "desc": "Hampers ",
+            "amt": 20,
+            "date": "2026-05-24"
+          },
+          {
+            "desc": "Rent ",
+            "amt": 100,
+            "date": "2026-05-25"
+          },
+          {
+            "desc": "Lunch ",
+            "amt": 1,
+            "date": "2026-05-25"
+          },
+          {
+            "desc": "Lunch ",
+            "amt": 1,
+            "date": "2026-05-26"
+          },
+          {
+            "desc": "Rent ",
+            "amt": 120,
+            "date": "2026-05-29"
+          },
+          {
+            "desc": "Lunch ",
+            "amt": 1,
+            "date": "2026-05-29"
+          }
+        ],
+        "salaries": [],
+        "perfumeTransfers": [
+          {
+            "desc": "Perfume ",
+            "amt": 10,
+            "date": "2026-05-02"
+          },
+          {
+            "desc": "Perfumes | Edited by Owner (owner-1) @ 2026-05-04T09:52:44.199Z | Prev: $30.00: Perfumes",
+            "amt": 31.54,
+            "date": "2026-05-03"
+          },
+          {
+            "desc": "Perfume",
+            "amt": 20,
+            "date": "2026-05-07"
+          },
+          {
+            "desc": "Perfumes",
+            "amt": 150,
+            "date": "2026-05-08"
+          },
+          {
+            "desc": "Perfumes",
+            "amt": 120,
+            "date": "2026-05-10"
+          },
+          {
+            "desc": "perfumes",
+            "amt": 100,
+            "date": "2026-05-11"
+          },
+          {
+            "desc": "Perfumes ",
+            "amt": 40,
+            "date": "2026-05-15"
+          },
+          {
+            "desc": "Perfume ",
+            "amt": 190,
+            "date": "2026-05-16"
+          },
+          {
+            "desc": "Perfume ",
+            "amt": 40,
+            "date": "2026-05-17"
+          },
+          {
+            "desc": "Perfume ",
+            "amt": 40,
+            "date": "2026-05-19"
+          },
+          {
+            "desc": "Perfume ",
+            "amt": 30,
+            "date": "2026-05-20"
+          },
+          {
+            "desc": "Perfumes ",
+            "amt": 100,
+            "date": "2026-05-21"
+          },
+          {
+            "desc": "Perfumes ",
+            "amt": 40,
+            "date": "2026-05-23"
+          },
+          {
+            "desc": "Perfumes",
+            "amt": 30,
+            "date": "2026-05-24"
+          },
+          {
+            "desc": "Perfume ",
+            "amt": 50,
+            "date": "2026-05-25"
+          },
+          {
+            "desc": "Perfume ",
+            "amt": 80,
+            "date": "2026-05-29"
+          }
+        ],
+        "posStockOrders": [],
+        "personalAndFamily": [
+          {
+            "desc": "Balance on Layby | Edited by Owner (owner-1) @ 2026-05-06T08:27:27.656Z | Prev: $105.00: Balance on Layby",
+            "amt": 0,
+            "date": "2026-05-06"
+          },
+          {
+            "desc": "Drawer  Adjustment | Edited by Owner (owner-1) @ 2026-05-06T08:26:35.382Z | Prev: $0.00: Balance On Lay By  | Edited by Owner (owner-1) @ 2026-05-06T08:11:53.203Z | Prev: $110.00: Balance On Lay By ",
+            "amt": 80,
+            "date": "2026-05-05"
+          }
+        ],
+        "groceries": [],
+        "tithes": [
+          {
+            "desc": "Tithe ",
+            "amt": 30,
+            "date": "2026-05-02"
+          },
+          {
+            "desc": "Tithe ",
+            "amt": 20,
+            "date": "2026-05-04"
+          },
+          {
+            "desc": "Balance",
+            "amt": 5,
+            "date": "2026-05-06"
+          },
+          {
+            "desc": "Tithe",
+            "amt": 50,
+            "date": "2026-05-09"
+          },
+          {
+            "desc": "tithe | Edited by Owner (owner-1) @ 2026-05-06T08:24:07.851Z | Prev: $0.00: Balance on Lay by | Edited by Owner (owner-1) @ 2026-05-06T08:12:47.700Z | Prev: $0.00: Balance on Lay by | Edited by Owner (owner-1) @ 2026-05-06T08:12:39.828Z | Prev: $105.00: Balance on Lay by",
+            "amt": 10,
+            "date": "2026-05-05"
+          },
+          {
+            "desc": "Tithe ",
+            "amt": 10,
+            "date": "2026-05-06"
+          },
+          {
+            "desc": "Tithe",
+            "amt": 15,
+            "date": "2026-05-08"
+          },
+          {
+            "desc": "Tithe",
+            "amt": 10,
+            "date": "2026-05-11"
+          },
+          {
+            "desc": "Tithe",
+            "amt": 10,
+            "date": "2026-05-12"
+          },
+          {
+            "desc": "Tithe",
+            "amt": 10,
+            "date": "2026-05-13"
+          },
+          {
+            "desc": "Tithe",
+            "amt": 15,
+            "date": "2026-05-14"
+          },
+          {
+            "desc": "Tithe ",
+            "amt": 25,
+            "date": "2026-05-15"
+          },
+          {
+            "desc": "Tithe ",
+            "amt": 10,
+            "date": "2026-05-18"
+          },
+          {
+            "desc": "Tithe ",
+            "amt": 10,
+            "date": "2026-05-19"
+          },
+          {
+            "desc": "Tithe ",
+            "amt": 5,
+            "date": "2026-05-20"
+          },
+          {
+            "desc": "Tithe ",
+            "amt": 30,
+            "date": "2026-05-21"
+          },
+          {
+            "desc": "Tithe ",
+            "amt": 20,
+            "date": "2026-05-22"
+          },
+          {
+            "desc": "Tithe ",
+            "amt": 50,
+            "date": "2026-05-23"
+          },
+          {
+            "desc": "Tithe ",
+            "amt": 10,
+            "date": "2026-05-25"
+          },
+          {
+            "desc": "Tithe ",
+            "amt": 40,
+            "date": "2026-05-29"
+          }
+        ],
+        "bankVaultSavings": [
+          {
+            "desc": "savings",
+            "amt": 40,
+            "date": "2026-05-09"
+          },
+          {
+            "desc": "Savings",
+            "amt": 270,
+            "date": "2026-05-03"
+          },
+          {
+            "desc": "Black box ",
+            "amt": 240,
+            "date": "2026-05-01"
+          },
+          {
+            "desc": "Black box ",
+            "amt": 100,
+            "date": "2026-05-02"
+          },
+          {
+            "desc": "Black box ",
+            "amt": 160,
+            "date": "2026-05-04"
+          },
+          {
+            "desc": "Black box ",
+            "amt": 180,
+            "date": "2026-05-05"
+          },
+          {
+            "desc": "Black box ",
+            "amt": 120,
+            "date": "2026-05-06"
+          },
+          {
+            "desc": "Black box",
+            "amt": 220,
+            "date": "2026-05-08"
+          },
+          {
+            "desc": "Savings",
+            "amt": 480,
+            "date": "2026-05-10"
+          },
+          {
+            "desc": "Savings",
+            "amt": 100,
+            "date": "2026-05-11"
+          },
+          {
+            "desc": "Black box",
+            "amt": 120,
+            "date": "2026-05-12"
+          },
+          {
+            "desc": "Black box",
+            "amt": 90,
+            "date": "2026-05-13"
+          },
+          {
+            "desc": "Black box ",
+            "amt": 130,
+            "date": "2026-05-15"
+          },
+          {
+            "desc": "Black box ",
+            "amt": 230,
+            "date": "2026-05-16"
+          },
+          {
+            "desc": "Black box ",
+            "amt": 330,
+            "date": "2026-05-18"
+          },
+          {
+            "desc": "Black box ",
+            "amt": 60,
+            "date": "2026-05-19"
+          },
+          {
+            "desc": "Black box ",
+            "amt": 100,
+            "date": "2026-05-20"
+          },
+          {
+            "desc": "Black box ",
+            "amt": 260,
+            "date": "2026-05-22"
+          },
+          {
+            "desc": "Black box ",
+            "amt": 170,
+            "date": "2026-05-23"
+          },
+          {
+            "desc": "Black box ",
+            "amt": 460,
+            "date": "2026-05-24"
+          },
+          {
+            "desc": "Black box ",
+            "amt": 290,
+            "date": "2026-05-25"
+          },
+          {
+            "desc": "Black box ",
+            "amt": 100,
+            "date": "2026-05-26"
+          }
+        ]
+      }
+    },
+    "Trade Center HQ": {
+      "shopId": "tradecenter",
+      "shopName": "Trade Center HQ",
+      "month": "May 2026",
+      "incomeStatement": {
+        "grossSalesRevenue": 997.1,
+        "cogs": 838.8100000000002,
+        "grossProfit": 158.28999999999985,
+        "grossMarginPercent": 15.875037609066279,
+        "operatingOverhead": 346,
+        "salaries": 0,
+        "totalOperatingExpenses": 346,
+        "operatingProfit": -187.71000000000015,
+        "personalDrawings": 0,
+        "groceries": 14,
+        "tithes": 0,
+        "nonOperatingExpenses": 14,
+        "netIncome": -201.71000000000015
+      },
+      "cashFlowStatement": {
+        "cashReceivedFromSales": 1030,
+        "laybyIncomeCollected": 0,
+        "cashPaidOperatingExpenses": 346,
+        "netCashFromOperatingActivities": 684,
+        "cashPaidStockPurchases": 0,
+        "cashTransferredToPerfumesPool": 0,
+        "netCashFromInvestingActivities": 0,
+        "cashTransferredToVaultSavings": 726,
+        "cashPersonalDrawingsAndTithes": 14,
+        "netCashFromFinancingActivities": -740,
+        "netChangeInCash": -56,
+        "openingCashDrawerTotal": 188,
+        "endingCashInDrawer": 132
+      },
+      "balanceSheet": {
+        "endingCashInDrawer": 132,
+        "cumulativePerfumeAvailable": 0,
+        "currentInventoryValuation": 0,
+        "totalCurrentAssets": 132,
+        "cumulativeLaybyLiability": 1.9,
+        "ownerEquity": 130.1,
+        "totalLiabilitiesAndEquity": 132
+      },
+      "breakdownDetails": {
+        "operatingOverhead": [
+          {
+            "desc": "Lunch",
+            "amt": 1,
+            "date": "2026-05-01"
+          },
+          {
+            "desc": "Lunch ",
+            "amt": 2,
+            "date": "2026-05-01"
+          },
+          {
+            "desc": "Rent",
+            "amt": 10,
+            "date": "2026-05-01"
+          },
+          {
+            "desc": "Lunch",
+            "amt": 1,
+            "date": "2026-05-02"
+          },
+          {
+            "desc": "Rent",
+            "amt": 10,
+            "date": "2026-05-02"
+          },
+          {
+            "desc": "Lunch ",
+            "amt": 1,
+            "date": "2026-05-02"
+          },
+          {
+            "desc": "Lunch",
+            "amt": 1,
+            "date": "2026-05-04"
+          },
+          {
+            "desc": "Rent ",
+            "amt": 10,
+            "date": "2026-05-04"
+          },
+          {
+            "desc": "Lunch",
+            "amt": 1,
+            "date": "2026-05-04"
+          },
+          {
+            "desc": "Lunch",
+            "amt": 1,
+            "date": "2026-05-05"
+          },
+          {
+            "desc": "Rent",
+            "amt": 10,
+            "date": "2026-05-05"
+          },
+          {
+            "desc": "Lunch ",
+            "amt": 1,
+            "date": "2026-05-05"
+          },
+          {
+            "desc": "Rent",
+            "amt": 10,
+            "date": "2026-05-06"
+          },
+          {
+            "desc": "Lunch ",
+            "amt": 2,
+            "date": "2026-05-06"
+          },
+          {
+            "desc": "Lunch ",
+            "amt": 1,
+            "date": "2026-05-07"
+          },
+          {
+            "desc": "Lunch",
+            "amt": 1,
+            "date": "2026-05-07"
+          },
+          {
+            "desc": "Lunch",
+            "amt": 1,
+            "date": "2026-05-08"
+          },
+          {
+            "desc": "Rent",
+            "amt": 10,
+            "date": "2026-05-08"
+          },
+          {
+            "desc": "Lunch",
+            "amt": 1,
+            "date": "2026-05-08"
+          },
+          {
+            "desc": "Lunch",
+            "amt": 2,
+            "date": "2026-05-09"
+          },
+          {
+            "desc": "Rent",
+            "amt": 10,
+            "date": "2026-05-09"
+          },
+          {
+            "desc": "Hamper Cups",
+            "amt": 20,
+            "date": "2026-05-09"
+          },
+          {
+            "desc": "Sillophen",
+            "amt": 3,
+            "date": "2026-05-09"
+          },
+          {
+            "desc": "Lunch",
+            "amt": 1,
+            "date": "2026-05-11"
+          },
+          {
+            "desc": "Remt",
+            "amt": 10,
+            "date": "2026-05-11"
+          },
+          {
+            "desc": "Lunch ",
+            "amt": 1,
+            "date": "2026-05-11"
+          },
+          {
+            "desc": "Rent",
+            "amt": 10,
+            "date": "2026-05-12"
+          },
+          {
+            "desc": "Lunch",
+            "amt": 2,
+            "date": "2026-05-12"
+          },
+          {
+            "desc": "Lunch",
+            "amt": 1,
+            "date": "2026-05-12"
+          },
+          {
+            "desc": "Banda Owing ",
+            "amt": 5,
+            "date": "2026-05-12"
+          },
+          {
+            "desc": "Banda Owing ",
+            "amt": 5,
+            "date": "2026-05-12"
+          },
+          {
+            "desc": "Lunch ",
+            "amt": 2,
+            "date": "2026-05-14"
+          },
+          {
+            "desc": "Rent",
+            "amt": 10,
+            "date": "2026-05-14"
+          },
+          {
+            "desc": "Kudzi",
+            "amt": 5,
+            "date": "2026-05-14"
+          },
+          {
+            "desc": "Lunch ",
+            "amt": 1,
+            "date": "2026-05-15"
+          },
+          {
+            "desc": "Rent",
+            "amt": 10,
+            "date": "2026-05-15"
+          },
+          {
+            "desc": "Lunch",
+            "amt": 1,
+            "date": "2026-05-15"
+          },
+          {
+            "desc": "Lunch",
+            "amt": 2,
+            "date": "2026-05-16"
+          },
+          {
+            "desc": "Rent",
+            "amt": 10,
+            "date": "2026-05-16"
+          },
+          {
+            "desc": "Lunch ",
+            "amt": 2,
+            "date": "2026-05-18"
+          },
+          {
+            "desc": "Rent ",
+            "amt": 10,
+            "date": "2026-05-18"
+          },
+          {
+            "desc": "Lunch ",
+            "amt": 2,
+            "date": "2026-05-19"
+          },
+          {
+            "desc": "Rent",
+            "amt": 10,
+            "date": "2026-05-19"
+          },
+          {
+            "desc": "Branding ",
+            "amt": 20,
+            "date": "2026-05-19"
+          },
+          {
+            "desc": "Lunch",
+            "amt": 2,
+            "date": "2026-05-20"
+          },
+          {
+            "desc": "Rent ",
+            "amt": 10,
+            "date": "2026-05-20"
+          },
+          {
+            "desc": "Rent ",
+            "amt": 10,
+            "date": "2026-05-21"
+          },
+          {
+            "desc": "Lunch ",
+            "amt": 2,
+            "date": "2026-05-21"
+          },
+          {
+            "desc": "Lunch ",
+            "amt": 2,
+            "date": "2026-05-23"
+          },
+          {
+            "desc": "Rent",
+            "amt": 10,
+            "date": "2026-05-23"
+          },
+          {
+            "desc": "Adie",
+            "amt": 10,
+            "date": "2026-05-23"
+          },
+          {
+            "desc": "Lunch ",
+            "amt": 2,
+            "date": "2026-05-25"
+          },
+          {
+            "desc": "Rent",
+            "amt": 10,
+            "date": "2026-05-25"
+          },
+          {
+            "desc": "Lunch ",
+            "amt": 2,
+            "date": "2026-05-26"
+          },
+          {
+            "desc": "Rent ",
+            "amt": 10,
+            "date": "2026-05-26"
+          },
+          {
+            "desc": "Rent",
+            "amt": 10,
+            "date": "2026-05-27"
+          },
+          {
+            "desc": "Lunch ",
+            "amt": 2,
+            "date": "2026-05-28"
+          },
+          {
+            "desc": "Rent ",
+            "amt": 10,
+            "date": "2026-05-28"
+          },
+          {
+            "desc": "Lunch ",
+            "amt": 2,
+            "date": "2026-05-29"
+          },
+          {
+            "desc": "Rent",
+            "amt": 10,
+            "date": "2026-05-29"
+          },
+          {
+            "desc": "Rent",
+            "amt": 10,
+            "date": "2026-05-30"
+          },
+          {
+            "desc": "Lunch",
+            "amt": 2,
+            "date": "2026-05-30"
+          }
+        ],
+        "salaries": [],
+        "perfumeTransfers": [],
+        "posStockOrders": [],
+        "personalAndFamily": [],
+        "groceries": [
+          {
+            "desc": "Drinks",
+            "amt": 14,
+            "date": "2026-05-30"
+          }
+        ],
+        "tithes": [],
+        "bankVaultSavings": [
+          {
+            "desc": "Savings ",
+            "amt": 40,
+            "date": "2026-05-01"
+          },
+          {
+            "desc": "Savings ",
+            "amt": 30,
+            "date": "2026-05-02"
+          },
+          {
+            "desc": "Savings ",
+            "amt": 60,
+            "date": "2026-05-04"
+          },
+          {
+            "desc": "Savings ",
+            "amt": 30,
+            "date": "2026-05-05"
+          },
+          {
+            "desc": "Savings ",
+            "amt": 40,
+            "date": "2026-05-06"
+          },
+          {
+            "desc": "Savings ",
+            "amt": 15,
+            "date": "2026-05-07"
+          },
+          {
+            "desc": "Savings ",
+            "amt": 20,
+            "date": "2026-05-08"
+          },
+          {
+            "desc": "Savings ",
+            "amt": 30,
+            "date": "2026-05-09"
+          },
+          {
+            "desc": "Savings ",
+            "amt": 40,
+            "date": "2026-05-11"
+          },
+          {
+            "desc": "Savings ",
+            "amt": 31,
+            "date": "2026-05-12"
+          },
+          {
+            "desc": "Savings ",
+            "amt": 20,
+            "date": "2026-05-12"
+          },
+          {
+            "desc": "Savings",
+            "amt": 30,
+            "date": "2026-05-14"
+          },
+          {
+            "desc": "Savings",
+            "amt": 40,
+            "date": "2026-05-15"
+          },
+          {
+            "desc": "Savings ",
+            "amt": 40,
+            "date": "2026-05-19"
+          },
+          {
+            "desc": "Savings ",
+            "amt": 50,
+            "date": "2026-05-21"
+          },
+          {
+            "desc": "Savings ",
+            "amt": 10,
+            "date": "2026-05-23"
+          },
+          {
+            "desc": "Savings ",
+            "amt": 30,
+            "date": "2026-05-25"
+          },
+          {
+            "desc": "Savings ",
+            "amt": 20,
+            "date": "2026-05-27"
+          },
+          {
+            "desc": "Savings ",
+            "amt": 50,
+            "date": "2026-05-28"
+          },
+          {
+            "desc": "Savings ",
+            "amt": 20,
+            "date": "2026-05-29"
+          },
+          {
+            "desc": "Savings ",
+            "amt": 20,
+            "date": "2026-05-29"
+          },
+          {
+            "desc": "Savings ",
+            "amt": 60,
+            "date": "2026-05-30"
+          }
+        ]
+      }
+    },
+    "Nirvana Tees": {
+      "shopId": "tshirts",
+      "shopName": "Nirvana Tees",
+      "month": "May 2026",
+      "incomeStatement": {
+        "grossSalesRevenue": 203,
+        "cogs": 159.76999999999998,
+        "grossProfit": 43.23000000000002,
+        "grossMarginPercent": 21.29556650246306,
+        "operatingOverhead": 0,
+        "salaries": 0,
+        "totalOperatingExpenses": 0,
+        "operatingProfit": 43.23000000000002,
+        "personalDrawings": 0,
+        "groceries": 0,
+        "tithes": 0,
+        "nonOperatingExpenses": 0,
+        "netIncome": 43.23000000000002
+      },
+      "cashFlowStatement": {
+        "cashReceivedFromSales": 203,
+        "laybyIncomeCollected": 0,
+        "cashPaidOperatingExpenses": 0,
+        "netCashFromOperatingActivities": 203,
+        "cashPaidStockPurchases": 0,
+        "cashTransferredToPerfumesPool": 0,
+        "netCashFromInvestingActivities": 0,
+        "cashTransferredToVaultSavings": 0,
+        "cashPersonalDrawingsAndTithes": 0,
+        "netCashFromFinancingActivities": 0,
+        "netChangeInCash": 203,
+        "openingCashDrawerTotal": 0,
+        "endingCashInDrawer": 203
+      },
+      "balanceSheet": {
+        "endingCashInDrawer": 203,
+        "cumulativePerfumeAvailable": 0,
+        "currentInventoryValuation": 0,
+        "totalCurrentAssets": 203,
+        "cumulativeLaybyLiability": 0,
+        "ownerEquity": 203,
+        "totalLiabilitiesAndEquity": 203
+      },
+      "breakdownDetails": {
+        "operatingOverhead": [],
+        "salaries": [],
+        "perfumeTransfers": [],
+        "posStockOrders": [],
+        "personalAndFamily": [],
+        "groceries": [],
+        "tithes": [],
+        "bankVaultSavings": []
+      }
+    },
+    "Consolidated (All Shops)": {
+      "shopId": "consolidated",
+      "shopName": "Consolidated (All Shops)",
+      "month": "May 2026",
+      "incomeStatement": {
+        "grossSalesRevenue": 15294.289999999999,
+        "cogs": 6384.360000000022,
+        "grossProfit": 8909.929999999977,
+        "grossMarginPercent": 58.25657810856194,
+        "operatingOverhead": 6585,
+        "salaries": 320,
+        "totalOperatingExpenses": 6905,
+        "operatingProfit": 2004.9299999999766,
+        "personalDrawings": 150,
+        "groceries": 88,
+        "tithes": 385,
+        "nonOperatingExpenses": 623,
+        "netIncome": 1381.9299999999766
+      },
+      "cashFlowStatement": {
+        "cashReceivedFromSales": 16101.46,
+        "laybyIncomeCollected": 460,
+        "cashPaidOperatingExpenses": 6905,
+        "netCashFromOperatingActivities": 9196.46,
+        "cashPaidStockPurchases": 243,
+        "cashTransferredToPerfumesPool": 1411.54,
+        "netCashFromInvestingActivities": -1654.54,
+        "cashTransferredToVaultSavings": 5506,
+        "cashPersonalDrawingsAndTithes": 623,
+        "netCashFromFinancingActivities": -6129,
+        "netChangeInCash": 1412.9199999999992,
+        "openingCashDrawerTotal": 8609.65,
+        "endingCashInDrawer": 10022.57
+      },
+      "balanceSheet": {
+        "endingCashInDrawer": 10022.57,
+        "cumulativePerfumeAvailable": 0,
+        "currentInventoryValuation": 41918.769999999975,
+        "totalCurrentAssets": 51941.339999999975,
+        "cumulativeLaybyLiability": 571.9,
+        "ownerEquity": 51369.43999999997,
+        "totalLiabilitiesAndEquity": 51941.339999999975
+      },
+      "breakdownDetails": {
+        "operatingOverhead": [
+          {
+            "desc": "rent",
+            "amt": 100,
+            "date": "2026-05-09"
+          },
+          {
+            "desc": "Rent",
+            "amt": 100,
+            "date": "2026-05-09"
+          },
+          {
+            "desc": "rent",
+            "amt": 100,
+            "date": "2026-05-07"
+          },
+          {
+            "desc": "Rent ",
+            "amt": 100,
+            "date": "2026-05-01"
+          },
+          {
+            "desc": "Lunch ",
+            "amt": 1,
+            "date": "2026-05-01"
+          },
+          {
+            "desc": "Lunch",
+            "amt": 1,
+            "date": "2026-05-01"
+          },
+          {
+            "desc": "Lunch ",
+            "amt": 2,
+            "date": "2026-05-01"
+          },
+          {
+            "desc": "Rent",
+            "amt": 10,
+            "date": "2026-05-01"
+          },
+          {
+            "desc": "Zesa",
+            "amt": 51,
+            "date": "2026-05-02"
+          },
+          {
+            "desc": "Brush",
+            "amt": 2,
+            "date": "2026-05-02"
+          },
+          {
+            "desc": "Lunch",
+            "amt": 2,
+            "date": "2026-05-02"
+          },
+          {
+            "desc": "Woodwork",
+            "amt": 20,
+            "date": "2026-05-02"
+          },
+          {
+            "desc": "Lunch",
+            "amt": 1,
+            "date": "2026-05-02"
+          },
+          {
+            "desc": "Rent",
+            "amt": 10,
+            "date": "2026-05-02"
+          },
+          {
+            "desc": "Lunch ",
+            "amt": 1,
+            "date": "2026-05-02"
+          },
+          {
+            "desc": "Rent",
+            "amt": 100,
+            "date": "2026-05-02"
+          },
+          {
+            "desc": "Tissue",
+            "amt": 1,
+            "date": "2026-05-02"
+          },
+          {
+            "desc": "Rent ",
+            "amt": 100,
+            "date": "2026-05-02"
+          },
+          {
+            "desc": "Lunch ",
+            "amt": 2,
+            "date": "2026-05-02"
+          },
+          {
+            "desc": "Drone batteries ",
+            "amt": 1,
+            "date": "2026-05-02"
+          },
+          {
+            "desc": "Lunch",
+            "amt": 1,
+            "date": "2026-05-03"
+          },
+          {
+            "desc": "Aunt april",
+            "amt": 15,
+            "date": "2026-05-04"
+          },
+          {
+            "desc": "Lunch",
+            "amt": 2,
+            "date": "2026-05-04"
+          },
+          {
+            "desc": "Lunch",
+            "amt": 1,
+            "date": "2026-05-04"
+          },
+          {
+            "desc": "Rent ",
+            "amt": 10,
+            "date": "2026-05-04"
+          },
+          {
+            "desc": "Lunch",
+            "amt": 1,
+            "date": "2026-05-04"
+          },
+          {
+            "desc": "Rent ",
+            "amt": 100,
+            "date": "2026-05-04"
+          },
+          {
+            "desc": "Lunch ",
+            "amt": 2,
+            "date": "2026-05-04"
+          },
+          {
+            "desc": "Lunch",
+            "amt": 1,
+            "date": "2026-05-05"
+          },
+          {
+            "desc": "Rent",
+            "amt": 10,
+            "date": "2026-05-05"
+          },
+          {
+            "desc": "Lunch ",
+            "amt": 1,
+            "date": "2026-05-05"
+          },
+          {
+            "desc": "Sa delivery",
+            "amt": 10,
+            "date": "2026-05-05"
+          },
+          {
+            "desc": "Lunch",
+            "amt": 1,
+            "date": "2026-05-05"
+          },
+          {
+            "desc": "Rent",
+            "amt": 100,
+            "date": "2026-05-05"
+          },
+          {
+            "desc": "Lunch",
+            "amt": 1,
+            "date": "2026-05-05"
+          },
+          {
+            "desc": "Electricty",
+            "amt": 40,
+            "date": "2026-05-05"
+          },
+          {
+            "desc": "Rent",
+            "amt": 10,
+            "date": "2026-05-06"
+          },
+          {
+            "desc": "Lunch ",
+            "amt": 2,
+            "date": "2026-05-06"
+          },
+          {
+            "desc": "Maxine",
+            "amt": 5,
+            "date": "2026-05-06"
+          },
+          {
+            "desc": "Featherduster",
+            "amt": 2,
+            "date": "2026-05-06"
+          },
+          {
+            "desc": "Lunch ",
+            "amt": 2,
+            "date": "2026-05-06"
+          },
+          {
+            "desc": "Lunch",
+            "amt": 3,
+            "date": "2026-05-06"
+          },
+          {
+            "desc": "Rent ",
+            "amt": 100,
+            "date": "2026-05-06"
+          },
+          {
+            "desc": "Rubber",
+            "amt": 1,
+            "date": "2026-05-07"
+          },
+          {
+            "desc": "Lunch ",
+            "amt": 1,
+            "date": "2026-05-07"
+          },
+          {
+            "desc": "Lunch",
+            "amt": 1,
+            "date": "2026-05-07"
+          },
+          {
+            "desc": "Rent",
+            "amt": 100,
+            "date": "2026-05-07"
+          },
+          {
+            "desc": "Lunch",
+            "amt": 2,
+            "date": "2026-05-07"
+          },
+          {
+            "desc": "Rent",
+            "amt": 24,
+            "date": "2026-05-07"
+          },
+          {
+            "desc": "SA_Delivery",
+            "amt": 15,
+            "date": "2026-05-07"
+          },
+          {
+            "desc": "Lunch",
+            "amt": 2,
+            "date": "2026-05-07"
+          },
+          {
+            "desc": "Lunch",
+            "amt": 1,
+            "date": "2026-05-08"
+          },
+          {
+            "desc": "Lunch",
+            "amt": 2,
+            "date": "2026-05-08"
+          },
+          {
+            "desc": "rent",
+            "amt": 100,
+            "date": "2026-05-08"
+          },
+          {
+            "desc": "Rent",
+            "amt": 10,
+            "date": "2026-05-08"
+          },
+          {
+            "desc": "Lunch",
+            "amt": 1,
+            "date": "2026-05-08"
+          },
+          {
+            "desc": "Uncle dutch",
+            "amt": 1,
+            "date": "2026-05-08"
+          },
+          {
+            "desc": "Rent",
+            "amt": 100,
+            "date": "2026-05-08"
+          },
+          {
+            "desc": "Lunch",
+            "amt": 2,
+            "date": "2026-05-08"
+          },
+          {
+            "desc": "Lunch",
+            "amt": 2,
+            "date": "2026-05-09"
+          },
+          {
+            "desc": "Rent",
+            "amt": 10,
+            "date": "2026-05-09"
+          },
+          {
+            "desc": "Hamper Cups",
+            "amt": 20,
+            "date": "2026-05-09"
+          },
+          {
+            "desc": "Sillophen",
+            "amt": 3,
+            "date": "2026-05-09"
+          },
+          {
+            "desc": "Affidavit",
+            "amt": 5,
+            "date": "2026-05-09"
+          },
+          {
+            "desc": "lunch",
+            "amt": 2,
+            "date": "2026-05-09"
+          },
+          {
+            "desc": "Lunch",
+            "amt": 1,
+            "date": "2026-05-10"
+          },
+          {
+            "desc": "Car repair",
+            "amt": 10,
+            "date": "2026-05-10"
+          },
+          {
+            "desc": "Rent",
+            "amt": 100,
+            "date": "2026-05-10"
+          },
+          {
+            "desc": "Rent",
+            "amt": 100,
+            "date": "2026-05-09"
+          },
+          {
+            "desc": "SA_Delivery",
+            "amt": 110,
+            "date": "2026-05-09"
+          },
+          {
+            "desc": "Eddie",
+            "amt": 10,
+            "date": "2026-05-09"
+          },
+          {
+            "desc": "Lunch",
+            "amt": 1,
+            "date": "2026-05-10"
+          },
+          {
+            "desc": "Lunch",
+            "amt": 1,
+            "date": "2026-05-11"
+          },
+          {
+            "desc": "Remt",
+            "amt": 10,
+            "date": "2026-05-11"
+          },
+          {
+            "desc": "Lunch ",
+            "amt": 1,
+            "date": "2026-05-11"
+          },
+          {
+            "desc": "Rent",
+            "amt": 100,
+            "date": "2026-05-11"
+          },
+          {
+            "desc": "Freedom",
+            "amt": 10,
+            "date": "2026-05-11"
+          },
+          {
+            "desc": "Lunch",
+            "amt": 2,
+            "date": "2026-05-11"
+          },
+          {
+            "desc": "Lunch",
+            "amt": 2,
+            "date": "2026-05-11"
+          },
+          {
+            "desc": "Rent",
+            "amt": 100,
+            "date": "2026-05-11"
+          },
+          {
+            "desc": "Rent",
+            "amt": 100,
+            "date": "2026-05-12"
+          },
+          {
+            "desc": "Lunch",
+            "amt": 2,
+            "date": "2026-05-12"
+          },
+          {
+            "desc": "Power adaptor",
+            "amt": 10,
+            "date": "2026-05-12"
+          },
+          {
+            "desc": "Flower wrapping papers",
+            "amt": 10,
+            "date": "2026-05-12"
+          },
+          {
+            "desc": "Lunch",
+            "amt": 2,
+            "date": "2026-05-12"
+          },
+          {
+            "desc": "Rent",
+            "amt": 10,
+            "date": "2026-05-12"
+          },
+          {
+            "desc": "Lunch",
+            "amt": 2,
+            "date": "2026-05-12"
+          },
+          {
+            "desc": "Lunch",
+            "amt": 1,
+            "date": "2026-05-12"
+          },
+          {
+            "desc": "Rent",
+            "amt": 100,
+            "date": "2026-05-12"
+          },
+          {
+            "desc": "Banda Owing ",
+            "amt": 5,
+            "date": "2026-05-12"
+          },
+          {
+            "desc": "Banda Owing ",
+            "amt": 5,
+            "date": "2026-05-12"
+          },
+          {
+            "desc": "Woodwork",
+            "amt": 30,
+            "date": "2026-05-13"
+          },
+          {
+            "desc": "Lunch",
+            "amt": 2,
+            "date": "2026-05-13"
+          },
+          {
+            "desc": "Data",
+            "amt": 10,
+            "date": "2026-05-13"
+          },
+          {
+            "desc": "Lunch",
+            "amt": 2,
+            "date": "2026-05-13"
+          },
+          {
+            "desc": "Rent",
+            "amt": 100,
+            "date": "2026-05-13"
+          },
+          {
+            "desc": "Uncle d",
+            "amt": 100,
+            "date": "2026-05-13"
+          },
+          {
+            "desc": "Medical : April",
+            "amt": 40,
+            "date": "2026-05-14"
+          },
+          {
+            "desc": "Fuel",
+            "amt": 10,
+            "date": "2026-05-14"
+          },
+          {
+            "desc": "Lunch",
+            "amt": 2,
+            "date": "2026-05-14"
+          },
+          {
+            "desc": "Lunch ",
+            "amt": 2,
+            "date": "2026-05-14"
+          },
+          {
+            "desc": "Rent",
+            "amt": 10,
+            "date": "2026-05-14"
+          },
+          {
+            "desc": "Kudzi",
+            "amt": 5,
+            "date": "2026-05-14"
+          },
+          {
+            "desc": "Watch repair",
+            "amt": 4,
+            "date": "2026-05-14"
+          },
+          {
+            "desc": "Rent",
+            "amt": 100,
+            "date": "2026-05-14"
+          },
+          {
+            "desc": "Rent",
+            "amt": 100,
+            "date": "2026-05-14"
+          },
+          {
+            "desc": "Lunch",
+            "amt": 1,
+            "date": "2026-05-14"
+          },
+          {
+            "desc": "Fuel",
+            "amt": 20,
+            "date": "2026-05-14"
+          },
+          {
+            "desc": "Priscilla",
+            "amt": 5,
+            "date": "2026-05-15"
+          },
+          {
+            "desc": "Tissue",
+            "amt": 1,
+            "date": "2026-05-15"
+          },
+          {
+            "desc": "Lunch",
+            "amt": 1,
+            "date": "2026-05-15"
+          },
+          {
+            "desc": "Lunch ",
+            "amt": 1,
+            "date": "2026-05-15"
+          },
+          {
+            "desc": "Rent",
+            "amt": 10,
+            "date": "2026-05-15"
+          },
+          {
+            "desc": "Lunch",
+            "amt": 1,
+            "date": "2026-05-15"
+          },
+          {
+            "desc": "Rent",
+            "amt": 100,
+            "date": "2026-05-15"
+          },
+          {
+            "desc": "Rent",
+            "amt": 100,
+            "date": "2026-05-15"
+          },
+          {
+            "desc": "Hampers ",
+            "amt": 15,
+            "date": "2026-05-15"
+          },
+          {
+            "desc": "Lunch ",
+            "amt": 2,
+            "date": "2026-05-15"
+          },
+          {
+            "desc": "SA_Delivery: Eddie",
+            "amt": 45,
+            "date": "2026-05-16"
+          },
+          {
+            "desc": "Lunch ",
+            "amt": 2,
+            "date": "2026-05-16"
+          },
+          {
+            "desc": "Car wash",
+            "amt": 3,
+            "date": "2026-05-16"
+          },
+          {
+            "desc": "Rent ",
+            "amt": 100,
+            "date": "2026-05-16"
+          },
+          {
+            "desc": "Lunch",
+            "amt": 1,
+            "date": "2026-05-16"
+          },
+          {
+            "desc": "Lunch",
+            "amt": 2,
+            "date": "2026-05-16"
+          },
+          {
+            "desc": "Rent",
+            "amt": 10,
+            "date": "2026-05-16"
+          },
+          {
+            "desc": "Rent",
+            "amt": 100,
+            "date": "2026-05-16"
+          },
+          {
+            "desc": "Home use",
+            "amt": 40,
+            "date": "2026-05-17"
+          },
+          {
+            "desc": "Lunch ",
+            "amt": 1,
+            "date": "2026-05-17"
+          },
+          {
+            "desc": "Platinum mothers",
+            "amt": 500,
+            "date": "2026-05-18"
+          },
+          {
+            "desc": "Lunch ",
+            "amt": 2,
+            "date": "2026-05-18"
+          },
+          {
+            "desc": "Lunch",
+            "amt": 2,
+            "date": "2026-05-18"
+          },
+          {
+            "desc": "Rent ",
+            "amt": 100,
+            "date": "2026-05-18"
+          },
+          {
+            "desc": "Lunch ",
+            "amt": 2,
+            "date": "2026-05-18"
+          },
+          {
+            "desc": "Rent ",
+            "amt": 10,
+            "date": "2026-05-18"
+          },
+          {
+            "desc": "Float",
+            "amt": 20,
+            "date": "2026-05-18"
+          },
+          {
+            "desc": "Rent ",
+            "amt": 100,
+            "date": "2026-05-19"
+          },
+          {
+            "desc": "Lunch ",
+            "amt": 1,
+            "date": "2026-05-19"
+          },
+          {
+            "desc": "Rent",
+            "amt": 100,
+            "date": "2026-05-19"
+          },
+          {
+            "desc": "Lunch ",
+            "amt": 2,
+            "date": "2026-05-19"
+          },
+          {
+            "desc": "Rent",
+            "amt": 10,
+            "date": "2026-05-19"
+          },
+          {
+            "desc": "Branding ",
+            "amt": 20,
+            "date": "2026-05-19"
+          },
+          {
+            "desc": "Dutch",
+            "amt": 80,
+            "date": "2026-05-20"
+          },
+          {
+            "desc": "Lunch ",
+            "amt": 2,
+            "date": "2026-05-20"
+          },
+          {
+            "desc": "Woodworks",
+            "amt": 20,
+            "date": "2026-05-20"
+          },
+          {
+            "desc": "Lunch",
+            "amt": 2,
+            "date": "2026-05-20"
+          },
+          {
+            "desc": "Rent ",
+            "amt": 100,
+            "date": "2026-05-20"
+          },
+          {
+            "desc": "Dutch",
+            "amt": 20,
+            "date": "2026-05-20"
+          },
+          {
+            "desc": "Lunch",
+            "amt": 2,
+            "date": "2026-05-20"
+          },
+          {
+            "desc": "Rent ",
+            "amt": 10,
+            "date": "2026-05-20"
+          },
+          {
+            "desc": "Medicals",
+            "amt": 35,
+            "date": "2026-05-21"
+          },
+          {
+            "desc": "Fuel",
+            "amt": 20,
+            "date": "2026-05-21"
+          },
+          {
+            "desc": "Rent ",
+            "amt": 10,
+            "date": "2026-05-21"
+          },
+          {
+            "desc": "Lunch ",
+            "amt": 2,
+            "date": "2026-05-21"
+          },
+          {
+            "desc": "Lunch ",
+            "amt": 2,
+            "date": "2026-05-21"
+          },
+          {
+            "desc": "Rent ",
+            "amt": 100,
+            "date": "2026-05-21"
+          },
+          {
+            "desc": "Customer refund ",
+            "amt": 50,
+            "date": "2026-05-21"
+          },
+          {
+            "desc": "Rent",
+            "amt": 160,
+            "date": "2026-05-21"
+          },
+          {
+            "desc": "Medicals",
+            "amt": 1,
+            "date": "2026-05-22"
+          },
+          {
+            "desc": "SA_Delivery",
+            "amt": 20,
+            "date": "2026-05-22"
+          },
+          {
+            "desc": "Cable",
+            "amt": 3,
+            "date": "2026-05-22"
+          },
+          {
+            "desc": "Dutch",
+            "amt": 1,
+            "date": "2026-05-22"
+          },
+          {
+            "desc": "Woodwork Stand",
+            "amt": 10,
+            "date": "2026-05-22"
+          },
+          {
+            "desc": "Lunch",
+            "amt": 2,
+            "date": "2026-05-22"
+          },
+          {
+            "desc": "Lunch ",
+            "amt": 2,
+            "date": "2026-05-22"
+          },
+          {
+            "desc": "Rent ",
+            "amt": 100,
+            "date": "2026-05-22"
+          },
+          {
+            "desc": "Rent",
+            "amt": 100,
+            "date": "2026-05-22"
+          },
+          {
+            "desc": "Uncle Dutch ",
+            "amt": 15,
+            "date": "2026-05-23"
+          },
+          {
+            "desc": "Affidavits ",
+            "amt": 2,
+            "date": "2026-05-23"
+          },
+          {
+            "desc": "Lunch",
+            "amt": 2,
+            "date": "2026-05-23"
+          },
+          {
+            "desc": "Rent",
+            "amt": 100,
+            "date": "2026-05-23"
+          },
+          {
+            "desc": "Lunch ",
+            "amt": 2,
+            "date": "2026-05-23"
+          },
+          {
+            "desc": "Rent",
+            "amt": 10,
+            "date": "2026-05-23"
+          },
+          {
+            "desc": "Adie",
+            "amt": 10,
+            "date": "2026-05-23"
+          },
+          {
+            "desc": "Lunch",
+            "amt": 2,
+            "date": "2026-05-23"
+          },
+          {
+            "desc": "Fuel",
+            "amt": 20,
+            "date": "2026-05-23"
+          },
+          {
+            "desc": "Rent",
+            "amt": 100,
+            "date": "2026-05-23"
+          },
+          {
+            "desc": "Lunch ",
+            "amt": 1,
+            "date": "2026-05-24"
+          },
+          {
+            "desc": "Hampers ",
+            "amt": 20,
+            "date": "2026-05-24"
+          },
+          {
+            "desc": "Zesa",
+            "amt": 12,
+            "date": "2026-05-25"
+          },
+          {
+            "desc": "Pampers",
+            "amt": 20,
+            "date": "2026-05-25"
+          },
+          {
+            "desc": "Lunch",
+            "amt": 1,
+            "date": "2026-05-25"
+          },
+          {
+            "desc": "Rent",
+            "amt": 100,
+            "date": "2026-05-25"
+          },
+          {
+            "desc": "Rent ",
+            "amt": 100,
+            "date": "2026-05-25"
+          },
+          {
+            "desc": "Lunch ",
+            "amt": 1,
+            "date": "2026-05-25"
+          },
+          {
+            "desc": "Lunch ",
+            "amt": 2,
+            "date": "2026-05-25"
+          },
+          {
+            "desc": "Rent",
+            "amt": 10,
+            "date": "2026-05-25"
+          },
+          {
+            "desc": "Lunch ",
+            "amt": 1,
+            "date": "2026-05-26"
+          },
+          {
+            "desc": "Airtime",
+            "amt": 2,
+            "date": "2026-05-26"
+          },
+          {
+            "desc": "Medication",
+            "amt": 20,
+            "date": "2026-05-26"
+          },
+          {
+            "desc": "Lunch ",
+            "amt": 2,
+            "date": "2026-05-26"
+          },
+          {
+            "desc": "Rent ",
+            "amt": 10,
+            "date": "2026-05-26"
+          },
+          {
+            "desc": "Rent",
+            "amt": 100,
+            "date": "2026-05-26"
+          },
+          {
+            "desc": "Accountant",
+            "amt": 100,
+            "date": "2026-05-27"
+          },
+          {
+            "desc": "Biking repairs",
+            "amt": 20,
+            "date": "2026-05-27"
+          },
+          {
+            "desc": "Uncle dutch",
+            "amt": 10,
+            "date": "2026-05-27"
+          },
+          {
+            "desc": "Lunch",
+            "amt": 2,
+            "date": "2026-05-27"
+          },
+          {
+            "desc": "Rent",
+            "amt": 10,
+            "date": "2026-05-27"
+          },
+          {
+            "desc": "Rent",
+            "amt": 100,
+            "date": "2026-05-27"
+          },
+          {
+            "desc": "Diapers",
+            "amt": 17,
+            "date": "2026-05-28"
+          },
+          {
+            "desc": "Bike repairs",
+            "amt": 20,
+            "date": "2026-05-28"
+          },
+          {
+            "desc": "Lunch ",
+            "amt": 2,
+            "date": "2026-05-28"
+          },
+          {
+            "desc": "Rent ",
+            "amt": 10,
+            "date": "2026-05-28"
+          },
+          {
+            "desc": "Rent",
+            "amt": 100,
+            "date": "2026-05-28"
+          },
+          {
+            "desc": "Fuel",
+            "amt": 20,
+            "date": "2026-05-29"
+          },
+          {
+            "desc": "Zesa",
+            "amt": 12,
+            "date": "2026-05-29"
+          },
+          {
+            "desc": "Tissues",
+            "amt": 1,
+            "date": "2026-05-29"
+          },
+          {
+            "desc": "Tissues",
+            "amt": 1,
+            "date": "2026-05-29"
+          },
+          {
+            "desc": "Lunch ",
+            "amt": 2,
+            "date": "2026-05-29"
+          },
+          {
+            "desc": "Rent",
+            "amt": 10,
+            "date": "2026-05-29"
+          },
+          {
+            "desc": "Rent ",
+            "amt": 120,
+            "date": "2026-05-29"
+          },
+          {
+            "desc": "Lunch ",
+            "amt": 1,
+            "date": "2026-05-29"
+          },
+          {
+            "desc": "Lunch",
+            "amt": 2,
+            "date": "2026-05-29"
+          },
+          {
+            "desc": "Rent",
+            "amt": 100,
+            "date": "2026-05-29"
+          },
+          {
+            "desc": "Lunch",
+            "amt": 2,
+            "date": "2026-05-30"
+          },
+          {
+            "desc": "Medication",
+            "amt": 10,
+            "date": "2026-05-30"
+          },
+          {
+            "desc": "Rent",
+            "amt": 10,
+            "date": "2026-05-30"
+          },
+          {
+            "desc": "Lunch",
+            "amt": 2,
+            "date": "2026-05-30"
+          },
+          {
+            "desc": "Rent",
+            "amt": 100,
+            "date": "2026-05-30"
+          }
+        ],
+        "salaries": [
+          {
+            "desc": "Salaries",
+            "amt": 20,
+            "date": "2026-05-02"
+          },
+          {
+            "desc": "Salaries",
+            "amt": 20,
+            "date": "2026-05-07"
+          },
+          {
+            "desc": "salaries",
+            "amt": 20,
+            "date": "2026-05-12"
+          },
+          {
+            "desc": "Salaries",
+            "amt": 120,
+            "date": "2026-05-13"
+          },
+          {
+            "desc": "Salaries",
+            "amt": 60,
+            "date": "2026-05-18"
+          },
+          {
+            "desc": "Salaries ",
+            "amt": 20,
+            "date": "2026-05-20"
+          },
+          {
+            "desc": "Salaries",
+            "amt": 40,
+            "date": "2026-05-23"
+          },
+          {
+            "desc": "Salaries : ",
+            "amt": 20,
+            "date": "2026-05-27"
+          }
+        ],
+        "perfumeTransfers": [
+          {
+            "desc": "Perfumes",
+            "amt": 50,
+            "date": "2026-05-09"
+          },
+          {
+            "desc": "Perfumes",
+            "amt": 40,
+            "date": "2026-05-02"
+          },
+          {
+            "desc": "Perfume ",
+            "amt": 10,
+            "date": "2026-05-02"
+          },
+          {
+            "desc": "Perfumes | Edited by Owner (owner-1) @ 2026-05-04T09:52:44.199Z | Prev: $30.00: Perfumes",
+            "amt": 31.54,
+            "date": "2026-05-03"
+          },
+          {
+            "desc": "Perfume",
+            "amt": 20,
+            "date": "2026-05-07"
+          },
+          {
+            "desc": "Perfume",
+            "amt": 20,
+            "date": "2026-05-07"
+          },
+          {
+            "desc": "Perfumes",
+            "amt": 150,
+            "date": "2026-05-08"
+          },
+          {
+            "desc": "Perfume",
+            "amt": 10,
+            "date": "2026-05-10"
+          },
+          {
+            "desc": "Perfumes",
+            "amt": 120,
+            "date": "2026-05-10"
+          },
+          {
+            "desc": "Perfumes",
+            "amt": 20,
+            "date": "2026-05-11"
+          },
+          {
+            "desc": "perfumes",
+            "amt": 100,
+            "date": "2026-05-11"
+          },
+          {
+            "desc": "Perfumes",
+            "amt": 40,
+            "date": "2026-05-12"
+          },
+          {
+            "desc": "Perfumes",
+            "amt": 20,
+            "date": "2026-05-15"
+          },
+          {
+            "desc": "Perfumes ",
+            "amt": 40,
+            "date": "2026-05-15"
+          },
+          {
+            "desc": "Perfume ",
+            "amt": 190,
+            "date": "2026-05-16"
+          },
+          {
+            "desc": "Perfumes",
+            "amt": 80,
+            "date": "2026-05-16"
+          },
+          {
+            "desc": "Perfume ",
+            "amt": 40,
+            "date": "2026-05-17"
+          },
+          {
+            "desc": "Perfume ",
+            "amt": 40,
+            "date": "2026-05-19"
+          },
+          {
+            "desc": "Perfumes",
+            "amt": 20,
+            "date": "2026-05-19"
+          },
+          {
+            "desc": "Perfume ",
+            "amt": 30,
+            "date": "2026-05-20"
+          },
+          {
+            "desc": "Perfume",
+            "amt": 30,
+            "date": "2026-05-20"
+          },
+          {
+            "desc": "Perfumes ",
+            "amt": 100,
+            "date": "2026-05-21"
+          },
+          {
+            "desc": "Perfumes ",
+            "amt": 40,
+            "date": "2026-05-23"
+          },
+          {
+            "desc": "Perfume",
+            "amt": 10,
+            "date": "2026-05-23"
+          },
+          {
+            "desc": "Perfumes",
+            "amt": 30,
+            "date": "2026-05-24"
+          },
+          {
+            "desc": "Perfume ",
+            "amt": 50,
+            "date": "2026-05-25"
+          },
+          {
+            "desc": "Perfume ",
+            "amt": 80,
+            "date": "2026-05-29"
+          }
+        ],
+        "posStockOrders": [
+          {
+            "desc": "Sa order",
+            "amt": 60,
+            "date": "2026-05-05"
+          },
+          {
+            "desc": "city Stock",
+            "amt": 10,
+            "date": "2026-05-09"
+          },
+          {
+            "desc": "Harare delivery",
+            "amt": 10,
+            "date": "2026-05-19"
+          },
+          {
+            "desc": "City stock walkie talkies",
+            "amt": 130,
+            "date": "2026-05-28"
+          },
+          {
+            "desc": "City stock poormans hats",
+            "amt": 21,
+            "date": "2026-05-28"
+          },
+          {
+            "desc": "City stock dog leashes",
+            "amt": 12,
+            "date": "2026-05-28"
+          }
+        ],
+        "personalAndFamily": [
+          {
+            "desc": "Balance on Layby | Edited by Owner (owner-1) @ 2026-05-06T08:27:27.656Z | Prev: $105.00: Balance on Layby",
+            "amt": 0,
+            "date": "2026-05-06"
+          },
+          {
+            "desc": "Drawer  Adjustment | Edited by Owner (owner-1) @ 2026-05-06T08:26:35.382Z | Prev: $0.00: Balance On Lay By  | Edited by Owner (owner-1) @ 2026-05-06T08:11:53.203Z | Prev: $110.00: Balance On Lay By ",
+            "amt": 80,
+            "date": "2026-05-05"
+          },
+          {
+            "desc": "Personal use",
+            "amt": 25,
+            "date": "2026-05-08"
+          },
+          {
+            "desc": "Personal use",
+            "amt": 10,
+            "date": "2026-05-09"
+          },
+          {
+            "desc": "exp | Edited by Owner (owner-1) @ 2026-05-11T07:16:13.260Z | Prev: $240.00: exp",
+            "amt": 0,
+            "date": "2026-05-09"
+          },
+          {
+            "desc": "Linda | Edited by Owner (owner-1) @ 2026-05-12T15:52:47.535Z | Prev: $30.00: Linda",
+            "amt": 35,
+            "date": "2026-05-11"
+          }
+        ],
+        "groceries": [
+          {
+            "desc": "Grocery",
+            "amt": 4,
+            "date": "2026-05-05"
+          },
+          {
+            "desc": "Grocery",
+            "amt": 10,
+            "date": "2026-05-05"
+          },
+          {
+            "desc": "Home groceries",
+            "amt": 10,
+            "date": "2026-05-12"
+          },
+          {
+            "desc": "Groceries",
+            "amt": 30,
+            "date": "2026-05-25"
+          },
+          {
+            "desc": "Home groceries",
+            "amt": 20,
+            "date": "2026-05-26"
+          },
+          {
+            "desc": "Drinks",
+            "amt": 14,
+            "date": "2026-05-30"
+          }
+        ],
+        "tithes": [
+          {
+            "desc": "Tithe ",
+            "amt": 30,
+            "date": "2026-05-02"
+          },
+          {
+            "desc": "Tithe ",
+            "amt": 20,
+            "date": "2026-05-04"
+          },
+          {
+            "desc": "Balance",
+            "amt": 5,
+            "date": "2026-05-06"
+          },
+          {
+            "desc": "Tithe",
+            "amt": 50,
+            "date": "2026-05-09"
+          },
+          {
+            "desc": "tithe | Edited by Owner (owner-1) @ 2026-05-06T08:24:07.851Z | Prev: $0.00: Balance on Lay by | Edited by Owner (owner-1) @ 2026-05-06T08:12:47.700Z | Prev: $0.00: Balance on Lay by | Edited by Owner (owner-1) @ 2026-05-06T08:12:39.828Z | Prev: $105.00: Balance on Lay by",
+            "amt": 10,
+            "date": "2026-05-05"
+          },
+          {
+            "desc": "Tithe ",
+            "amt": 10,
+            "date": "2026-05-06"
+          },
+          {
+            "desc": "Tithe",
+            "amt": 15,
+            "date": "2026-05-08"
+          },
+          {
+            "desc": "Tithe",
+            "amt": 10,
+            "date": "2026-05-11"
+          },
+          {
+            "desc": "Tithe",
+            "amt": 10,
+            "date": "2026-05-12"
+          },
+          {
+            "desc": "Tithe",
+            "amt": 10,
+            "date": "2026-05-13"
+          },
+          {
+            "desc": "Tithe",
+            "amt": 15,
+            "date": "2026-05-14"
+          },
+          {
+            "desc": "Tithe ",
+            "amt": 25,
+            "date": "2026-05-15"
+          },
+          {
+            "desc": "Tithe ",
+            "amt": 10,
+            "date": "2026-05-18"
+          },
+          {
+            "desc": "Tithe ",
+            "amt": 10,
+            "date": "2026-05-19"
+          },
+          {
+            "desc": "Tithe ",
+            "amt": 5,
+            "date": "2026-05-20"
+          },
+          {
+            "desc": "Tithe ",
+            "amt": 30,
+            "date": "2026-05-21"
+          },
+          {
+            "desc": "Tithe ",
+            "amt": 20,
+            "date": "2026-05-22"
+          },
+          {
+            "desc": "Tithe ",
+            "amt": 50,
+            "date": "2026-05-23"
+          },
+          {
+            "desc": "Tithe ",
+            "amt": 10,
+            "date": "2026-05-25"
+          },
+          {
+            "desc": "Tithe ",
+            "amt": 40,
+            "date": "2026-05-29"
+          }
+        ],
+        "bankVaultSavings": [
+          {
+            "desc": "savings",
+            "amt": 40,
+            "date": "2026-05-09"
+          },
+          {
+            "desc": "Savings",
+            "amt": 270,
+            "date": "2026-05-03"
+          },
+          {
+            "desc": "Black box ",
+            "amt": 240,
+            "date": "2026-05-01"
+          },
+          {
+            "desc": "Savings ",
+            "amt": 40,
+            "date": "2026-05-01"
+          },
+          {
+            "desc": "Savings ",
+            "amt": 30,
+            "date": "2026-05-02"
+          },
+          {
+            "desc": "Black box ",
+            "amt": 100,
+            "date": "2026-05-02"
+          },
+          {
+            "desc": "Black box ",
+            "amt": 160,
+            "date": "2026-05-04"
+          },
+          {
+            "desc": "Savings ",
+            "amt": 60,
+            "date": "2026-05-04"
+          },
+          {
+            "desc": "Black box ",
+            "amt": 180,
+            "date": "2026-05-05"
+          },
+          {
+            "desc": "Savings ",
+            "amt": 30,
+            "date": "2026-05-05"
+          },
+          {
+            "desc": "Black box ",
+            "amt": 120,
+            "date": "2026-05-06"
+          },
+          {
+            "desc": "Savings ",
+            "amt": 40,
+            "date": "2026-05-06"
+          },
+          {
+            "desc": "Savings ",
+            "amt": 15,
+            "date": "2026-05-07"
+          },
+          {
+            "desc": "Black box",
+            "amt": 220,
+            "date": "2026-05-08"
+          },
+          {
+            "desc": "Savings ",
+            "amt": 20,
+            "date": "2026-05-08"
+          },
+          {
+            "desc": "Savings ",
+            "amt": 30,
+            "date": "2026-05-09"
+          },
+          {
+            "desc": "Savings",
+            "amt": 480,
+            "date": "2026-05-10"
+          },
+          {
+            "desc": "Savings ",
+            "amt": 40,
+            "date": "2026-05-11"
+          },
+          {
+            "desc": "Savings",
+            "amt": 100,
+            "date": "2026-05-11"
+          },
+          {
+            "desc": "Black box",
+            "amt": 120,
+            "date": "2026-05-12"
+          },
+          {
+            "desc": "Savings ",
+            "amt": 31,
+            "date": "2026-05-12"
+          },
+          {
+            "desc": "Blackbox",
+            "amt": 410,
+            "date": "2026-05-12"
+          },
+          {
+            "desc": "Savings ",
+            "amt": 20,
+            "date": "2026-05-12"
+          },
+          {
+            "desc": "Black box",
+            "amt": 90,
+            "date": "2026-05-13"
+          },
+          {
+            "desc": "Savings",
+            "amt": 30,
+            "date": "2026-05-14"
+          },
+          {
+            "desc": "Savings",
+            "amt": 40,
+            "date": "2026-05-15"
+          },
+          {
+            "desc": "Black box ",
+            "amt": 130,
+            "date": "2026-05-15"
+          },
+          {
+            "desc": "Black box ",
+            "amt": 230,
+            "date": "2026-05-16"
+          },
+          {
+            "desc": "Black box ",
+            "amt": 330,
+            "date": "2026-05-18"
+          },
+          {
+            "desc": "Black box ",
+            "amt": 60,
+            "date": "2026-05-19"
+          },
+          {
+            "desc": "Savings ",
+            "amt": 40,
+            "date": "2026-05-19"
+          },
+          {
+            "desc": "Black box ",
+            "amt": 100,
+            "date": "2026-05-20"
+          },
+          {
+            "desc": "Savings ",
+            "amt": 50,
+            "date": "2026-05-21"
+          },
+          {
+            "desc": "Black box ",
+            "amt": 260,
+            "date": "2026-05-22"
+          },
+          {
+            "desc": "Black box ",
+            "amt": 170,
+            "date": "2026-05-23"
+          },
+          {
+            "desc": "Savings ",
+            "amt": 10,
+            "date": "2026-05-23"
+          },
+          {
+            "desc": "Black box ",
+            "amt": 460,
+            "date": "2026-05-24"
+          },
+          {
+            "desc": "Black box ",
+            "amt": 290,
+            "date": "2026-05-25"
+          },
+          {
+            "desc": "Savings ",
+            "amt": 30,
+            "date": "2026-05-25"
+          },
+          {
+            "desc": "Black box ",
+            "amt": 100,
+            "date": "2026-05-26"
+          },
+          {
+            "desc": "Savings ",
+            "amt": 20,
+            "date": "2026-05-27"
+          },
+          {
+            "desc": "Savings ",
+            "amt": 50,
+            "date": "2026-05-28"
+          },
+          {
+            "desc": "Savings ",
+            "amt": 20,
+            "date": "2026-05-29"
+          },
+          {
+            "desc": "Savings ",
+            "amt": 20,
+            "date": "2026-05-29"
+          },
+          {
+            "desc": "Blackbox",
+            "amt": 120,
+            "date": "2026-05-30"
+          },
+          {
+            "desc": "Savings ",
+            "amt": 60,
+            "date": "2026-05-30"
+          }
+        ]
+      }
+    }
+  },
+  "June 2026": {
+    "Kipasa Branch": {
+      "shopId": "kipasa",
+      "shopName": "Kipasa Branch",
+      "month": "June 2026",
+      "incomeStatement": {
+        "grossSalesRevenue": 6159.5,
+        "cogs": 2609.11,
+        "grossProfit": 3550.39,
+        "grossMarginPercent": 57.64087994155369,
+        "operatingOverhead": 3418,
+        "salaries": 190,
+        "totalOperatingExpenses": 3608,
+        "operatingProfit": -57.61000000000013,
+        "personalDrawings": 30,
+        "groceries": 130,
+        "tithes": 0,
+        "nonOperatingExpenses": 160,
+        "netIncome": -217.61000000000013
+      },
+      "cashFlowStatement": {
+        "cashReceivedFromSales": 6537.5,
+        "laybyIncomeCollected": 325,
+        "cashPaidOperatingExpenses": 3608,
+        "netCashFromOperatingActivities": 2929.5,
+        "cashPaidStockPurchases": 1937,
+        "cashTransferredToPerfumesPool": 410,
+        "netCashFromInvestingActivities": -2347,
+        "cashTransferredToVaultSavings": 0,
+        "cashPersonalDrawingsAndTithes": 160,
+        "netCashFromFinancingActivities": -160,
+        "netChangeInCash": 422.5,
+        "openingCashDrawerTotal": 9677.5,
+        "endingCashInDrawer": 10100
+      },
+      "balanceSheet": {
+        "endingCashInDrawer": 10100,
+        "cumulativePerfumeAvailable": 0,
+        "currentInventoryValuation": 0,
+        "totalCurrentAssets": 10100,
+        "cumulativeLaybyLiability": 475,
+        "ownerEquity": 9625,
+        "totalLiabilitiesAndEquity": 10100
+      },
+      "breakdownDetails": {
+        "operatingOverhead": [
+          {
+            "desc": "Button stick ",
+            "amt": 12,
+            "date": "2026-06-08"
+          },
+          {
+            "desc": "Lunch ",
+            "amt": 2,
+            "date": "2026-06-09"
+          },
+          {
+            "desc": "Ashton ",
+            "amt": 100,
+            "date": "2026-06-12"
+          },
+          {
+            "desc": "Wifi",
+            "amt": 40,
+            "date": "2026-06-12"
+          },
+          {
+            "desc": "Fuel ",
+            "amt": 10,
+            "date": "2026-06-13"
+          },
+          {
+            "desc": "Fuel ",
+            "amt": 10,
+            "date": "2026-06-15"
+          },
+          {
+            "desc": "Receipt books",
+            "amt": 30,
+            "date": "2026-06-16"
+          },
+          {
+            "desc": "Rent",
+            "amt": 100,
+            "date": "2026-06-19"
+          },
+          {
+            "desc": "Hats",
+            "amt": 4,
+            "date": "2026-06-22"
+          },
+          {
+            "desc": "Uncle terry",
+            "amt": 30,
+            "date": "2026-06-22"
+          },
+          {
+            "desc": "Lunch ",
+            "amt": 3,
+            "date": "2026-06-23"
+          },
+          {
+            "desc": "Lunch uncle dutch",
+            "amt": 10,
+            "date": "2026-06-24"
+          },
+          {
+            "desc": "Lunch",
+            "amt": 2,
+            "date": "2026-06-24"
+          },
+          {
+            "desc": "Lunch ",
+            "amt": 3,
+            "date": "2026-06-25"
+          },
+          {
+            "desc": "Bobby ",
+            "amt": 40,
+            "date": "2026-06-26"
+          },
+          {
+            "desc": "Uncle Dutch ",
+            "amt": 1,
+            "date": "2026-06-26"
+          },
+          {
+            "desc": "Fuel",
+            "amt": 10,
+            "date": "2026-06-08"
+          },
+          {
+            "desc": "Lunch",
+            "amt": 2,
+            "date": "2026-06-10"
+          },
+          {
+            "desc": "Rent",
+            "amt": 50,
+            "date": "2026-06-12"
+          },
+          {
+            "desc": "Lunch ",
+            "amt": 1,
+            "date": "2026-06-13"
+          },
+          {
+            "desc": "Lunch ",
+            "amt": 3,
+            "date": "2026-06-15"
+          },
+          {
+            "desc": "Tshirts",
+            "amt": 125,
+            "date": "2026-06-16"
+          },
+          {
+            "desc": "Watch",
+            "amt": 2,
+            "date": "2026-06-18"
+          },
+          {
+            "desc": "Lunch",
+            "amt": 4,
+            "date": "2026-06-22"
+          },
+          {
+            "desc": "Fuel",
+            "amt": 20,
+            "date": "2026-06-22"
+          },
+          {
+            "desc": "Rent",
+            "amt": 100,
+            "date": "2026-06-22"
+          },
+          {
+            "desc": "Cobra+tissue",
+            "amt": 3,
+            "date": "2026-06-23"
+          },
+          {
+            "desc": "Rent",
+            "amt": 100,
+            "date": "2026-06-24"
+          },
+          {
+            "desc": "Rent",
+            "amt": 100,
+            "date": "2026-06-25"
+          },
+          {
+            "desc": "Lunch uncle dutch ",
+            "amt": 2,
+            "date": "2026-06-04"
+          },
+          {
+            "desc": "Rent",
+            "amt": 100,
+            "date": "2026-06-04"
+          },
+          {
+            "desc": "Balloons ",
+            "amt": 1,
+            "date": "2026-06-08"
+          },
+          {
+            "desc": "Keyholder",
+            "amt": 10,
+            "date": "2026-06-10"
+          },
+          {
+            "desc": "Lunch",
+            "amt": 2,
+            "date": "2026-06-11"
+          },
+          {
+            "desc": "Watch repair ",
+            "amt": 2,
+            "date": "2026-06-15"
+          },
+          {
+            "desc": "Rent ",
+            "amt": 100,
+            "date": "2026-06-15"
+          },
+          {
+            "desc": "Lunch",
+            "amt": 3,
+            "date": "2026-06-18"
+          },
+          {
+            "desc": "Home ",
+            "amt": 2,
+            "date": "2026-06-19"
+          },
+          {
+            "desc": "Lunch ",
+            "amt": 2,
+            "date": "2026-06-08"
+          },
+          {
+            "desc": "Medicine ",
+            "amt": 2,
+            "date": "2026-06-09"
+          },
+          {
+            "desc": "Rent",
+            "amt": 100,
+            "date": "2026-06-11"
+          },
+          {
+            "desc": "Affidavit ",
+            "amt": 2.5,
+            "date": "2026-06-24"
+          },
+          {
+            "desc": "Lunch ",
+            "amt": 1,
+            "date": "2026-06-13"
+          },
+          {
+            "desc": "Lunch ",
+            "amt": 3,
+            "date": "2026-06-16"
+          },
+          {
+            "desc": "Rent",
+            "amt": 100,
+            "date": "2026-06-18"
+          },
+          {
+            "desc": "Lunch",
+            "amt": 1,
+            "date": "2026-06-20"
+          },
+          {
+            "desc": "Sa Deliveries ",
+            "amt": 5,
+            "date": "2026-06-23"
+          },
+          {
+            "desc": "Rent",
+            "amt": 100,
+            "date": "2026-06-23"
+          },
+          {
+            "desc": "Wood work",
+            "amt": 1,
+            "date": "2026-06-05"
+          },
+          {
+            "desc": "Rent",
+            "amt": 100,
+            "date": "2026-06-12"
+          },
+          {
+            "desc": "Fuel",
+            "amt": 20,
+            "date": "2026-06-05"
+          },
+          {
+            "desc": "Cell-tape",
+            "amt": 5,
+            "date": "2026-06-06"
+          },
+          {
+            "desc": "Uncle dutch ",
+            "amt": 3,
+            "date": "2026-06-08"
+          },
+          {
+            "desc": "Rent",
+            "amt": 100,
+            "date": "2026-06-13"
+          },
+          {
+            "desc": "Shop fitting ",
+            "amt": 2,
+            "date": "2026-06-15"
+          },
+          {
+            "desc": "Lunch",
+            "amt": 3,
+            "date": "2026-06-17"
+          },
+          {
+            "desc": "Fuel",
+            "amt": 20,
+            "date": "2026-06-19"
+          },
+          {
+            "desc": "Rent",
+            "amt": 100,
+            "date": "2026-06-20"
+          },
+          {
+            "desc": "Medicals",
+            "amt": 200,
+            "date": "2026-06-21"
+          },
+          {
+            "desc": "Rings",
+            "amt": 20,
+            "date": "2026-06-22"
+          },
+          {
+            "desc": "Lunch ",
+            "amt": 3,
+            "date": "2026-06-26"
+          },
+          {
+            "desc": "Ashton ",
+            "amt": 1,
+            "date": "2026-06-26"
+          },
+          {
+            "desc": "Rent ",
+            "amt": 100,
+            "date": "2026-06-26"
+          },
+          {
+            "desc": "Uncle dutch lunch ",
+            "amt": 1,
+            "date": "2026-06-27"
+          },
+          {
+            "desc": "Fuel",
+            "amt": 10,
+            "date": "2026-06-27"
+          },
+          {
+            "desc": "Rent ",
+            "amt": 100,
+            "date": "2026-06-27"
+          },
+          {
+            "desc": "Rent",
+            "amt": 100,
+            "date": "2026-06-21"
+          },
+          {
+            "desc": "Rent",
+            "amt": 100,
+            "date": "2026-06-05"
+          },
+          {
+            "desc": "Refund(stanley cup customer)",
+            "amt": 30,
+            "date": "2026-06-01"
+          },
+          {
+            "desc": "Rent",
+            "amt": 240,
+            "date": "2026-06-01"
+          },
+          {
+            "desc": "Fuel uncle dutch",
+            "amt": 10,
+            "date": "2026-06-02"
+          },
+          {
+            "desc": "SA delivery",
+            "amt": 2.5,
+            "date": "2026-06-02"
+          },
+          {
+            "desc": "SA delivery",
+            "amt": 5,
+            "date": "2026-06-02"
+          },
+          {
+            "desc": "Rent",
+            "amt": 100,
+            "date": "2026-06-02"
+          },
+          {
+            "desc": "Zesa",
+            "amt": 73,
+            "date": "2026-06-03"
+          },
+          {
+            "desc": "Fuel",
+            "amt": 20,
+            "date": "2026-06-03"
+          },
+          {
+            "desc": "Uncle d lunch",
+            "amt": 3,
+            "date": "2026-06-03"
+          },
+          {
+            "desc": "Lunch",
+            "amt": 2,
+            "date": "2026-06-03"
+          },
+          {
+            "desc": "Check up",
+            "amt": 20,
+            "date": "2026-06-04"
+          },
+          {
+            "desc": "Pos",
+            "amt": 60,
+            "date": "2026-06-04"
+          },
+          {
+            "desc": "Lunch",
+            "amt": 2,
+            "date": "2026-06-04"
+          },
+          {
+            "desc": "Fuel ",
+            "amt": 20,
+            "date": "2026-06-06"
+          },
+          {
+            "desc": "Lunch ",
+            "amt": 3,
+            "date": "2026-06-06"
+          },
+          {
+            "desc": "Dog",
+            "amt": 40,
+            "date": "2026-06-13"
+          },
+          {
+            "desc": "Nassa",
+            "amt": 20,
+            "date": "2026-06-15"
+          },
+          {
+            "desc": "Ashton ",
+            "amt": 10,
+            "date": "2026-06-19"
+          },
+          {
+            "desc": "Eddie transport",
+            "amt": 30,
+            "date": "2026-06-29"
+          },
+          {
+            "desc": "Fuel",
+            "amt": 20,
+            "date": "2026-06-29"
+          },
+          {
+            "desc": "Lunch",
+            "amt": 3,
+            "date": "2026-06-29"
+          },
+          {
+            "desc": "Maria transport ",
+            "amt": 1,
+            "date": "2026-06-29"
+          },
+          {
+            "desc": "Rent",
+            "amt": 100,
+            "date": "2026-06-29"
+          },
+          {
+            "desc": "Mozambique ",
+            "amt": 20,
+            "date": "2026-06-30"
+          },
+          {
+            "desc": "Lunch ",
+            "amt": 15,
+            "date": "2026-06-30"
+          },
+          {
+            "desc": "Baby wipers,diapers n lotion",
+            "amt": 24,
+            "date": "2026-06-30"
+          },
+          {
+            "desc": "Rent",
+            "amt": 100,
+            "date": "2026-06-30"
+          }
+        ],
+        "salaries": [
+          {
+            "desc": "Salaries ",
+            "amt": 90,
+            "date": "2026-06-10"
+          },
+          {
+            "desc": "Salaries ",
+            "amt": 20,
+            "date": "2026-06-10"
+          },
+          {
+            "desc": "Ashton salaries ",
+            "amt": 20,
+            "date": "2026-06-16"
+          },
+          {
+            "desc": "Salaries ",
+            "amt": 20,
+            "date": "2026-06-26"
+          },
+          {
+            "desc": "Salaries Ashton",
+            "amt": 20,
+            "date": "2026-06-02"
+          },
+          {
+            "desc": "Salaries ",
+            "amt": 20,
+            "date": "2026-06-29"
+          }
+        ],
+        "perfumeTransfers": [
+          {
+            "desc": "Perfume ",
+            "amt": 10,
+            "date": "2026-06-15"
+          },
+          {
+            "desc": "Perfumes - 30 is in ecocash Dutch will cash out  | Edited by Owner (owner-1) @ 2026-06-22T15:56:57.001Z | Prev: $50.00: Perfumes | Edited by Owner (owner-1) @ 2026-06-22T15:58:17.419Z | Prev: $20.00: Perfumes - 30 is in ecocash Dutch will cash out  | Edited by Owner (owner-1) @ 2026-06-22T15:56:57.001Z | Prev: $50.00: Perfumes",
+            "amt": 50,
+            "date": "2026-06-22"
+          },
+          {
+            "desc": "Perfumes",
+            "amt": 70,
+            "date": "2026-06-23"
+          },
+          {
+            "desc": "Perfume ",
+            "amt": 40,
+            "date": "2026-06-12"
+          },
+          {
+            "desc": "Perfume ",
+            "amt": 10,
+            "date": "2026-06-13"
+          },
+          {
+            "desc": "Perfume",
+            "amt": 40,
+            "date": "2026-06-18"
+          },
+          {
+            "desc": "Perfumes",
+            "amt": 80,
+            "date": "2026-06-20"
+          },
+          {
+            "desc": "Perfume ",
+            "amt": 50,
+            "date": "2026-06-21"
+          },
+          {
+            "desc": "Perfume",
+            "amt": 30,
+            "date": "2026-06-01"
+          },
+          {
+            "desc": "Perfume | Edited by Owner (owner-1) @ 2026-06-01T15:53:05.932Z | Prev: $30.00: Perfume",
+            "amt": 0,
+            "date": "2026-06-01"
+          },
+          {
+            "desc": "Perfume",
+            "amt": 30,
+            "date": "2026-06-03"
+          },
+          {
+            "desc": "Perfume | Edited by Owner (owner-1) @ 2026-06-03T16:00:54.898Z | Prev: $30.00: Perfume",
+            "amt": 0,
+            "date": "2026-06-03"
+          }
+        ],
+        "posStockOrders": [
+          {
+            "desc": "Stockvel ",
+            "amt": 300,
+            "date": "2026-06-06"
+          },
+          {
+            "desc": "China order",
+            "amt": 50,
+            "date": "2026-06-19"
+          },
+          {
+            "desc": "Harare stock ",
+            "amt": 35,
+            "date": "2026-06-26"
+          },
+          {
+            "desc": "China",
+            "amt": 40,
+            "date": "2026-06-27"
+          },
+          {
+            "desc": "City stock ",
+            "amt": 40,
+            "date": "2026-06-08"
+          },
+          {
+            "desc": "Citystock",
+            "amt": 10,
+            "date": "2026-06-10"
+          },
+          {
+            "desc": "Harare order",
+            "amt": 30,
+            "date": "2026-06-16"
+          },
+          {
+            "desc": "City stock thermal cups",
+            "amt": 20,
+            "date": "2026-06-19"
+          },
+          {
+            "desc": "Sa order",
+            "amt": 400,
+            "date": "2026-06-26"
+          },
+          {
+            "desc": "China",
+            "amt": 100,
+            "date": "2026-06-08"
+          },
+          {
+            "desc": "Citystock buttonsticks",
+            "amt": 12,
+            "date": "2026-06-17"
+          },
+          {
+            "desc": "SA order ",
+            "amt": 500,
+            "date": "2026-06-23"
+          },
+          {
+            "desc": "City stock buttonstick",
+            "amt": 18,
+            "date": "2026-06-01"
+          },
+          {
+            "desc": "City stock boots",
+            "amt": 30,
+            "date": "2026-06-02"
+          },
+          {
+            "desc": "City stock ",
+            "amt": 10,
+            "date": "2026-06-08"
+          },
+          {
+            "desc": "City stock ",
+            "amt": 30,
+            "date": "2026-06-09"
+          },
+          {
+            "desc": "China order",
+            "amt": 312,
+            "date": "2026-06-29"
+          }
+        ],
+        "personalAndFamily": [
+          {
+            "desc": "Uncle dutch | Edited by Owner (owner-1) @ 2026-06-12T16:11:28.991Z | Prev: $50.00: Uncle dutch",
+            "amt": 30,
+            "date": "2026-06-12"
+          }
+        ],
+        "groceries": [
+          {
+            "desc": "Groceries ",
+            "amt": 20,
+            "date": "2026-06-10"
+          },
+          {
+            "desc": "Groceries | Edited by Owner (owner-1) @ 2026-06-20T15:57:19.711Z | Prev: $20.00: Groceries",
+            "amt": 0,
+            "date": "2026-06-20"
+          },
+          {
+            "desc": "Groceries",
+            "amt": 20,
+            "date": "2026-06-20"
+          },
+          {
+            "desc": "Groceries ",
+            "amt": 20,
+            "date": "2026-06-23"
+          },
+          {
+            "desc": "Groceries",
+            "amt": 30,
+            "date": "2026-06-01"
+          },
+          {
+            "desc": "Groceries ",
+            "amt": 40,
+            "date": "2026-06-30"
+          }
+        ],
+        "tithes": [],
+        "bankVaultSavings": []
+      }
+    },
+    "Dubdub Outlet": {
+      "shopId": "dubdub",
+      "shopName": "Dubdub Outlet",
+      "month": "June 2026",
+      "incomeStatement": {
+        "grossSalesRevenue": 8686,
+        "cogs": 3542.510000000006,
+        "grossProfit": 5143.489999999994,
+        "grossMarginPercent": 59.21586460971672,
+        "operatingOverhead": 3428,
+        "salaries": 0,
+        "totalOperatingExpenses": 3428,
+        "operatingProfit": 1715.4899999999943,
+        "personalDrawings": 0,
+        "groceries": 20,
+        "tithes": 1195,
+        "nonOperatingExpenses": 1215,
+        "netIncome": 500.4899999999943
+      },
+      "cashFlowStatement": {
+        "cashReceivedFromSales": 10089,
+        "laybyIncomeCollected": 765,
+        "cashPaidOperatingExpenses": 3428,
+        "netCashFromOperatingActivities": 6661,
+        "cashPaidStockPurchases": 5,
+        "cashTransferredToPerfumesPool": 1130,
+        "netCashFromInvestingActivities": -1135,
+        "cashTransferredToVaultSavings": 4330,
+        "cashPersonalDrawingsAndTithes": 1215,
+        "netCashFromFinancingActivities": -5545,
+        "netChangeInCash": -19,
+        "openingCashDrawerTotal": 4220,
+        "endingCashInDrawer": 4201
+      },
+      "balanceSheet": {
+        "endingCashInDrawer": 4201,
+        "cumulativePerfumeAvailable": 0,
+        "currentInventoryValuation": 0,
+        "totalCurrentAssets": 4201,
+        "cumulativeLaybyLiability": 1185,
+        "ownerEquity": 3016,
+        "totalLiabilitiesAndEquity": 4201
+      },
+      "breakdownDetails": {
+        "operatingOverhead": [
+          {
+            "desc": "Lunch ",
+            "amt": 2,
+            "date": "2026-06-06"
+          },
+          {
+            "desc": "Rent ",
+            "amt": 100,
+            "date": "2026-06-09"
+          },
+          {
+            "desc": "Lunch ",
+            "amt": 2,
+            "date": "2026-06-11"
+          },
+          {
+            "desc": "Lunch ",
+            "amt": 2,
+            "date": "2026-06-12"
+          },
+          {
+            "desc": "Lunch ",
+            "amt": 1,
+            "date": "2026-06-13"
+          },
+          {
+            "desc": "Rent ",
+            "amt": 40,
+            "date": "2026-06-20"
+          },
+          {
+            "desc": "Rent ",
+            "amt": 100,
+            "date": "2026-06-24"
+          },
+          {
+            "desc": "Lunch ",
+            "amt": 2,
+            "date": "2026-06-25"
+          },
+          {
+            "desc": "Lunch",
+            "amt": 2,
+            "date": "2026-06-26"
+          },
+          {
+            "desc": "Rent",
+            "amt": 100,
+            "date": "2026-06-15"
+          },
+          {
+            "desc": "Auntie ",
+            "amt": 21,
+            "date": "2026-06-16"
+          },
+          {
+            "desc": "Rent ",
+            "amt": 100,
+            "date": "2026-06-18"
+          },
+          {
+            "desc": "Vape purchase ",
+            "amt": 165,
+            "date": "2026-06-20"
+          },
+          {
+            "desc": "Car wash ",
+            "amt": 3,
+            "date": "2026-06-20"
+          },
+          {
+            "desc": "Lunch ",
+            "amt": 1,
+            "date": "2026-06-21"
+          },
+          {
+            "desc": "Rent ",
+            "amt": 100,
+            "date": "2026-06-22"
+          },
+          {
+            "desc": "Rent ",
+            "amt": 100,
+            "date": "2026-06-25"
+          },
+          {
+            "desc": "Hamper ",
+            "amt": 10,
+            "date": "2026-06-26"
+          },
+          {
+            "desc": "Lunch ",
+            "amt": 2,
+            "date": "2026-06-09"
+          },
+          {
+            "desc": "Lunch ",
+            "amt": 1,
+            "date": "2026-06-16"
+          },
+          {
+            "desc": "Rent ",
+            "amt": 100,
+            "date": "2026-06-16"
+          },
+          {
+            "desc": "Lunch ",
+            "amt": 2,
+            "date": "2026-06-20"
+          },
+          {
+            "desc": "Rent ",
+            "amt": 100,
+            "date": "2026-06-23"
+          },
+          {
+            "desc": "Rent ",
+            "amt": 100,
+            "date": "2026-06-26"
+          },
+          {
+            "desc": "Lunch ",
+            "amt": 1,
+            "date": "2026-06-14"
+          },
+          {
+            "desc": "Lunch ",
+            "amt": 2,
+            "date": "2026-06-18"
+          },
+          {
+            "desc": "Lunch",
+            "amt": 2,
+            "date": "2026-06-19"
+          },
+          {
+            "desc": "Plastic bags ",
+            "amt": 1,
+            "date": "2026-06-20"
+          },
+          {
+            "desc": "Rent ",
+            "amt": 60,
+            "date": "2026-06-21"
+          },
+          {
+            "desc": "Vape payment ",
+            "amt": 75,
+            "date": "2026-06-22"
+          },
+          {
+            "desc": "Lunch ",
+            "amt": 1,
+            "date": "2026-06-23"
+          },
+          {
+            "desc": "Rent ",
+            "amt": 100,
+            "date": "2026-06-06"
+          },
+          {
+            "desc": "Electricity ",
+            "amt": 40,
+            "date": "2026-06-10"
+          },
+          {
+            "desc": "Rent",
+            "amt": 100,
+            "date": "2026-06-10"
+          },
+          {
+            "desc": "Data",
+            "amt": 18,
+            "date": "2026-06-17"
+          },
+          {
+            "desc": "Lunch ",
+            "amt": 2,
+            "date": "2026-06-10"
+          },
+          {
+            "desc": "Rent",
+            "amt": 100,
+            "date": "2026-06-17"
+          },
+          {
+            "desc": "Rent",
+            "amt": 100,
+            "date": "2026-06-19"
+          },
+          {
+            "desc": "Lunch ",
+            "amt": 2,
+            "date": "2026-06-22"
+          },
+          {
+            "desc": "Lunch ",
+            "amt": 2,
+            "date": "2026-06-24"
+          },
+          {
+            "desc": "Lunch ",
+            "amt": 2,
+            "date": "2026-06-27"
+          },
+          {
+            "desc": "Affidavits ",
+            "amt": 3,
+            "date": "2026-06-27"
+          },
+          {
+            "desc": "Rent ",
+            "amt": 100,
+            "date": "2026-06-27"
+          },
+          {
+            "desc": "Lunch ",
+            "amt": 2,
+            "date": "2026-06-01"
+          },
+          {
+            "desc": "Vape payment ",
+            "amt": 20,
+            "date": "2026-06-01"
+          },
+          {
+            "desc": "Rent ",
+            "amt": 100,
+            "date": "2026-06-01"
+          },
+          {
+            "desc": "Lunch ",
+            "amt": 1,
+            "date": "2026-06-02"
+          },
+          {
+            "desc": "Data",
+            "amt": 10,
+            "date": "2026-06-02"
+          },
+          {
+            "desc": "Rent ",
+            "amt": 100,
+            "date": "2026-06-02"
+          },
+          {
+            "desc": "Bank transfer ",
+            "amt": 365,
+            "date": "2026-06-02"
+          },
+          {
+            "desc": "Lunch ",
+            "amt": 2,
+            "date": "2026-06-03"
+          },
+          {
+            "desc": "Rent ",
+            "amt": 100,
+            "date": "2026-06-03"
+          },
+          {
+            "desc": "Lunch ",
+            "amt": 2,
+            "date": "2026-06-04"
+          },
+          {
+            "desc": "Rent ",
+            "amt": 100,
+            "date": "2026-06-04"
+          },
+          {
+            "desc": "Lunch ",
+            "amt": 2,
+            "date": "2026-06-05"
+          },
+          {
+            "desc": "Rent ",
+            "amt": 100,
+            "date": "2026-06-05"
+          },
+          {
+            "desc": "Lunch ",
+            "amt": 1,
+            "date": "2026-06-07"
+          },
+          {
+            "desc": "Rent ",
+            "amt": 100,
+            "date": "2026-06-11"
+          },
+          {
+            "desc": "Rent ",
+            "amt": 100,
+            "date": "2026-06-12"
+          },
+          {
+            "desc": "Rent ",
+            "amt": 100,
+            "date": "2026-06-13"
+          },
+          {
+            "desc": "Lunch ",
+            "amt": 2,
+            "date": "2026-06-15"
+          },
+          {
+            "desc": "Lunch ",
+            "amt": 2,
+            "date": "2026-06-17"
+          },
+          {
+            "desc": "Home use ",
+            "amt": 50,
+            "date": "2026-06-28"
+          },
+          {
+            "desc": "Lunch ",
+            "amt": 1,
+            "date": "2026-06-28"
+          },
+          {
+            "desc": "Lunch ",
+            "amt": 2,
+            "date": "2026-06-29"
+          },
+          {
+            "desc": "Rent ",
+            "amt": 100,
+            "date": "2026-06-29"
+          },
+          {
+            "desc": "Licence ",
+            "amt": 98,
+            "date": "2026-06-30"
+          },
+          {
+            "desc": "Rent ",
+            "amt": 100,
+            "date": "2026-06-30"
+          },
+          {
+            "desc": "Lunch ",
+            "amt": 1,
+            "date": "2026-06-30"
+          }
+        ],
+        "salaries": [],
+        "perfumeTransfers": [
+          {
+            "desc": "Perfume ",
+            "amt": 40,
+            "date": "2026-06-09"
+          },
+          {
+            "desc": "Perfume ",
+            "amt": 20,
+            "date": "2026-06-11"
+          },
+          {
+            "desc": "Perfume ",
+            "amt": 180,
+            "date": "2026-06-17"
+          },
+          {
+            "desc": "Perfume ",
+            "amt": 70,
+            "date": "2026-06-22"
+          },
+          {
+            "desc": "Perfume ",
+            "amt": 30,
+            "date": "2026-06-24"
+          },
+          {
+            "desc": "Perfume",
+            "amt": 60,
+            "date": "2026-06-16"
+          },
+          {
+            "desc": "Perfume ",
+            "amt": 40,
+            "date": "2026-06-18"
+          },
+          {
+            "desc": "Perfumes ",
+            "amt": 130,
+            "date": "2026-06-25"
+          },
+          {
+            "desc": "Perfume ",
+            "amt": 30,
+            "date": "2026-06-06"
+          },
+          {
+            "desc": "Perfume ",
+            "amt": 20,
+            "date": "2026-06-23"
+          },
+          {
+            "desc": "Perfume ",
+            "amt": 40,
+            "date": "2026-06-27"
+          },
+          {
+            "desc": "Perfume ",
+            "amt": 20,
+            "date": "2026-06-01"
+          },
+          {
+            "desc": "Perfume ",
+            "amt": 10,
+            "date": "2026-06-02"
+          },
+          {
+            "desc": "Perfume ",
+            "amt": 140,
+            "date": "2026-06-03"
+          },
+          {
+            "desc": "Perfume ",
+            "amt": 90,
+            "date": "2026-06-04"
+          },
+          {
+            "desc": "Perfume ",
+            "amt": 60,
+            "date": "2026-06-05"
+          },
+          {
+            "desc": "Perfume ",
+            "amt": 70,
+            "date": "2026-06-10"
+          },
+          {
+            "desc": "Perfume ",
+            "amt": 50,
+            "date": "2026-06-28"
+          },
+          {
+            "desc": "Perfume ",
+            "amt": 30,
+            "date": "2026-06-29"
+          }
+        ],
+        "posStockOrders": [
+          {
+            "desc": "Stock delivery ",
+            "amt": 5,
+            "date": "2026-06-21"
+          }
+        ],
+        "personalAndFamily": [],
+        "groceries": [
+          {
+            "desc": "Home groceries ",
+            "amt": 20,
+            "date": "2026-06-07"
+          }
+        ],
+        "tithes": [
+          {
+            "desc": "Tithe ",
+            "amt": 15,
+            "date": "2026-06-13"
+          },
+          {
+            "desc": "Uncle D ",
+            "amt": 85,
+            "date": "2026-06-14"
+          },
+          {
+            "desc": "Tithe ",
+            "amt": 10,
+            "date": "2026-06-18"
+          },
+          {
+            "desc": "Tithe ",
+            "amt": 5,
+            "date": "2026-06-23"
+          },
+          {
+            "desc": "Tithe ",
+            "amt": 20,
+            "date": "2026-06-24"
+          },
+          {
+            "desc": "Tithe ",
+            "amt": 5,
+            "date": "2026-06-11"
+          },
+          {
+            "desc": "Tithe ",
+            "amt": 15,
+            "date": "2026-06-12"
+          },
+          {
+            "desc": "Dutch ",
+            "amt": 70,
+            "date": "2026-06-07"
+          },
+          {
+            "desc": "Tithe ",
+            "amt": 25,
+            "date": "2026-06-09"
+          },
+          {
+            "desc": "Tithe ",
+            "amt": 10,
+            "date": "2026-06-10"
+          },
+          {
+            "desc": "Tithe ",
+            "amt": 10,
+            "date": "2026-06-17"
+          },
+          {
+            "desc": "Dutch ",
+            "amt": 60,
+            "date": "2026-06-21"
+          },
+          {
+            "desc": "Dutch ",
+            "amt": 110,
+            "date": "2026-06-07"
+          },
+          {
+            "desc": "Tithe withdrawal",
+            "amt": 130,
+            "date": "2026-06-07"
+          },
+          {
+            "desc": "Tithe ",
+            "amt": 10,
+            "date": "2026-06-16"
+          },
+          {
+            "desc": "Tithe ",
+            "amt": 30,
+            "date": "2026-06-22"
+          },
+          {
+            "desc": "Tithe ",
+            "amt": 25,
+            "date": "2026-06-25"
+          },
+          {
+            "desc": "Tithe ",
+            "amt": 40,
+            "date": "2026-06-06"
+          },
+          {
+            "desc": "Dutch ",
+            "amt": 86,
+            "date": "2026-06-07"
+          },
+          {
+            "desc": "Tithe ",
+            "amt": 5,
+            "date": "2026-06-13"
+          },
+          {
+            "desc": "Tithe ",
+            "amt": 5,
+            "date": "2026-06-20"
+          },
+          {
+            "desc": "Tithe ",
+            "amt": 5,
+            "date": "2026-06-26"
+          },
+          {
+            "desc": "Tithe ",
+            "amt": 50,
+            "date": "2026-06-27"
+          },
+          {
+            "desc": "Tithe ",
+            "amt": 5,
+            "date": "2026-06-01"
+          },
+          {
+            "desc": "Tithe ",
+            "amt": 30,
+            "date": "2026-06-02"
+          },
+          {
+            "desc": "Tithe ",
+            "amt": 5,
+            "date": "2026-06-03"
+          },
+          {
+            "desc": "Tithe ",
+            "amt": 15,
+            "date": "2026-06-04"
+          },
+          {
+            "desc": "Tithe",
+            "amt": 10,
+            "date": "2026-06-05"
+          },
+          {
+            "desc": "Tithe ",
+            "amt": 5,
+            "date": "2026-06-15"
+          },
+          {
+            "desc": "Tithe ",
+            "amt": 20,
+            "date": "2026-06-19"
+          },
+          {
+            "desc": "Uncle Dutch ",
+            "amt": 135,
+            "date": "2026-06-28"
+          },
+          {
+            "desc": "balance",
+            "amt": 104,
+            "date": "2026-06-29"
+          },
+          {
+            "desc": "Tithe ",
+            "amt": 30,
+            "date": "2026-06-29"
+          },
+          {
+            "desc": "Tithe ",
+            "amt": 10,
+            "date": "2026-06-30"
+          }
+        ],
+        "bankVaultSavings": [
+          {
+            "desc": "Black box ",
+            "amt": 100,
+            "date": "2026-06-18"
+          },
+          {
+            "desc": "Black box ",
+            "amt": 270,
+            "date": "2026-06-23"
+          },
+          {
+            "desc": "Black box ",
+            "amt": 60,
+            "date": "2026-06-06"
+          },
+          {
+            "desc": "Black box ",
+            "amt": 160,
+            "date": "2026-06-20"
+          },
+          {
+            "desc": "Black box ",
+            "amt": 150,
+            "date": "2026-06-22"
+          },
+          {
+            "desc": "Black box ",
+            "amt": 120,
+            "date": "2026-06-09"
+          },
+          {
+            "desc": "Black box ",
+            "amt": 230,
+            "date": "2026-06-10"
+          },
+          {
+            "desc": "Black box ",
+            "amt": 50,
+            "date": "2026-06-11"
+          },
+          {
+            "desc": "Black box ",
+            "amt": 170,
+            "date": "2026-06-25"
+          },
+          {
+            "desc": "Black box ",
+            "amt": 90,
+            "date": "2026-06-08"
+          },
+          {
+            "desc": "Black box ",
+            "amt": 200,
+            "date": "2026-06-14"
+          },
+          {
+            "desc": "Black box ",
+            "amt": 100,
+            "date": "2026-06-17"
+          },
+          {
+            "desc": "Black box ",
+            "amt": 380,
+            "date": "2026-06-07"
+          },
+          {
+            "desc": "Black box ",
+            "amt": 70,
+            "date": "2026-06-12"
+          },
+          {
+            "desc": "Black box ",
+            "amt": 110,
+            "date": "2026-06-13"
+          },
+          {
+            "desc": "Black box ",
+            "amt": 230,
+            "date": "2026-06-26"
+          },
+          {
+            "desc": "Black box ",
+            "amt": 260,
+            "date": "2026-06-03"
+          },
+          {
+            "desc": "Black box ",
+            "amt": 200,
+            "date": "2026-06-05"
+          },
+          {
+            "desc": "Black box ",
+            "amt": 70,
+            "date": "2026-06-19"
+          },
+          {
+            "desc": "Black box ",
+            "amt": 630,
+            "date": "2026-06-28"
+          },
+          {
+            "desc": "Black box ",
+            "amt": 40,
+            "date": "2026-06-29"
+          },
+          {
+            "desc": "Black box ",
+            "amt": 310,
+            "date": "2026-06-30"
+          },
+          {
+            "desc": "Black box ",
+            "amt": 330,
+            "date": "2026-06-30"
+          }
+        ]
+      }
+    },
+    "Trade Center HQ": {
+      "shopId": "tradecenter",
+      "shopName": "Trade Center HQ",
+      "month": "June 2026",
+      "incomeStatement": {
+        "grossSalesRevenue": 624,
+        "cogs": 297.15,
+        "grossProfit": 326.85,
+        "grossMarginPercent": 52.3798076923077,
+        "operatingOverhead": 214,
+        "salaries": 0,
+        "totalOperatingExpenses": 214,
+        "operatingProfit": 112.85000000000002,
+        "personalDrawings": 0,
+        "groceries": 0,
+        "tithes": 0,
+        "nonOperatingExpenses": 0,
+        "netIncome": 112.85000000000002
+      },
+      "cashFlowStatement": {
+        "cashReceivedFromSales": 645,
+        "laybyIncomeCollected": 0,
+        "cashPaidOperatingExpenses": 214,
+        "netCashFromOperatingActivities": 431,
+        "cashPaidStockPurchases": 10,
+        "cashTransferredToPerfumesPool": 0,
+        "netCashFromInvestingActivities": -10,
+        "cashTransferredToVaultSavings": 307,
+        "cashPersonalDrawingsAndTithes": 0,
+        "netCashFromFinancingActivities": -307,
+        "netChangeInCash": 114,
+        "openingCashDrawerTotal": 76,
+        "endingCashInDrawer": 190
+      },
+      "balanceSheet": {
+        "endingCashInDrawer": 190,
+        "cumulativePerfumeAvailable": 0,
+        "currentInventoryValuation": 0,
+        "totalCurrentAssets": 190,
+        "cumulativeLaybyLiability": 1.9,
+        "ownerEquity": 188.1,
+        "totalLiabilitiesAndEquity": 190
+      },
+      "breakdownDetails": {
+        "operatingOverhead": [
+          {
+            "desc": "Rent",
+            "amt": 10,
+            "date": "2026-06-13"
+          },
+          {
+            "desc": "Rent",
+            "amt": 10,
+            "date": "2026-06-23"
+          },
+          {
+            "desc": "Rent",
+            "amt": 10,
+            "date": "2026-06-09"
+          },
+          {
+            "desc": "Lunch",
+            "amt": 2,
+            "date": "2026-06-19"
+          },
+          {
+            "desc": "Lunch ",
+            "amt": 2,
+            "date": "2026-06-22"
+          },
+          {
+            "desc": "Lunch ",
+            "amt": 2,
+            "date": "2026-06-23"
+          },
+          {
+            "desc": "Lunch ",
+            "amt": 2,
+            "date": "2026-06-09"
+          },
+          {
+            "desc": "Lunch ",
+            "amt": 1,
+            "date": "2026-06-13"
+          },
+          {
+            "desc": "Rent",
+            "amt": 10,
+            "date": "2026-06-19"
+          },
+          {
+            "desc": "Lunch ",
+            "amt": 2,
+            "date": "2026-06-20"
+          },
+          {
+            "desc": "Rent",
+            "amt": 10,
+            "date": "2026-06-22"
+          },
+          {
+            "desc": "Lunch ",
+            "amt": 2,
+            "date": "2026-06-09"
+          },
+          {
+            "desc": "Rent",
+            "amt": 10,
+            "date": "2026-06-15"
+          },
+          {
+            "desc": "Lunch",
+            "amt": 1,
+            "date": "2026-06-09"
+          },
+          {
+            "desc": "Remt",
+            "amt": 10,
+            "date": "2026-06-09"
+          },
+          {
+            "desc": "Lunch",
+            "amt": 1,
+            "date": "2026-06-12"
+          },
+          {
+            "desc": "Lunch",
+            "amt": 1,
+            "date": "2026-06-13"
+          },
+          {
+            "desc": "Lunch",
+            "amt": 2,
+            "date": "2026-06-15"
+          },
+          {
+            "desc": "Rent",
+            "amt": 10,
+            "date": "2026-06-16"
+          },
+          {
+            "desc": "Lunch ",
+            "amt": 2,
+            "date": "2026-06-12"
+          },
+          {
+            "desc": "Rent",
+            "amt": 10,
+            "date": "2026-06-25"
+          },
+          {
+            "desc": "Lunch ",
+            "amt": 2,
+            "date": "2026-06-02"
+          },
+          {
+            "desc": "Rent",
+            "amt": 10,
+            "date": "2026-06-02"
+          },
+          {
+            "desc": "Rent",
+            "amt": 10,
+            "date": "2026-06-12"
+          },
+          {
+            "desc": "Lunch",
+            "amt": 2,
+            "date": "2026-06-16"
+          },
+          {
+            "desc": "Lunch",
+            "amt": 2,
+            "date": "2026-06-25"
+          },
+          {
+            "desc": "Rent ",
+            "amt": 10,
+            "date": "2026-06-26"
+          },
+          {
+            "desc": "Lunch ",
+            "amt": 2,
+            "date": "2026-06-26"
+          },
+          {
+            "desc": "Sa",
+            "amt": 30,
+            "date": "2026-06-26"
+          },
+          {
+            "desc": "Lunch ",
+            "amt": 2,
+            "date": "2026-06-29"
+          },
+          {
+            "desc": "Rent",
+            "amt": 10,
+            "date": "2026-06-29"
+          },
+          {
+            "desc": "Rent",
+            "amt": 10,
+            "date": "2026-06-27"
+          },
+          {
+            "desc": "Lunch ",
+            "amt": 2,
+            "date": "2026-06-27"
+          },
+          {
+            "desc": "Rent",
+            "amt": 10,
+            "date": "2026-06-30"
+          },
+          {
+            "desc": "Lunch ",
+            "amt": 2,
+            "date": "2026-06-30"
+          }
+        ],
+        "salaries": [],
+        "perfumeTransfers": [],
+        "posStockOrders": [
+          {
+            "desc": "City stock",
+            "amt": 10,
+            "date": "2026-06-13"
+          }
+        ],
+        "personalAndFamily": [],
+        "groceries": [],
+        "tithes": [],
+        "bankVaultSavings": [
+          {
+            "desc": "Savings ",
+            "amt": 40,
+            "date": "2026-06-20"
+          },
+          {
+            "desc": "Savings ",
+            "amt": 37,
+            "date": "2026-06-09"
+          },
+          {
+            "desc": "Savings ",
+            "amt": 10,
+            "date": "2026-06-09"
+          },
+          {
+            "desc": "Savings ",
+            "amt": 10,
+            "date": "2026-06-15"
+          },
+          {
+            "desc": "Savings ",
+            "amt": 10,
+            "date": "2026-06-19"
+          },
+          {
+            "desc": "Savings",
+            "amt": 20,
+            "date": "2026-06-23"
+          },
+          {
+            "desc": "Savings ",
+            "amt": 10,
+            "date": "2026-06-13"
+          },
+          {
+            "desc": "Savings",
+            "amt": 30,
+            "date": "2026-06-16"
+          },
+          {
+            "desc": "Savings ",
+            "amt": 20,
+            "date": "2026-06-02"
+          },
+          {
+            "desc": "Savings ",
+            "amt": 20,
+            "date": "2026-06-25"
+          },
+          {
+            "desc": "Savings ",
+            "amt": 20,
+            "date": "2026-06-29"
+          },
+          {
+            "desc": "Savings ",
+            "amt": 50,
+            "date": "2026-06-27"
+          },
+          {
+            "desc": "Savings ",
+            "amt": 30,
+            "date": "2026-06-30"
+          }
+        ]
+      }
+    },
+    "Nirvana Tees": {
+      "shopId": "tshirts",
+      "shopName": "Nirvana Tees",
+      "month": "June 2026",
+      "incomeStatement": {
+        "grossSalesRevenue": 127.5,
+        "cogs": 100.73,
+        "grossProfit": 26.769999999999996,
+        "grossMarginPercent": 20.996078431372545,
+        "operatingOverhead": 125,
+        "salaries": 0,
+        "totalOperatingExpenses": 125,
+        "operatingProfit": -98.23,
+        "personalDrawings": 0,
+        "groceries": 0,
+        "tithes": 0,
+        "nonOperatingExpenses": 0,
+        "netIncome": -98.23
+      },
+      "cashFlowStatement": {
+        "cashReceivedFromSales": 127.5,
+        "laybyIncomeCollected": 0,
+        "cashPaidOperatingExpenses": 125,
+        "netCashFromOperatingActivities": 2.5,
+        "cashPaidStockPurchases": 0,
+        "cashTransferredToPerfumesPool": 0,
+        "netCashFromInvestingActivities": 0,
+        "cashTransferredToVaultSavings": 0,
+        "cashPersonalDrawingsAndTithes": 0,
+        "netCashFromFinancingActivities": 0,
+        "netChangeInCash": 2.5,
+        "openingCashDrawerTotal": 0,
+        "endingCashInDrawer": 2.5
+      },
+      "balanceSheet": {
+        "endingCashInDrawer": 2.5,
+        "cumulativePerfumeAvailable": 0,
+        "currentInventoryValuation": 0,
+        "totalCurrentAssets": 2.5,
+        "cumulativeLaybyLiability": 0,
+        "ownerEquity": 2.5,
+        "totalLiabilitiesAndEquity": 2.5
+      },
+      "breakdownDetails": {
+        "operatingOverhead": [
+          {
+            "desc": "Tshirts",
+            "amt": 125,
+            "date": "2026-06-16"
+          }
+        ],
+        "salaries": [],
+        "perfumeTransfers": [],
+        "posStockOrders": [],
+        "personalAndFamily": [],
+        "groceries": [],
+        "tithes": [],
+        "bankVaultSavings": []
+      }
+    },
+    "Consolidated (All Shops)": {
+      "shopId": "consolidated",
+      "shopName": "Consolidated (All Shops)",
+      "month": "June 2026",
+      "incomeStatement": {
+        "grossSalesRevenue": 15597,
+        "cogs": 6549.500000000017,
+        "grossProfit": 9047.499999999982,
+        "grossMarginPercent": 58.00795024684222,
+        "operatingOverhead": 7060,
+        "salaries": 190,
+        "totalOperatingExpenses": 7250,
+        "operatingProfit": 1797.4999999999818,
+        "personalDrawings": 30,
+        "groceries": 150,
+        "tithes": 1195,
+        "nonOperatingExpenses": 1375,
+        "netIncome": 422.4999999999818
+      },
+      "cashFlowStatement": {
+        "cashReceivedFromSales": 17399,
+        "laybyIncomeCollected": 1090,
+        "cashPaidOperatingExpenses": 7250,
+        "netCashFromOperatingActivities": 10149,
+        "cashPaidStockPurchases": 1952,
+        "cashTransferredToPerfumesPool": 1540,
+        "netCashFromInvestingActivities": -3492,
+        "cashTransferredToVaultSavings": 4637,
+        "cashPersonalDrawingsAndTithes": 1375,
+        "netCashFromFinancingActivities": -6012,
+        "netChangeInCash": 645,
+        "openingCashDrawerTotal": 13973.5,
+        "endingCashInDrawer": 14618.5
+      },
+      "balanceSheet": {
+        "endingCashInDrawer": 14618.5,
+        "cumulativePerfumeAvailable": 0,
+        "currentInventoryValuation": 41918.769999999975,
+        "totalCurrentAssets": 56537.269999999975,
+        "cumulativeLaybyLiability": 1661.9,
+        "ownerEquity": 54875.36999999997,
+        "totalLiabilitiesAndEquity": 56537.269999999975
+      },
+      "breakdownDetails": {
+        "operatingOverhead": [
+          {
+            "desc": "Lunch ",
+            "amt": 2,
+            "date": "2026-06-06"
+          },
+          {
+            "desc": "Button stick ",
+            "amt": 12,
+            "date": "2026-06-08"
+          },
+          {
+            "desc": "Lunch ",
+            "amt": 2,
+            "date": "2026-06-09"
+          },
+          {
+            "desc": "Rent ",
+            "amt": 100,
+            "date": "2026-06-09"
+          },
+          {
+            "desc": "Lunch ",
+            "amt": 2,
+            "date": "2026-06-11"
+          },
+          {
+            "desc": "Lunch ",
+            "amt": 2,
+            "date": "2026-06-12"
+          },
+          {
+            "desc": "Ashton ",
+            "amt": 100,
+            "date": "2026-06-12"
+          },
+          {
+            "desc": "Wifi",
+            "amt": 40,
+            "date": "2026-06-12"
+          },
+          {
+            "desc": "Lunch ",
+            "amt": 1,
+            "date": "2026-06-13"
+          },
+          {
+            "desc": "Fuel ",
+            "amt": 10,
+            "date": "2026-06-13"
+          },
+          {
+            "desc": "Rent",
+            "amt": 10,
+            "date": "2026-06-13"
+          },
+          {
+            "desc": "Fuel ",
+            "amt": 10,
+            "date": "2026-06-15"
+          },
+          {
+            "desc": "Receipt books",
+            "amt": 30,
+            "date": "2026-06-16"
+          },
+          {
+            "desc": "Rent",
+            "amt": 100,
+            "date": "2026-06-19"
+          },
+          {
+            "desc": "Rent ",
+            "amt": 40,
+            "date": "2026-06-20"
+          },
+          {
+            "desc": "Hats",
+            "amt": 4,
+            "date": "2026-06-22"
+          },
+          {
+            "desc": "Uncle terry",
+            "amt": 30,
+            "date": "2026-06-22"
+          },
+          {
+            "desc": "Lunch ",
+            "amt": 3,
+            "date": "2026-06-23"
+          },
+          {
+            "desc": "Rent",
+            "amt": 10,
+            "date": "2026-06-23"
+          },
+          {
+            "desc": "Rent ",
+            "amt": 100,
+            "date": "2026-06-24"
+          },
+          {
+            "desc": "Lunch uncle dutch",
+            "amt": 10,
+            "date": "2026-06-24"
+          },
+          {
+            "desc": "Lunch",
+            "amt": 2,
+            "date": "2026-06-24"
+          },
+          {
+            "desc": "Lunch ",
+            "amt": 2,
+            "date": "2026-06-25"
+          },
+          {
+            "desc": "Lunch ",
+            "amt": 3,
+            "date": "2026-06-25"
+          },
+          {
+            "desc": "Lunch",
+            "amt": 2,
+            "date": "2026-06-26"
+          },
+          {
+            "desc": "Bobby ",
+            "amt": 40,
+            "date": "2026-06-26"
+          },
+          {
+            "desc": "Uncle Dutch ",
+            "amt": 1,
+            "date": "2026-06-26"
+          },
+          {
+            "desc": "Fuel",
+            "amt": 10,
+            "date": "2026-06-08"
+          },
+          {
+            "desc": "Rent",
+            "amt": 10,
+            "date": "2026-06-09"
+          },
+          {
+            "desc": "Lunch",
+            "amt": 2,
+            "date": "2026-06-10"
+          },
+          {
+            "desc": "Rent",
+            "amt": 50,
+            "date": "2026-06-12"
+          },
+          {
+            "desc": "Lunch ",
+            "amt": 1,
+            "date": "2026-06-13"
+          },
+          {
+            "desc": "Rent",
+            "amt": 100,
+            "date": "2026-06-15"
+          },
+          {
+            "desc": "Lunch ",
+            "amt": 3,
+            "date": "2026-06-15"
+          },
+          {
+            "desc": "Tshirts",
+            "amt": 125,
+            "date": "2026-06-16"
+          },
+          {
+            "desc": "Auntie ",
+            "amt": 21,
+            "date": "2026-06-16"
+          },
+          {
+            "desc": "Rent ",
+            "amt": 100,
+            "date": "2026-06-18"
+          },
+          {
+            "desc": "Watch",
+            "amt": 2,
+            "date": "2026-06-18"
+          },
+          {
+            "desc": "Lunch",
+            "amt": 2,
+            "date": "2026-06-19"
+          },
+          {
+            "desc": "Vape purchase ",
+            "amt": 165,
+            "date": "2026-06-20"
+          },
+          {
+            "desc": "Car wash ",
+            "amt": 3,
+            "date": "2026-06-20"
+          },
+          {
+            "desc": "Lunch ",
+            "amt": 1,
+            "date": "2026-06-21"
+          },
+          {
+            "desc": "Rent ",
+            "amt": 100,
+            "date": "2026-06-22"
+          },
+          {
+            "desc": "Lunch",
+            "amt": 4,
+            "date": "2026-06-22"
+          },
+          {
+            "desc": "Fuel",
+            "amt": 20,
+            "date": "2026-06-22"
+          },
+          {
+            "desc": "Rent",
+            "amt": 100,
+            "date": "2026-06-22"
+          },
+          {
+            "desc": "Lunch ",
+            "amt": 2,
+            "date": "2026-06-22"
+          },
+          {
+            "desc": "Cobra+tissue",
+            "amt": 3,
+            "date": "2026-06-23"
+          },
+          {
+            "desc": "Lunch ",
+            "amt": 2,
+            "date": "2026-06-23"
+          },
+          {
+            "desc": "Rent",
+            "amt": 100,
+            "date": "2026-06-24"
+          },
+          {
+            "desc": "Rent ",
+            "amt": 100,
+            "date": "2026-06-25"
+          },
+          {
+            "desc": "Rent",
+            "amt": 100,
+            "date": "2026-06-25"
+          },
+          {
+            "desc": "Hamper ",
+            "amt": 10,
+            "date": "2026-06-26"
+          },
+          {
+            "desc": "Lunch uncle dutch ",
+            "amt": 2,
+            "date": "2026-06-04"
+          },
+          {
+            "desc": "Rent",
+            "amt": 100,
+            "date": "2026-06-04"
+          },
+          {
+            "desc": "Balloons ",
+            "amt": 1,
+            "date": "2026-06-08"
+          },
+          {
+            "desc": "Lunch ",
+            "amt": 2,
+            "date": "2026-06-09"
+          },
+          {
+            "desc": "Lunch ",
+            "amt": 2,
+            "date": "2026-06-09"
+          },
+          {
+            "desc": "Keyholder",
+            "amt": 10,
+            "date": "2026-06-10"
+          },
+          {
+            "desc": "Lunch",
+            "amt": 2,
+            "date": "2026-06-11"
+          },
+          {
+            "desc": "Lunch ",
+            "amt": 1,
+            "date": "2026-06-13"
+          },
+          {
+            "desc": "Watch repair ",
+            "amt": 2,
+            "date": "2026-06-15"
+          },
+          {
+            "desc": "Rent ",
+            "amt": 100,
+            "date": "2026-06-15"
+          },
+          {
+            "desc": "Lunch ",
+            "amt": 1,
+            "date": "2026-06-16"
+          },
+          {
+            "desc": "Rent ",
+            "amt": 100,
+            "date": "2026-06-16"
+          },
+          {
+            "desc": "Lunch",
+            "amt": 3,
+            "date": "2026-06-18"
+          },
+          {
+            "desc": "Home ",
+            "amt": 2,
+            "date": "2026-06-19"
+          },
+          {
+            "desc": "Rent",
+            "amt": 10,
+            "date": "2026-06-19"
+          },
+          {
+            "desc": "Lunch ",
+            "amt": 2,
+            "date": "2026-06-20"
+          },
+          {
+            "desc": "Lunch ",
+            "amt": 2,
+            "date": "2026-06-20"
+          },
+          {
+            "desc": "Rent ",
+            "amt": 100,
+            "date": "2026-06-23"
+          },
+          {
+            "desc": "Rent",
+            "amt": 10,
+            "date": "2026-06-22"
+          },
+          {
+            "desc": "Rent ",
+            "amt": 100,
+            "date": "2026-06-26"
+          },
+          {
+            "desc": "Lunch ",
+            "amt": 2,
+            "date": "2026-06-08"
+          },
+          {
+            "desc": "Medicine ",
+            "amt": 2,
+            "date": "2026-06-09"
+          },
+          {
+            "desc": "Lunch ",
+            "amt": 2,
+            "date": "2026-06-09"
+          },
+          {
+            "desc": "Rent",
+            "amt": 100,
+            "date": "2026-06-11"
+          },
+          {
+            "desc": "Affidavit ",
+            "amt": 2.5,
+            "date": "2026-06-24"
+          },
+          {
+            "desc": "Lunch ",
+            "amt": 1,
+            "date": "2026-06-13"
+          },
+          {
+            "desc": "Lunch ",
+            "amt": 1,
+            "date": "2026-06-14"
+          },
+          {
+            "desc": "Rent",
+            "amt": 10,
+            "date": "2026-06-15"
+          },
+          {
+            "desc": "Lunch ",
+            "amt": 3,
+            "date": "2026-06-16"
+          },
+          {
+            "desc": "Lunch ",
+            "amt": 2,
+            "date": "2026-06-18"
+          },
+          {
+            "desc": "Rent",
+            "amt": 100,
+            "date": "2026-06-18"
+          },
+          {
+            "desc": "Lunch",
+            "amt": 2,
+            "date": "2026-06-19"
+          },
+          {
+            "desc": "Plastic bags ",
+            "amt": 1,
+            "date": "2026-06-20"
+          },
+          {
+            "desc": "Lunch",
+            "amt": 1,
+            "date": "2026-06-20"
+          },
+          {
+            "desc": "Rent ",
+            "amt": 60,
+            "date": "2026-06-21"
+          },
+          {
+            "desc": "Vape payment ",
+            "amt": 75,
+            "date": "2026-06-22"
+          },
+          {
+            "desc": "Lunch ",
+            "amt": 1,
+            "date": "2026-06-23"
+          },
+          {
+            "desc": "Sa Deliveries ",
+            "amt": 5,
+            "date": "2026-06-23"
+          },
+          {
+            "desc": "Rent",
+            "amt": 100,
+            "date": "2026-06-23"
+          },
+          {
+            "desc": "Wood work",
+            "amt": 1,
+            "date": "2026-06-05"
+          },
+          {
+            "desc": "Rent ",
+            "amt": 100,
+            "date": "2026-06-06"
+          },
+          {
+            "desc": "Lunch",
+            "amt": 1,
+            "date": "2026-06-09"
+          },
+          {
+            "desc": "Remt",
+            "amt": 10,
+            "date": "2026-06-09"
+          },
+          {
+            "desc": "Electricity ",
+            "amt": 40,
+            "date": "2026-06-10"
+          },
+          {
+            "desc": "Rent",
+            "amt": 100,
+            "date": "2026-06-10"
+          },
+          {
+            "desc": "Lunch",
+            "amt": 1,
+            "date": "2026-06-12"
+          },
+          {
+            "desc": "Rent",
+            "amt": 100,
+            "date": "2026-06-12"
+          },
+          {
+            "desc": "Lunch",
+            "amt": 1,
+            "date": "2026-06-13"
+          },
+          {
+            "desc": "Lunch",
+            "amt": 2,
+            "date": "2026-06-15"
+          },
+          {
+            "desc": "Rent",
+            "amt": 10,
+            "date": "2026-06-16"
+          },
+          {
+            "desc": "Data",
+            "amt": 18,
+            "date": "2026-06-17"
+          },
+          {
+            "desc": "Fuel",
+            "amt": 20,
+            "date": "2026-06-05"
+          },
+          {
+            "desc": "Cell-tape",
+            "amt": 5,
+            "date": "2026-06-06"
+          },
+          {
+            "desc": "Uncle dutch ",
+            "amt": 3,
+            "date": "2026-06-08"
+          },
+          {
+            "desc": "Lunch ",
+            "amt": 2,
+            "date": "2026-06-10"
+          },
+          {
+            "desc": "Lunch ",
+            "amt": 2,
+            "date": "2026-06-12"
+          },
+          {
+            "desc": "Rent",
+            "amt": 100,
+            "date": "2026-06-13"
+          },
+          {
+            "desc": "Shop fitting ",
+            "amt": 2,
+            "date": "2026-06-15"
+          },
+          {
+            "desc": "Rent",
+            "amt": 100,
+            "date": "2026-06-17"
+          },
+          {
+            "desc": "Lunch",
+            "amt": 3,
+            "date": "2026-06-17"
+          },
+          {
+            "desc": "Rent",
+            "amt": 100,
+            "date": "2026-06-19"
+          },
+          {
+            "desc": "Fuel",
+            "amt": 20,
+            "date": "2026-06-19"
+          },
+          {
+            "desc": "Rent",
+            "amt": 100,
+            "date": "2026-06-20"
+          },
+          {
+            "desc": "Medicals",
+            "amt": 200,
+            "date": "2026-06-21"
+          },
+          {
+            "desc": "Lunch ",
+            "amt": 2,
+            "date": "2026-06-22"
+          },
+          {
+            "desc": "Rings",
+            "amt": 20,
+            "date": "2026-06-22"
+          },
+          {
+            "desc": "Lunch ",
+            "amt": 2,
+            "date": "2026-06-24"
+          },
+          {
+            "desc": "Lunch ",
+            "amt": 3,
+            "date": "2026-06-26"
+          },
+          {
+            "desc": "Ashton ",
+            "amt": 1,
+            "date": "2026-06-26"
+          },
+          {
+            "desc": "Rent ",
+            "amt": 100,
+            "date": "2026-06-26"
+          },
+          {
+            "desc": "Uncle dutch lunch ",
+            "amt": 1,
+            "date": "2026-06-27"
+          },
+          {
+            "desc": "Fuel",
+            "amt": 10,
+            "date": "2026-06-27"
+          },
+          {
+            "desc": "Lunch ",
+            "amt": 2,
+            "date": "2026-06-27"
+          },
+          {
+            "desc": "Affidavits ",
+            "amt": 3,
+            "date": "2026-06-27"
+          },
+          {
+            "desc": "Rent ",
+            "amt": 100,
+            "date": "2026-06-27"
+          },
+          {
+            "desc": "Rent ",
+            "amt": 100,
+            "date": "2026-06-27"
+          },
+          {
+            "desc": "Rent",
+            "amt": 10,
+            "date": "2026-06-25"
+          },
+          {
+            "desc": "Rent",
+            "amt": 100,
+            "date": "2026-06-21"
+          },
+          {
+            "desc": "Rent",
+            "amt": 100,
+            "date": "2026-06-05"
+          },
+          {
+            "desc": "Refund(stanley cup customer)",
+            "amt": 30,
+            "date": "2026-06-01"
+          },
+          {
+            "desc": "Rent",
+            "amt": 240,
+            "date": "2026-06-01"
+          },
+          {
+            "desc": "Lunch ",
+            "amt": 2,
+            "date": "2026-06-01"
+          },
+          {
+            "desc": "Vape payment ",
+            "amt": 20,
+            "date": "2026-06-01"
+          },
+          {
+            "desc": "Rent ",
+            "amt": 100,
+            "date": "2026-06-01"
+          },
+          {
+            "desc": "Fuel uncle dutch",
+            "amt": 10,
+            "date": "2026-06-02"
+          },
+          {
+            "desc": "SA delivery",
+            "amt": 2.5,
+            "date": "2026-06-02"
+          },
+          {
+            "desc": "SA delivery",
+            "amt": 5,
+            "date": "2026-06-02"
+          },
+          {
+            "desc": "Lunch ",
+            "amt": 2,
+            "date": "2026-06-02"
+          },
+          {
+            "desc": "Rent",
+            "amt": 10,
+            "date": "2026-06-02"
+          },
+          {
+            "desc": "Rent",
+            "amt": 100,
+            "date": "2026-06-02"
+          },
+          {
+            "desc": "Lunch ",
+            "amt": 1,
+            "date": "2026-06-02"
+          },
+          {
+            "desc": "Data",
+            "amt": 10,
+            "date": "2026-06-02"
+          },
+          {
+            "desc": "Rent ",
+            "amt": 100,
+            "date": "2026-06-02"
+          },
+          {
+            "desc": "Bank transfer ",
+            "amt": 365,
+            "date": "2026-06-02"
+          },
+          {
+            "desc": "Lunch ",
+            "amt": 2,
+            "date": "2026-06-03"
+          },
+          {
+            "desc": "Rent ",
+            "amt": 100,
+            "date": "2026-06-03"
+          },
+          {
+            "desc": "Zesa",
+            "amt": 73,
+            "date": "2026-06-03"
+          },
+          {
+            "desc": "Fuel",
+            "amt": 20,
+            "date": "2026-06-03"
+          },
+          {
+            "desc": "Uncle d lunch",
+            "amt": 3,
+            "date": "2026-06-03"
+          },
+          {
+            "desc": "Lunch",
+            "amt": 2,
+            "date": "2026-06-03"
+          },
+          {
+            "desc": "Lunch ",
+            "amt": 2,
+            "date": "2026-06-04"
+          },
+          {
+            "desc": "Rent ",
+            "amt": 100,
+            "date": "2026-06-04"
+          },
+          {
+            "desc": "Check up",
+            "amt": 20,
+            "date": "2026-06-04"
+          },
+          {
+            "desc": "Pos",
+            "amt": 60,
+            "date": "2026-06-04"
+          },
+          {
+            "desc": "Lunch",
+            "amt": 2,
+            "date": "2026-06-04"
+          },
+          {
+            "desc": "Lunch ",
+            "amt": 2,
+            "date": "2026-06-05"
+          },
+          {
+            "desc": "Rent ",
+            "amt": 100,
+            "date": "2026-06-05"
+          },
+          {
+            "desc": "Fuel ",
+            "amt": 20,
+            "date": "2026-06-06"
+          },
+          {
+            "desc": "Lunch ",
+            "amt": 3,
+            "date": "2026-06-06"
+          },
+          {
+            "desc": "Lunch ",
+            "amt": 1,
+            "date": "2026-06-07"
+          },
+          {
+            "desc": "Rent ",
+            "amt": 100,
+            "date": "2026-06-11"
+          },
+          {
+            "desc": "Rent ",
+            "amt": 100,
+            "date": "2026-06-12"
+          },
+          {
+            "desc": "Rent",
+            "amt": 10,
+            "date": "2026-06-12"
+          },
+          {
+            "desc": "Rent ",
+            "amt": 100,
+            "date": "2026-06-13"
+          },
+          {
+            "desc": "Dog",
+            "amt": 40,
+            "date": "2026-06-13"
+          },
+          {
+            "desc": "Lunch ",
+            "amt": 2,
+            "date": "2026-06-15"
+          },
+          {
+            "desc": "Nassa",
+            "amt": 20,
+            "date": "2026-06-15"
+          },
+          {
+            "desc": "Lunch",
+            "amt": 2,
+            "date": "2026-06-16"
+          },
+          {
+            "desc": "Lunch ",
+            "amt": 2,
+            "date": "2026-06-17"
+          },
+          {
+            "desc": "Ashton ",
+            "amt": 10,
+            "date": "2026-06-19"
+          },
+          {
+            "desc": "Lunch",
+            "amt": 2,
+            "date": "2026-06-25"
+          },
+          {
+            "desc": "Home use ",
+            "amt": 50,
+            "date": "2026-06-28"
+          },
+          {
+            "desc": "Lunch ",
+            "amt": 1,
+            "date": "2026-06-28"
+          },
+          {
+            "desc": "Eddie transport",
+            "amt": 30,
+            "date": "2026-06-29"
+          },
+          {
+            "desc": "Fuel",
+            "amt": 20,
+            "date": "2026-06-29"
+          },
+          {
+            "desc": "Lunch",
+            "amt": 3,
+            "date": "2026-06-29"
+          },
+          {
+            "desc": "Rent ",
+            "amt": 10,
+            "date": "2026-06-26"
+          },
+          {
+            "desc": "Lunch ",
+            "amt": 2,
+            "date": "2026-06-26"
+          },
+          {
+            "desc": "Sa",
+            "amt": 30,
+            "date": "2026-06-26"
+          },
+          {
+            "desc": "Lunch ",
+            "amt": 2,
+            "date": "2026-06-29"
+          },
+          {
+            "desc": "Lunch ",
+            "amt": 2,
+            "date": "2026-06-29"
+          },
+          {
+            "desc": "Rent ",
+            "amt": 100,
+            "date": "2026-06-29"
+          },
+          {
+            "desc": "Rent",
+            "amt": 10,
+            "date": "2026-06-29"
+          },
+          {
+            "desc": "Rent",
+            "amt": 10,
+            "date": "2026-06-27"
+          },
+          {
+            "desc": "Lunch ",
+            "amt": 2,
+            "date": "2026-06-27"
+          },
+          {
+            "desc": "Maria transport ",
+            "amt": 1,
+            "date": "2026-06-29"
+          },
+          {
+            "desc": "Rent",
+            "amt": 100,
+            "date": "2026-06-29"
+          },
+          {
+            "desc": "Mozambique ",
+            "amt": 20,
+            "date": "2026-06-30"
+          },
+          {
+            "desc": "Lunch ",
+            "amt": 15,
+            "date": "2026-06-30"
+          },
+          {
+            "desc": "Baby wipers,diapers n lotion",
+            "amt": 24,
+            "date": "2026-06-30"
+          },
+          {
+            "desc": "Licence ",
+            "amt": 98,
+            "date": "2026-06-30"
+          },
+          {
+            "desc": "Rent ",
+            "amt": 100,
+            "date": "2026-06-30"
+          },
+          {
+            "desc": "Lunch ",
+            "amt": 1,
+            "date": "2026-06-30"
+          },
+          {
+            "desc": "Rent",
+            "amt": 100,
+            "date": "2026-06-30"
+          },
+          {
+            "desc": "Rent",
+            "amt": 10,
+            "date": "2026-06-30"
+          },
+          {
+            "desc": "Lunch ",
+            "amt": 2,
+            "date": "2026-06-30"
+          }
+        ],
+        "salaries": [
+          {
+            "desc": "Salaries ",
+            "amt": 90,
+            "date": "2026-06-10"
+          },
+          {
+            "desc": "Salaries ",
+            "amt": 20,
+            "date": "2026-06-10"
+          },
+          {
+            "desc": "Ashton salaries ",
+            "amt": 20,
+            "date": "2026-06-16"
+          },
+          {
+            "desc": "Salaries ",
+            "amt": 20,
+            "date": "2026-06-26"
+          },
+          {
+            "desc": "Salaries Ashton",
+            "amt": 20,
+            "date": "2026-06-02"
+          },
+          {
+            "desc": "Salaries ",
+            "amt": 20,
+            "date": "2026-06-29"
+          }
+        ],
+        "perfumeTransfers": [
+          {
+            "desc": "Perfume ",
+            "amt": 40,
+            "date": "2026-06-09"
+          },
+          {
+            "desc": "Perfume ",
+            "amt": 20,
+            "date": "2026-06-11"
+          },
+          {
+            "desc": "Perfume ",
+            "amt": 180,
+            "date": "2026-06-17"
+          },
+          {
+            "desc": "Perfume ",
+            "amt": 70,
+            "date": "2026-06-22"
+          },
+          {
+            "desc": "Perfume ",
+            "amt": 30,
+            "date": "2026-06-24"
+          },
+          {
+            "desc": "Perfume ",
+            "amt": 10,
+            "date": "2026-06-15"
+          },
+          {
+            "desc": "Perfume",
+            "amt": 60,
+            "date": "2026-06-16"
+          },
+          {
+            "desc": "Perfume ",
+            "amt": 40,
+            "date": "2026-06-18"
+          },
+          {
+            "desc": "Perfumes - 30 is in ecocash Dutch will cash out  | Edited by Owner (owner-1) @ 2026-06-22T15:56:57.001Z | Prev: $50.00: Perfumes | Edited by Owner (owner-1) @ 2026-06-22T15:58:17.419Z | Prev: $20.00: Perfumes - 30 is in ecocash Dutch will cash out  | Edited by Owner (owner-1) @ 2026-06-22T15:56:57.001Z | Prev: $50.00: Perfumes",
+            "amt": 50,
+            "date": "2026-06-22"
+          },
+          {
+            "desc": "Perfumes",
+            "amt": 70,
+            "date": "2026-06-23"
+          },
+          {
+            "desc": "Perfumes ",
+            "amt": 130,
+            "date": "2026-06-25"
+          },
+          {
+            "desc": "Perfume ",
+            "amt": 30,
+            "date": "2026-06-06"
+          },
+          {
+            "desc": "Perfume ",
+            "amt": 40,
+            "date": "2026-06-12"
+          },
+          {
+            "desc": "Perfume ",
+            "amt": 10,
+            "date": "2026-06-13"
+          },
+          {
+            "desc": "Perfume",
+            "amt": 40,
+            "date": "2026-06-18"
+          },
+          {
+            "desc": "Perfumes",
+            "amt": 80,
+            "date": "2026-06-20"
+          },
+          {
+            "desc": "Perfume ",
+            "amt": 20,
+            "date": "2026-06-23"
+          },
+          {
+            "desc": "Perfume ",
+            "amt": 40,
+            "date": "2026-06-27"
+          },
+          {
+            "desc": "Perfume ",
+            "amt": 50,
+            "date": "2026-06-21"
+          },
+          {
+            "desc": "Perfume",
+            "amt": 30,
+            "date": "2026-06-01"
+          },
+          {
+            "desc": "Perfume | Edited by Owner (owner-1) @ 2026-06-01T15:53:05.932Z | Prev: $30.00: Perfume",
+            "amt": 0,
+            "date": "2026-06-01"
+          },
+          {
+            "desc": "Perfume ",
+            "amt": 20,
+            "date": "2026-06-01"
+          },
+          {
+            "desc": "Perfume ",
+            "amt": 10,
+            "date": "2026-06-02"
+          },
+          {
+            "desc": "Perfume ",
+            "amt": 140,
+            "date": "2026-06-03"
+          },
+          {
+            "desc": "Perfume",
+            "amt": 30,
+            "date": "2026-06-03"
+          },
+          {
+            "desc": "Perfume | Edited by Owner (owner-1) @ 2026-06-03T16:00:54.898Z | Prev: $30.00: Perfume",
+            "amt": 0,
+            "date": "2026-06-03"
+          },
+          {
+            "desc": "Perfume ",
+            "amt": 90,
+            "date": "2026-06-04"
+          },
+          {
+            "desc": "Perfume ",
+            "amt": 60,
+            "date": "2026-06-05"
+          },
+          {
+            "desc": "Perfume ",
+            "amt": 70,
+            "date": "2026-06-10"
+          },
+          {
+            "desc": "Perfume ",
+            "amt": 50,
+            "date": "2026-06-28"
+          },
+          {
+            "desc": "Perfume ",
+            "amt": 30,
+            "date": "2026-06-29"
+          }
+        ],
+        "posStockOrders": [
+          {
+            "desc": "Stockvel ",
+            "amt": 300,
+            "date": "2026-06-06"
+          },
+          {
+            "desc": "China order",
+            "amt": 50,
+            "date": "2026-06-19"
+          },
+          {
+            "desc": "Stock delivery ",
+            "amt": 5,
+            "date": "2026-06-21"
+          },
+          {
+            "desc": "Harare stock ",
+            "amt": 35,
+            "date": "2026-06-26"
+          },
+          {
+            "desc": "China",
+            "amt": 40,
+            "date": "2026-06-27"
+          },
+          {
+            "desc": "City stock ",
+            "amt": 40,
+            "date": "2026-06-08"
+          },
+          {
+            "desc": "Citystock",
+            "amt": 10,
+            "date": "2026-06-10"
+          },
+          {
+            "desc": "Harare order",
+            "amt": 30,
+            "date": "2026-06-16"
+          },
+          {
+            "desc": "City stock thermal cups",
+            "amt": 20,
+            "date": "2026-06-19"
+          },
+          {
+            "desc": "Sa order",
+            "amt": 400,
+            "date": "2026-06-26"
+          },
+          {
+            "desc": "China",
+            "amt": 100,
+            "date": "2026-06-08"
+          },
+          {
+            "desc": "City stock",
+            "amt": 10,
+            "date": "2026-06-13"
+          },
+          {
+            "desc": "Citystock buttonsticks",
+            "amt": 12,
+            "date": "2026-06-17"
+          },
+          {
+            "desc": "SA order ",
+            "amt": 500,
+            "date": "2026-06-23"
+          },
+          {
+            "desc": "City stock buttonstick",
+            "amt": 18,
+            "date": "2026-06-01"
+          },
+          {
+            "desc": "City stock boots",
+            "amt": 30,
+            "date": "2026-06-02"
+          },
+          {
+            "desc": "City stock ",
+            "amt": 10,
+            "date": "2026-06-08"
+          },
+          {
+            "desc": "City stock ",
+            "amt": 30,
+            "date": "2026-06-09"
+          },
+          {
+            "desc": "China order",
+            "amt": 312,
+            "date": "2026-06-29"
+          }
+        ],
+        "personalAndFamily": [
+          {
+            "desc": "Uncle dutch | Edited by Owner (owner-1) @ 2026-06-12T16:11:28.991Z | Prev: $50.00: Uncle dutch",
+            "amt": 30,
+            "date": "2026-06-12"
+          }
+        ],
+        "groceries": [
+          {
+            "desc": "Home groceries ",
+            "amt": 20,
+            "date": "2026-06-07"
+          },
+          {
+            "desc": "Groceries ",
+            "amt": 20,
+            "date": "2026-06-10"
+          },
+          {
+            "desc": "Groceries | Edited by Owner (owner-1) @ 2026-06-20T15:57:19.711Z | Prev: $20.00: Groceries",
+            "amt": 0,
+            "date": "2026-06-20"
+          },
+          {
+            "desc": "Groceries",
+            "amt": 20,
+            "date": "2026-06-20"
+          },
+          {
+            "desc": "Groceries ",
+            "amt": 20,
+            "date": "2026-06-23"
+          },
+          {
+            "desc": "Groceries",
+            "amt": 30,
+            "date": "2026-06-01"
+          },
+          {
+            "desc": "Groceries ",
+            "amt": 40,
+            "date": "2026-06-30"
+          }
+        ],
+        "tithes": [
+          {
+            "desc": "Tithe ",
+            "amt": 15,
+            "date": "2026-06-13"
+          },
+          {
+            "desc": "Uncle D ",
+            "amt": 85,
+            "date": "2026-06-14"
+          },
+          {
+            "desc": "Tithe ",
+            "amt": 10,
+            "date": "2026-06-18"
+          },
+          {
+            "desc": "Tithe ",
+            "amt": 5,
+            "date": "2026-06-23"
+          },
+          {
+            "desc": "Tithe ",
+            "amt": 20,
+            "date": "2026-06-24"
+          },
+          {
+            "desc": "Tithe ",
+            "amt": 5,
+            "date": "2026-06-11"
+          },
+          {
+            "desc": "Tithe ",
+            "amt": 15,
+            "date": "2026-06-12"
+          },
+          {
+            "desc": "Dutch ",
+            "amt": 70,
+            "date": "2026-06-07"
+          },
+          {
+            "desc": "Tithe ",
+            "amt": 25,
+            "date": "2026-06-09"
+          },
+          {
+            "desc": "Tithe ",
+            "amt": 10,
+            "date": "2026-06-10"
+          },
+          {
+            "desc": "Tithe ",
+            "amt": 10,
+            "date": "2026-06-17"
+          },
+          {
+            "desc": "Dutch ",
+            "amt": 60,
+            "date": "2026-06-21"
+          },
+          {
+            "desc": "Dutch ",
+            "amt": 110,
+            "date": "2026-06-07"
+          },
+          {
+            "desc": "Tithe withdrawal",
+            "amt": 130,
+            "date": "2026-06-07"
+          },
+          {
+            "desc": "Tithe ",
+            "amt": 10,
+            "date": "2026-06-16"
+          },
+          {
+            "desc": "Tithe ",
+            "amt": 30,
+            "date": "2026-06-22"
+          },
+          {
+            "desc": "Tithe ",
+            "amt": 25,
+            "date": "2026-06-25"
+          },
+          {
+            "desc": "Tithe ",
+            "amt": 40,
+            "date": "2026-06-06"
+          },
+          {
+            "desc": "Dutch ",
+            "amt": 86,
+            "date": "2026-06-07"
+          },
+          {
+            "desc": "Tithe ",
+            "amt": 5,
+            "date": "2026-06-13"
+          },
+          {
+            "desc": "Tithe ",
+            "amt": 5,
+            "date": "2026-06-20"
+          },
+          {
+            "desc": "Tithe ",
+            "amt": 5,
+            "date": "2026-06-26"
+          },
+          {
+            "desc": "Tithe ",
+            "amt": 50,
+            "date": "2026-06-27"
+          },
+          {
+            "desc": "Tithe ",
+            "amt": 5,
+            "date": "2026-06-01"
+          },
+          {
+            "desc": "Tithe ",
+            "amt": 30,
+            "date": "2026-06-02"
+          },
+          {
+            "desc": "Tithe ",
+            "amt": 5,
+            "date": "2026-06-03"
+          },
+          {
+            "desc": "Tithe ",
+            "amt": 15,
+            "date": "2026-06-04"
+          },
+          {
+            "desc": "Tithe",
+            "amt": 10,
+            "date": "2026-06-05"
+          },
+          {
+            "desc": "Tithe ",
+            "amt": 5,
+            "date": "2026-06-15"
+          },
+          {
+            "desc": "Tithe ",
+            "amt": 20,
+            "date": "2026-06-19"
+          },
+          {
+            "desc": "Uncle Dutch ",
+            "amt": 135,
+            "date": "2026-06-28"
+          },
+          {
+            "desc": "balance",
+            "amt": 104,
+            "date": "2026-06-29"
+          },
+          {
+            "desc": "Tithe ",
+            "amt": 30,
+            "date": "2026-06-29"
+          },
+          {
+            "desc": "Tithe ",
+            "amt": 10,
+            "date": "2026-06-30"
+          }
+        ],
+        "bankVaultSavings": [
+          {
+            "desc": "Black box ",
+            "amt": 100,
+            "date": "2026-06-18"
+          },
+          {
+            "desc": "Black box ",
+            "amt": 270,
+            "date": "2026-06-23"
+          },
+          {
+            "desc": "Black box ",
+            "amt": 60,
+            "date": "2026-06-06"
+          },
+          {
+            "desc": "Black box ",
+            "amt": 160,
+            "date": "2026-06-20"
+          },
+          {
+            "desc": "Savings ",
+            "amt": 40,
+            "date": "2026-06-20"
+          },
+          {
+            "desc": "Black box ",
+            "amt": 150,
+            "date": "2026-06-22"
+          },
+          {
+            "desc": "Savings ",
+            "amt": 37,
+            "date": "2026-06-09"
+          },
+          {
+            "desc": "Savings ",
+            "amt": 10,
+            "date": "2026-06-09"
+          },
+          {
+            "desc": "Savings ",
+            "amt": 10,
+            "date": "2026-06-15"
+          },
+          {
+            "desc": "Savings ",
+            "amt": 10,
+            "date": "2026-06-19"
+          },
+          {
+            "desc": "Black box ",
+            "amt": 120,
+            "date": "2026-06-09"
+          },
+          {
+            "desc": "Black box ",
+            "amt": 230,
+            "date": "2026-06-10"
+          },
+          {
+            "desc": "Black box ",
+            "amt": 50,
+            "date": "2026-06-11"
+          },
+          {
+            "desc": "Black box ",
+            "amt": 170,
+            "date": "2026-06-25"
+          },
+          {
+            "desc": "Savings",
+            "amt": 20,
+            "date": "2026-06-23"
+          },
+          {
+            "desc": "Black box ",
+            "amt": 90,
+            "date": "2026-06-08"
+          },
+          {
+            "desc": "Black box ",
+            "amt": 200,
+            "date": "2026-06-14"
+          },
+          {
+            "desc": "Black box ",
+            "amt": 100,
+            "date": "2026-06-17"
+          },
+          {
+            "desc": "Black box ",
+            "amt": 380,
+            "date": "2026-06-07"
+          },
+          {
+            "desc": "Black box ",
+            "amt": 70,
+            "date": "2026-06-12"
+          },
+          {
+            "desc": "Black box ",
+            "amt": 110,
+            "date": "2026-06-13"
+          },
+          {
+            "desc": "Savings ",
+            "amt": 10,
+            "date": "2026-06-13"
+          },
+          {
+            "desc": "Savings",
+            "amt": 30,
+            "date": "2026-06-16"
+          },
+          {
+            "desc": "Black box ",
+            "amt": 230,
+            "date": "2026-06-26"
+          },
+          {
+            "desc": "Savings ",
+            "amt": 20,
+            "date": "2026-06-02"
+          },
+          {
+            "desc": "Black box ",
+            "amt": 260,
+            "date": "2026-06-03"
+          },
+          {
+            "desc": "Black box ",
+            "amt": 200,
+            "date": "2026-06-05"
+          },
+          {
+            "desc": "Black box ",
+            "amt": 70,
+            "date": "2026-06-19"
+          },
+          {
+            "desc": "Savings ",
+            "amt": 20,
+            "date": "2026-06-25"
+          },
+          {
+            "desc": "Black box ",
+            "amt": 630,
+            "date": "2026-06-28"
+          },
+          {
+            "desc": "Savings ",
+            "amt": 20,
+            "date": "2026-06-29"
+          },
+          {
+            "desc": "Black box ",
+            "amt": 40,
+            "date": "2026-06-29"
+          },
+          {
+            "desc": "Savings ",
+            "amt": 50,
+            "date": "2026-06-27"
+          },
+          {
+            "desc": "Black box ",
+            "amt": 310,
+            "date": "2026-06-30"
+          },
+          {
+            "desc": "Black box ",
+            "amt": 330,
+            "date": "2026-06-30"
+          },
+          {
+            "desc": "Savings ",
+            "amt": 30,
+            "date": "2026-06-30"
+          }
+        ]
+      }
+    }
+  }
+}

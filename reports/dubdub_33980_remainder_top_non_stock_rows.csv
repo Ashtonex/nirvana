@@ -1,0 +1,31 @@
+date,shop,category,amount,title,id
+2026-05-04,kipasa,Rent / overhead,1200,May Rent,94339728-44ed-41ef-af24-7622c10070a0
+2026-04-13,kipasa,Supplier / payables,1110,payables,ce83ec9f-03a1-4d20-abff-22646c0aa5f8
+2026-03-23,operations,Other labelled payout,1000,Yohanne,68495f55-779b-4ad3-a38a-b8acd86c5f40
+2026-07-24,dubdub,Rent / overhead,800,Bank  | Direct POS Entry (dubdub),1b7651df-3342-4078-9450-1a0ed9e0e2e8
+2026-04-09,operations,Other labelled payout,667,Romeo,c5ff7c55-133b-4c28-b7cc-8de9f2ec0869
+2026-03-31,dubdub,Tax / banking,600,Banking,14f71eec-d7ac-4758-8475-b7a0e7d51d1c
+2026-04-29,dubdub,Tax / banking,600,Banking,fa3be7df-c3a5-4c2d-a1b2-c6515f0eb6a3
+2026-06-29,dubdub,Rent / overhead,600,ZIMRA | Direct POS Entry (dubdub),2310fbc6-f6b2-4f34-bb3b-5b2342f74a01
+2026-03-23,operations,Other labelled payout,500,Round - Shakespoon,615a97d6-fd41-49e3-9c83-5643731b2259
+2026-03-31,operations,Other labelled payout,500,Round,25db4546-66e2-4588-9be1-bd6162d4dabc
+2026-04-07,dubdub,Rent / overhead,500,Rent taken by dutch total of 700 from Dub,81a3ddaf-21d6-4ee7-ab6d-8dafa560c1e1
+2026-04-14,operations,Other labelled payout,500,Round,6e0576d2-5ffd-470e-b44f-30e0b1e9c399
+2026-04-20,operations,Other labelled payout,500,Round,64df26ff-d9c5-4306-970a-ff10cc8625eb
+2026-04-27,operations,Other labelled payout,500,round,d8b35429-2a63-418c-ba5a-95d818d76213
+2026-05-06,operations,Other labelled payout,500,Round,cf1c0fe9-7f96-455a-bfac-b0f29c0fc022
+2026-03-30,kipasa,Tax / banking,450,Banking : ,50e27ec4-a7be-4851-9aa0-d34d58ead6df
+2026-04-09,operations,Other labelled payout,450,Dutch : China  Accomodation,a85fd1ac-13c9-47ad-ab80-ee7df5189d40
+2026-07-10,kipasa,Rent / overhead,400,Nassa | Direct POS Entry (kipasa),38483c5c-3ad7-46bf-95f9-6cef9ae11927
+2026-03-20,operations,Other labelled payout,300,David Chaeruka (Dutch),e1577877-aa43-424a-ab96-8fd7303a42ec
+2026-04-27,operations,Other labelled payout,300,Building Pledge,e2d6f9ac-3eef-4e75-82be-852099b04f5d
+2026-05-06,operations,Rent / overhead,300,Home Rent,61b211f9-1c52-41ef-b246-e8cf21cda069
+2026-05-07,operations,Other labelled payout,300,Harare_Order,8ef21429-4cf8-46a9-8747-22c1f3bcb8b1
+2026-07-03,kipasa,Rent / overhead,300,Pst kethy | Direct POS Entry (kipasa),04c2b103-2946-4464-b4cf-8277a6bbdf11
+2026-04-07,kipasa,Rent / overhead,270,Home Rent taken by Dutch,1c3360c5-1142-44f7-87e9-ee6e05d6dbb9
+2026-03-23,kipasa,Tax / banking,250,Banking,430d812c-e360-461f-82e9-5d202be9ccb8
+2026-05-04,operations,Other labelled payout,240,Balance Accounts,0b4e4314-5357-4259-a052-1c3e08d9d101
+2026-04-07,operations,Rent / overhead,200,200 Rent taken from dub total 700 by dutch,0fad5562-456e-4996-9165-ce7f489d7838
+2026-04-16,operations,Other labelled payout,200,Mr banda,f5d0aad4-945b-49fb-9ba7-be1d0b192d9c
+2026-04-29,dubdub,Other labelled payout,160,Balance ,e2adf79c-0a3a-4eea-922e-d6abdf3ca339
+2026-05-28,operations,Salaries / wages,160,Salaries,d33a7dc7-9c87-4eaf-bf91-ace24bc5f91d

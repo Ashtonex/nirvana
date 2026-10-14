@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
 import { sendEmail } from '@/lib/email';
+import { getStaffSessionEmployeeId, requireOwnerAccess } from '@/lib/api-auth';
 
 async function generateEODForDate(shopId: string, dateStr: string) {
   const targetDate = new Date(dateStr);
@@ -189,6 +190,12 @@ async function generateEODForDate(shopId: string, dateStr: string) {
 }
 
 export async function POST(request: Request) {
+  const staffEmployeeId = await getStaffSessionEmployeeId();
+  const ownerAccess = await requireOwnerAccess(request);
+  if (!staffEmployeeId && !ownerAccess.ok) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
   try {
     const formData = await request.formData();
     const shopId = formData.get('shopId') as string;

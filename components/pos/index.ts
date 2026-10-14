@@ -4,3 +4,7 @@ export * from './TicketSidebar';
 export * from './TenderModal';
 export * from './CashierSwitchModal';
 export * from './RegisterDrawerModal';
+export * from './ReturnModal';
+export * from './AddStockModal';
+export * from './PoolClosingModal';
+export * from './ManagerWorkspaceModal';

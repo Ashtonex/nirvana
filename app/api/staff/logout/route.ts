@@ -13,7 +13,7 @@ export async function POST() {
 
   jar.set("nirvana_staff", "", {
     httpOnly: true,
-    secure: true,
+    secure: process.env.NODE_ENV === "production",
     sameSite: "lax",
     path: "/",
     maxAge: 0,

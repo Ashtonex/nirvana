@@ -1,0 +1,52 @@
+{
+  "generatedAt": "2026-08-02T20:28:57.255Z",
+  "hypothesis": {
+    "months": 7,
+    "monthlyDubDubTransfer": 4500,
+    "totalDubDubTransfer": 31500,
+    "monthlyRunningCost": 3000,
+    "totalRunningCost": 21000,
+    "preTaxSurplus": 10500,
+    "taxRate": 0.155,
+    "tax": 1627.5,
+    "afterTaxSurplus": 8872.5,
+    "monthlyRentProvision": 2000,
+    "totalRentProvision": 14000,
+    "monthlyRentPaid": 1200,
+    "totalRentPaid": 8400,
+    "rentExtra": 5600,
+    "expectedRetained": 14472.5
+  },
+  "actual": {
+    "dubDubPool": 33980,
+    "stockOrders": 17737,
+    "otherLabelledPayout": 7638,
+    "supplierPayables": 1110,
+    "salaries": 260,
+    "utilities": 124,
+    "transport": 35,
+    "groceries": 10,
+    "investPerfumes": 0.01,
+    "taxBanking": 1950,
+    "rentPaid": 5015,
+    "visibleRemainder": 100.99,
+    "otherOperating": 9177.01,
+    "runningCostComparable": 26914.010000000002,
+    "preTaxSurplus": 7065.989999999998,
+    "modelTaxOnActualSurplus": 1095.2284499999996,
+    "afterModelTaxSurplus": 5970.761549999998,
+    "actualRentExtraIfRingfenced": 8985,
+    "modeledRetainedIfRentRingfenced": 14955.76155,
+    "visibleCashAfterLabelledUses": 100.98999999999796
+  },
+  "variance": {
+    "expectedRetainedVsVisibleCash": -14371.510000000002,
+    "inflow": 2480,
+    "runningCost": 5914.010000000002,
+    "taxBanking": 322.5,
+    "rentPaid": -3385,
+    "modeledRetainedIfRingfencedGap": 483.26154999999926,
+    "missingRentReserveControl": 14000
+  },
+  "source": "G:\\work\\ATMCAPPROJECTS\\nirvana\\reports\\dubdub_33980_remainder_after_stock_breakdown.json"
+}

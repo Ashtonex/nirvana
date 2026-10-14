@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
 import { cookies } from 'next/headers';
 import { createHash } from 'crypto';
+import { requireOwnerAccess } from '@/lib/api-auth';
 
 async function getStaffIdFromCookie() {
     const token = (await cookies()).get('nirvana_staff')?.value;
@@ -25,9 +26,12 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: 'Missing code or employeeId' }, { status: 400 });
         }
 
-        // Staff can only confirm verification for themselves.
+        // Staff can only confirm verification for themselves (or owners can bypass).
         const staffId = await getStaffIdFromCookie();
-        if (staffId && staffId !== employeeId) {
+        const ownerAccess = await requireOwnerAccess(request);
+        const isOwner = ownerAccess.ok;
+
+        if (!isOwner && (!staffId || staffId !== employeeId)) {
             return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
         }
 

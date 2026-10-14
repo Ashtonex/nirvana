@@ -116,7 +116,27 @@ export async function POST(req: Request) {
 
   const saleQty = Number(sale.quantity || 0);
   if (saleQty <= 0) return NextResponse.json({ error: "Invalid sale quantity" }, { status: 400 });
-  if (quantity > saleQty) return NextResponse.json({ error: "Return quantity exceeds sale" }, { status: 400 });
+
+  // Query prior returns for this sale to ensure remaining returnable quantity is not exceeded
+  const { data: priorReturns } = await supabaseAdmin
+    .from("sales")
+    .select("quantity,client_name,notes")
+    .eq("shop_id", sale.shop_id)
+    .lt("total_with_tax", 0);
+
+  const alreadyReturned = (priorReturns || []).filter((r: any) => {
+    const cName = String(r.client_name || "");
+    const n = String(r.notes || "");
+    return cName.includes(`[REF:${sale.id}]`) || n.includes(`[REF:${sale.id}]`) || cName.includes(sale.id);
+  }).reduce((sum: number, r: any) => sum + Math.abs(Number(r.quantity || 0)), 0);
+
+  const returnableQty = Math.max(0, saleQty - alreadyReturned);
+  if (returnableQty <= 0) {
+    return NextResponse.json({ error: "This sale has already been fully refunded/returned." }, { status: 400 });
+  }
+  if (quantity > returnableQty) {
+    return NextResponse.json({ error: `Return quantity (${quantity}) exceeds remaining returnable units (${returnableQty}).` }, { status: 400 });
+  }
 
   const perUnitBeforeTax = Number(sale.total_before_tax || 0) / saleQty;
   const perUnitTax = Number(sale.tax || 0) / saleQty;
@@ -142,13 +162,13 @@ export async function POST(req: Request) {
     total_with_tax: totalWithTax,
     date: timestamp,
     employee_id: actor.role === "owner" ? (sale.employee_id || actor.id) : actor.id,
-    client_name: `CREDIT NOTE (${reason})${notes ? ` — ${notes}` : ""}`,
+    client_name: `CREDIT NOTE (${reason})${notes ? ` — ${notes}` : ""} [REF:${sale.id}]`,
     payment_method: sale.payment_method || 'cash',
     // Optional columns (if you add them later)
     transaction_type: "refund",
     original_sale_id: sale.id,
     reason_code: reason,
-    notes,
+    notes: `${notes ? `${notes} | ` : ""}[REF:${sale.id}]`,
     restock,
   };
 

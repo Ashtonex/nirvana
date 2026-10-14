@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { requirePrivilegedActor, requireStaffActor, isPrivilegedRole } from "@/lib/apiAuth";
-import { classifyOperationsAccount, getOperationsComputedBalance, isOverheadContributionKind, isOverheadPaymentKind } from "@/lib/operations";
+import { classifyOperationsAccount, getOperationsComputedBalance, getOperationsVaultImpact, isOverheadContributionKind, isOverheadPaymentKind } from "@/lib/operations";
 import { supabaseAdmin } from "@/lib/supabase";
 
 export const runtime = "nodejs";
@@ -34,7 +34,7 @@ export async function GET() {
     const { data: ledgerRows } = await ledgerQuery;
 
     const computedBalance = actorShopId
-      ? (ledgerRows || []).reduce((sum: number, row: any) => sum + Number(row.amount || 0), 0)
+      ? (ledgerRows || []).reduce((sum: number, row: any) => sum + getOperationsVaultImpact(row), 0)
       : await getOperationsComputedBalance();
     
     const shopTotals: Record<string, number> = {};

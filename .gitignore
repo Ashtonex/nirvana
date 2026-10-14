@@ -60,3 +60,5 @@ android/.kotlin/
 
 # scratch directory for local temp copies
 /scratch
+/tmp/
+.claude/

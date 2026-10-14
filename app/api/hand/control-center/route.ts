@@ -108,11 +108,15 @@ function isHandOperationalExpense(entry: Pick<LedgerRow, 'type' | 'category' | '
   if (String(entry.type || '').toLowerCase() !== 'expense') return false;
   if (isSavingsOrBlackboxTransferEntry(entry)) return false;
 
-  const category = String(entry.category || '');
+  const category = String(entry.category || '').toLowerCase().trim();
   const text = `${entry.category || ''} ${entry.description || ''}`.toLowerCase();
 
-  if (category === 'Perfume' || category === 'Transfer') return false;
-  if (text.includes('perfume')) return false;
+  if (['perfume', 'transfer', 'operations transfer', 'stock orders', 'stock', 'overhead', 'groceries', 'personal use', 'tithe'].includes(category)) {
+    return false;
+  }
+  if (/(perfume|invest|stock order|buying stock|rent|salary|salaries|wage|payroll|personal|owner|drawing|grocer|grocery|supermarket|tithe|church|blackbox|black box|saving|savings|transfer|operations transfer)/.test(text)) {
+    return false;
+  }
 
   return true;
 }
@@ -432,6 +436,7 @@ export async function GET() {
       const salesValue30d = sum(shopSales30d.map((sale) => sale.total_with_tax));
       const expenseValue = sum(
         shopLedger
+          .filter((entry) => entry.category !== 'Operations Transfer')
           .filter((entry) => String(entry.type || '').toLowerCase() === 'expense' || isSavingsOrBlackboxTransferEntry(entry))
           .map((entry) => entry.amount)
       );

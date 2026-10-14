@@ -61,8 +61,18 @@ import {
 } from "../../actions";
 import { useOfflineSales } from "@/components/useOfflineSales";
 import { thermalPrinter } from "@/lib/thermalPrinter";
-import { CategoryBar, ProductGrid, TenderModal, CashierSwitchModal, RegisterDrawerModal } from "@/components/pos";
 import { cacheCatalogForShop, getLocalCatalogForShop } from "@/lib/local-db";
+import { 
+    CategoryBar, 
+    ProductGrid, 
+    TenderModal, 
+    CashierSwitchModal, 
+    RegisterDrawerModal,
+    ReturnModal,
+    AddStockModal,
+    PoolClosingModal,
+    ManagerWorkspaceModal
+} from "@/components/pos";
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
@@ -368,6 +378,9 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
     const [isEodHistoryModalOpen, setIsEodHistoryModalOpen] = useState(false);
 
     const [isReturnModalOpen, setIsReturnModalOpen] = useState(false);
+    const [isAddStockModalOpen, setIsAddStockModalOpen] = useState(false);
+    const [isPoolClosingModalOpen, setIsPoolClosingModalOpen] = useState(false);
+    const [isManagerWorkspaceOpen, setIsManagerWorkspaceOpen] = useState(false);
     const [returnSaleId, setReturnSaleId] = useState("");
     const [returnQty, setReturnQty] = useState("1");
     const [returnReason, setReturnReason] = useState("Customer return");
@@ -1411,13 +1424,19 @@ Generated via NIRVANA POS`;
         });
     };
 
-    // Gate: require a real physical cash count before End of Day can proceed. Mandatory to enter
-    // (can't skip the modal), but never blocks on a mismatch — see closeCashRegister in
-    // app/actions.ts for why blocking here would repeat an earlier, costly mistake.
+    // Mandatory pool accountability & drawer reconciliation sequence before day closing.
     const beginEndOfDay = () => {
-        if (!confirm('End of day: generate report and log out?')) return;
-        setClosingCountAmount(Number.isFinite(liveCashInDrawer) ? liveCashInDrawer.toFixed(2) : "");
-        setIsClosingCountModalOpen(true);
+        setIsPoolClosingModalOpen(true);
+    };
+
+    const handlePoolClosingConfirmed = async (counted: number, poolConfirmed: boolean) => {
+        setIsPoolClosingModalOpen(false);
+        try {
+            await closeCashRegister(shopId, liveCashInDrawer, counted);
+        } catch (e) {
+            console.warn("closeCashRegister failed (continuing EOD anyway):", e);
+        }
+        continueEndOfDayAndLogout(counted);
     };
 
     const handleConfirmClosingCount = async () => {
@@ -1717,52 +1736,69 @@ Generated via NIRVANA POS`;
                     </div>
                 )}
 
-                <div className="flex flex-wrap items-center gap-2">
-                    {/* NEW CAPITAL METRICS */}
-                    <div className="flex items-center gap-3 w-full sm:w-auto bg-slate-900/50 p-2 rounded-xl border border-slate-800">
-                        <div className="flex flex-col px-2">
-                            <span className="text-[9px] uppercase font-black text-slate-500 tracking-wider">Rent Pool</span>
-                            <span className={cn("text-sm font-black italic", shopRentBalance < 0 ? "text-rose-400" : "text-emerald-400")}>
-                                ${shopRentBalance.toFixed(2)}
-                            </span>
-                        </div>
-                        <div className="w-px h-8 bg-slate-800" />
-                        <div className="flex flex-col px-2">
-                            <span className="text-[9px] uppercase font-black text-slate-500 tracking-wider">Invest Capital</span>
-                            <span className={cn("text-sm font-black italic", shopInvestBalance < 0 ? "text-rose-400" : "text-violet-400")}>
-                                ${shopInvestBalance.toFixed(2)}
-                            </span>
-                        </div>
-                    </div>
-
-                    {canUseManagerTools && (
-                        <Button
-                            onClick={() => setIsManagerToolsOpen(true)}
-                            className="bg-amber-600 hover:bg-amber-500 text-[10px] font-black uppercase italic h-10 px-3 flex items-center gap-2"
-                            title="Admin/Manager tools"
+                {/* SIMPLIFIED POS HEADER — 2 STREAMLINED TIERS */}
+                {/* TIER 1: SHIFT STATUS & DEVICE STRIP */}
+                <div className="flex flex-wrap items-center justify-between gap-2 bg-slate-900/60 border border-slate-800 p-2.5 rounded-2xl backdrop-blur-md">
+                    {/* Left: Cashier & Cash Drawer & Hardware */}
+                    <div className="flex items-center gap-2">
+                        {/* Cashier Quick Switch Button (1s PIN Verification) */}
+                        <button
+                            type="button"
+                            onClick={() => setIsCashierSwitchModalOpen(true)}
+                            className="bg-slate-950 border border-slate-800 hover:border-violet-500/60 px-3 py-1.5 rounded-xl flex items-center gap-2.5 h-10 shadow transition-all cursor-pointer group"
+                            title="Switch Cashier (1s PIN Verification)"
                         >
-                            <ShieldAlert className="h-4 w-4" /> Manager Tools
-                        </Button>
-                    )}
+                            <Users className="h-4 w-4 text-violet-400 group-hover:scale-110 transition-transform" />
+                            <div className="flex flex-col text-left">
+                                <span className="text-[9px] text-slate-500 uppercase font-black leading-none">Cashier</span>
+                                <span className="text-xs font-bold text-slate-200 truncate max-w-[90px]">
+                                    {staffDisplayName || (employees.find((e: any) => e.id === selectedEmployeeId)?.name) || "Select"}
+                                </span>
+                            </div>
+                        </button>
 
+                        {/* Cash Drawer Management */}
+                        <button
+                            type="button"
+                            onClick={() => setIsRegisterDrawerModalOpen(true)}
+                            className="bg-slate-950 border border-slate-800 hover:border-emerald-500/60 px-3 py-1.5 rounded-xl flex items-center gap-2.5 h-10 shadow transition-all cursor-pointer group"
+                            title="Manage Register Drawer (Float, Expenses, Close)"
+                        >
+                            <Coins className="h-4 w-4 text-emerald-400 group-hover:scale-110 transition-transform" />
+                            <div className="flex flex-col text-left">
+                                <span className="text-[9px] text-slate-500 uppercase font-black leading-none">Drawer</span>
+                                <span className="text-xs font-bold text-slate-200 font-mono">${liveCashInDrawer.toFixed(2)}</span>
+                            </div>
+                        </button>
 
+                        {/* Compact Printer & Hardware */}
+                        <div className="hidden sm:flex items-center gap-1 bg-slate-950 border border-slate-800 rounded-xl p-1 h-10">
+                            <Button
+                                onClick={() => handleConnectPrinter('usb')}
+                                disabled={isConnectingPrinter}
+                                variant="ghost"
+                                className={cn(
+                                    "h-8 px-2 text-[9px] font-black uppercase italic flex items-center gap-1 rounded-lg",
+                                    (isPrinterConnected && printerTransport === 'usb') ? "bg-emerald-500/20 text-emerald-400" : "text-slate-500"
+                                )}
+                            >
+                                USB
+                            </Button>
+                            <Button
+                                onClick={() => handleConnectPrinter('bluetooth')}
+                                disabled={isConnectingPrinter}
+                                variant="ghost"
+                                className={cn(
+                                    "h-8 px-2 text-[9px] font-black uppercase italic flex items-center gap-1 rounded-lg",
+                                    (isPrinterConnected && printerTransport === 'bluetooth') ? "bg-blue-500/20 text-blue-400" : "text-slate-500"
+                                )}
+                            >
+                                {isConnectingPrinter && printerTransport === 'bluetooth' ? "..." : "BT"}
+                            </Button>
+                        </div>
 
-                    <Button
-                        onClick={() => window.location.reload()}
-                        className="bg-slate-700 hover:bg-slate-600 text-[10px] font-black uppercase italic h-10 px-3 flex items-center gap-2"
-                        title="Refresh page"
-                    >
-                        <RefreshCcw className="h-4 w-4" /> Refresh
-                    </Button>
-
-                    {db?.settings?.taxMode ? (
-                        <Badge className="bg-emerald-500/10 text-emerald-300 border-emerald-500/20 text-[9px] font-black uppercase">
-                            Tax: {String(db.settings.taxMode).replace(/_/g, " ")} @ {Number(db.settings.taxRate || 0) * 100}%
-                        </Badge>
-                    ) : null}
-
-                    <div className="flex items-center gap-1 bg-slate-900 border border-slate-800 rounded-lg p-1 h-10 px-3">
-                        <div className="flex items-center gap-2 mr-1">
+                        {/* Compact Backlog toggle */}
+                        <div className="hidden md:flex items-center gap-1 bg-slate-950 border border-slate-800 rounded-xl px-2.5 h-10">
                             <input 
                                 type="checkbox" 
                                 id="backlog-mode" 
@@ -1770,233 +1806,144 @@ Generated via NIRVANA POS`;
                                 onChange={(e) => setIsBacklogMode(e.target.checked)}
                                 className="h-3 w-3 rounded border-slate-700 bg-slate-800 text-violet-600 focus:ring-violet-500"
                             />
-                            <label htmlFor="backlog-mode" className="text-[9px] font-black uppercase text-slate-400 cursor-pointer whitespace-nowrap">Backlog</label>
+                            <label htmlFor="backlog-mode" className="text-[9px] font-black uppercase text-slate-400 cursor-pointer ml-1">Backlog</label>
+                            {isBacklogMode && (
+                                <input 
+                                    type="date" 
+                                    value={backlogDate} 
+                                    onChange={(e) => setBacklogDate(e.target.value)}
+                                    className="bg-transparent border-none text-[9px] font-black uppercase text-violet-400 focus:ring-0 w-24 p-0 ml-1"
+                                />
+                            )}
                         </div>
-                        {isBacklogMode && (
-                            <input 
-                                type="date" 
-                                value={backlogDate} 
-                                onChange={(e) => setBacklogDate(e.target.value)}
-                                className="bg-transparent border-none text-[9px] font-black uppercase text-violet-400 focus:ring-0 w-24 p-0 ml-1"
-                            />
+
+                        {db?.settings?.taxMode ? (
+                            <Badge className="bg-emerald-500/10 text-emerald-300 border-emerald-500/20 text-[9px] font-black uppercase hidden lg:inline-flex">
+                                Tax: {Number(db.settings.taxRate || 0) * 100}%
+                            </Badge>
+                        ) : null}
+                    </div>
+
+                    {/* Right: Management Workspace, Refresh & Close Shift */}
+                    <div className="flex items-center gap-2">
+                        {canUseManagerTools && (
+                            <Button
+                                onClick={() => setIsManagerWorkspaceOpen(true)}
+                                className="bg-slate-950 hover:bg-slate-800 border border-amber-500/30 text-amber-300 text-[10px] font-black uppercase italic h-10 px-3 flex items-center gap-1.5 rounded-xl shadow"
+                                title="Open Manager Workspace (Capital Pools, Strategic Reports & Operations)"
+                            >
+                                <ShieldCheck className="h-4 w-4 text-amber-400" /> Manager Workspace
+                            </Button>
                         )}
-                    </div>
 
-                    <div className="flex items-center gap-1 bg-slate-900 border border-slate-800 rounded-lg p-1 h-10">
                         <Button
-                            onClick={() => handleConnectPrinter('usb')}
-                            disabled={isConnectingPrinter}
-                            variant="ghost"
-                            className={cn(
-                                "h-8 px-2 text-[8px] font-black uppercase italic flex items-center gap-1",
-                                (isPrinterConnected && printerTransport === 'usb') ? "bg-emerald-500/20 text-emerald-400" : "text-slate-500"
-                            )}
+                            onClick={() => window.location.reload()}
+                            variant="outline"
+                            className="h-10 w-10 p-0 border-slate-800 text-slate-400 hover:text-white bg-slate-950 rounded-xl"
+                            title="Refresh register"
                         >
-                            USB
+                            <RefreshCcw className="h-4 w-4" />
                         </Button>
+
                         <Button
-                            onClick={() => handleConnectPrinter('bluetooth')}
-                            disabled={isConnectingPrinter}
-                            variant="ghost"
-                            className={cn(
-                                "h-8 px-2 text-[8px] font-black uppercase italic flex items-center gap-1",
-                                (isPrinterConnected && printerTransport === 'bluetooth') ? "bg-blue-500/20 text-blue-400" : "text-slate-500"
-                            )}
+                            onClick={beginEndOfDay}
+                            disabled={isClosingDay}
+                            variant="outline"
+                            className="h-10 px-3 border-rose-500/40 text-rose-400 hover:bg-rose-500/10 text-[10px] font-black uppercase tracking-wider flex items-center gap-2 rounded-xl shadow"
+                            title="Mandatory pool accountability and day closing sequence"
                         >
-                            {isConnectingPrinter && printerTransport === 'bluetooth' ? "..." : "BT"}
+                            <Power className="h-4 w-4 text-rose-500" /> {isClosingDay ? 'Closing...' : 'Close Shift'}
                         </Button>
                     </div>
+                </div>
 
-                    <Button
-                        onClick={async () => {
-                            try {
-                                if (cart.length > 0) {
-                                    // Generate preview receipt from live cart
-                                    const previewItems = cart.map(entry => {
-                                        const netPrice = entry.price / (1 + taxRate);
-                                        const grossPrice = entry.price;
-                                        const lineNet = netPrice * entry.quantity;
-                                        const lineGross = grossPrice * entry.quantity;
-                                        const itemTax = lineGross - lineNet;
+                {/* TIER 2: PRIMARY POS ACTIONS TOOLBAR */}
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
+                        {/* 1. Add Stock (High Touch Primary) */}
+                        <Button
+                            onClick={() => setIsAddStockModalOpen(true)}
+                            className="bg-emerald-600 hover:bg-emerald-500 text-white text-[10px] font-black uppercase italic h-10 px-3.5 flex items-center gap-2 rounded-xl shadow-lg shadow-emerald-600/20 transition-all hover:scale-[1.02]"
+                            title="Add stock to existing SKUs or create new products"
+                        >
+                            <PackagePlus className="h-4 w-4" /> Add Stock
+                        </Button>
 
-                                        return {
-                                            name: entry.item.name,
-                                            quantity: entry.quantity,
-                                            priceNet: netPrice,
-                                            priceGross: grossPrice,
-                                            totalNet: lineNet,
-                                            totalGross: lineGross,
-                                            tax: itemTax
-                                        };
-                                    });
+                        {/* 2. Record Expense */}
+                        <Button
+                            onClick={() => setIsExpenseModalOpen(true)}
+                            variant="outline"
+                            className="h-10 px-3 border-rose-500/30 text-rose-300 hover:bg-rose-500/10 text-[10px] font-black uppercase italic flex items-center gap-1.5 rounded-xl"
+                            title="Record shop expense"
+                        >
+                            <Minus className="h-4 w-4" /> Add Exp.
+                        </Button>
 
-                                    const cashier = employees.find((e: any) => e.id === selectedEmployeeId)?.name || "System";
-                                    const previewReceipt = {
-                                        orderId: "PREVIEW",
-                                        transactionId: "PREVIEW-" + Math.random().toString(36).substring(2, 6).toUpperCase(),
-                                        shopName: shop?.name || "NIRVANA STORE",
-                                        cashier,
-                                        dateStamp: new Date().toLocaleDateString(),
-                                        timeStamp: new Date().toLocaleTimeString(),
-                                        items: previewItems,
-                                        subtotal: totalBeforeTax,
-                                        discount: discountAmount,
-                                        tax: totalTax,
-                                        total: totalDue,
-                                        paymentMethod: paymentMethod.toUpperCase()
-                                    };
-                                    await thermalPrinter.printReceipt(previewReceipt);
-                                } else {
-                                    await thermalPrinter.printTest();
-                                }
-                            } catch (e: any) {
-                                alert("Print failed: " + e.message);
-                            }
-                        }}
-                        className="bg-emerald-600 hover:bg-emerald-500 text-[10px] font-black uppercase italic h-10 px-3 flex items-center gap-2"
-                    >
-                        <Printer className="h-4 w-4" /> {cart.length > 0 ? "Print Preview" : "Test Print"}
-                    </Button>
+                        {/* 3. Product Returns */}
+                        <Button
+                            onClick={() => setIsReturnModalOpen(true)}
+                            variant="outline"
+                            className="h-10 px-3 border-amber-500/40 text-amber-200 hover:bg-amber-500/10 text-[10px] font-black uppercase italic flex items-center gap-1.5 rounded-xl"
+                            title="Process product return or credit note"
+                        >
+                            <Receipt className="h-4 w-4 text-amber-400" /> Returns
+                        </Button>
 
-                    <Button
-                        onClick={() => {
-                            const month = new Date().toISOString().substring(0, 7);
-                            const date = new Date().toISOString().split('T')[0];
-                            window.open(`/api/reports/combined?shopId=${shopId}&month=${month}&date=${date}`, '_blank');
-                        }}
-                        className="bg-indigo-600 hover:bg-indigo-500 text-[10px] font-black uppercase italic h-10 px-3 flex items-center gap-2"
-                        title="Download unified EOD, Monthly and Quarterly master report"
-                    >
-                        <FileText className="h-4 w-4" /> Strategic Master Report
-                    </Button>
+                        {/* 4. Receipts History */}
+                        <Button
+                            onClick={() => setIsReceiptsModalOpen(true)}
+                            variant="outline"
+                            className="h-10 px-3 border-slate-800 text-slate-300 hover:bg-slate-800 text-[10px] font-black uppercase italic flex items-center gap-1.5 rounded-xl"
+                            title="View today's receipts"
+                        >
+                            <FileText className="h-4 w-4 text-slate-400" /> Receipts
+                        </Button>
 
-                    <Button
-                        onClick={beginEndOfDay}
-                        disabled={isClosingDay}
-                        variant="outline"
-                        className="h-10 px-3 border-rose-500/30 text-rose-400 hover:bg-rose-500/10 text-[10px] font-black uppercase italic flex items-center gap-2"
-                        title="End of day + log out"
-                    >
-                        <Power className="h-4 w-4" /> {isClosingDay ? 'Closing...' : 'Power Off'}
-                    </Button>
+                        {/* 5. Lay-bys */}
+                        <Button
+                            onClick={() => setIsLaybyModalOpen(true)}
+                            variant="outline"
+                            className="h-10 px-3 border-sky-500/30 text-sky-200 hover:bg-sky-500/10 text-[10px] font-black uppercase italic flex items-center gap-1.5 rounded-xl"
+                            title="Manage customer lay-bys"
+                        >
+                            <RefreshCcw className="h-4 w-4 text-sky-400" /> Lay-bys
+                        </Button>
 
-                    <Button
-                        onClick={() => setIsEodHistoryModalOpen(true)}
-                        variant="outline"
-                        className="h-10 px-3 border-sky-500/30 text-sky-300 hover:bg-sky-500/10 text-[10px] font-black uppercase italic flex items-center gap-2"
-                        title="View daily reports history"
-                    >
-                        <FileText className="h-4 w-4" /> Reports
-                    </Button>
+                        {/* 6. Staff Chat */}
+                        <Button
+                            onClick={() => (window.location.href = '/staff-chat')}
+                            variant="outline"
+                            className="h-10 px-3 border-slate-800 text-slate-300 hover:bg-slate-800 text-[10px] font-black uppercase italic flex items-center gap-1.5 rounded-xl"
+                            title="Open staff chat"
+                        >
+                            <MessageSquare className="h-4 w-4 text-slate-400" /> Chat
+                        </Button>
+                    </div>
 
-                    <Button
-                        onClick={() => setIsExpenseModalOpen(true)}
-                        variant="outline"
-                        className="h-10 px-3 border-rose-500/30 text-rose-300 hover:bg-rose-500/10 text-[10px] font-black uppercase italic flex items-center gap-2"
-                        title="Record shop expense"
-                    >
-                        <Minus className="h-4 w-4" /> Add Exp.
-                    </Button>
-
-                    <Button
-                        onClick={() => {
-                            setOpsPostAmount("");
-                            setOpsPostNotes("");
-                            setIsOpsPostModalOpen(true);
-                        }}
-                        variant="outline"
-                        className="h-10 px-3 border-emerald-500/30 text-emerald-200 hover:bg-emerald-500/10 text-[10px] font-black uppercase italic flex items-center gap-2"
-                        title="Post cash from drawer to Operations (Master Vault)"
-                    >
-                        <Coins className="h-4 w-4" /> Post Ops
-                    </Button>
-
-                    <Button
-                        onClick={() => {
-                            setDirectOpsAmount("");
-                            setDirectOpsNotes("");
-                            setDirectOpsType("deposit");
-                            setDirectOpsKind("eod_deposit");
-                            setDirectOpsCategory("");
-                            setDirectOpsFundingPool("savings");
-                            setIsDirectOpsModalOpen(true);
-                        }}
-                        variant="outline"
-                        className="h-10 px-3 border-violet-500/30 text-violet-200 hover:bg-violet-500/10 text-[10px] font-black uppercase italic flex items-center gap-2"
-                        title="Direct Operations Deposit or Deduction"
-                    >
-                        <ArrowRightLeft className="h-4 w-4" /> Direct Ops
-                    </Button>
-
-                    <Button
-                        onClick={() => {
-                            setReturnStatus("");
-                            setIsReturnModalOpen(true);
-                        }}
-                        variant="outline"
-                        className="h-10 px-3 border-amber-500/30 text-amber-200 hover:bg-amber-500/10 text-[10px] font-black uppercase italic flex items-center gap-2"
-                        title="Issue return / credit note"
-                    >
-                        <Receipt className="h-4 w-4" /> Return
-                    </Button>
-
-                    <Button
-                        onClick={() => setIsReceiptsModalOpen(true)}
-                        variant="outline"
-                        className="h-10 px-3 border-emerald-500/30 text-emerald-200 hover:bg-emerald-500/10 text-[10px] font-black uppercase italic flex items-center gap-2"
-                        title="View today's receipts"
-                    >
-                        <FileText className="h-4 w-4" /> Receipts
-                    </Button>
-
-                    <Button
-                        onClick={() => setIsExpensesModalOpen(true)}
-                        variant="outline"
-                        className="h-10 px-3 border-rose-500/30 text-rose-200 hover:bg-rose-500/10 text-[10px] font-black uppercase italic flex items-center gap-2"
-                        title="View expenses"
-                    >
-                        <Minus className="h-4 w-4" /> Expenses
-                    </Button>
-
-                    <Button
-                        onClick={() => setIsLaybyModalOpen(true)}
-                        variant="outline"
-                        className="h-10 px-3 border-sky-500/30 text-sky-200 hover:bg-sky-500/10 text-[10px] font-black uppercase italic flex items-center gap-2"
-                        title="Manage pending Lay-bys"
-                    >
-                        <RefreshCcw className="h-4 w-4 text-sky-400" /> Lay-bys
-                    </Button>
-
-                    <Button
-                        onClick={() => (window.location.href = '/staff-chat')}
-                        variant="outline"
-                        className="h-10 px-3 border-slate-700 text-slate-200 hover:bg-slate-800/60 text-[10px] font-black uppercase italic flex items-center gap-2"
-                        title="Open staff chat"
-                    >
-                        <MessageSquare className="h-4 w-4" /> Chat
-                    </Button>
-
-                    <div className="bg-slate-900 border border-slate-800 px-4 py-2 rounded-lg flex items-center gap-3 h-10 shadow-lg w-full sm:w-auto">
-                        <LayoutGrid className="h-4 w-4 text-violet-400" />
-                        <div className="flex flex-col">
-                            <span className="text-[10px] text-slate-500 uppercase font-black leading-none">Shop Stock</span>
-                            <span className="text-xs font-bold text-slate-200">{totalShopStock} Pieces</span>
+                    {/* Stock Count Pill & Logout */}
+                    <div className="flex items-center gap-2">
+                        <div className="bg-slate-900 border border-slate-800 px-3 py-1.5 rounded-xl flex items-center gap-2.5 h-10 shadow">
+                            <LayoutGrid className="h-4 w-4 text-violet-400" />
+                            <div className="flex flex-col">
+                                <span className="text-[9px] text-slate-500 uppercase font-black leading-none">Shop Stock</span>
+                                <span className="text-xs font-bold text-slate-200 font-mono">{totalShopStock} Pieces</span>
+                            </div>
                         </div>
-                    </div>
 
-                    <Button
-                        onClick={async () => {
-                            if (confirm('Log out now?')) {
-                                await fetch('/api/staff/logout', { method: 'POST' });
-                                window.location.href = '/login';
-                            }
-                        }}
-                        variant="outline"
-                        className="h-10 px-3 border-slate-700 text-slate-200 hover:bg-slate-800/60 text-[10px] font-black uppercase italic flex items-center gap-2"
-                        title="Log out"
-                    >
-                        <LogOut className="h-4 w-4" /> Logout
-                    </Button>
+                        <Button
+                            onClick={async () => {
+                                if (confirm('Log out now?')) {
+                                    await fetch('/api/staff/logout', { method: 'POST' });
+                                    window.location.href = '/login';
+                                }
+                            }}
+                            variant="outline"
+                            className="h-10 px-3 border-slate-800 text-slate-400 hover:text-white hover:bg-slate-800 text-[10px] font-black uppercase italic flex items-center gap-1.5 rounded-xl"
+                            title="Log out"
+                        >
+                            <LogOut className="h-4 w-4" />
+                        </Button>
+                    </div>
                 </div>
 
                 <Modal
@@ -2151,88 +2098,7 @@ Generated via NIRVANA POS`;
                     </div>
                 </Modal>
 
-                <div className="flex gap-1.5 sm:gap-2 w-full mt-4 sm:mt-0 sm:w-auto overflow-x-auto pb-2 scrollbar-hide px-2 sm:px-0">
-                    {/* Cashier Quick Switch Button (1s Local PIN) */}
-                    <button
-                        type="button"
-                        onClick={() => setIsCashierSwitchModalOpen(true)}
-                        className="bg-slate-900 border border-slate-800 hover:border-violet-500/60 px-2 sm:px-3 py-2 rounded-lg flex items-center gap-2 sm:gap-3 h-10 shadow-lg min-w-max transition-all cursor-pointer group"
-                        title="Switch Cashier (1s PIN Verification)"
-                    >
-                        <Users className="h-4 w-4 text-violet-400 group-hover:scale-110 transition-transform" />
-                        <div className="flex flex-col text-left">
-                            <span className="text-[9px] sm:text-[10px] text-slate-500 uppercase font-black leading-none">Cashier</span>
-                            <span className="text-xs font-bold text-slate-200 truncate max-w-[80px]">
-                                {staffDisplayName || (employees.find((e: any) => e.id === selectedEmployeeId)?.name) || "Select"}
-                            </span>
-                        </div>
-                    </button>
-
-                    {/* Cash Drawer Management (Open float / Outflow / Close) */}
-                    <button
-                        type="button"
-                        onClick={() => setIsRegisterDrawerModalOpen(true)}
-                        className="bg-slate-900 border border-slate-800 hover:border-emerald-500/60 px-2 sm:px-3 py-2 rounded-lg flex items-center gap-2 sm:gap-3 h-10 shadow-lg min-w-max transition-all cursor-pointer group"
-                        title="Manage Register Drawer (Open Float, Expenses, Close)"
-                    >
-                        <Coins className="h-4 w-4 text-emerald-400 group-hover:scale-110 transition-transform" />
-                        <div className="flex flex-col text-left">
-                            <span className="text-[9px] sm:text-[10px] text-slate-500 uppercase font-black leading-none">Drawer</span>
-                            <span className="text-xs font-bold text-slate-200">${liveCashInDrawer.toFixed(2)}</span>
-                        </div>
-                    </button>
-
-                    <div className="bg-slate-900 border border-slate-800 px-2 sm:px-3 py-2 rounded-lg flex items-center gap-2 sm:gap-3 h-10 shadow-lg min-w-max">
-                        <AlertCircle className="h-4 w-4 text-rose-400" />
-                        <div className="flex flex-col">
-                            <span className="text-[9px] sm:text-[10px] text-slate-500 uppercase font-black leading-none">Exp.</span>
-                            <span className="text-xs font-bold text-slate-200">${todaysPosExpenses.toFixed(2)}</span>
-                        </div>
-                    </div>
-
-                    <div className="bg-slate-900 border border-slate-800 px-2 sm:px-3 py-2 rounded-lg flex items-center gap-2 sm:gap-3 h-10 shadow-lg min-w-max">
-                        <TrendingUp className="h-4 w-4 text-emerald-400" />
-                        <div className="flex flex-col">
-                            <span className="text-[9px] sm:text-[10px] text-slate-500 uppercase font-black leading-none">Ops Inc.</span>
-                            <span className="text-xs font-bold text-emerald-400">+${todaysOpsIncome.toFixed(2)}</span>
-                        </div>
-                    </div>
-
-                    <div className="bg-slate-900 border border-slate-800 px-2 sm:px-3 py-2 rounded-lg flex items-center gap-2 sm:gap-3 h-10 shadow-lg min-w-max">
-                        <Coins className="h-4 w-4 text-amber-400" />
-                        <div className="flex flex-col">
-                            <span className="text-[9px] sm:text-[10px] text-slate-500 uppercase font-black leading-none">Post</span>
-                            <span className="text-xs font-bold text-slate-200">${todaysOpsPosts.toFixed(2)}</span>
-                        </div>
-                    </div>
-
-                    <div className="bg-slate-900 border border-sky-500/30 px-2 sm:px-3 py-2 rounded-lg flex items-center gap-2 sm:gap-3 h-10 shadow-lg min-w-max">
-                        <Sparkles className="h-4 w-4 text-sky-400" />
-                        <div className="flex flex-col">
-                            <span className="text-[9px] sm:text-[10px] text-slate-500 uppercase font-black leading-none">Invest</span>
-                            <span className="text-xs font-bold text-sky-400">${(investBalance?.availableBalance ?? 0).toFixed(2)}</span>
-                        </div>
-                    </div>
-
-                    <button
-                        onClick={() => setIsTitheModalOpen(true)}
-                        className="bg-slate-900 border border-violet-500/30 px-2 sm:px-3 py-2 rounded-lg flex items-center gap-2 sm:gap-3 h-10 shadow-lg min-w-max hover:border-violet-500/60 transition-colors cursor-pointer"
-                    >
-                        <Heart className="h-4 w-4 text-violet-400" />
-                        <div className="flex flex-col">
-                            <span className="text-[9px] sm:text-[10px] text-slate-500 uppercase font-black leading-none">Tithe</span>
-                            <span className="text-xs font-bold text-violet-400">${cumulativeTithe.toFixed(2)}</span>
-                        </div>
-                    </button>
-
-                    <div className={`bg-slate-900 border ${groceriesExceeded ? 'border-red-500/60 bg-red-950/20' : 'border-emerald-500/30'} px-2 sm:px-3 py-2 rounded-lg flex items-center gap-2 sm:gap-3 h-10 shadow-lg min-w-max`}>
-                        <ShoppingCart className={`h-4 w-4 ${groceriesExceeded ? 'text-red-400' : 'text-emerald-400'}`} />
-                        <div className="flex flex-col">
-                            <span className="text-[9px] sm:text-[10px] text-slate-500 uppercase font-black leading-none">Groceries</span>
-                            <span className={`text-xs font-bold ${groceriesExceeded ? 'text-red-400' : 'text-emerald-400'}`}>${currentMonthGroceries.toFixed(2)}</span>
-                        </div>
-                    </div>
-                </div>
+                {/* Obsolete redundant bottom row removed - Cashier & Drawer now reside in Tier 1 Header */}
 
                 <div className="mb-8 p-4 bg-slate-900/60 border border-amber-500/20 rounded-2xl backdrop-blur-sm">
                     <div className="flex items-center gap-2 mb-4">
@@ -3305,138 +3171,77 @@ Generated via NIRVANA POS`;
                 </div>
             </Modal>
 
-            <Modal
+            {/* Product-First Returns & Credit Note Modal */}
+            <ReturnModal
                 isOpen={isReturnModalOpen}
                 onClose={() => setIsReturnModalOpen(false)}
-                title="Return / Credit Note"
-            >
-                <div className="space-y-4">
-                    <p className="text-[10px] text-slate-500 font-bold uppercase">
-                        Manager-only. Select a Sale ID from today's sales or enter manually.
-                    </p>
+                sales={db.sales || []}
+                shopId={shopId}
+                canIssueReturn={canUseManagerTools}
+                onReturnCompleted={(returnId) => {
+                    router.refresh();
+                }}
+            />
 
-                    <div className="space-y-2">
-                        <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Select Sale (Today)</label>
-                        <select
-                            value={returnSaleId}
-                            onChange={(e) => setReturnSaleId(e.target.value)}
-                            className="h-10 bg-slate-950 border border-slate-800 rounded-md text-xs font-bold text-slate-200 px-3 outline-none w-full"
-                        >
-                            <option value="">-- Select a sale --</option>
-                            {todaysSales.map((sale: any) => (
-                                <option key={sale.id} value={sale.id}>
-                                    {sale.id} - {sale.clientName || 'Walk-in'} - ${(sale.totalWithTax || 0).toFixed(2)}
-                                </option>
-                            ))}
-                        </select>
-                    </div>
+            {/* Complete Add Stock Dual-Mode Modal (Existing SKU & New Product) */}
+            <AddStockModal
+                isOpen={isAddStockModalOpen}
+                onClose={() => setIsAddStockModalOpen(false)}
+                shopId={shopId}
+                inventory={inventoryState}
+                shops={db.shops || []}
+                employeeId={selectedEmployeeId}
+                onStockReceived={(item, deltaQty) => {
+                    upsertLocalInventoryItem(item, deltaQty);
+                }}
+            />
 
-                    <div className="space-y-2">
-                        <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Or Enter Sale ID Manually</label>
-                        <Input
-                            value={returnSaleId}
-                            onChange={(e) => setReturnSaleId(e.target.value)}
-                            className="bg-slate-950"
-                            placeholder="e.g. ab12cd3"
-                        />
-                    </div>
+            {/* Mandatory Pool Accountability & Shift Closing Modal */}
+            <PoolClosingModal
+                isOpen={isPoolClosingModalOpen}
+                onClose={() => setIsPoolClosingModalOpen(false)}
+                shopId={shopId}
+                employeeId={selectedEmployeeId}
+                liveCashInDrawer={liveCashInDrawer}
+                shopRentBalance={shopRentBalance}
+                shopInvestBalance={shopInvestBalance}
+                cumulativeTithe={cumulativeTithe}
+                onClosingConfirmed={(counted, poolConfirmed) => {
+                    handlePoolClosingConfirmed(counted, poolConfirmed);
+                }}
+            />
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        <div className="space-y-2">
-                            <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Quantity</label>
-                            <Input
-                                value={returnQty}
-                                onChange={(e) => setReturnQty(e.target.value)}
-                                className="bg-slate-950"
-                                inputMode="numeric"
-                                placeholder="1"
-                            />
-                        </div>
-                        <div className="space-y-2">
-                            <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Restock</label>
-                            <select
-                                value={returnRestock ? "yes" : "no"}
-                                onChange={(e) => setReturnRestock(e.target.value === "yes")}
-                                className="h-10 bg-slate-950 border border-slate-800 rounded-md text-xs font-bold text-slate-200 px-3 outline-none"
-                            >
-                                <option value="yes">Yes (resellable)</option>
-                                <option value="no">No (damaged)</option>
-                            </select>
-                        </div>
-                    </div>
-
-                    <div className="space-y-2">
-                        <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Reason</label>
-                        <select
-                            value={returnReason}
-                            onChange={(e) => setReturnReason(e.target.value)}
-                            className="h-10 bg-slate-950 border border-slate-800 rounded-md text-xs font-bold text-slate-200 px-3 outline-none"
-                        >
-                            <option value="Customer return">Customer return</option>
-                            <option value="Damaged">Damaged</option>
-                            <option value="Wrong item">Wrong item</option>
-                            <option value="Warranty">Warranty</option>
-                            <option value="Price correction">Price correction</option>
-                            <option value="Goodwill">Goodwill</option>
-                        </select>
-                    </div>
-
-                    <div className="space-y-2">
-                        <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Notes (optional)</label>
-                        <Input
-                            value={returnNotes}
-                            onChange={(e) => setReturnNotes(e.target.value)}
-                            className="bg-slate-950"
-                            placeholder="Short context for audit trail"
-                        />
-                    </div>
-
-                    {returnStatus ? (
-                        <div className="text-xs font-bold text-slate-300 bg-slate-950/40 border border-slate-800 rounded-lg p-3 whitespace-pre-wrap">
-                            {returnStatus}
-                        </div>
-                    ) : null}
-
-                    <Button
-                        className="w-full h-12 font-black uppercase italic tracking-widest"
-                        disabled={returnBusy || !returnSaleId.trim()}
-                        onClick={async () => {
-                            setReturnBusy(true);
-                            setReturnStatus("");
-                            try {
-                                const qtyNum = Math.max(1, Number(returnQty || 1));
-                                const res = await fetch('/api/returns', {
-                                    method: 'POST',
-                                    headers: { 'Content-Type': 'application/json' },
-                                    body: JSON.stringify({
-                                        saleId: returnSaleId.trim(),
-                                        quantity: qtyNum,
-                                        reason: returnReason,
-                                        notes: returnNotes,
-                                        restock: returnRestock,
-                                    }),
-                                    credentials: 'include'
-                                });
-                                const data = await res.json().catch(() => ({}));
-                                if (!res.ok) {
-                                    setReturnStatus(`ERROR: ${data?.error || 'Return failed'}`);
-                                    return;
-                                }
-                                setReturnStatus(`Return recorded. Credit note id: ${data?.returnId || 'OK'}`);
-                                setReturnSaleId("");
-                                setReturnQty("1");
-                                setReturnNotes("");
-                            } catch (e: any) {
-                                setReturnStatus(`ERROR: ${e?.message || 'Return failed'}`);
-                            } finally {
-                                setReturnBusy(false);
-                            }
-                        }}
-                    >
-                        {returnBusy ? <RefreshCcw className="h-4 w-4 animate-spin" /> : "Issue Credit Note"}
-                    </Button>
-                </div>
-            </Modal>
+            {/* Consolidated Management & Operations Workspace Modal */}
+            <ManagerWorkspaceModal
+                isOpen={isManagerWorkspaceOpen}
+                onClose={() => setIsManagerWorkspaceOpen(false)}
+                shopId={shopId}
+                staffDisplayName={staffDisplayName}
+                shopRentBalance={shopRentBalance}
+                shopInvestBalance={shopInvestBalance}
+                todaysOpsIncome={todaysOpsIncome}
+                todaysOpsPosts={todaysOpsPosts}
+                onOpenOpsPost={() => {
+                    setOpsPostAmount("");
+                    setOpsPostNotes("");
+                    setIsOpsPostModalOpen(true);
+                }}
+                onOpenDirectOps={() => {
+                    setDirectOpsAmount("");
+                    setDirectOpsNotes("");
+                    setDirectOpsType("deposit");
+                    setDirectOpsKind("eod_deposit");
+                    setDirectOpsCategory("");
+                    setDirectOpsFundingPool("savings");
+                    setIsDirectOpsModalOpen(true);
+                }}
+                onOpenReportsHistory={() => setIsEodHistoryModalOpen(true)}
+                onGenerateStrategicReport={() => {
+                    const month = new Date().toISOString().substring(0, 7);
+                    const date = new Date().toISOString().split('T')[0];
+                    window.open(`/api/reports/combined?shopId=${shopId}&month=${month}&date=${date}`, '_blank');
+                }}
+            />
 
             <Modal
                 isOpen={isReceiptsModalOpen}

@@ -7,6 +7,10 @@ import { revalidatePath } from 'next/cache';
 import { sendEmail } from '@/lib/email';
 import { ORACLE_RECIPIENT } from '@/lib/resend';
 
+type IdRow = { id?: string | null };
+type QuantityRow = { quantity?: number | string | null };
+type InventoryAlertRow = QuantityRow & { name?: string | null; reorder_level?: number | string | null };
+
 export async function POST(request: Request) {
   const authError = await enforceOwnerOnly();
   if (authError) return authError;
@@ -30,8 +34,13 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, message: 'Invalid sale data' }, { status: 400 });
     }
 
-    const saleId = Math.random().toString(36).substring(2, 9);
+    const saleId = crypto.randomUUID();
     const timestamp = date ? new Date(date).toISOString() : new Date().toISOString();
+    const numericQuantity = Number(quantity || 1);
+    const numericUnitPrice = Number(unitPrice || 0);
+    const numericTotalWithTax = Number(totalWithTax);
+    const numericTotalBeforeTax = Number.isFinite(Number(totalBeforeTax)) ? Number(totalBeforeTax) : numericTotalWithTax;
+    const numericTax = Number.isFinite(Number(tax)) ? Number(tax) : Math.max(0, numericTotalWithTax - numericTotalBeforeTax);
 
     // 1. Z-Report Alignment: Check if an EOD report already exists for this date/shop
     const dateOnly = timestamp.split('T')[0];
@@ -48,17 +57,33 @@ export async function POST(request: Request) {
       console.warn(`[add-sale] Warning: Adding sale to a day that already has a sent EOD report (${dateOnly})`);
     }
 
+    // Duplicate-sale check (warn-only, mirrors app/actions.ts recordSale — never blocks a manual entry)
+    const { data: identicalSales } = await supabaseAdmin
+      .from('sales')
+      .select('id')
+      .eq('shop_id', shopId)
+      .eq('client_name', clientName)
+      .eq('item_name', itemName)
+      .eq('quantity', numericQuantity)
+      .eq('unit_price', numericUnitPrice)
+      .gte('date', `${dateOnly}T00:00:00.000Z`)
+      .lt('date', `${dateOnly}T23:59:59.999Z`);
+
+    if (identicalSales && identicalSales.length >= 3) {
+      console.warn(`[add-sale] Multiple identical sales detected for ${clientName}: ${identicalSales.length} times today. Recording anyway.`);
+    }
+
     // Add to Supabase
     const { error: supabaseError } = await supabaseAdmin.from('sales').insert({
       id: saleId,
       shop_id: shopId,
       item_name: itemName,
       item_id: body.itemId || null, 
-      quantity,
-      unit_price: unitPrice,
-      total_before_tax: totalWithTax / 1.155, 
-      tax: totalWithTax - (totalWithTax / 1.155), 
-      total_with_tax: totalWithTax,
+      quantity: numericQuantity,
+      unit_price: numericUnitPrice,
+      total_before_tax: numericTotalBeforeTax,
+      tax: numericTax,
+      total_with_tax: numericTotalWithTax,
       date: timestamp,
       employee_id: employeeId,
       client_name: clientName,
@@ -81,19 +106,20 @@ export async function POST(request: Request) {
           .ilike('name', itemName)
           .limit(1)
           .maybeSingle();
-        if (match && (match as any).id) resolvedItemId = (match as any).id;
+        const matchedItem = match as IdRow | null;
+        if (matchedItem?.id) resolvedItemId = matchedItem.id;
       }
 
       // If still not found, create an ad-hoc inventory item and allocation so we can decrement to 0
       if (!resolvedItemId && itemName) {
-        const adhocId = `adhoc_${Math.random().toString(36).substring(2, 9)}`;
+        const adhocId = `adhoc_${crypto.randomUUID()}`;
         const timestamp = new Date().toISOString();
         await supabaseAdmin.from('inventory_items').insert({
           id: adhocId,
           shipment_id: 'MANUAL-SALE-ADHOC',
           name: itemName,
           category: 'Quick Sale',
-          quantity: quantity, // create with just enough stock
+          quantity: numericQuantity, // create with just enough stock
           acquisition_price: 0,
           landed_cost: 0,
           date_added: timestamp
@@ -101,7 +127,7 @@ export async function POST(request: Request) {
         await supabaseAdmin.from('inventory_allocations').insert({
           item_id: adhocId,
           shop_id: shopId,
-          quantity: quantity
+          quantity: numericQuantity
         });
         resolvedItemId = adhocId;
       }
@@ -118,7 +144,8 @@ export async function POST(request: Request) {
 
         if (currentAlloc) {
           // Normal decrement if allocation exists
-          const newAllocQty = Number((currentAlloc as any).quantity || 0) - quantity;
+          const allocation = currentAlloc as QuantityRow;
+          const newAllocQty = Number(allocation.quantity || 0) - numericQuantity;
           await supabaseAdmin
             .from('inventory_allocations')
             .update({ quantity: newAllocQty })
@@ -132,7 +159,7 @@ export async function POST(request: Request) {
             .insert({
               item_id: resolvedItemId,
               shop_id: shopId,
-              quantity: -quantity
+              quantity: -numericQuantity
             });
           console.log(`[add-sale] Auto-created missing allocation for ${resolvedItemId} at ${shopId}`);
         }
@@ -145,23 +172,24 @@ export async function POST(request: Request) {
           .maybeSingle();
 
         if (currentItem) {
-          const newItemQty = Math.max(0, Number((currentItem as any).quantity || 0) - quantity);
+          const item = currentItem as InventoryAlertRow;
+          const newItemQty = Math.max(0, Number(item.quantity || 0) - numericQuantity);
           await supabaseAdmin
             .from('inventory_items')
             .update({ quantity: newItemQty })
             .eq('id', resolvedItemId);
 
           // Low-Stock Triggers
-          const reorderLevel = Number((currentItem as any).reorder_level || 5);
+          const reorderLevel = Number(item.reorder_level || 5);
           if (newItemQty <= reorderLevel) {
             try {
               await sendEmail({
                 to: ORACLE_RECIPIENT,
-                subject: `[ALERT] Low Stock: ${(currentItem as any).name}`,
+                subject: `[ALERT] Low Stock: ${item.name || itemName}`,
                 html: `
                   <div style="font-family:sans-serif;padding:20px;border:1px solid #eee;border-radius:10px;">
                     <h2 style="color:#e11d48;">Inventory Alert</h2>
-                    <p>Product <strong>${(currentItem as any).name}</strong> is running low.</p>
+                    <p>Product <strong>${item.name || itemName}</strong> is running low.</p>
                     <p>Remaining: <span style="font-size:18px;font-weight:bold;color:#e11d48;">${newItemQty}</span> units</p>
                     <p>Shop: ${shopId}</p>
                     <hr/>
@@ -190,12 +218,12 @@ export async function POST(request: Request) {
         id: saleId,
         shopId,
         itemName,
-        quantity,
-        unitPrice,
-        totalBeforeTax,
-        tax,
-        totalWithTax,
-        date,
+        quantity: numericQuantity,
+        unitPrice: numericUnitPrice,
+        totalBeforeTax: numericTotalBeforeTax,
+        tax: numericTax,
+        totalWithTax: numericTotalWithTax,
+        date: timestamp,
         employeeId,
         clientName,
         paymentMethod: 'cash'

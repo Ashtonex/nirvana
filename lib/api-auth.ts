@@ -3,7 +3,7 @@ import { createHash } from "crypto";
 import { supabaseAdmin } from "@/lib/supabase";
 
 export function isApiAuthEnforced() {
-  return process.env.NIRVANA_ENFORCE_API_AUTH === "true";
+  return process.env.NIRVANA_ENFORCE_API_AUTH !== "false";
 }
 
 export async function getStaffSessionEmployeeId() {
@@ -52,7 +52,24 @@ export async function requireOwnerAccess(req: Request) {
 
   const ownerCookie = (await cookies()).get("nirvana_owner")?.value;
   if (ownerCookie) {
-    return { ok: true as const };
+    const tokenHash = createHash("sha256").update(ownerCookie).digest("hex");
+    const { data: session } = await supabaseAdmin
+      .from("staff_sessions")
+      .select("employee_id, expires_at")
+      .eq("token_hash", tokenHash)
+      .maybeSingle();
+
+    if (session && (!session.expires_at || new Date(session.expires_at).getTime() > Date.now())) {
+      const { data: emp } = await supabaseAdmin
+        .from("employees")
+        .select("role")
+        .eq("id", session.employee_id)
+        .maybeSingle();
+
+      if (emp?.role === "owner") {
+        return { ok: true as const };
+      }
+    }
   }
 
   const ownerBearer = await isOwnerFromBearer(req);

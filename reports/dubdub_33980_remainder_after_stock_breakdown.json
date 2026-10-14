@@ -1,0 +1,296 @@
+{
+  "dubDubPool": 33980,
+  "stockOrders": 17737,
+  "remainingAfterStock": 16243,
+  "nonStockLabelled": 16142.01,
+  "unresolved": 100.99,
+  "breakdown": [
+    {
+      "category": "Other labelled payout",
+      "amount": 7638,
+      "count": 38
+    },
+    {
+      "category": "Rent / overhead",
+      "amount": 5015,
+      "count": 16
+    },
+    {
+      "category": "Tax / banking",
+      "amount": 1950,
+      "count": 5
+    },
+    {
+      "category": "Supplier / payables",
+      "amount": 1110,
+      "count": 1
+    },
+    {
+      "category": "Salaries / wages",
+      "amount": 260,
+      "count": 2
+    },
+    {
+      "category": "Utilities",
+      "amount": 124,
+      "count": 4
+    },
+    {
+      "category": "Transport",
+      "amount": 35,
+      "count": 2
+    },
+    {
+      "category": "Groceries",
+      "amount": 10,
+      "count": 1
+    },
+    {
+      "category": "Invest / perfumes",
+      "amount": 0.01,
+      "count": 1
+    }
+  ],
+  "topNonStockRows": [
+    {
+      "date": "2026-05-04",
+      "shop": "kipasa",
+      "category": "Rent / overhead",
+      "amount": 1200,
+      "title": "May Rent",
+      "id": "94339728-44ed-41ef-af24-7622c10070a0"
+    },
+    {
+      "date": "2026-04-13",
+      "shop": "kipasa",
+      "category": "Supplier / payables",
+      "amount": 1110,
+      "title": "payables",
+      "id": "ce83ec9f-03a1-4d20-abff-22646c0aa5f8"
+    },
+    {
+      "date": "2026-03-23",
+      "shop": "operations",
+      "category": "Other labelled payout",
+      "amount": 1000,
+      "title": "Yohanne",
+      "id": "68495f55-779b-4ad3-a38a-b8acd86c5f40"
+    },
+    {
+      "date": "2026-07-24",
+      "shop": "dubdub",
+      "category": "Rent / overhead",
+      "amount": 800,
+      "title": "Bank  | Direct POS Entry (dubdub)",
+      "id": "1b7651df-3342-4078-9450-1a0ed9e0e2e8"
+    },
+    {
+      "date": "2026-04-09",
+      "shop": "operations",
+      "category": "Other labelled payout",
+      "amount": 667,
+      "title": "Romeo",
+      "id": "c5ff7c55-133b-4c28-b7cc-8de9f2ec0869"
+    },
+    {
+      "date": "2026-03-31",
+      "shop": "dubdub",
+      "category": "Tax / banking",
+      "amount": 600,
+      "title": "Banking",
+      "id": "14f71eec-d7ac-4758-8475-b7a0e7d51d1c"
+    },
+    {
+      "date": "2026-04-29",
+      "shop": "dubdub",
+      "category": "Tax / banking",
+      "amount": 600,
+      "title": "Banking",
+      "id": "fa3be7df-c3a5-4c2d-a1b2-c6515f0eb6a3"
+    },
+    {
+      "date": "2026-06-29",
+      "shop": "dubdub",
+      "category": "Rent / overhead",
+      "amount": 600,
+      "title": "ZIMRA | Direct POS Entry (dubdub)",
+      "id": "2310fbc6-f6b2-4f34-bb3b-5b2342f74a01"
+    },
+    {
+      "date": "2026-03-23",
+      "shop": "operations",
+      "category": "Other labelled payout",
+      "amount": 500,
+      "title": "Round - Shakespoon",
+      "id": "615a97d6-fd41-49e3-9c83-5643731b2259"
+    },
+    {
+      "date": "2026-03-31",
+      "shop": "operations",
+      "category": "Other labelled payout",
+      "amount": 500,
+      "title": "Round",
+      "id": "25db4546-66e2-4588-9be1-bd6162d4dabc"
+    },
+    {
+      "date": "2026-04-07",
+      "shop": "dubdub",
+      "category": "Rent / overhead",
+      "amount": 500,
+      "title": "Rent taken by dutch total of 700 from Dub",
+      "id": "81a3ddaf-21d6-4ee7-ab6d-8dafa560c1e1"
+    },
+    {
+      "date": "2026-04-14",
+      "shop": "operations",
+      "category": "Other labelled payout",
+      "amount": 500,
+      "title": "Round",
+      "id": "6e0576d2-5ffd-470e-b44f-30e0b1e9c399"
+    },
+    {
+      "date": "2026-04-20",
+      "shop": "operations",
+      "category": "Other labelled payout",
+      "amount": 500,
+      "title": "Round",
+      "id": "64df26ff-d9c5-4306-970a-ff10cc8625eb"
+    },
+    {
+      "date": "2026-04-27",
+      "shop": "operations",
+      "category": "Other labelled payout",
+      "amount": 500,
+      "title": "round",
+      "id": "d8b35429-2a63-418c-ba5a-95d818d76213"
+    },
+    {
+      "date": "2026-05-06",
+      "shop": "operations",
+      "category": "Other labelled payout",
+      "amount": 500,
+      "title": "Round",
+      "id": "cf1c0fe9-7f96-455a-bfac-b0f29c0fc022"
+    },
+    {
+      "date": "2026-03-30",
+      "shop": "kipasa",
+      "category": "Tax / banking",
+      "amount": 450,
+      "title": "Banking : ",
+      "id": "50e27ec4-a7be-4851-9aa0-d34d58ead6df"
+    },
+    {
+      "date": "2026-04-09",
+      "shop": "operations",
+      "category": "Other labelled payout",
+      "amount": 450,
+      "title": "Dutch : China  Accomodation",
+      "id": "a85fd1ac-13c9-47ad-ab80-ee7df5189d40"
+    },
+    {
+      "date": "2026-07-10",
+      "shop": "kipasa",
+      "category": "Rent / overhead",
+      "amount": 400,
+      "title": "Nassa | Direct POS Entry (kipasa)",
+      "id": "38483c5c-3ad7-46bf-95f9-6cef9ae11927"
+    },
+    {
+      "date": "2026-03-20",
+      "shop": "operations",
+      "category": "Other labelled payout",
+      "amount": 300,
+      "title": "David Chaeruka (Dutch)",
+      "id": "e1577877-aa43-424a-ab96-8fd7303a42ec"
+    },
+    {
+      "date": "2026-04-27",
+      "shop": "operations",
+      "category": "Other labelled payout",
+      "amount": 300,
+      "title": "Building Pledge",
+      "id": "e2d6f9ac-3eef-4e75-82be-852099b04f5d"
+    },
+    {
+      "date": "2026-05-06",
+      "shop": "operations",
+      "category": "Rent / overhead",
+      "amount": 300,
+      "title": "Home Rent",
+      "id": "61b211f9-1c52-41ef-b246-e8cf21cda069"
+    },
+    {
+      "date": "2026-05-07",
+      "shop": "operations",
+      "category": "Other labelled payout",
+      "amount": 300,
+      "title": "Harare_Order",
+      "id": "8ef21429-4cf8-46a9-8747-22c1f3bcb8b1"
+    },
+    {
+      "date": "2026-07-03",
+      "shop": "kipasa",
+      "category": "Rent / overhead",
+      "amount": 300,
+      "title": "Pst kethy | Direct POS Entry (kipasa)",
+      "id": "04c2b103-2946-4464-b4cf-8277a6bbdf11"
+    },
+    {
+      "date": "2026-04-07",
+      "shop": "kipasa",
+      "category": "Rent / overhead",
+      "amount": 270,
+      "title": "Home Rent taken by Dutch",
+      "id": "1c3360c5-1142-44f7-87e9-ee6e05d6dbb9"
+    },
+    {
+      "date": "2026-03-23",
+      "shop": "kipasa",
+      "category": "Tax / banking",
+      "amount": 250,
+      "title": "Banking",
+      "id": "430d812c-e360-461f-82e9-5d202be9ccb8"
+    },
+    {
+      "date": "2026-05-04",
+      "shop": "operations",
+      "category": "Other labelled payout",
+      "amount": 240,
+      "title": "Balance Accounts",
+      "id": "0b4e4314-5357-4259-a052-1c3e08d9d101"
+    },
+    {
+      "date": "2026-04-07",
+      "shop": "operations",
+      "category": "Rent / overhead",
+      "amount": 200,
+      "title": "200 Rent taken from dub total 700 by dutch",
+      "id": "0fad5562-456e-4996-9165-ce7f489d7838"
+    },
+    {
+      "date": "2026-04-16",
+      "shop": "operations",
+      "category": "Other labelled payout",
+      "amount": 200,
+      "title": "Mr banda",
+      "id": "f5d0aad4-945b-49fb-9ba7-be1d0b192d9c"
+    },
+    {
+      "date": "2026-04-29",
+      "shop": "dubdub",
+      "category": "Other labelled payout",
+      "amount": 160,
+      "title": "Balance ",
+      "id": "e2adf79c-0a3a-4eea-922e-d6abdf3ca339"
+    },
+    {
+      "date": "2026-05-28",
+      "shop": "operations",
+      "category": "Salaries / wages",
+      "amount": 160,
+      "title": "Salaries",
+      "id": "d33a7dc7-9c87-4eaf-bf91-ace24bc5f91d"
+    }
+  ]
+}

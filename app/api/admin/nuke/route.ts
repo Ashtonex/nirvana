@@ -48,53 +48,72 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Missing confirm" }, { status: 400 });
   }
 
+  const errors: string[] = [];
+
+  const runDelete = async (table: string, col: string) => {
+    try {
+      await deleteAll(table, col);
+    } catch (e: any) {
+      errors.push(e.message || String(e));
+    }
+  };
+
   // Hard wipe (keep: owners + shops + settings)
   // Order tries to avoid FK issues.
-  try {
-    await deleteAll("staff_sessions", "token_hash");
-  } catch {}
-  try {
-    await deleteAll("staff_login_codes", "id");
-  } catch {}
+  await runDelete("staff_sessions", "token_hash");
+  await runDelete("staff_login_codes", "id");
 
   await Promise.all([
     // Comms + requests
-    deleteAll("staff_chat_messages", "id").catch(() => undefined),
-    deleteAll("stock_requests", "id").catch(() => undefined),
+    runDelete("staff_chat_messages", "id"),
+    runDelete("stock_requests", "id"),
 
     // Commerce + ops
-    deleteAll("quotations", "id").catch(() => undefined),
-    deleteAll("sales", "id").catch(() => undefined),
-    deleteAll("transfers", "id").catch(() => undefined),
+    runDelete("quotations", "id"),
+    runDelete("sales", "id"),
+    runDelete("transfers", "id"),
 
     // Accounting + logs
-    deleteAll("ledger_entries", "id").catch(() => undefined),
-    deleteAll("oracle_emails", "id").catch(() => undefined),
-    deleteAll("audit_log", "id").catch(() => undefined),
+    runDelete("ledger_entries", "id"),
+    runDelete("oracle_emails", "id"),
+    runDelete("audit_log", "id"),
   ]);
 
   // Inventory
-  await deleteAll("inventory_allocations", "item_id").catch(() => undefined);
-  await deleteAll("inventory_items", "id").catch(() => undefined);
-  await deleteAll("shipments", "id").catch(() => undefined);
+  await runDelete("inventory_allocations", "item_id");
+  await runDelete("inventory_items", "id");
+  await runDelete("shipments", "id");
 
   // Employees (keep owners)
   const delEmp = await supabaseAdmin.from("employees").delete().neq("role", "owner");
   if (delEmp.error) {
+    errors.push(`employees: ${delEmp.error.message}`);
     // If FK constraints exist, fall back to soft-disable (best-effort)
-    await supabaseAdmin
+    const softDisable = await supabaseAdmin
       .from("employees")
       .update({ is_active: false, active: false })
       .neq("role", "owner");
+    if (softDisable.error) {
+      errors.push(`employees soft-disable: ${softDisable.error.message}`);
+    }
   }
 
   // Ensure the calling owner remains active (schema tolerant)
   try {
-    await supabaseAdmin
+    const ownerVerify = await supabaseAdmin
       .from("employees")
       .update({ is_active: true, active: true })
       .eq("id", auth.userId);
-  } catch {}
+    if (ownerVerify.error) {
+      errors.push(`calling owner status recovery: ${ownerVerify.error.message}`);
+    }
+  } catch (e: any) {
+    errors.push(`calling owner status recovery exception: ${e.message || String(e)}`);
+  }
 
-  return NextResponse.json({ success: true, adminName: auth.name });
+  return NextResponse.json({
+    success: errors.length === 0,
+    adminName: auth.name,
+    errors: errors.length > 0 ? errors : undefined
+  });
 }

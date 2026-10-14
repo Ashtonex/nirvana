@@ -1383,6 +1383,351 @@ export async function addNewProductFromPos(productData: any) {
     };
 }
 
+export async function receiveStockInShop(input: {
+    mode: 'existing' | 'new_product';
+    shopId: string;
+    itemId?: string;
+    quantityToAdd?: number;
+    unitLandedCost?: number;
+    movementType?: 'received_new' | 'allocated_from_central' | 'inter_shop_transfer' | 'count_correction';
+    sourceShopId?: string;
+    name?: string;
+    category?: string;
+    sku?: string;
+    sellingPrice?: number;
+    initialStock?: number;
+    landedCost?: number;
+    notes?: string;
+    supplier?: string;
+    deliveryRef?: string;
+    employeeId?: string;
+}) {
+    const actor = await getActorFromCookies().catch(() => null);
+    const shopId = String(input.shopId || '').trim();
+    if (!shopId) throw new Error("Missing shopId");
+    const timestamp = new Date().toISOString();
+    const effectiveEmployeeId = input.employeeId || actor?.id || 'POS';
+
+    if (input.mode === 'new_product') {
+        const name = String(input.name || '').trim();
+        const category = String(input.category || 'General').trim() || 'General';
+        const landedCost = Number(input.landedCost || 0);
+        const initialStock = Math.max(0, Number(input.initialStock || 0));
+        if (!name) throw new Error("Product name is required");
+
+        // Duplicate check
+        const { data: existingMatches } = await supabaseAdmin
+            .from('inventory_items')
+            .select('id, name, quantity, category, landed_cost')
+            .ilike('name', name)
+            .limit(5);
+
+        const existing = (existingMatches || []).find(
+            (i: any) => String(i.name || '').toLowerCase() === name.toLowerCase()
+        );
+
+        if (existing) {
+            return {
+                duplicateFound: true,
+                existingItem: {
+                    id: existing.id,
+                    name: existing.name,
+                    category: existing.category,
+                    quantity: existing.quantity,
+                    landedCost: existing.landed_cost,
+                },
+                message: `A product named "${existing.name}" already exists in inventory.`,
+            };
+        }
+
+        const id = Math.random().toString(36).substring(2, 9);
+        const shipmentId = input.deliveryRef ? `DELIV-${input.deliveryRef}` : 'POS-INTAKE';
+
+        await supabaseAdmin.from('inventory_items').insert({
+            id,
+            shipment_id: shipmentId,
+            name,
+            category,
+            quantity: initialStock,
+            acquisition_price: landedCost,
+            landed_cost: landedCost,
+            date_added: timestamp,
+        });
+
+        await supabaseAdmin.from('inventory_allocations').insert({
+            item_id: id,
+            shop_id: shopId,
+            quantity: initialStock,
+        });
+
+        const totalCost = initialStock * landedCost;
+        if (totalCost > 0) {
+            await supabaseAdmin.from('ledger_entries').insert([{
+                id: Math.random().toString(36).substring(2, 9),
+                shop_id: shopId,
+                type: 'asset',
+                category: 'Inventory Acquisition',
+                amount: totalCost,
+                date: timestamp,
+                description: `Stock Intake (New Item): ${name} (${initialStock} units @ $${landedCost.toFixed(2)})${input.supplier ? ` | Supplier: ${input.supplier}` : ''}${input.notes ? ` | ${input.notes}` : ''}`,
+                employee_id: effectiveEmployeeId,
+            }]);
+        }
+
+        await supabaseAdmin.from('audit_log').insert({
+            id: Math.random().toString(36).substring(2, 9),
+            timestamp,
+            employee_id: effectiveEmployeeId,
+            action: 'STOCK_NEW_PRODUCT_CREATED',
+            details: `Created ${name} (${category}) with ${initialStock} units at shop ${shopId}`,
+        });
+
+        revalidatePath('/inventory');
+        revalidatePath(`/shops/${shopId}`);
+        revalidatePath('/');
+
+        return {
+            success: true,
+            createdNew: true,
+            item: {
+                id,
+                name,
+                category,
+                landedCost,
+                quantity: initialStock,
+                allocations: [{ shopId, quantity: initialStock }],
+            },
+            addedStock: initialStock,
+        };
+    }
+
+    // MODE: EXISTING PRODUCT
+    const itemId = String(input.itemId || '').trim();
+    const qty = Math.max(1, Number(input.quantityToAdd || 0));
+    const movementType = input.movementType || 'received_new';
+    const unitLandedCost = Number(input.unitLandedCost || 0);
+
+    if (!itemId) throw new Error("Missing itemId");
+
+    const { data: item, error: itemErr } = await supabaseAdmin
+        .from('inventory_items')
+        .select('*')
+        .eq('id', itemId)
+        .maybeSingle();
+
+    if (itemErr || !item) throw new Error("Item not found in master catalog");
+
+    const { data: currentAlloc } = await supabaseAdmin
+        .from('inventory_allocations')
+        .select('*')
+        .eq('item_id', itemId)
+        .eq('shop_id', shopId)
+        .maybeSingle();
+
+    const currentShopQty = Number(currentAlloc?.quantity || 0);
+
+    if (movementType === 'received_new') {
+        const newShopQty = currentShopQty + qty;
+        const newMasterQty = Number(item.quantity || 0) + qty;
+
+        if (currentAlloc) {
+            await supabaseAdmin
+                .from('inventory_allocations')
+                .update({ quantity: newShopQty })
+                .eq('id', currentAlloc.id);
+        } else {
+            await supabaseAdmin
+                .from('inventory_allocations')
+                .insert({ item_id: itemId, shop_id: shopId, quantity: newShopQty });
+        }
+
+        await supabaseAdmin
+            .from('inventory_items')
+            .update({ 
+                quantity: newMasterQty,
+                ...(unitLandedCost > 0 ? { landed_cost: unitLandedCost } : {})
+            })
+            .eq('id', itemId);
+
+        const totalCost = qty * (unitLandedCost || Number(item.landed_cost || 0));
+        if (totalCost > 0) {
+            await supabaseAdmin.from('ledger_entries').insert([{
+                id: Math.random().toString(36).substring(2, 9),
+                shop_id: shopId,
+                type: 'asset',
+                category: 'Inventory Acquisition',
+                amount: totalCost,
+                date: timestamp,
+                description: `Stock Intake (Restock): ${item.name} (+${qty} units @ $${(unitLandedCost || Number(item.landed_cost || 0)).toFixed(2)})${input.supplier ? ` | Supplier: ${input.supplier}` : ''}${input.notes ? ` | ${input.notes}` : ''}`,
+                employee_id: effectiveEmployeeId,
+            }]);
+        }
+
+        await supabaseAdmin.from('audit_log').insert({
+            id: Math.random().toString(36).substring(2, 9),
+            timestamp,
+            employee_id: effectiveEmployeeId,
+            action: 'STOCK_RECEIVED_NEW',
+            details: `Received +${qty} units of ${item.name} at shop ${shopId}. New shop stock: ${newShopQty}`,
+        });
+
+        revalidatePath('/inventory');
+        revalidatePath(`/shops/${shopId}`);
+        revalidatePath('/');
+
+        return {
+            success: true,
+            createdNew: false,
+            item: {
+                ...item,
+                landedCost: unitLandedCost || Number(item.landed_cost || 0),
+                allocations: [{ shopId, quantity: newShopQty }],
+            },
+            newShopQty,
+            addedStock: qty,
+        };
+    } else if (movementType === 'allocated_from_central') {
+        const newShopQty = currentShopQty + qty;
+
+        if (currentAlloc) {
+            await supabaseAdmin
+                .from('inventory_allocations')
+                .update({ quantity: newShopQty })
+                .eq('id', currentAlloc.id);
+        } else {
+            await supabaseAdmin
+                .from('inventory_allocations')
+                .insert({ item_id: itemId, shop_id: shopId, quantity: newShopQty });
+        }
+
+        await supabaseAdmin.from('audit_log').insert({
+            id: Math.random().toString(36).substring(2, 9),
+            timestamp,
+            employee_id: effectiveEmployeeId,
+            action: 'STOCK_ALLOCATED_CENTRAL',
+            details: `Allocated +${qty} units of ${item.name} from central stock to shop ${shopId}. New shop stock: ${newShopQty}`,
+        });
+
+        revalidatePath('/inventory');
+        revalidatePath(`/shops/${shopId}`);
+
+        return {
+            success: true,
+            createdNew: false,
+            item: {
+                ...item,
+                allocations: [{ shopId, quantity: newShopQty }],
+            },
+            newShopQty,
+            addedStock: qty,
+        };
+    } else if (movementType === 'inter_shop_transfer') {
+        const fromShopId = String(input.sourceShopId || '').trim();
+        if (!fromShopId || fromShopId === shopId) {
+            throw new Error("Invalid source shop for inter-shop transfer");
+        }
+
+        const { data: sourceAlloc } = await supabaseAdmin
+            .from('inventory_allocations')
+            .select('*')
+            .eq('item_id', itemId)
+            .eq('shop_id', fromShopId)
+            .maybeSingle();
+
+        const sourceQty = Number(sourceAlloc?.quantity || 0);
+        if (sourceQty < qty) {
+            throw new Error(`Insufficient stock in ${fromShopId.toUpperCase()} (Available: ${sourceQty}, Requested: ${qty})`);
+        }
+
+        await supabaseAdmin
+            .from('inventory_allocations')
+            .update({ quantity: sourceQty - qty })
+            .eq('id', sourceAlloc.id);
+
+        const newShopQty = currentShopQty + qty;
+        if (currentAlloc) {
+            await supabaseAdmin
+                .from('inventory_allocations')
+                .update({ quantity: newShopQty })
+                .eq('id', currentAlloc.id);
+        } else {
+            await supabaseAdmin
+                .from('inventory_allocations')
+                .insert({ item_id: itemId, shop_id: shopId, quantity: newShopQty });
+        }
+
+        await supabaseAdmin.from('audit_log').insert({
+            id: Math.random().toString(36).substring(2, 9),
+            timestamp,
+            employee_id: effectiveEmployeeId,
+            action: 'INTER_SHOP_TRANSFER',
+            details: `Transferred ${qty} units of ${item.name} from ${fromShopId.toUpperCase()} to ${shopId.toUpperCase()}${input.notes ? ` | Notes: ${input.notes}` : ''}`,
+        });
+
+        revalidatePath('/inventory');
+        revalidatePath(`/shops/${shopId}`);
+        revalidatePath(`/shops/${fromShopId}`);
+
+        return {
+            success: true,
+            createdNew: false,
+            item: {
+                ...item,
+                allocations: [{ shopId, quantity: newShopQty }],
+            },
+            newShopQty,
+            addedStock: qty,
+        };
+    } else if (movementType === 'count_correction') {
+        const targetCount = Number(input.quantityToAdd);
+        if (!Number.isFinite(targetCount) || targetCount < 0) {
+            throw new Error("Target count must be a non-negative number");
+        }
+        const delta = targetCount - currentShopQty;
+        const newMasterQty = Math.max(0, Number(item.quantity || 0) + delta);
+
+        if (currentAlloc) {
+            await supabaseAdmin
+                .from('inventory_allocations')
+                .update({ quantity: targetCount })
+                .eq('id', currentAlloc.id);
+        } else {
+            await supabaseAdmin
+                .from('inventory_allocations')
+                .insert({ item_id: itemId, shop_id: shopId, quantity: targetCount });
+        }
+
+        await supabaseAdmin
+            .from('inventory_items')
+            .update({ quantity: newMasterQty })
+            .eq('id', itemId);
+
+        await supabaseAdmin.from('audit_log').insert({
+            id: Math.random().toString(36).substring(2, 9),
+            timestamp,
+            employee_id: effectiveEmployeeId,
+            action: 'STOCK_COUNT_CORRECTION',
+            details: `Corrected stock of ${item.name} at shop ${shopId} from ${currentShopQty} to ${targetCount} (delta: ${delta > 0 ? `+${delta}` : delta})${input.notes ? ` | Reason: ${input.notes}` : ''}`,
+        });
+
+        revalidatePath('/inventory');
+        revalidatePath(`/shops/${shopId}`);
+
+        return {
+            success: true,
+            createdNew: false,
+            item: {
+                ...item,
+                allocations: [{ shopId, quantity: targetCount }],
+            },
+            newShopQty: targetCount,
+            addedStock: delta,
+        };
+    }
+
+    throw new Error(`Unsupported movement type: ${movementType}`);
+}
+
 export async function openCashRegister(shopId: string, expectedAmount: number, actualAmount: number) {
     const timestamp = new Date().toISOString();
     const id = Math.random().toString(36).substring(2, 9);
@@ -1917,6 +2262,213 @@ export async function recordTitheWithdrawal(
     revalidatePath('/finance/oracle');
 }
 
+export async function getTodayPoolMovements(shopId: string, targetDate?: string) {
+    const today = targetDate || new Date().toISOString().split('T')[0];
+    const since = `${today}T00:00:00.000Z`;
+    const until = `${today}T23:59:59.999Z`;
+
+    const [opsRes, titheRes] = await Promise.all([
+        supabaseAdmin
+            .from('operations_ledger')
+            .select('*')
+            .eq('shop_id', shopId)
+            .gte('created_at', since)
+            .lte('created_at', until)
+            .order('created_at', { ascending: false }),
+        supabaseAdmin
+            .from('ledger_entries')
+            .select('*')
+            .eq('shop_id', shopId)
+            .ilike('category', '%tithe%')
+            .gte('date', since)
+            .lte('date', until)
+            .order('date', { ascending: false })
+    ]);
+
+    const opsRows = opsRes.data || [];
+    const titheRows = titheRes.data || [];
+
+    const rentMovements = opsRows
+        .filter((r: any) => String(r.overhead_category || '').toLowerCase() === 'rent' || String(r.bucket_key || '').toLowerCase() === 'rent')
+        .map((r: any) => ({
+            id: r.id,
+            time: r.created_at,
+            amount: Math.abs(Number(r.amount || 0)),
+            direction: Number(r.amount || 0) >= 0 ? 'deposit' : 'withdrawal',
+            title: r.title || 'Rent Movement',
+            notes: r.notes || '',
+            source: r.metadata?.source || 'operations'
+        }));
+
+    const investMovements = opsRows
+        .filter((r: any) => String(r.bucket_key || '').toLowerCase() === 'invest_perfumes')
+        .map((r: any) => ({
+            id: r.id,
+            time: r.created_at,
+            amount: Math.abs(Number(r.amount || 0)),
+            direction: Number(r.amount || 0) >= 0 ? 'deposit' : 'withdrawal',
+            title: r.title || 'Invest Capital Movement',
+            notes: r.notes || '',
+            source: r.metadata?.source || 'operations'
+        }));
+
+    const titheMovements = titheRows.map((r: any) => ({
+        id: r.id,
+        time: r.date,
+        amount: Math.abs(Number(r.amount || 0)),
+        direction: Number(r.amount || 0) >= 0 ? 'withdrawal' : 'deposit',
+        title: r.description || 'Tithe Withdrawal',
+        notes: r.category || '',
+        source: 'drawer_ledger'
+    }));
+
+    return {
+        rent: {
+            movements: rentMovements,
+            totalAdditions: rentMovements.filter((m: any) => m.direction === 'deposit').reduce((s: number, m: any) => s + m.amount, 0),
+            totalDeductions: rentMovements.filter((m: any) => m.direction === 'withdrawal').reduce((s: number, m: any) => s + m.amount, 0)
+        },
+        invest: {
+            movements: investMovements,
+            totalAdditions: investMovements.filter((m: any) => m.direction === 'deposit').reduce((s: number, m: any) => s + m.amount, 0),
+            totalDeductions: investMovements.filter((m: any) => m.direction === 'withdrawal').reduce((s: number, m: any) => s + m.amount, 0)
+        },
+        tithe: {
+            movements: titheMovements,
+            totalAdditions: titheMovements.filter((m: any) => m.direction === 'deposit').reduce((s: number, m: any) => s + m.amount, 0),
+            totalDeductions: titheMovements.filter((m: any) => m.direction === 'withdrawal').reduce((s: number, m: any) => s + m.amount, 0)
+        }
+    };
+}
+
+export async function recordPoolMovement(input: {
+    shopId: string;
+    pool: 'rent' | 'invest' | 'tithe';
+    movementType: 'withdrawal' | 'deposit';
+    amount: number;
+    title: string;
+    description: string;
+    cashHandling: 'drawer_cash' | 'pool_internal' | 'external_account';
+    employeeId?: string;
+    effectiveDate?: string;
+}) {
+    const actor = await getActorFromCookies().catch(() => null);
+    const shopId = String(input.shopId || '').trim();
+    const amount = Number(input.amount);
+    const pool = input.pool;
+    const movementType = input.movementType;
+    const cashHandling = input.cashHandling || 'drawer_cash';
+    const title = String(input.title || '').trim() || `${pool.toUpperCase()} ${movementType}`;
+    const description = String(input.description || '').trim();
+    const employeeId = input.employeeId || actor?.id || 'POS';
+
+    if (!shopId) throw new Error("Missing shopId");
+    if (!Number.isFinite(amount) || amount <= 0) throw new Error("Invalid amount");
+
+    const timestamp = input.effectiveDate ? new Date(input.effectiveDate).toISOString() : new Date().toISOString();
+    const dayStamp = timestamp.split('T')[0];
+
+    if (pool === 'tithe') {
+        const id = Math.random().toString(36).substring(2, 9);
+        await supabaseAdmin.from('ledger_entries').insert([{
+            id,
+            shop_id: shopId,
+            type: 'asset',
+            category: movementType === 'withdrawal' ? 'Tithe Withdrawal' : 'Tithe Contribution',
+            amount: movementType === 'withdrawal' ? amount : -amount,
+            date: timestamp,
+            description: `${title}${description ? ` | ${description}` : ''}`,
+            employee_id: employeeId
+        }]);
+
+        await supabaseAdmin.from('audit_log').insert([{
+            id: Math.random().toString(36).substring(2, 9),
+            action: movementType === 'withdrawal' ? 'record_tithe_withdrawal' : 'record_tithe_contribution',
+            shop_id: shopId,
+            employee_id: employeeId,
+            details: { amount, title, description, cashHandling },
+            timestamp
+        }]);
+    } else if (pool === 'rent') {
+        const bucketKey = 'rent';
+        const direction = movementType;
+        let drawerLedgerId: string | undefined;
+
+        if (cashHandling === 'drawer_cash') {
+            drawerLedgerId = Math.random().toString(36).substring(2, 9);
+            await supabaseAdmin.from('ledger_entries').insert([{
+                id: drawerLedgerId,
+                shop_id: shopId,
+                type: direction === 'withdrawal' ? 'expense' : 'income',
+                category: direction === 'withdrawal' ? 'Rent Payout' : 'Rent Contribution',
+                amount: amount,
+                date: timestamp,
+                description: `${title}${description ? ` | ${description}` : ''}`,
+                employee_id: employeeId
+            }]);
+        }
+
+        await postFundTransaction({
+            amount,
+            direction,
+            bucketKey,
+            overheadCategory: 'rent',
+            shopId,
+            title,
+            notes: description ? `${description} (${cashHandling})` : `POS Pool Check (${cashHandling})`,
+            effectiveDate: dayStamp,
+            actor: { type: actor?.kind || 'staff', employeeId },
+            sourceLedgerEntryId: drawerLedgerId,
+            metadata: {
+                source: 'pos_pool_accountability',
+                cashHandling,
+                pool: 'rent',
+            }
+        });
+    } else if (pool === 'invest') {
+        const bucketKey = 'invest_perfumes';
+        const direction = movementType;
+        let drawerLedgerId: string | undefined;
+
+        if (cashHandling === 'drawer_cash') {
+            drawerLedgerId = Math.random().toString(36).substring(2, 9);
+            await supabaseAdmin.from('ledger_entries').insert([{
+                id: drawerLedgerId,
+                shop_id: shopId,
+                type: direction === 'withdrawal' ? 'expense' : 'income',
+                category: direction === 'withdrawal' ? 'Invest Capital Outflow' : 'Invest Capital Return',
+                amount: amount,
+                date: timestamp,
+                description: `${title}${description ? ` | ${description}` : ''}`,
+                employee_id: employeeId
+            }]);
+        }
+
+        await postFundTransaction({
+            amount,
+            direction,
+            bucketKey,
+            shopId,
+            title,
+            notes: description ? `${description} (${cashHandling})` : `POS Pool Check (${cashHandling})`,
+            effectiveDate: dayStamp,
+            actor: { type: actor?.kind || 'staff', employeeId },
+            sourceLedgerEntryId: drawerLedgerId,
+            metadata: {
+                source: 'pos_pool_accountability',
+                cashHandling,
+                pool: 'invest',
+            }
+        });
+    }
+
+    revalidatePath(`/shops/${shopId}`);
+    revalidatePath('/operations');
+    revalidatePath('/invest');
+    revalidatePath('/finance/oracle');
+
+    return { success: true, pool, amount, movementType };
+}
 
 export async function getOracleMasterPulse(daysLimit = 60) {
     try {

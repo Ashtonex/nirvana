@@ -12,7 +12,7 @@ export async function POST(req: Request) {
   const { data: employee } = await supabaseAdmin
     .from("employees")
     .select("*")
-    .eq("email", workEmail)
+    .ilike("email", workEmail)
     .maybeSingle();
 
   if (!employee) {
@@ -33,11 +33,16 @@ export async function POST(req: Request) {
   const codeHash = createHash("sha256").update(code).digest("hex");
   const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString();
 
-  await supabaseAdmin.from("staff_login_codes").insert({
+  const { error: insertError } = await supabaseAdmin.from("staff_login_codes").insert({
     employee_id: employee.id,
     code_hash: codeHash,
     expires_at: expiresAt,
   });
+
+  if (insertError) {
+    console.error("Failed to insert staff login code:", insertError);
+    return NextResponse.json({ error: "Failed to create login code" }, { status: 500 });
+  }
 
   await sendEmail({
     to: personalEmail,

@@ -164,11 +164,16 @@ type InventoryCommandLists = {
     shipmentWarnings: number;
   };
   lists: {
-    priorityReorders: Array<Record<string, any>>;
-    trappedCapital: Array<Record<string, any>>;
-    deadStock: Array<Record<string, any>>;
-    shipmentWarnings: Array<Record<string, any>>;
+    priorityReorders: Array<Record<string, unknown>>;
+    trappedCapital: Array<Record<string, unknown>>;
+    deadStock: Array<Record<string, unknown>>;
+    shipmentWarnings: Array<Record<string, unknown>>;
   };
+};
+
+type JobResult = {
+  kind?: string;
+  summary?: string;
 };
 
 type SaleForm = {
@@ -188,6 +193,7 @@ type ExpenseForm = {
   date: string;
   description: string;
   autoRoute: boolean;
+  fundingPool: 'savings' | 'overhead' | 'invest';
 };
 
 const OWNER_EMAIL = 'flectere@dev.com';
@@ -276,8 +282,8 @@ function MiniTable({
   empty,
 }: {
   title: string;
-  rows: Array<Record<string, any>>;
-  columns: Array<{ key: string; label: string; format?: (value: any, row: Record<string, any>) => string }>;
+  rows: Array<Record<string, unknown>>;
+  columns: Array<{ key: string; label: string; format?: (value: unknown, row: Record<string, unknown>) => string }>;
   empty: string;
 }) {
   return (
@@ -362,6 +368,7 @@ export default function TheHandPage() {
     date: new Date().toISOString().split('T')[0],
     description: '',
     autoRoute: true,
+    fundingPool: 'savings',
   });
   const [intelForm, setIntelForm] = useState({
     taxRate: 15.5,
@@ -464,13 +471,13 @@ export default function TheHandPage() {
     boot();
   }, [loadControlRoom, loadInventoryCommands]);
 
-  const downloadInventoryCommandCsv = (name: string, rows: Array<Record<string, any>>) => {
+  const downloadInventoryCommandCsv = (name: string, rows: Array<Record<string, unknown>>) => {
     if (rows.length === 0) {
       addLog('warning', `No rows available for ${name}.`);
       return;
     }
     const headers = Object.keys(rows[0]);
-    const escape = (value: any) => {
+    const escape = (value: unknown) => {
       const text = String(value ?? '');
       return /[",\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
     };
@@ -490,6 +497,10 @@ export default function TheHandPage() {
     shopId: 'kipasa' as SaleForm['shopId'],
     date: new Date().toISOString().split('T')[0],
     amount: 0,
+  });
+  const [pastClosingForm, setPastClosingForm] = useState({
+    shopId: 'kipasa' as SaleForm['shopId'],
+    date: new Date().toISOString().split('T')[0],
   });
 
   const updateOpeningBalance = async (shop: 'kipasa' | 'dubdub' | 'tradecenter' | 'tshirts') => {
@@ -547,6 +558,31 @@ export default function TheHandPage() {
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Failed to record past opening';
       addLog('error', message);
+    }
+  };
+
+  const handleRecordPastClosing = async () => {
+    const amount = Number(closingOverrideAmount);
+    if (!Number.isFinite(amount) || amount < 0) {
+      addLog('warning', 'Past closing needs a valid non-negative amount.');
+      return;
+    }
+
+    if (!confirm(`OVERRIDE PAST CLOSING? You are about to set ${pastClosingForm.shopId.toUpperCase()} closing cash to ${currency(amount)} on ${pastClosingForm.date}. Continue?`)) {
+      return;
+    }
+
+    try {
+      await updateCashDrawerClosing({
+        shopId: pastClosingForm.shopId,
+        dateYYYYMMDD: pastClosingForm.date,
+        newAmount: amount,
+      });
+      addLog('success', `Past closing balance for ${pastClosingForm.shopId} on ${pastClosingForm.date} set to ${currency(amount)}.`);
+      setClosingOverrideAmount('');
+      await loadControlRoom();
+    } catch (error: unknown) {
+      addLog('error', error instanceof Error ? error.message : 'Failed to set past closing balance.');
     }
   };
 
@@ -624,6 +660,7 @@ export default function TheHandPage() {
           date: new Date(`${expenseForm.date}T12:00:00Z`).toISOString(),
           description: expenseForm.description,
           autoRoute: expenseForm.autoRoute,
+          fundingPool: expenseForm.fundingPool,
           overwrite: true,
         }),
       });
@@ -767,7 +804,8 @@ export default function TheHandPage() {
         throw new Error(data.error || data.message || `Job ${kind} execution failed`);
       }
       
-      const summary = data.results?.map((r: any) => `[${r.kind}]: ${r.summary || 'ok'}`).join(', ') || 'Snapshot cycle executed successfully.';
+      const results = Array.isArray(data.results) ? data.results as JobResult[] : [];
+      const summary = results.map((r) => `[${r.kind || 'job'}]: ${r.summary || 'ok'}`).join(', ') || 'Snapshot cycle executed successfully.';
       addLog('success', `AI Engine Success: ${summary}`);
       await loadControlRoom();
     } catch (error: unknown) {
@@ -1042,16 +1080,16 @@ export default function TheHandPage() {
                       <p className="text-xs font-black uppercase tracking-[0.22em] text-slate-500 mb-4">Past Closing Override</p>
                       <div className="space-y-3">
                         <select
-                          value={pastOpeningForm.shopId}
-                          onChange={(event) => setPastOpeningForm((prev) => ({ ...prev, shopId: event.target.value as SaleForm['shopId'] }))}
+                          value={pastClosingForm.shopId}
+                          onChange={(event) => setPastClosingForm((prev) => ({ ...prev, shopId: event.target.value as SaleForm['shopId'] }))}
                           className="w-full rounded-xl border border-white/10 bg-slate-950 px-3 py-2 text-sm text-white"
                         >
                           {SHOPS.map((shop) => <option key={shop.id} value={shop.id}>{shop.name}</option>)}
                         </select>
                         <input
                           type="date"
-                          value={pastOpeningForm.date}
-                          onChange={(event) => setPastOpeningForm((prev) => ({ ...prev, date: event.target.value }))}
+                          value={pastClosingForm.date}
+                          onChange={(event) => setPastClosingForm((prev) => ({ ...prev, date: event.target.value }))}
                           className="w-full rounded-xl border border-white/10 bg-slate-950 px-3 py-2 text-sm text-white"
                         />
                         <input
@@ -1062,20 +1100,30 @@ export default function TheHandPage() {
                           className="w-full rounded-xl border border-white/10 bg-slate-950 px-3 py-2 text-sm text-white outline-none focus:border-rose-500/50"
                         />
                         <button
-                          onClick={async () => {
-                            if (!confirm("OVERRIDE PAST CLOSING?")) return;
-                            try {
-                              await updateCashDrawerClosing({ 
-                                shopId: pastOpeningForm.shopId, 
-                                dateYYYYMMDD: pastOpeningForm.date, 
-                                newAmount: Number(closingOverrideAmount) 
-                              });
-                              addLog('success', `Past closing balance for ${pastOpeningForm.shopId} on ${pastOpeningForm.date} set to ${currency(Number(closingOverrideAmount))}.`);
-                              await loadControlRoom();
-                            } catch (error: unknown) {
-                              addLog('error', error instanceof Error ? error.message : 'Failed to set past closing balance.');
-                            }
-                          }}
+                          onClick={handleRecordPastClosing}
+                          disabled={!closingOverrideAmount}
+                          className="w-full rounded-xl border border-rose-400/30 bg-rose-500/10 py-3 text-xs font-black uppercase tracking-widest text-rose-200 hover:bg-rose-500/20 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          Set Past Closing
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="rounded-2xl border border-white/10 bg-slate-900/40 p-4">
+                      <p className="text-xs font-black uppercase tracking-[0.22em] text-slate-500 mb-4">Past Expense / Pool Movement</p>
+                      <div className="space-y-3">
+                        <select
+                          value={expenseForm.shopId}
+                          onChange={(event) => setExpenseForm((prev) => ({ ...prev, shopId: event.target.value as ExpenseForm['shopId'] }))}
+                          className="w-full rounded-xl border border-white/10 bg-slate-950 px-3 py-2 text-sm text-white"
+                        >
+                          {SHOPS.map((shop) => <option key={shop.id} value={shop.id}>{shop.name}</option>)}
+                          <option value="global">Global</option>
+                        </select>
+                        <input
+                          type="date"
+                          value={expenseForm.date}
+                          onChange={(event) => setExpenseForm((prev) => ({ ...prev, date: event.target.value }))}
                           className="w-full rounded-xl border border-white/10 bg-slate-950 px-3 py-2 text-sm text-white"
                         />
                         <select
@@ -1086,9 +1134,26 @@ export default function TheHandPage() {
                           <option value="rent">Rent</option>
                           <option value="salaries">Salaries</option>
                           <option value="utilities">Utilities</option>
-                          <option value="stock">Stock</option>
+                          <option value="stock_orders">Stock Orders</option>
+                          <option value="perfume">Perfumes / Invest Pool</option>
+                          <option value="business_expense">Business Expense</option>
+                          <option value="transport">Transport</option>
+                          <option value="groceries">Groceries</option>
+                          <option value="personal">Personal Use</option>
+                          <option value="tithe">Tithe</option>
                           <option value="misc">Miscellaneous</option>
                         </select>
+                        {expenseForm.category === 'stock_orders' && (
+                          <select
+                            value={expenseForm.fundingPool}
+                            onChange={(event) => setExpenseForm((prev) => ({ ...prev, fundingPool: event.target.value as ExpenseForm['fundingPool'] }))}
+                            className="w-full rounded-xl border border-white/10 bg-slate-950 px-3 py-2 text-sm text-white"
+                          >
+                            <option value="savings">Operations Savings</option>
+                            <option value="overhead">Rent / Overhead Pool</option>
+                            <option value="invest">Perfumes / Invest Pool</option>
+                          </select>
+                        )}
                         <input
                           type="number"
                           placeholder="Amount"
@@ -1103,11 +1168,90 @@ export default function TheHandPage() {
                           onChange={(event) => setExpenseForm((prev) => ({ ...prev, description: event.target.value }))}
                           className="w-full rounded-xl border border-white/10 bg-slate-950 px-3 py-2 text-sm text-white"
                         />
+                        <label className="flex items-center gap-3 rounded-xl border border-white/10 bg-slate-950 px-3 py-2 text-xs font-bold text-slate-300">
+                          <input
+                            type="checkbox"
+                            checked={expenseForm.autoRoute}
+                            onChange={(event) => setExpenseForm((prev) => ({ ...prev, autoRoute: event.target.checked }))}
+                            className="h-4 w-4 accent-rose-500"
+                          />
+                          Auto-route cash pool entry
+                        </label>
+                        <div className="rounded-xl border border-white/10 bg-slate-950/60 px-3 py-2 text-[11px] font-bold uppercase tracking-widest text-slate-500">
+                          {expenseForm.category === 'perfume'
+                            ? 'Route: deposit to perfumes / invest'
+                            : expenseForm.category === 'stock_orders'
+                              ? `Route: withdraw stock orders from ${expenseForm.fundingPool}`
+                              : expenseForm.category === 'rent' || expenseForm.category === 'salaries'
+                                ? 'Route: overhead payment'
+                                : 'Route: operations savings withdrawal'}
+                        </div>
                         <button
                           onClick={handleRecordExpense}
-                          className="w-full rounded-xl border border-rose-400/30 bg-rose-500/10 py-3 text-xs font-black uppercase tracking-widest text-rose-200 hover:bg-rose-500/20"
+                          disabled={expenseForm.amount <= 0}
+                          className="w-full rounded-xl border border-rose-400/30 bg-rose-500/10 py-3 text-xs font-black uppercase tracking-widest text-rose-200 hover:bg-rose-500/20 disabled:cursor-not-allowed disabled:opacity-50"
                         >
                           Post Expense
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="rounded-2xl border border-white/10 bg-slate-900/40 p-4">
+                      <p className="text-xs font-black uppercase tracking-[0.22em] text-slate-500 mb-4">Past Sale</p>
+                      <div className="space-y-3">
+                        <select
+                          value={saleForm.shopId}
+                          onChange={(event) => setSaleForm((prev) => ({ ...prev, shopId: event.target.value as SaleForm['shopId'] }))}
+                          className="w-full rounded-xl border border-white/10 bg-slate-950 px-3 py-2 text-sm text-white"
+                        >
+                          {SHOPS.map((shop) => <option key={shop.id} value={shop.id}>{shop.name}</option>)}
+                        </select>
+                        <input
+                          type="date"
+                          value={saleForm.date}
+                          onChange={(event) => setSaleForm((prev) => ({ ...prev, date: event.target.value }))}
+                          className="w-full rounded-xl border border-white/10 bg-slate-950 px-3 py-2 text-sm text-white"
+                        />
+                        <input
+                          type="text"
+                          placeholder="Client"
+                          value={saleForm.clientName}
+                          onChange={(event) => setSaleForm((prev) => ({ ...prev, clientName: event.target.value }))}
+                          className="w-full rounded-xl border border-white/10 bg-slate-950 px-3 py-2 text-sm text-white"
+                        />
+                        <input
+                          type="text"
+                          placeholder="Item"
+                          value={saleForm.itemName}
+                          onChange={(event) => setSaleForm((prev) => ({ ...prev, itemName: event.target.value }))}
+                          className="w-full rounded-xl border border-white/10 bg-slate-950 px-3 py-2 text-sm text-white"
+                        />
+                        <div className="grid grid-cols-2 gap-3">
+                          <input
+                            type="number"
+                            min={1}
+                            placeholder="Qty"
+                            value={saleForm.quantity}
+                            onChange={(event) => setSaleForm((prev) => ({ ...prev, quantity: Number(event.target.value || 1) }))}
+                            className="w-full rounded-xl border border-white/10 bg-slate-950 px-3 py-2 text-sm text-white"
+                          />
+                          <input
+                            type="number"
+                            placeholder="Unit Price"
+                            value={saleForm.unitPrice}
+                            onChange={(event) => setSaleForm((prev) => ({ ...prev, unitPrice: Number(event.target.value || 0) }))}
+                            className="w-full rounded-xl border border-white/10 bg-slate-950 px-3 py-2 text-sm text-white"
+                          />
+                        </div>
+                        <div className="rounded-xl border border-white/10 bg-slate-950/60 px-3 py-2 text-[11px] font-bold uppercase tracking-widest text-slate-500">
+                          Total: {currency(saleForm.quantity * saleForm.unitPrice)}
+                        </div>
+                        <button
+                          onClick={handleRecordSale}
+                          disabled={!saleForm.clientName || !saleForm.itemName || saleForm.quantity <= 0 || saleForm.unitPrice <= 0}
+                          className="w-full rounded-xl border border-emerald-400/30 bg-emerald-500/10 py-3 text-xs font-black uppercase tracking-widest text-emerald-200 hover:bg-emerald-500/20 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          Post Sale
                         </button>
                       </div>
                     </div>
@@ -1417,7 +1561,7 @@ export default function TheHandPage() {
                     { key: 'stock', label: 'Stock' },
                     { key: 'daysInStock', label: 'Age', format: (v) => `${v}d` },
                     { key: 'trappedCapital', label: 'Value', format: (v) => currency(Number(v || 0)) },
-                    { key: 'lastSaleAt', label: 'Last Sale', format: (v) => v ? new Date(v).toLocaleDateString() : 'none' },
+                    { key: 'lastSaleAt', label: 'Last Sale', format: (v) => v ? new Date(String(v)).toLocaleDateString() : 'none' },
                   ]}
                 />
                 <MiniTable
@@ -1441,8 +1585,42 @@ export default function TheHandPage() {
             <WindowCard eyebrow="Neural Intelligence Hub" title="AI Analytics & Deep Learning Engine" icon={Brain} className="border-sky-500/30">
               <div className="space-y-6">
                 <p className="text-sm text-slate-400">
-                  Execute advanced numerical computations, machine learning regressions, and deep learning demand forecasts directly on the server's Python virtual environment.
+                  Execute advanced numerical computations, machine learning regressions, and deep learning demand forecasts directly on the server&apos;s Python virtual environment.
                 </p>
+
+                <div className="rounded-2xl border border-white/10 bg-slate-950/40 p-5">
+                  <p className="text-xs font-black uppercase tracking-[0.22em] text-slate-500 mb-4">Intelligence Constants</p>
+                  <div className="grid gap-3 md:grid-cols-4">
+                    <input
+                      type="number"
+                      value={intelForm.taxRate}
+                      onChange={(event) => setIntelForm((prev) => ({ ...prev, taxRate: Number(event.target.value || 0) }))}
+                      className="w-full rounded-xl border border-white/10 bg-slate-950 px-3 py-2 text-sm text-white"
+                      placeholder="Tax %"
+                    />
+                    <input
+                      type="number"
+                      value={intelForm.taxThreshold}
+                      onChange={(event) => setIntelForm((prev) => ({ ...prev, taxThreshold: Number(event.target.value || 0) }))}
+                      className="w-full rounded-xl border border-white/10 bg-slate-950 px-3 py-2 text-sm text-white"
+                      placeholder="Tax Threshold"
+                    />
+                    <input
+                      type="number"
+                      value={intelForm.zombieDays}
+                      onChange={(event) => setIntelForm((prev) => ({ ...prev, zombieDays: Number(event.target.value || 0) }))}
+                      className="w-full rounded-xl border border-white/10 bg-slate-950 px-3 py-2 text-sm text-white"
+                      placeholder="Zombie Days"
+                    />
+                    <button
+                      onClick={handleUpdateIntelligence}
+                      disabled={busy}
+                      className="rounded-xl border border-sky-400/30 bg-sky-500/10 px-4 py-2 text-xs font-black uppercase tracking-widest text-sky-200 hover:bg-sky-500/20 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      Save Constants
+                    </button>
+                  </div>
+                </div>
 
                 <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                   {/* Demand Forecast */}

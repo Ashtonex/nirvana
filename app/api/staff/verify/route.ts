@@ -12,7 +12,7 @@ export async function POST(req: Request) {
   const { data: employee } = await supabaseAdmin
     .from("employees")
     .select("*")
-    .eq("email", workEmail)
+    .ilike("email", workEmail)
     .maybeSingle();
 
   if (!employee) {
@@ -48,11 +48,16 @@ export async function POST(req: Request) {
   const tokenHash = createHash("sha256").update(token).digest("hex");
   const expiresAt = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString();
 
-  await supabaseAdmin.from("staff_sessions").insert({
+  const { error: sessionError } = await supabaseAdmin.from("staff_sessions").insert({
     employee_id: employee.id,
     token_hash: tokenHash,
     expires_at: expiresAt,
   });
+
+  if (sessionError) {
+    console.error("Failed to insert staff session:", sessionError);
+    return NextResponse.json({ error: "Failed to create session" }, { status: 500 });
+  }
 
   // Consume code
   await supabaseAdmin.from("staff_login_codes").delete().eq("id", record.id);
@@ -71,7 +76,7 @@ export async function POST(req: Request) {
 
   (await cookies()).set("nirvana_staff", token, {
     httpOnly: true,
-    secure: true,
+    secure: process.env.NODE_ENV === "production",
     sameSite: "lax",
     path: "/",
     maxAge: 14 * 24 * 60 * 60,

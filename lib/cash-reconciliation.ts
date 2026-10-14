@@ -28,6 +28,7 @@ export function buildCashReconciliation(input: {
 
   const drawerExpenses = sumNumbers(
     shopLedger
+      .filter((entry) => entry.category !== "Operations Transfer")
       .filter((entry) => String(entry.type || "").toLowerCase() === "expense" || isSavingsOrBlackboxTransferEntry(entry))
       .map((entry) => entry.amount as number | string | null | undefined)
   );

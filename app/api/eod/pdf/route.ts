@@ -78,7 +78,7 @@ export async function GET(req: Request) {
   try {
     const url = new URL(req.url);
     const shopId = url.searchParams.get("shopId") || "";
-    const isTest = url.searchParams.get("test") === "true";
+    const isTest = url.searchParams.get("test") === "true" && process.env.NODE_ENV !== "production";
     const date = url.searchParams.get("date"); // YYYY-MM-DD (optional)
 
     if (!shopId) {

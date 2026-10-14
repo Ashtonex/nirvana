@@ -29,6 +29,34 @@ CREATE TABLE IF NOT EXISTS operations_ledger (
   created_at TIMESTAMPTZ DEFAULT now()
 );
 
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint WHERE conname = 'operations_ledger_sensitive_cash_pool_metadata'
+  ) THEN
+    ALTER TABLE operations_ledger
+      ADD CONSTRAINT operations_ledger_sensitive_cash_pool_metadata
+      CHECK (
+        kind NOT IN ('stock_orders', 'invest_deposit', 'invest_withdrawal')
+        OR (
+          metadata ->> 'cashPoolTransaction' = 'true'
+          AND metadata ->> 'fundingPool' IN ('savings', 'overhead', 'invest')
+        )
+      );
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint WHERE conname = 'operations_ledger_invest_kind_uses_invest_pool'
+  ) THEN
+    ALTER TABLE operations_ledger
+      ADD CONSTRAINT operations_ledger_invest_kind_uses_invest_pool
+      CHECK (
+        kind NOT IN ('invest_deposit', 'invest_withdrawal')
+        OR metadata ->> 'fundingPool' = 'invest'
+      );
+  END IF;
+END $$;
+
 ALTER TABLE operations_ledger ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Allow all operations on operations_ledger" ON operations_ledger FOR ALL USING (true) WITH CHECK (true);
 

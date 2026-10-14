@@ -1,0 +1,104 @@
+date,shop,category,status,amount,kind,title,notes,id
+2026-03-20,operations,Other labelled payout,Labelled payment,155,overhead_payment,Chicken Project,,c608c633-9f09-46d9-b18c-7e2166085257
+2026-03-20,operations,Salaries / wages,Labelled payment,100,overhead_payment,Salaries for name,,db8820ec-72c7-4bf8-a170-3aca8df06aa0
+2026-03-20,tradecenter,Other labelled payout,Labelled payment,58,overhead_payment,Drinks,,e03fd114-d826-40cd-8707-b91da8becb24
+2026-03-20,operations,Other labelled payout,Labelled payment,300,overhead_payment,David Chaeruka (Dutch),,e1577877-aa43-424a-ab96-8fd7303a42ec
+2026-03-20,operations,Stock orders,Labelled payment,200,overhead_payment,SA_Order,,50385c7d-1cf1-4dc8-84fb-6da4f87fd6a3
+2026-03-21,operations,Other labelled payout,Labelled payment,34,overhead_payment,Shakespoon,,39e73b15-98f0-4a46-a139-52cc00c92bf0
+2026-03-23,kipasa,Tax / banking,Labelled payment,250,overhead_payment,Banking,,430d812c-e360-461f-82e9-5d202be9ccb8
+2026-03-23,operations,Tax / banking,Labelled payment,50,overhead_payment,Banking,,df2a9bd2-bb3e-4ea3-99c1-ad71021814cc
+2026-03-23,operations,Other labelled payout,Labelled payment,1000,overhead_payment,Yohanne,,68495f55-779b-4ad3-a38a-b8acd86c5f40
+2026-03-23,operations,Other labelled payout,Labelled payment,500,overhead_payment,Round - Shakespoon,,615a97d6-fd41-49e3-9c83-5643731b2259
+2026-03-23,operations,Stock orders,Labelled payment,200,overhead_payment,SA_Order,,335dd604-56d3-4485-ab25-bb6e2d74a6a3
+2026-03-27,kipasa,Other labelled payout,Labelled payment,50,overhead_payment,Hilenial,,90ddfffc-070a-464c-bf18-86e1d5abbddc
+2026-03-27,operations,Stock orders,Labelled payment,100,overhead_payment,Stockvel,,133fb9e6-a5bb-4c15-bcdb-eb181181b446
+2026-03-27,operations,Stock orders,Labelled payment,500,overhead_payment,SA_Orders,,d6089e31-9d02-4151-9d52-cca75f167c29
+2026-03-30,kipasa,Tax / banking,Labelled payment,450,overhead_payment,Banking : ,,50e27ec4-a7be-4851-9aa0-d34d58ead6df
+2026-03-31,operations,Other labelled payout,Labelled payment,500,overhead_payment,Round,,25db4546-66e2-4588-9be1-bd6162d4dabc
+2026-03-31,dubdub,Tax / banking,Labelled payment,600,overhead_payment,Banking,,14f71eec-d7ac-4758-8475-b7a0e7d51d1c
+2026-04-01,operations,Stock orders,Labelled payment,2000,overhead_payment,SA_Order,,e4ca9a3a-0e16-40a1-995a-9bcc4a2aa64c
+2026-04-01,operations,Other labelled payout,Labelled payment,53,overhead_payment,Cimas,,8e82762d-5917-4fdc-8272-24f631b3c4d2
+2026-04-01,operations,Transport,Labelled payment,15,overhead_payment,SA_Transport,,a860c222-dd1c-4d11-bd12-2f56306210d3
+2026-04-01,operations,Stock orders,Labelled payment,200,overhead_payment,SA_Order,,65938fa9-d45c-4ec1-85b5-59e0dc700b35
+2026-04-02,operations,Other labelled payout,Labelled payment,5,overhead_payment,Batsi,,7ec0aa9e-a406-4947-9003-f05f8f4f7d1d
+2026-04-02,operations,Stock orders,Labelled payment,200,overhead_payment,SA_Orders,,acb46ae2-214e-44cd-aad0-5c608e7b3c6e
+2026-04-02,operations,Stock orders,Labelled payment,280,overhead_payment,Stockvel,,2842a8cd-5442-4378-b7ac-2c19bdd6655f
+2026-04-02,operations,Rent / overhead,Labelled payment,30,overhead_payment,Rent,,434512e5-7876-48fd-b9ef-c29ff16f7585
+2026-04-02,operations,Stock orders,Labelled payment,540,overhead_payment,Salaries (Stockvel),,2d6ab4e5-ea5b-4148-8e16-526f8aee054b
+2026-04-07,operations,Utilities,Labelled payment,7,overhead_payment,Water,,1e77144e-1b8d-40bb-a2e1-ac41a7cacd5c
+2026-04-07,operations,Stock orders,Labelled payment,10,overhead_payment,SA_Order,,345cd2a6-13eb-442f-9d0a-fbdc7b1b97ee
+2026-04-07,operations,Other labelled payout,Unclear,680,overhead_payment,680,,1b14f4d0-9bd7-48a3-9e9c-e027dfd61339
+2026-04-07,dubdub,Rent / overhead,Labelled payment,500,overhead_payment,Rent taken by dutch total of 700 from Dub,,81a3ddaf-21d6-4ee7-ab6d-8dafa560c1e1
+2026-04-07,operations,Rent / overhead,Labelled payment,200,overhead_payment,200 Rent taken from dub total 700 by dutch,,0fad5562-456e-4996-9165-ce7f489d7838
+2026-04-07,kipasa,Rent / overhead,Labelled payment,270,overhead_payment,Home Rent taken by Dutch,,1c3360c5-1142-44f7-87e9-ee6e05d6dbb9
+2026-04-07,tradecenter,Utilities,Labelled payment,7,overhead_payment,Water,,5ca25f6e-eba5-485a-9cdc-0f65fc7d4451
+2026-04-09,operations,Stock orders,Labelled payment,20,overhead_payment,SA_Order,,1d59a5b0-64e3-41ca-92eb-b9e68e60cf47
+2026-04-09,operations,Utilities,Labelled payment,10,overhead_payment,Water Bill,,56d572e3-929d-474f-8778-d5602b32a11c
+2026-04-09,operations,Stock orders,Labelled payment,100,overhead_payment,SA_Order,,7fd8c700-bc48-4918-8eaf-b599c47881e0
+2026-04-09,operations,Other labelled payout,Labelled payment,450,overhead_payment,Dutch : China  Accomodation,,a85fd1ac-13c9-47ad-ab80-ee7df5189d40
+2026-04-09,operations,Other labelled payout,Labelled payment,667,overhead_payment,Romeo,,c5ff7c55-133b-4c28-b7cc-8de9f2ec0869
+2026-04-09,operations,Stock orders,Labelled payment,1217,overhead_payment,Stockvel,,654c0eb9-f42f-405b-a1c6-827dfc25af7c
+2026-04-11,operations,Rent / overhead,Labelled payment,65,overhead_payment,Home Rent,,d8ecca5c-54cc-4aed-9239-b93b857b7a9b
+2026-04-11,operations,Utilities,Labelled payment,100,overhead_payment,Stokvel (Water Bill),,4b76ac06-a825-42aa-ab9e-d5f80e353143
+2026-04-11,operations,Other labelled payout,Labelled payment,40,overhead_payment,Drinks (TC),,e70f8c31-10e7-4d81-ab76-d39b64a9091c
+2026-04-11,operations,Transport,Labelled payment,20,overhead_payment,Fuel,,b0fb75dd-522e-4023-a559-b6621bb72296
+2026-04-14,operations,Groceries,Labelled payment,10,overhead_payment,April Groceries,,bd49f668-85a9-44d1-8537-7d7849e0821d
+2026-04-14,operations,Other labelled payout,Labelled payment,500,overhead_payment,Round,,6e0576d2-5ffd-470e-b44f-30e0b1e9c399
+2026-04-16,operations,Other labelled payout,Labelled payment,200,overhead_payment,Mr banda,,f5d0aad4-945b-49fb-9ba7-be1d0b192d9c
+2026-04-20,operations,Other labelled payout,Labelled payment,500,overhead_payment,Round,,64df26ff-d9c5-4306-970a-ff10cc8625eb
+2026-04-20,operations,Stock orders,Labelled payment,1700,overhead_payment,SA_Orders,,ba3c5809-76c5-4f9a-8524-a5c5aac5c60c
+2026-04-23,operations,Other labelled payout,Labelled payment,30,overhead_payment,Door repair,,73d06f28-3411-42c8-9b97-51993a882524
+2026-04-24,kipasa,Stock orders,Labelled payment,30,overhead_payment,Drinks_Stock Orders,,3c89408d-e186-49fb-96bf-cd7d3daefde2
+2026-04-24,operations,Other labelled payout,Labelled payment,15,overhead_payment,Dutchess,,dde1a847-ee4a-4828-a4f3-4eb0b1151423
+2026-04-24,operations,Other labelled payout,Labelled payment,20,overhead_payment,Bike Battery,,9a0c4266-8828-4dd5-815c-d403be4f0fc7
+2026-04-27,operations,Other labelled payout,Labelled payment,53,overhead_payment,Cimas,,6f9f828c-caf4-4abd-b6e4-0c4c57ce0f6d
+2026-04-27,operations,Other labelled payout,Labelled payment,300,overhead_payment,Building Pledge,,e2d6f9ac-3eef-4e75-82be-852099b04f5d
+2026-04-27,operations,Other labelled payout,Labelled payment,500,overhead_payment,round,,d8b35429-2a63-418c-ba5a-95d818d76213
+2026-04-13,kipasa,Supplier / payables,Labelled payment,1110,overhead_payment,payables,,ce83ec9f-03a1-4d20-abff-22646c0aa5f8
+2026-04-29,kipasa,Other labelled payout,Labelled payment,50,overhead_payment,Software developmemt : DB Migration,,115ea442-3771-4a2d-b288-b28ee0bd3bb4
+2026-04-29,dubdub,Tax / banking,Labelled payment,600,overhead_payment,Banking,,fa3be7df-c3a5-4c2d-a1b2-c6515f0eb6a3
+2026-04-29,dubdub,Other labelled payout,Labelled payment,160,overhead_payment,Balance ,,e2adf79c-0a3a-4eea-922e-d6abdf3ca339
+2026-05-01,operations,Other labelled payout,Adjustment-looking,12421,overhead_payment,Apri Adjustment,,a2e0d8db-61ba-4af6-8931-6daee9d8a6c2
+2026-05-02,operations,Stock orders,Labelled payment,2700,overhead_payment,SA_Orders,,6eeb97dd-7678-4a15-bad5-557d0e457ac7
+2026-05-02,operations,Other labelled payout,Labelled payment,100,overhead_payment,Ivin,,07f5aa95-d348-441e-b175-da3f476b5f04
+2026-05-04,kipasa,Rent / overhead,Labelled payment,1200,overhead_payment,May Rent,,94339728-44ed-41ef-af24-7622c10070a0
+2026-05-04,operations,Other labelled payout,Labelled payment,240,overhead_payment,Balance Accounts,,0b4e4314-5357-4259-a052-1c3e08d9d101
+2026-05-06,operations,Other labelled payout,Labelled payment,500,overhead_payment,Round,,cf1c0fe9-7f96-455a-bfac-b0f29c0fc022
+2026-05-06,operations,Rent / overhead,Labelled payment,300,overhead_payment,Home Rent,,61b211f9-1c52-41ef-b246-e8cf21cda069
+2026-05-06,tradecenter,Stock orders,Labelled payment,40,stock_orders,Drinks,,ebfd6a79-ca8a-475e-8e38-179b2804ab95
+2026-05-06,operations,Other labelled payout,Labelled payment,60,overhead_payment,busineess,,7af940b2-778b-44e9-bd2e-21da839bb8c0
+2026-05-07,dubdub,Other labelled payout,Labelled payment,40,overhead_payment,electricty,,b67a2651-9949-42c0-b24d-71d1ad3ef39f
+2026-05-06,operations,Other labelled payout,Labelled payment,20,overhead_payment,Engraving boards,,9e609601-5ae1-448c-8912-3950dc37cae8
+2026-05-06,operations,Other labelled payout,Labelled payment,50,overhead_payment,Gari,,8ea51177-7fef-4679-9845-4808c0d5d7e3
+2026-05-06,operations,Other labelled payout,Labelled payment,20,overhead_payment,Yohanne,,c00d76e4-370d-4ee1-a26b-1b21d4b9ce82
+2026-05-07,kipasa,Other labelled payout,Labelled payment,100,overhead_payment,Fungai,,96bfc9f4-d7a4-486f-b316-d98173e3bb8e
+2026-05-07,tradecenter,Other labelled payout,Labelled payment,15,overhead_payment,Drinks,,eb288a04-ea9d-4a12-ac72-4f65775075e0
+2026-05-07,operations,Stock orders,Labelled payment,230,overhead_payment,SA_Order,,6acc1e33-2d45-4457-97e3-03d02baf8ca2
+2026-05-07,operations,Other labelled payout,Labelled payment,300,overhead_payment,Harare_Order,,8ef21429-4cf8-46a9-8747-22c1f3bcb8b1
+2026-05-09,operations,Other labelled payout,Labelled payment,23,overhead_payment,silophen & hamper cups,,19d34533-fd0c-4d78-8e87-1da851eaf5f0
+2026-05-12,operations,Stock orders,Labelled payment,2000,stock_orders,SA Order,,5dd77833-5c2d-4805-9f87-6a94013ab705
+2026-05-25,operations,Stock orders,Labelled payment,1100,stock_orders,SA_Order,,9913990f-9e77-4826-9d93-c9f43927dcda
+2026-05-21,operations,Stock orders,Labelled payment,100,stock_orders,China_Order,,daf8d4b3-9d93-495b-aee6-6125c837c1ca
+2026-05-20,operations,Other labelled payout,Labelled payment,10,overhead_payment,Dutch,,97b336ea-fd7e-4723-8eba-c4c8f7fb65b4
+2026-05-28,operations,Stock orders,Labelled payment,1600,stock_orders,SA-Order,,133fffdb-bb3b-4308-9814-4cfdd39306d9
+2026-05-28,operations,Salaries / wages,Labelled payment,160,eod_deposit,Salaries,,d33a7dc7-9c87-4eaf-bf91-ace24bc5f91d
+2026-05-28,operations,Stock orders,Labelled payment,110,stock_orders,City-Stock,,b4e83d24-bb55-4c3c-bee6-4ec4fca030d3
+2026-05-28,operations,Stock orders,Labelled payment,20,stock_orders,Harare Stock,,505c6072-4e86-470b-a75d-52ab6fe2f8fc
+2026-05-28,operations,Stock orders,Labelled payment,40,stock_orders,Drinks,,4ad0ce9f-d3f1-48c4-a781-d489ef508547
+2026-05-28,operations,Rent / overhead,Labelled payment,10,overhead_payment,10,,28692d91-ea22-45ed-94a1-01b695f0a25f
+2026-06-25,tradecenter,Rent / overhead,Labelled payment,10,overhead_payment,Rent,Auto-routed from POS expense: Overhead payment,2c6807ae-51bc-48d7-acf9-0b4c23c79981
+2026-06-25,tradecenter,Other labelled payout,Labelled payment,20,overhead_payment,Savings ,Auto-routed from POS expense: Overhead payment,19e8dd73-48d2-4c85-834f-bf81e4603da0
+2026-06-27,kipasa,Rent / overhead,Adjustment-looking,3430,overhead_payment,Historical Rent Reconciliation,System adjustment to zero out unwithdrawn historical rent,103d1c64-26db-4411-8cbf-219d573caedc
+2026-06-27,dubdub,Rent / overhead,Adjustment-looking,10364,overhead_payment,Historical Rent Reconciliation,System adjustment to zero out unwithdrawn historical rent,41625fd8-8014-402d-97a2-78e8c013d8af
+2026-06-29,dubdub,Rent / overhead,Labelled payment,600,overhead_payment,ZIMRA,Direct POS Entry (dubdub),2310fbc6-f6b2-4f34-bb3b-5b2342f74a01
+2026-06-29,kipasa,Stock orders,Labelled payment,1700,overhead_payment,China order,Direct POS Entry (kipasa),c0a6815c-4bf6-46e4-9ed9-0d3ce2b42af3
+2026-07-03,kipasa,Rent / overhead,Labelled payment,300,overhead_payment,Pst kethy,Direct POS Entry (kipasa),04c2b103-2946-4464-b4cf-8277a6bbdf11
+2026-07-04,dubdub,Stock orders,Labelled payment,300,overhead_payment,SA ORder,Direct POS Entry (dubdub),0bc59045-c93a-4700-a5fd-5889f0c8b67d
+2026-07-04,dubdub,Stock orders,Labelled payment,100,overhead_payment,Sa order,Direct POS Entry (dubdub),9cdbfb26-e096-4bb6-9c05-0f3415feaed9
+2026-07-10,kipasa,Rent / overhead,Labelled payment,100,overhead_payment,Nassa,Direct POS Entry (kipasa),4e695d7f-78e1-43c3-9f22-7002e8e2f4c2
+2026-07-10,kipasa,Rent / overhead,Labelled payment,400,overhead_payment,Nassa,Direct POS Entry (kipasa),38483c5c-3ad7-46bf-95f9-6cef9ae11927
+2026-07-11,kipasa,Rent / overhead,Labelled payment,100,overhead_payment,Salaries ,Direct POS Entry (kipasa),ba1ef33a-b9f5-49a1-84ba-bf5f2a599b7b
+2026-07-18,kipasa,Rent / overhead,Labelled payment,130,overhead_payment,Bikes,Direct POS Entry (kipasa),ffedcc7e-7dc7-47d6-a15e-22f2e58d8601
+2026-07-24,dubdub,Rent / overhead,Labelled payment,800,overhead_payment,Bank ,Direct POS Entry (dubdub),1b7651df-3342-4078-9450-1a0ed9e0e2e8
+2026-07-24,dubdub,Invest / perfumes,Labelled payment,0.01,invest_withdrawal,Turns test,Direct POS Entry (dubdub),8be32ce5-2083-4ced-8109-a4a89bb699fc
+2026-07-24,dubdub,Stock orders,Labelled payment,400,overhead_payment,SA Order,Direct POS Entry (dubdub),7d1bf6b1-aaff-4104-939e-01e4e56ea7ad

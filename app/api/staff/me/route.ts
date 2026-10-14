@@ -11,18 +11,25 @@ export async function GET() {
   if (!token) {
     const ownerToken = jar.get("nirvana_owner")?.value;
     if (ownerToken) {
-      console.log("[/api/staff/me] No staff token, but has owner token - returning owner");
-      return NextResponse.json({
-        staff: {
-          id: "owner",
-          name: "Owner",
-          surname: "",
-          shop_id: null,
-          role: "owner",
-          is_active: true,
-          active: true,
-        },
-      });
+      const tokenHash = createHash("sha256").update(ownerToken).digest("hex");
+      const { data: session } = await supabaseAdmin
+        .from("staff_sessions")
+        .select("employee_id, expires_at")
+        .eq("token_hash", tokenHash)
+        .maybeSingle();
+
+      if (session && (!session.expires_at || new Date(session.expires_at).getTime() > Date.now())) {
+        const { data: owner } = await supabaseAdmin
+          .from("employees")
+          .select("id,name,surname,shop_id,role,is_active,active")
+          .eq("id", session.employee_id)
+          .maybeSingle();
+
+        if (owner && owner.role === "owner") {
+          return NextResponse.json({ staff: owner });
+        }
+      }
+      return NextResponse.json({ staff: null }, { status: 401 });
     }
 
     console.log("[/api/staff/me] No tokens found - returning 401");

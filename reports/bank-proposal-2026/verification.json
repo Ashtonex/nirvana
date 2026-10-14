@@ -1,0 +1,8 @@
+{
+  "arithmetic": "passed: principal 10000, interest 1300, uses 10000, cash rollforward balanced",
+  "hashes": {
+    "source_extract.json": "828750581e2af004232423f2131b8ca107e34aacf9874a7b573483c80ac4cbd1",
+    "Inventivee_Harvest_BancABC_Funding_Proposal.docx": "9dc49723ac1783ab7a6acbb58efc6076b1a262996983f07583376b9711f1716e",
+    "cashflow_support.csv": "ee0f2f299500ab9430b35dca256e4ab4ad5e6ec234c62fad8aaa790be708f698"
+  }
+}

@@ -1,10 +1,18 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase";
+import { getStaffSessionEmployeeId, requireOwnerAccess } from "@/lib/api-auth";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 5;
 
-export async function GET() {
+export async function GET(request: Request) {
+  const staffEmployeeId = await getStaffSessionEmployeeId();
+  const ownerAccess = await requireOwnerAccess(request);
+
+  if (!staffEmployeeId && !ownerAccess.ok) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   const last24h = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
   
   // Get today's sales (24h window for accuracy)

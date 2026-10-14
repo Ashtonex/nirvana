@@ -1,0 +1,4588 @@
+{
+  "generatedAt": "2026-07-31T11:15:25.430Z",
+  "scope": {
+    "shopId": "dubdub",
+    "periodStart": "2026-01-01",
+    "periodEnd": "2026-07-31",
+    "exclusions": [
+      "drift resets",
+      "zero-value rows from actual cash totals",
+      "negative operations rows from sent-to-operations totals"
+    ],
+    "matchRules": [
+      "exact date + bucket + amount",
+      "fallback: same bucket + amount within two days"
+    ]
+  },
+  "sourceRowsScanned": {
+    "ledgerEntries": 1287,
+    "operationsLedger": 258
+  },
+  "excludedRows": {
+    "driftResetLedger": 0,
+    "driftResetOperations": 0,
+    "zeroValueLedger": 2,
+    "zeroValueOperations": 0,
+    "negativeOperations": 0
+  },
+  "totals": {
+    "ledger": {
+      "Savings": 17420,
+      "Blackbox": 16560,
+      "total": 33980,
+      "count": 174
+    },
+    "operations": {
+      "Savings": 1530,
+      "Blackbox": 14690,
+      "total": 16220,
+      "count": 84
+    },
+    "matchedAmount": 15810,
+    "unmatchedLedgerAmount": 18170,
+    "unmatchedOperationsAmount": 410
+  },
+  "monthlyRows": [
+    {
+      "month": "2026-01",
+      "ledgerSavings": 4630,
+      "ledgerBlackbox": 0,
+      "ledgerTotal": 4630,
+      "opsSavings": 0,
+      "opsBlackbox": 0,
+      "opsTotal": 0,
+      "variance": 4630
+    },
+    {
+      "month": "2026-02",
+      "ledgerSavings": 6120,
+      "ledgerBlackbox": 0,
+      "ledgerTotal": 6120,
+      "opsSavings": 0,
+      "opsBlackbox": 0,
+      "opsTotal": 0,
+      "variance": 6120
+    },
+    {
+      "month": "2026-03",
+      "ledgerSavings": 5080,
+      "ledgerBlackbox": 150,
+      "ledgerTotal": 5230,
+      "opsSavings": 400,
+      "opsBlackbox": 0,
+      "opsTotal": 400,
+      "variance": 4830
+    },
+    {
+      "month": "2026-04",
+      "ledgerSavings": 700,
+      "ledgerBlackbox": 3180,
+      "ledgerTotal": 3880,
+      "opsSavings": 240,
+      "opsBlackbox": 1460,
+      "opsTotal": 1700,
+      "variance": 2180
+    },
+    {
+      "month": "2026-05",
+      "ledgerSavings": 890,
+      "ledgerBlackbox": 3360,
+      "ledgerTotal": 4250,
+      "opsSavings": 890,
+      "opsBlackbox": 3360,
+      "opsTotal": 4250,
+      "variance": 0
+    },
+    {
+      "month": "2026-06",
+      "ledgerSavings": 0,
+      "ledgerBlackbox": 4330,
+      "ledgerTotal": 4330,
+      "opsSavings": 0,
+      "opsBlackbox": 4330,
+      "opsTotal": 4330,
+      "variance": 0
+    },
+    {
+      "month": "2026-07",
+      "ledgerSavings": 0,
+      "ledgerBlackbox": 5540,
+      "ledgerTotal": 5540,
+      "opsSavings": 0,
+      "opsBlackbox": 5540,
+      "opsTotal": 5540,
+      "variance": 0
+    }
+  ],
+  "matches": [
+    {
+      "ledger": {
+        "id": "csqf6oq",
+        "source": "POS ledger",
+        "date": "2026-03-19",
+        "month": "2026-03",
+        "bucket": "Savings",
+        "amount": 330,
+        "rawAmount": 330,
+        "category": "Transfer",
+        "description": "Savings",
+        "employeeId": "20767a78-1ce5-4ac3-be6f-b5ab6e06d1c7"
+      },
+      "operations": {
+        "id": "13b26ad0-1605-4c31-bb23-47384aef06db",
+        "source": "Operations ledger",
+        "date": "2026-03-20",
+        "month": "2026-03",
+        "bucket": "Savings",
+        "amount": 330,
+        "rawAmount": 330,
+        "kind": "eod_deposit",
+        "title": "Savings",
+        "notes": "",
+        "employeeId": ""
+      },
+      "matchType": "Same amount within two days"
+    },
+    {
+      "ledger": {
+        "id": "21kxvto",
+        "source": "POS ledger",
+        "date": "2026-03-20",
+        "month": "2026-03",
+        "bucket": "Savings",
+        "amount": 70,
+        "rawAmount": 70,
+        "category": "Transfer",
+        "description": "Savings",
+        "employeeId": "20767a78-1ce5-4ac3-be6f-b5ab6e06d1c7"
+      },
+      "operations": {
+        "id": "2c703f92-43c5-4852-9f1c-015409b7e1d5",
+        "source": "Operations ledger",
+        "date": "2026-03-20",
+        "month": "2026-03",
+        "bucket": "Savings",
+        "amount": 70,
+        "rawAmount": 70,
+        "kind": "eod_deposit",
+        "title": "Savings",
+        "notes": "",
+        "employeeId": "1fb70c90-7786-41b5-8b77-93eb6da3d34f"
+      },
+      "matchType": "Exact date, bucket, and amount"
+    },
+    {
+      "ledger": {
+        "id": "11e201w",
+        "source": "POS ledger",
+        "date": "2026-04-21",
+        "month": "2026-04",
+        "bucket": "Blackbox",
+        "amount": 160,
+        "rawAmount": 160,
+        "category": "Transfer",
+        "description": "Black box ",
+        "employeeId": "4bcaef17-5185-4dbf-8674-a03462c0e4c5"
+      },
+      "operations": {
+        "id": "09ab4972-0e92-4deb-83e7-7fbeab4d076c",
+        "source": "Operations ledger",
+        "date": "2026-04-21",
+        "month": "2026-04",
+        "bucket": "Blackbox",
+        "amount": 160,
+        "rawAmount": 160,
+        "kind": "eod_deposit",
+        "title": "Black box ",
+        "notes": "Auto-routed from POS expense: Manual deposit",
+        "employeeId": "4bcaef17-5185-4dbf-8674-a03462c0e4c5"
+      },
+      "matchType": "Exact date, bucket, and amount"
+    },
+    {
+      "ledger": {
+        "id": "96k9xkk",
+        "source": "POS ledger",
+        "date": "2026-04-22",
+        "month": "2026-04",
+        "bucket": "Blackbox",
+        "amount": 140,
+        "rawAmount": 140,
+        "category": "Transfer",
+        "description": "Black box ",
+        "employeeId": "4bcaef17-5185-4dbf-8674-a03462c0e4c5"
+      },
+      "operations": {
+        "id": "41fbbd59-8c76-4161-9123-a069b89c9782",
+        "source": "Operations ledger",
+        "date": "2026-04-22",
+        "month": "2026-04",
+        "bucket": "Blackbox",
+        "amount": 140,
+        "rawAmount": 140,
+        "kind": "eod_deposit",
+        "title": "Black box ",
+        "notes": "Auto-routed from POS expense: Manual deposit",
+        "employeeId": "4bcaef17-5185-4dbf-8674-a03462c0e4c5"
+      },
+      "matchType": "Exact date, bucket, and amount"
+    },
+    {
+      "ledger": {
+        "id": "y7wmrxo",
+        "source": "POS ledger",
+        "date": "2026-04-24",
+        "month": "2026-04",
+        "bucket": "Blackbox",
+        "amount": 150,
+        "rawAmount": 150,
+        "category": "Transfer",
+        "description": "Black box ",
+        "employeeId": "20767a78-1ce5-4ac3-be6f-b5ab6e06d1c7"
+      },
+      "operations": {
+        "id": "753364a7-7492-44b4-9c00-1f2e231e19a5",
+        "source": "Operations ledger",
+        "date": "2026-04-24",
+        "month": "2026-04",
+        "bucket": "Blackbox",
+        "amount": 150,
+        "rawAmount": 150,
+        "kind": "eod_deposit",
+        "title": "Black box ",
+        "notes": "Auto-routed from POS expense: Manual deposit",
+        "employeeId": "20767a78-1ce5-4ac3-be6f-b5ab6e06d1c7"
+      },
+      "matchType": "Exact date, bucket, and amount"
+    },
+    {
+      "ledger": {
+        "id": "0qdsoea",
+        "source": "POS ledger",
+        "date": "2026-04-25",
+        "month": "2026-04",
+        "bucket": "Blackbox",
+        "amount": 120,
+        "rawAmount": 120,
+        "category": "Transfer",
+        "description": "Black box ",
+        "employeeId": "20767a78-1ce5-4ac3-be6f-b5ab6e06d1c7"
+      },
+      "operations": {
+        "id": "2a1680f0-6c37-4a76-9e28-2b1d35eb3620",
+        "source": "Operations ledger",
+        "date": "2026-04-25",
+        "month": "2026-04",
+        "bucket": "Blackbox",
+        "amount": 120,
+        "rawAmount": 120,
+        "kind": "eod_deposit",
+        "title": "Black box ",
+        "notes": "Auto-routed from POS expense: Manual deposit",
+        "employeeId": "20767a78-1ce5-4ac3-be6f-b5ab6e06d1c7"
+      },
+      "matchType": "Exact date, bucket, and amount"
+    },
+    {
+      "ledger": {
+        "id": "47v0ohw",
+        "source": "POS ledger",
+        "date": "2026-04-27",
+        "month": "2026-04",
+        "bucket": "Blackbox",
+        "amount": 70,
+        "rawAmount": 70,
+        "category": "Blackbox",
+        "description": "Black box ",
+        "employeeId": "4bcaef17-5185-4dbf-8674-a03462c0e4c5"
+      },
+      "operations": {
+        "id": "9eac7e3a-a27b-413d-9b38-a6da61f865b4",
+        "source": "Operations ledger",
+        "date": "2026-04-27",
+        "month": "2026-04",
+        "bucket": "Blackbox",
+        "amount": 70,
+        "rawAmount": 70,
+        "kind": "eod_deposit",
+        "title": "Black box ",
+        "notes": "Auto-routed from POS expense: Manual deposit",
+        "employeeId": "4bcaef17-5185-4dbf-8674-a03462c0e4c5"
+      },
+      "matchType": "Exact date, bucket, and amount"
+    },
+    {
+      "ledger": {
+        "id": "ovm883f",
+        "source": "POS ledger",
+        "date": "2026-04-28",
+        "month": "2026-04",
+        "bucket": "Blackbox",
+        "amount": 250,
+        "rawAmount": 250,
+        "category": "Blackbox",
+        "description": "Black box ",
+        "employeeId": "4bcaef17-5185-4dbf-8674-a03462c0e4c5"
+      },
+      "operations": {
+        "id": "02e1cd9e-0305-4fcb-9cd2-65f5cba64ff6",
+        "source": "Operations ledger",
+        "date": "2026-04-28",
+        "month": "2026-04",
+        "bucket": "Blackbox",
+        "amount": 250,
+        "rawAmount": 250,
+        "kind": "eod_deposit",
+        "title": "Black box ",
+        "notes": "Auto-routed from POS expense: Manual deposit",
+        "employeeId": "4bcaef17-5185-4dbf-8674-a03462c0e4c5"
+      },
+      "matchType": "Exact date, bucket, and amount"
+    },
+    {
+      "ledger": {
+        "id": "my1njpr",
+        "source": "POS ledger",
+        "date": "2026-04-29",
+        "month": "2026-04",
+        "bucket": "Blackbox",
+        "amount": 310,
+        "rawAmount": 310,
+        "category": "Blackbox",
+        "description": "Black box ",
+        "employeeId": "4bcaef17-5185-4dbf-8674-a03462c0e4c5"
+      },
+      "operations": {
+        "id": "c61796f2-3dcf-4112-a72f-302ee80a1340",
+        "source": "Operations ledger",
+        "date": "2026-04-29",
+        "month": "2026-04",
+        "bucket": "Blackbox",
+        "amount": 310,
+        "rawAmount": 310,
+        "kind": "eod_deposit",
+        "title": "Black box ",
+        "notes": "Auto-routed from POS expense: Manual deposit",
+        "employeeId": "4bcaef17-5185-4dbf-8674-a03462c0e4c5"
+      },
+      "matchType": "Exact date, bucket, and amount"
+    },
+    {
+      "ledger": {
+        "id": "3797bqa",
+        "source": "POS ledger",
+        "date": "2026-04-30",
+        "month": "2026-04",
+        "bucket": "Blackbox",
+        "amount": 90,
+        "rawAmount": 90,
+        "category": "Blackbox",
+        "description": "Black box ",
+        "employeeId": "4bcaef17-5185-4dbf-8674-a03462c0e4c5"
+      },
+      "operations": {
+        "id": "e5339c9a-de4f-4f5d-b515-d324890d38ca",
+        "source": "Operations ledger",
+        "date": "2026-04-30",
+        "month": "2026-04",
+        "bucket": "Blackbox",
+        "amount": 90,
+        "rawAmount": 90,
+        "kind": "eod_deposit",
+        "title": "Black box ",
+        "notes": "Auto-routed from POS expense: Manual deposit",
+        "employeeId": "4bcaef17-5185-4dbf-8674-a03462c0e4c5"
+      },
+      "matchType": "Exact date, bucket, and amount"
+    },
+    {
+      "ledger": {
+        "id": "jofxvjk",
+        "source": "POS ledger",
+        "date": "2026-05-01",
+        "month": "2026-05",
+        "bucket": "Blackbox",
+        "amount": 240,
+        "rawAmount": 240,
+        "category": "Blackbox",
+        "description": "Black box ",
+        "employeeId": "20767a78-1ce5-4ac3-be6f-b5ab6e06d1c7"
+      },
+      "operations": {
+        "id": "394c320f-e6d0-49f0-a15b-637cfa0e5050",
+        "source": "Operations ledger",
+        "date": "2026-05-01",
+        "month": "2026-05",
+        "bucket": "Blackbox",
+        "amount": 240,
+        "rawAmount": 240,
+        "kind": "eod_deposit",
+        "title": "Black box ",
+        "notes": "Auto-routed from POS expense: Manual deposit",
+        "employeeId": "20767a78-1ce5-4ac3-be6f-b5ab6e06d1c7"
+      },
+      "matchType": "Exact date, bucket, and amount"
+    },
+    {
+      "ledger": {
+        "id": "wznrx04",
+        "source": "POS ledger",
+        "date": "2026-05-02",
+        "month": "2026-05",
+        "bucket": "Blackbox",
+        "amount": 100,
+        "rawAmount": 100,
+        "category": "Blackbox",
+        "description": "Black box ",
+        "employeeId": "4bcaef17-5185-4dbf-8674-a03462c0e4c5"
+      },
+      "operations": {
+        "id": "4f2e9e90-940b-4c34-9c9c-c306ebd9f8fa",
+        "source": "Operations ledger",
+        "date": "2026-05-02",
+        "month": "2026-05",
+        "bucket": "Blackbox",
+        "amount": 100,
+        "rawAmount": 100,
+        "kind": "eod_deposit",
+        "title": "Black box ",
+        "notes": "Auto-routed from POS expense: Manual deposit",
+        "employeeId": "4bcaef17-5185-4dbf-8674-a03462c0e4c5"
+      },
+      "matchType": "Exact date, bucket, and amount"
+    },
+    {
+      "ledger": {
+        "id": "kkg2yu1",
+        "source": "POS ledger",
+        "date": "2026-05-03",
+        "month": "2026-05",
+        "bucket": "Savings",
+        "amount": 270,
+        "rawAmount": 270,
+        "category": "Savings",
+        "description": "Savings",
+        "employeeId": "owner"
+      },
+      "operations": {
+        "id": "b854d39a-5bdb-473d-81d7-c2b0243eb15f",
+        "source": "Operations ledger",
+        "date": "2026-05-03",
+        "month": "2026-05",
+        "bucket": "Savings",
+        "amount": 270,
+        "rawAmount": 270,
+        "kind": "savings_deposit",
+        "title": "Savings",
+        "notes": "Auto-routed from POS expense: Savings deposit",
+        "employeeId": "owner"
+      },
+      "matchType": "Exact date, bucket, and amount"
+    },
+    {
+      "ledger": {
+        "id": "obk1xwk",
+        "source": "POS ledger",
+        "date": "2026-05-04",
+        "month": "2026-05",
+        "bucket": "Blackbox",
+        "amount": 160,
+        "rawAmount": 160,
+        "category": "Blackbox",
+        "description": "Black box ",
+        "employeeId": "20767a78-1ce5-4ac3-be6f-b5ab6e06d1c7"
+      },
+      "operations": {
+        "id": "fb368e07-0d55-4f1f-86d5-216d8c4af7d3",
+        "source": "Operations ledger",
+        "date": "2026-05-04",
+        "month": "2026-05",
+        "bucket": "Blackbox",
+        "amount": 160,
+        "rawAmount": 160,
+        "kind": "blackbox",
+        "title": "Black box ",
+        "notes": "Auto-routed from POS expense: Black Box deposit",
+        "employeeId": "20767a78-1ce5-4ac3-be6f-b5ab6e06d1c7"
+      },
+      "matchType": "Exact date, bucket, and amount"
+    },
+    {
+      "ledger": {
+        "id": "b5r5lgs",
+        "source": "POS ledger",
+        "date": "2026-05-05",
+        "month": "2026-05",
+        "bucket": "Blackbox",
+        "amount": 180,
+        "rawAmount": 180,
+        "category": "Blackbox",
+        "description": "Black box ",
+        "employeeId": "20767a78-1ce5-4ac3-be6f-b5ab6e06d1c7"
+      },
+      "operations": {
+        "id": "6160e9c0-15aa-4f88-aacc-e42ebbb1296d",
+        "source": "Operations ledger",
+        "date": "2026-05-05",
+        "month": "2026-05",
+        "bucket": "Blackbox",
+        "amount": 180,
+        "rawAmount": 180,
+        "kind": "blackbox",
+        "title": "Black box ",
+        "notes": "Auto-routed from POS expense: Black Box deposit",
+        "employeeId": "20767a78-1ce5-4ac3-be6f-b5ab6e06d1c7"
+      },
+      "matchType": "Exact date, bucket, and amount"
+    },
+    {
+      "ledger": {
+        "id": "4iw4hlk",
+        "source": "POS ledger",
+        "date": "2026-05-06",
+        "month": "2026-05",
+        "bucket": "Blackbox",
+        "amount": 120,
+        "rawAmount": 120,
+        "category": "Blackbox",
+        "description": "Black box ",
+        "employeeId": "20767a78-1ce5-4ac3-be6f-b5ab6e06d1c7"
+      },
+      "operations": {
+        "id": "d0deca15-8c5c-4356-877a-04d2812de4b8",
+        "source": "Operations ledger",
+        "date": "2026-05-06",
+        "month": "2026-05",
+        "bucket": "Blackbox",
+        "amount": 120,
+        "rawAmount": 120,
+        "kind": "blackbox",
+        "title": "Black box ",
+        "notes": "Auto-routed from POS expense: Black Box deposit",
+        "employeeId": "20767a78-1ce5-4ac3-be6f-b5ab6e06d1c7"
+      },
+      "matchType": "Exact date, bucket, and amount"
+    },
+    {
+      "ledger": {
+        "id": "1wwfc8i",
+        "source": "POS ledger",
+        "date": "2026-05-08",
+        "month": "2026-05",
+        "bucket": "Blackbox",
+        "amount": 220,
+        "rawAmount": 220,
+        "category": "Blackbox",
+        "description": "Black box",
+        "employeeId": "20767a78-1ce5-4ac3-be6f-b5ab6e06d1c7"
+      },
+      "operations": {
+        "id": "05e18207-cd1b-4c19-9582-cbae8a5142fb",
+        "source": "Operations ledger",
+        "date": "2026-05-08",
+        "month": "2026-05",
+        "bucket": "Blackbox",
+        "amount": 220,
+        "rawAmount": 220,
+        "kind": "blackbox",
+        "title": "Black box",
+        "notes": "Auto-routed from POS expense: Black Box deposit",
+        "employeeId": "20767a78-1ce5-4ac3-be6f-b5ab6e06d1c7"
+      },
+      "matchType": "Exact date, bucket, and amount"
+    },
+    {
+      "ledger": {
+        "id": "4o4trqx",
+        "source": "POS ledger",
+        "date": "2026-05-09",
+        "month": "2026-05",
+        "bucket": "Savings",
+        "amount": 40,
+        "rawAmount": 40,
+        "category": "Savings",
+        "description": "savings",
+        "employeeId": "owner"
+      },
+      "operations": {
+        "id": "d2b5f509-0cab-4284-be2c-2cb87d24e4a9",
+        "source": "Operations ledger",
+        "date": "2026-05-09",
+        "month": "2026-05",
+        "bucket": "Savings",
+        "amount": 40,
+        "rawAmount": 40,
+        "kind": "savings_deposit",
+        "title": "savings",
+        "notes": "Auto-routed from POS expense: Savings deposit",
+        "employeeId": "owner"
+      },
+      "matchType": "Exact date, bucket, and amount"
+    },
+    {
+      "ledger": {
+        "id": "y2r912p",
+        "source": "POS ledger",
+        "date": "2026-05-10",
+        "month": "2026-05",
+        "bucket": "Savings",
+        "amount": 480,
+        "rawAmount": 480,
+        "category": "Savings",
+        "description": "Savings",
+        "employeeId": "4bcaef17-5185-4dbf-8674-a03462c0e4c5"
+      },
+      "operations": {
+        "id": "56fdedc5-d63a-42a1-abd3-ff5fd3dadf83",
+        "source": "Operations ledger",
+        "date": "2026-05-10",
+        "month": "2026-05",
+        "bucket": "Savings",
+        "amount": 480,
+        "rawAmount": 480,
+        "kind": "savings_deposit",
+        "title": "Savings",
+        "notes": "Auto-routed from POS expense: Savings deposit",
+        "employeeId": "4bcaef17-5185-4dbf-8674-a03462c0e4c5"
+      },
+      "matchType": "Exact date, bucket, and amount"
+    },
+    {
+      "ledger": {
+        "id": "f3c4ye6",
+        "source": "POS ledger",
+        "date": "2026-05-11",
+        "month": "2026-05",
+        "bucket": "Savings",
+        "amount": 100,
+        "rawAmount": 100,
+        "category": "Savings",
+        "description": "Savings",
+        "employeeId": "owner"
+      },
+      "operations": {
+        "id": "65a6f336-d94f-48f8-9ccd-1197fc61389b",
+        "source": "Operations ledger",
+        "date": "2026-05-11",
+        "month": "2026-05",
+        "bucket": "Savings",
+        "amount": 100,
+        "rawAmount": 100,
+        "kind": "savings_deposit",
+        "title": "Savings",
+        "notes": "Auto-routed from POS expense: Savings deposit",
+        "employeeId": "owner"
+      },
+      "matchType": "Exact date, bucket, and amount"
+    },
+    {
+      "ledger": {
+        "id": "t89p5mc",
+        "source": "POS ledger",
+        "date": "2026-05-12",
+        "month": "2026-05",
+        "bucket": "Blackbox",
+        "amount": 120,
+        "rawAmount": 120,
+        "category": "Blackbox",
+        "description": "Black box",
+        "employeeId": "4bcaef17-5185-4dbf-8674-a03462c0e4c5"
+      },
+      "operations": {
+        "id": "d79ea786-533d-461a-94cd-be80f757b8c8",
+        "source": "Operations ledger",
+        "date": "2026-05-12",
+        "month": "2026-05",
+        "bucket": "Blackbox",
+        "amount": 120,
+        "rawAmount": 120,
+        "kind": "blackbox",
+        "title": "Black box",
+        "notes": "Auto-routed from POS expense: Black Box deposit",
+        "employeeId": "4bcaef17-5185-4dbf-8674-a03462c0e4c5"
+      },
+      "matchType": "Exact date, bucket, and amount"
+    },
+    {
+      "ledger": {
+        "id": "5lv3kic",
+        "source": "POS ledger",
+        "date": "2026-05-13",
+        "month": "2026-05",
+        "bucket": "Blackbox",
+        "amount": 90,
+        "rawAmount": 90,
+        "category": "Blackbox",
+        "description": "Black box",
+        "employeeId": "4bcaef17-5185-4dbf-8674-a03462c0e4c5"
+      },
+      "operations": {
+        "id": "b80fac90-58ad-49ed-9347-0aec19154bae",
+        "source": "Operations ledger",
+        "date": "2026-05-13",
+        "month": "2026-05",
+        "bucket": "Blackbox",
+        "amount": 90,
+        "rawAmount": 90,
+        "kind": "eod_deposit",
+        "title": "Black box",
+        "notes": "Auto-routed from POS expense: Black Box deposit",
+        "employeeId": "4bcaef17-5185-4dbf-8674-a03462c0e4c5"
+      },
+      "matchType": "Exact date, bucket, and amount"
+    },
+    {
+      "ledger": {
+        "id": "jslvlq3",
+        "source": "POS ledger",
+        "date": "2026-05-15",
+        "month": "2026-05",
+        "bucket": "Blackbox",
+        "amount": 130,
+        "rawAmount": 130,
+        "category": "Blackbox",
+        "description": "Black box ",
+        "employeeId": "4bcaef17-5185-4dbf-8674-a03462c0e4c5"
+      },
+      "operations": {
+        "id": "f8547916-d397-4b95-931f-ebdf882e6d62",
+        "source": "Operations ledger",
+        "date": "2026-05-15",
+        "month": "2026-05",
+        "bucket": "Blackbox",
+        "amount": 130,
+        "rawAmount": 130,
+        "kind": "blackbox",
+        "title": "Black box ",
+        "notes": "Auto-routed from POS expense: Black Box deposit",
+        "employeeId": "4bcaef17-5185-4dbf-8674-a03462c0e4c5"
+      },
+      "matchType": "Exact date, bucket, and amount"
+    },
+    {
+      "ledger": {
+        "id": "d998kk2",
+        "source": "POS ledger",
+        "date": "2026-05-16",
+        "month": "2026-05",
+        "bucket": "Blackbox",
+        "amount": 230,
+        "rawAmount": 230,
+        "category": "Blackbox",
+        "description": "Black box ",
+        "employeeId": "4bcaef17-5185-4dbf-8674-a03462c0e4c5"
+      },
+      "operations": {
+        "id": "cf80cc82-6401-45cd-981b-35b97cc410d7",
+        "source": "Operations ledger",
+        "date": "2026-05-16",
+        "month": "2026-05",
+        "bucket": "Blackbox",
+        "amount": 230,
+        "rawAmount": 230,
+        "kind": "blackbox",
+        "title": "Black box ",
+        "notes": "Auto-routed from POS expense: Black Box deposit",
+        "employeeId": "4bcaef17-5185-4dbf-8674-a03462c0e4c5"
+      },
+      "matchType": "Exact date, bucket, and amount"
+    },
+    {
+      "ledger": {
+        "id": "w0jvt8z",
+        "source": "POS ledger",
+        "date": "2026-05-18",
+        "month": "2026-05",
+        "bucket": "Blackbox",
+        "amount": 330,
+        "rawAmount": 330,
+        "category": "Blackbox",
+        "description": "Black box ",
+        "employeeId": "4bcaef17-5185-4dbf-8674-a03462c0e4c5"
+      },
+      "operations": {
+        "id": "1c55dc15-32ae-4af7-a549-7b60ae2131f6",
+        "source": "Operations ledger",
+        "date": "2026-05-18",
+        "month": "2026-05",
+        "bucket": "Blackbox",
+        "amount": 330,
+        "rawAmount": 330,
+        "kind": "blackbox",
+        "title": "Black box ",
+        "notes": "Auto-routed from POS expense: Black Box deposit",
+        "employeeId": "4bcaef17-5185-4dbf-8674-a03462c0e4c5"
+      },
+      "matchType": "Exact date, bucket, and amount"
+    },
+    {
+      "ledger": {
+        "id": "w7v8vtf",
+        "source": "POS ledger",
+        "date": "2026-05-19",
+        "month": "2026-05",
+        "bucket": "Blackbox",
+        "amount": 60,
+        "rawAmount": 60,
+        "category": "Blackbox",
+        "description": "Black box ",
+        "employeeId": "20767a78-1ce5-4ac3-be6f-b5ab6e06d1c7"
+      },
+      "operations": {
+        "id": "2940d6a3-3dbc-446f-a45b-a71be82d7f6e",
+        "source": "Operations ledger",
+        "date": "2026-05-19",
+        "month": "2026-05",
+        "bucket": "Blackbox",
+        "amount": 60,
+        "rawAmount": 60,
+        "kind": "blackbox",
+        "title": "Black box ",
+        "notes": "Auto-routed from POS expense: Black Box deposit",
+        "employeeId": "20767a78-1ce5-4ac3-be6f-b5ab6e06d1c7"
+      },
+      "matchType": "Exact date, bucket, and amount"
+    },
+    {
+      "ledger": {
+        "id": "ti6seqc",
+        "source": "POS ledger",
+        "date": "2026-05-20",
+        "month": "2026-05",
+        "bucket": "Blackbox",
+        "amount": 100,
+        "rawAmount": 100,
+        "category": "Blackbox",
+        "description": "Black box ",
+        "employeeId": "20767a78-1ce5-4ac3-be6f-b5ab6e06d1c7"
+      },
+      "operations": {
+        "id": "2dc04b22-838d-4e95-add9-a5afe2ade582",
+        "source": "Operations ledger",
+        "date": "2026-05-20",
+        "month": "2026-05",
+        "bucket": "Blackbox",
+        "amount": 100,
+        "rawAmount": 100,
+        "kind": "blackbox",
+        "title": "Black box ",
+        "notes": "Auto-routed from POS expense: Black Box deposit",
+        "employeeId": "20767a78-1ce5-4ac3-be6f-b5ab6e06d1c7"
+      },
+      "matchType": "Exact date, bucket, and amount"
+    },
+    {
+      "ledger": {
+        "id": "m6h9js8",
+        "source": "POS ledger",
+        "date": "2026-05-22",
+        "month": "2026-05",
+        "bucket": "Blackbox",
+        "amount": 260,
+        "rawAmount": 260,
+        "category": "Blackbox",
+        "description": "Black box ",
+        "employeeId": "20767a78-1ce5-4ac3-be6f-b5ab6e06d1c7"
+      },
+      "operations": {
+        "id": "5d8d4b57-c8df-481e-82e7-a3d53e8540d9",
+        "source": "Operations ledger",
+        "date": "2026-05-22",
+        "month": "2026-05",
+        "bucket": "Blackbox",
+        "amount": 260,
+        "rawAmount": 260,
+        "kind": "blackbox",
+        "title": "Black box ",
+        "notes": "Auto-routed from POS expense: Black Box deposit",
+        "employeeId": "20767a78-1ce5-4ac3-be6f-b5ab6e06d1c7"
+      },
+      "matchType": "Exact date, bucket, and amount"
+    },
+    {
+      "ledger": {
+        "id": "ofuf5f0",
+        "source": "POS ledger",
+        "date": "2026-05-23",
+        "month": "2026-05",
+        "bucket": "Blackbox",
+        "amount": 170,
+        "rawAmount": 170,
+        "category": "Blackbox",
+        "description": "Black box ",
+        "employeeId": "4bcaef17-5185-4dbf-8674-a03462c0e4c5"
+      },
+      "operations": {
+        "id": "d264811c-ff7e-463f-b95c-20b608ab5b13",
+        "source": "Operations ledger",
+        "date": "2026-05-23",
+        "month": "2026-05",
+        "bucket": "Blackbox",
+        "amount": 170,
+        "rawAmount": 170,
+        "kind": "blackbox",
+        "title": "Black box ",
+        "notes": "Auto-routed from POS expense: Black Box deposit",
+        "employeeId": "4bcaef17-5185-4dbf-8674-a03462c0e4c5"
+      },
+      "matchType": "Exact date, bucket, and amount"
+    },
+    {
+      "ledger": {
+        "id": "fwgrb0d",
+        "source": "POS ledger",
+        "date": "2026-05-24",
+        "month": "2026-05",
+        "bucket": "Blackbox",
+        "amount": 460,
+        "rawAmount": 460,
+        "category": "Blackbox",
+        "description": "Black box ",
+        "employeeId": "4bcaef17-5185-4dbf-8674-a03462c0e4c5"
+      },
+      "operations": {
+        "id": "10d3ed5c-4c9d-4e09-b81b-338845d269f9",
+        "source": "Operations ledger",
+        "date": "2026-05-24",
+        "month": "2026-05",
+        "bucket": "Blackbox",
+        "amount": 460,
+        "rawAmount": 460,
+        "kind": "blackbox",
+        "title": "Black box ",
+        "notes": "Auto-routed from POS expense: Black Box deposit",
+        "employeeId": "4bcaef17-5185-4dbf-8674-a03462c0e4c5"
+      },
+      "matchType": "Exact date, bucket, and amount"
+    },
+    {
+      "ledger": {
+        "id": "aax1gyf",
+        "source": "POS ledger",
+        "date": "2026-05-25",
+        "month": "2026-05",
+        "bucket": "Blackbox",
+        "amount": 290,
+        "rawAmount": 290,
+        "category": "Blackbox",
+        "description": "Black box ",
+        "employeeId": "20767a78-1ce5-4ac3-be6f-b5ab6e06d1c7"
+      },
+      "operations": {
+        "id": "3bb2cf14-82c7-401d-9d32-502e29688c74",
+        "source": "Operations ledger",
+        "date": "2026-05-25",
+        "month": "2026-05",
+        "bucket": "Blackbox",
+        "amount": 290,
+        "rawAmount": 290,
+        "kind": "blackbox",
+        "title": "Black box ",
+        "notes": "Auto-routed from POS expense: Black Box deposit",
+        "employeeId": "20767a78-1ce5-4ac3-be6f-b5ab6e06d1c7"
+      },
+      "matchType": "Exact date, bucket, and amount"
+    },
+    {
+      "ledger": {
+        "id": "qsdhztz",
+        "source": "POS ledger",
+        "date": "2026-05-26",
+        "month": "2026-05",
+        "bucket": "Blackbox",
+        "amount": 100,
+        "rawAmount": 100,
+        "category": "Blackbox",
+        "description": "Black box ",
+        "employeeId": "20767a78-1ce5-4ac3-be6f-b5ab6e06d1c7"
+      },
+      "operations": {
+        "id": "a08dff60-8b13-4205-a9d2-b0aa35da1ba5",
+        "source": "Operations ledger",
+        "date": "2026-05-26",
+        "month": "2026-05",
+        "bucket": "Blackbox",
+        "amount": 100,
+        "rawAmount": 100,
+        "kind": "blackbox",
+        "title": "Black box ",
+        "notes": "Auto-routed from POS expense: Black Box deposit",
+        "employeeId": "20767a78-1ce5-4ac3-be6f-b5ab6e06d1c7"
+      },
+      "matchType": "Exact date, bucket, and amount"
+    },
+    {
+      "ledger": {
+        "id": "4vtisyf",
+        "source": "POS ledger",
+        "date": "2026-06-03",
+        "month": "2026-06",
+        "bucket": "Blackbox",
+        "amount": 260,
+        "rawAmount": 260,
+        "category": "Blackbox",
+        "description": "Black box ",
+        "employeeId": "20767a78-1ce5-4ac3-be6f-b5ab6e06d1c7"
+      },
+      "operations": {
+        "id": "bfb3d176-f26b-4406-b045-04708b97d4d2",
+        "source": "Operations ledger",
+        "date": "2026-06-03",
+        "month": "2026-06",
+        "bucket": "Blackbox",
+        "amount": 260,
+        "rawAmount": 260,
+        "kind": "blackbox",
+        "title": "Black box ",
+        "notes": "Auto-routed from POS expense: Black Box deposit",
+        "employeeId": "20767a78-1ce5-4ac3-be6f-b5ab6e06d1c7"
+      },
+      "matchType": "Exact date, bucket, and amount"
+    },
+    {
+      "ledger": {
+        "id": "3f1ppa6",
+        "source": "POS ledger",
+        "date": "2026-06-05",
+        "month": "2026-06",
+        "bucket": "Blackbox",
+        "amount": 200,
+        "rawAmount": 200,
+        "category": "Blackbox",
+        "description": "Black box ",
+        "employeeId": "20767a78-1ce5-4ac3-be6f-b5ab6e06d1c7"
+      },
+      "operations": {
+        "id": "26fc2289-9e67-4e17-a01a-317233e6b709",
+        "source": "Operations ledger",
+        "date": "2026-06-05",
+        "month": "2026-06",
+        "bucket": "Blackbox",
+        "amount": 200,
+        "rawAmount": 200,
+        "kind": "blackbox",
+        "title": "Black box ",
+        "notes": "Auto-routed from POS expense: Black Box deposit",
+        "employeeId": "20767a78-1ce5-4ac3-be6f-b5ab6e06d1c7"
+      },
+      "matchType": "Exact date, bucket, and amount"
+    },
+    {
+      "ledger": {
+        "id": "d539ygw",
+        "source": "POS ledger",
+        "date": "2026-06-06",
+        "month": "2026-06",
+        "bucket": "Blackbox",
+        "amount": 60,
+        "rawAmount": 60,
+        "category": "Blackbox",
+        "description": "Black box ",
+        "employeeId": "20767a78-1ce5-4ac3-be6f-b5ab6e06d1c7"
+      },
+      "operations": {
+        "id": "f84273f6-f26e-418b-8787-78c56ba55dc5",
+        "source": "Operations ledger",
+        "date": "2026-06-06",
+        "month": "2026-06",
+        "bucket": "Blackbox",
+        "amount": 60,
+        "rawAmount": 60,
+        "kind": "blackbox",
+        "title": "Black box ",
+        "notes": "Auto-routed from POS expense: Black Box deposit",
+        "employeeId": "20767a78-1ce5-4ac3-be6f-b5ab6e06d1c7"
+      },
+      "matchType": "Exact date, bucket, and amount"
+    },
+    {
+      "ledger": {
+        "id": "w5z40kx",
+        "source": "POS ledger",
+        "date": "2026-06-07",
+        "month": "2026-06",
+        "bucket": "Blackbox",
+        "amount": 380,
+        "rawAmount": 380,
+        "category": "Blackbox",
+        "description": "Black box ",
+        "employeeId": "4bcaef17-5185-4dbf-8674-a03462c0e4c5"
+      },
+      "operations": {
+        "id": "ba4bf036-6ac5-4e69-98ac-4fd5d998df3e",
+        "source": "Operations ledger",
+        "date": "2026-06-07",
+        "month": "2026-06",
+        "bucket": "Blackbox",
+        "amount": 380,
+        "rawAmount": 380,
+        "kind": "blackbox",
+        "title": "Black box ",
+        "notes": "Auto-routed from POS expense: Black Box deposit",
+        "employeeId": "4bcaef17-5185-4dbf-8674-a03462c0e4c5"
+      },
+      "matchType": "Exact date, bucket, and amount"
+    },
+    {
+      "ledger": {
+        "id": "okz3bc5",
+        "source": "POS ledger",
+        "date": "2026-06-08",
+        "month": "2026-06",
+        "bucket": "Blackbox",
+        "amount": 90,
+        "rawAmount": 90,
+        "category": "Blackbox",
+        "description": "Black box ",
+        "employeeId": "20767a78-1ce5-4ac3-be6f-b5ab6e06d1c7"
+      },
+      "operations": {
+        "id": "02a1c5f1-ee92-445b-9bb3-8fd09cdc4098",
+        "source": "Operations ledger",
+        "date": "2026-06-08",
+        "month": "2026-06",
+        "bucket": "Blackbox",
+        "amount": 90,
+        "rawAmount": 90,
+        "kind": "blackbox",
+        "title": "Black box ",
+        "notes": "Auto-routed from POS expense: Black Box deposit",
+        "employeeId": "20767a78-1ce5-4ac3-be6f-b5ab6e06d1c7"
+      },
+      "matchType": "Exact date, bucket, and amount"
+    },
+    {
+      "ledger": {
+        "id": "z703kvb",
+        "source": "POS ledger",
+        "date": "2026-06-09",
+        "month": "2026-06",
+        "bucket": "Blackbox",
+        "amount": 120,
+        "rawAmount": 120,
+        "category": "Blackbox",
+        "description": "Black box ",
+        "employeeId": "4bcaef17-5185-4dbf-8674-a03462c0e4c5"
+      },
+      "operations": {
+        "id": "42912ee1-67db-4da8-be08-6bbae157f152",
+        "source": "Operations ledger",
+        "date": "2026-06-09",
+        "month": "2026-06",
+        "bucket": "Blackbox",
+        "amount": 120,
+        "rawAmount": 120,
+        "kind": "blackbox",
+        "title": "Black box ",
+        "notes": "Auto-routed from POS expense: Black Box deposit",
+        "employeeId": "4bcaef17-5185-4dbf-8674-a03462c0e4c5"
+      },
+      "matchType": "Exact date, bucket, and amount"
+    },
+    {
+      "ledger": {
+        "id": "d2zk9rn",
+        "source": "POS ledger",
+        "date": "2026-06-10",
+        "month": "2026-06",
+        "bucket": "Blackbox",
+        "amount": 230,
+        "rawAmount": 230,
+        "category": "Blackbox",
+        "description": "Black box ",
+        "employeeId": "4bcaef17-5185-4dbf-8674-a03462c0e4c5"
+      },
+      "operations": {
+        "id": "5a9dfe91-6218-4748-90a8-c3c284870e9d",
+        "source": "Operations ledger",
+        "date": "2026-06-10",
+        "month": "2026-06",
+        "bucket": "Blackbox",
+        "amount": 230,
+        "rawAmount": 230,
+        "kind": "blackbox",
+        "title": "Black box ",
+        "notes": "Auto-routed from POS expense: Black Box deposit",
+        "employeeId": "4bcaef17-5185-4dbf-8674-a03462c0e4c5"
+      },
+      "matchType": "Exact date, bucket, and amount"
+    },
+    {
+      "ledger": {
+        "id": "nmvt33s",
+        "source": "POS ledger",
+        "date": "2026-06-11",
+        "month": "2026-06",
+        "bucket": "Blackbox",
+        "amount": 50,
+        "rawAmount": 50,
+        "category": "Blackbox",
+        "description": "Black box ",
+        "employeeId": "20767a78-1ce5-4ac3-be6f-b5ab6e06d1c7"
+      },
+      "operations": {
+        "id": "a1a248a8-0c5f-493d-b225-5e1f9b71a2e7",
+        "source": "Operations ledger",
+        "date": "2026-06-11",
+        "month": "2026-06",
+        "bucket": "Blackbox",
+        "amount": 50,
+        "rawAmount": 50,
+        "kind": "blackbox",
+        "title": "Black box ",
+        "notes": "Auto-routed from POS expense: Black Box deposit",
+        "employeeId": "20767a78-1ce5-4ac3-be6f-b5ab6e06d1c7"
+      },
+      "matchType": "Exact date, bucket, and amount"
+    },
+    {
+      "ledger": {
+        "id": "4k1m3t0",
+        "source": "POS ledger",
+        "date": "2026-06-12",
+        "month": "2026-06",
+        "bucket": "Blackbox",
+        "amount": 70,
+        "rawAmount": 70,
+        "category": "Blackbox",
+        "description": "Black box ",
+        "employeeId": "20767a78-1ce5-4ac3-be6f-b5ab6e06d1c7"
+      },
+      "operations": {
+        "id": "98211faa-c580-45a9-8d7e-2089e7c53c60",
+        "source": "Operations ledger",
+        "date": "2026-06-12",
+        "month": "2026-06",
+        "bucket": "Blackbox",
+        "amount": 70,
+        "rawAmount": 70,
+        "kind": "blackbox",
+        "title": "Black box ",
+        "notes": "Auto-routed from POS expense: Black Box deposit",
+        "employeeId": "20767a78-1ce5-4ac3-be6f-b5ab6e06d1c7"
+      },
+      "matchType": "Exact date, bucket, and amount"
+    },
+    {
+      "ledger": {
+        "id": "wmhyzr9",
+        "source": "POS ledger",
+        "date": "2026-06-13",
+        "month": "2026-06",
+        "bucket": "Blackbox",
+        "amount": 110,
+        "rawAmount": 110,
+        "category": "Blackbox",
+        "description": "Black box ",
+        "employeeId": "20767a78-1ce5-4ac3-be6f-b5ab6e06d1c7"
+      },
+      "operations": {
+        "id": "7700a28d-41b7-477d-88d7-67789a814a89",
+        "source": "Operations ledger",
+        "date": "2026-06-13",
+        "month": "2026-06",
+        "bucket": "Blackbox",
+        "amount": 110,
+        "rawAmount": 110,
+        "kind": "blackbox",
+        "title": "Black box ",
+        "notes": "Auto-routed from POS expense: Black Box deposit",
+        "employeeId": "20767a78-1ce5-4ac3-be6f-b5ab6e06d1c7"
+      },
+      "matchType": "Exact date, bucket, and amount"
+    },
+    {
+      "ledger": {
+        "id": "xj6ake4",
+        "source": "POS ledger",
+        "date": "2026-06-14",
+        "month": "2026-06",
+        "bucket": "Blackbox",
+        "amount": 200,
+        "rawAmount": 200,
+        "category": "Blackbox",
+        "description": "Black box ",
+        "employeeId": "4bcaef17-5185-4dbf-8674-a03462c0e4c5"
+      },
+      "operations": {
+        "id": "dee09571-6aa2-4135-b679-10001f0a05bb",
+        "source": "Operations ledger",
+        "date": "2026-06-14",
+        "month": "2026-06",
+        "bucket": "Blackbox",
+        "amount": 200,
+        "rawAmount": 200,
+        "kind": "blackbox",
+        "title": "Black box ",
+        "notes": "Auto-routed from POS expense: Black Box deposit",
+        "employeeId": "4bcaef17-5185-4dbf-8674-a03462c0e4c5"
+      },
+      "matchType": "Exact date, bucket, and amount"
+    },
+    {
+      "ledger": {
+        "id": "jvaa0hm",
+        "source": "POS ledger",
+        "date": "2026-06-17",
+        "month": "2026-06",
+        "bucket": "Blackbox",
+        "amount": 100,
+        "rawAmount": 100,
+        "category": "Blackbox",
+        "description": "Black box ",
+        "employeeId": "4bcaef17-5185-4dbf-8674-a03462c0e4c5"
+      },
+      "operations": {
+        "id": "cf1c5008-f36e-48e2-a36c-6bd5765d9f70",
+        "source": "Operations ledger",
+        "date": "2026-06-17",
+        "month": "2026-06",
+        "bucket": "Blackbox",
+        "amount": 100,
+        "rawAmount": 100,
+        "kind": "blackbox",
+        "title": "Black box ",
+        "notes": "Auto-routed from POS expense: Black Box deposit",
+        "employeeId": "4bcaef17-5185-4dbf-8674-a03462c0e4c5"
+      },
+      "matchType": "Exact date, bucket, and amount"
+    },
+    {
+      "ledger": {
+        "id": "p8827l1",
+        "source": "POS ledger",
+        "date": "2026-06-18",
+        "month": "2026-06",
+        "bucket": "Blackbox",
+        "amount": 100,
+        "rawAmount": 100,
+        "category": "Blackbox",
+        "description": "Black box ",
+        "employeeId": "4bcaef17-5185-4dbf-8674-a03462c0e4c5"
+      },
+      "operations": {
+        "id": "2833a038-cbbb-47fc-9d1b-e49bf2d7874d",
+        "source": "Operations ledger",
+        "date": "2026-06-18",
+        "month": "2026-06",
+        "bucket": "Blackbox",
+        "amount": 100,
+        "rawAmount": 100,
+        "kind": "blackbox",
+        "title": "Black box ",
+        "notes": "Auto-routed from POS expense: Black Box deposit",
+        "employeeId": "4bcaef17-5185-4dbf-8674-a03462c0e4c5"
+      },
+      "matchType": "Exact date, bucket, and amount"
+    },
+    {
+      "ledger": {
+        "id": "l62ndjt",
+        "source": "POS ledger",
+        "date": "2026-06-19",
+        "month": "2026-06",
+        "bucket": "Blackbox",
+        "amount": 70,
+        "rawAmount": 70,
+        "category": "Blackbox",
+        "description": "Black box ",
+        "employeeId": "20767a78-1ce5-4ac3-be6f-b5ab6e06d1c7"
+      },
+      "operations": {
+        "id": "11b20976-cc89-4e8e-a2e8-83a81dfbefe4",
+        "source": "Operations ledger",
+        "date": "2026-06-19",
+        "month": "2026-06",
+        "bucket": "Blackbox",
+        "amount": 70,
+        "rawAmount": 70,
+        "kind": "blackbox",
+        "title": "Black box ",
+        "notes": "Auto-routed from POS expense: Black Box deposit",
+        "employeeId": "20767a78-1ce5-4ac3-be6f-b5ab6e06d1c7"
+      },
+      "matchType": "Exact date, bucket, and amount"
+    },
+    {
+      "ledger": {
+        "id": "21p23zy",
+        "source": "POS ledger",
+        "date": "2026-06-20",
+        "month": "2026-06",
+        "bucket": "Blackbox",
+        "amount": 160,
+        "rawAmount": 160,
+        "category": "Blackbox",
+        "description": "Black box ",
+        "employeeId": "20767a78-1ce5-4ac3-be6f-b5ab6e06d1c7"
+      },
+      "operations": {
+        "id": "6a4161a1-4b7f-4a8c-af6c-7d249dfa0ccc",
+        "source": "Operations ledger",
+        "date": "2026-06-20",
+        "month": "2026-06",
+        "bucket": "Blackbox",
+        "amount": 160,
+        "rawAmount": 160,
+        "kind": "blackbox",
+        "title": "Black box ",
+        "notes": "Auto-routed from POS expense: Black Box deposit",
+        "employeeId": "20767a78-1ce5-4ac3-be6f-b5ab6e06d1c7"
+      },
+      "matchType": "Exact date, bucket, and amount"
+    },
+    {
+      "ledger": {
+        "id": "lq4s08k",
+        "source": "POS ledger",
+        "date": "2026-06-22",
+        "month": "2026-06",
+        "bucket": "Blackbox",
+        "amount": 150,
+        "rawAmount": 150,
+        "category": "Blackbox",
+        "description": "Black box ",
+        "employeeId": "20767a78-1ce5-4ac3-be6f-b5ab6e06d1c7"
+      },
+      "operations": {
+        "id": "e48b1027-b57f-440c-b664-afd342f00449",
+        "source": "Operations ledger",
+        "date": "2026-06-22",
+        "month": "2026-06",
+        "bucket": "Blackbox",
+        "amount": 150,
+        "rawAmount": 150,
+        "kind": "blackbox",
+        "title": "Black box ",
+        "notes": "Auto-routed from POS expense: Black Box deposit",
+        "employeeId": "20767a78-1ce5-4ac3-be6f-b5ab6e06d1c7"
+      },
+      "matchType": "Exact date, bucket, and amount"
+    },
+    {
+      "ledger": {
+        "id": "pp9uj5c",
+        "source": "POS ledger",
+        "date": "2026-06-23",
+        "month": "2026-06",
+        "bucket": "Blackbox",
+        "amount": 270,
+        "rawAmount": 270,
+        "category": "Blackbox",
+        "description": "Black box ",
+        "employeeId": "20767a78-1ce5-4ac3-be6f-b5ab6e06d1c7"
+      },
+      "operations": {
+        "id": "e7639894-4881-472b-917a-9fcc8b13de67",
+        "source": "Operations ledger",
+        "date": "2026-06-23",
+        "month": "2026-06",
+        "bucket": "Blackbox",
+        "amount": 270,
+        "rawAmount": 270,
+        "kind": "blackbox",
+        "title": "Black box ",
+        "notes": "Auto-routed from POS expense: Black Box deposit",
+        "employeeId": "20767a78-1ce5-4ac3-be6f-b5ab6e06d1c7"
+      },
+      "matchType": "Exact date, bucket, and amount"
+    },
+    {
+      "ledger": {
+        "id": "lvxyb7a",
+        "source": "POS ledger",
+        "date": "2026-06-25",
+        "month": "2026-06",
+        "bucket": "Blackbox",
+        "amount": 170,
+        "rawAmount": 170,
+        "category": "Blackbox",
+        "description": "Black box ",
+        "employeeId": "20767a78-1ce5-4ac3-be6f-b5ab6e06d1c7"
+      },
+      "operations": {
+        "id": "9a66d995-42cb-4d30-a00c-76b042804333",
+        "source": "Operations ledger",
+        "date": "2026-06-25",
+        "month": "2026-06",
+        "bucket": "Blackbox",
+        "amount": 170,
+        "rawAmount": 170,
+        "kind": "blackbox",
+        "title": "Black box ",
+        "notes": "Auto-routed from POS expense: Black Box deposit",
+        "employeeId": "20767a78-1ce5-4ac3-be6f-b5ab6e06d1c7"
+      },
+      "matchType": "Exact date, bucket, and amount"
+    },
+    {
+      "ledger": {
+        "id": "93yxizc",
+        "source": "POS ledger",
+        "date": "2026-06-26",
+        "month": "2026-06",
+        "bucket": "Blackbox",
+        "amount": 230,
+        "rawAmount": 230,
+        "category": "Blackbox",
+        "description": "Black box ",
+        "employeeId": "4bcaef17-5185-4dbf-8674-a03462c0e4c5"
+      },
+      "operations": {
+        "id": "1a9a4214-6cbc-4f04-87de-01a742e53e8f",
+        "source": "Operations ledger",
+        "date": "2026-06-26",
+        "month": "2026-06",
+        "bucket": "Blackbox",
+        "amount": 230,
+        "rawAmount": 230,
+        "kind": "blackbox",
+        "title": "Black box ",
+        "notes": "Auto-routed from POS expense: Black Box deposit",
+        "employeeId": "4bcaef17-5185-4dbf-8674-a03462c0e4c5"
+      },
+      "matchType": "Exact date, bucket, and amount"
+    },
+    {
+      "ledger": {
+        "id": "tilxqxy",
+        "source": "POS ledger",
+        "date": "2026-06-28",
+        "month": "2026-06",
+        "bucket": "Blackbox",
+        "amount": 630,
+        "rawAmount": 630,
+        "category": "Blackbox",
+        "description": "Black box ",
+        "employeeId": "4bcaef17-5185-4dbf-8674-a03462c0e4c5"
+      },
+      "operations": {
+        "id": "8e024d82-1c9e-44aa-86bb-efee7a6b5c9e",
+        "source": "Operations ledger",
+        "date": "2026-06-28",
+        "month": "2026-06",
+        "bucket": "Blackbox",
+        "amount": 630,
+        "rawAmount": 630,
+        "kind": "overhead_contribution",
+        "title": "Black box ",
+        "notes": "Auto-routed from POS expense: Overhead contribution",
+        "employeeId": "4bcaef17-5185-4dbf-8674-a03462c0e4c5"
+      },
+      "matchType": "Exact date, bucket, and amount"
+    },
+    {
+      "ledger": {
+        "id": "w2la9aw",
+        "source": "POS ledger",
+        "date": "2026-06-29",
+        "month": "2026-06",
+        "bucket": "Blackbox",
+        "amount": 40,
+        "rawAmount": 40,
+        "category": "Blackbox",
+        "description": "Black box ",
+        "employeeId": "4bcaef17-5185-4dbf-8674-a03462c0e4c5"
+      },
+      "operations": {
+        "id": "1c6bdad9-41ef-4567-a168-7e46b586e0c1",
+        "source": "Operations ledger",
+        "date": "2026-06-29",
+        "month": "2026-06",
+        "bucket": "Blackbox",
+        "amount": 40,
+        "rawAmount": 40,
+        "kind": "blackbox",
+        "title": "Black box ",
+        "notes": "Auto-routed from POS expense: Black Box deposit",
+        "employeeId": "4bcaef17-5185-4dbf-8674-a03462c0e4c5"
+      },
+      "matchType": "Exact date, bucket, and amount"
+    },
+    {
+      "ledger": {
+        "id": "380bfw4",
+        "source": "POS ledger",
+        "date": "2026-06-30",
+        "month": "2026-06",
+        "bucket": "Blackbox",
+        "amount": 330,
+        "rawAmount": 330,
+        "category": "Blackbox",
+        "description": "Black box ",
+        "employeeId": "20767a78-1ce5-4ac3-be6f-b5ab6e06d1c7"
+      },
+      "operations": {
+        "id": "d66a9574-0234-4b4c-8ee7-a67f58e5e0d0",
+        "source": "Operations ledger",
+        "date": "2026-06-30",
+        "month": "2026-06",
+        "bucket": "Blackbox",
+        "amount": 330,
+        "rawAmount": 330,
+        "kind": "blackbox",
+        "title": "Black box ",
+        "notes": "Auto-routed from POS expense: Black Box deposit",
+        "employeeId": "20767a78-1ce5-4ac3-be6f-b5ab6e06d1c7"
+      },
+      "matchType": "Exact date, bucket, and amount"
+    },
+    {
+      "ledger": {
+        "id": "wt2yfzn",
+        "source": "POS ledger",
+        "date": "2026-06-30",
+        "month": "2026-06",
+        "bucket": "Blackbox",
+        "amount": 310,
+        "rawAmount": 310,
+        "category": "Blackbox",
+        "description": "Black box ",
+        "employeeId": "20767a78-1ce5-4ac3-be6f-b5ab6e06d1c7"
+      },
+      "operations": {
+        "id": "6a4dcae4-4f8e-436e-91c4-ccd3fd52f7fd",
+        "source": "Operations ledger",
+        "date": "2026-06-30",
+        "month": "2026-06",
+        "bucket": "Blackbox",
+        "amount": 310,
+        "rawAmount": 310,
+        "kind": "blackbox",
+        "title": "Black box ",
+        "notes": "Auto-routed from POS expense: Black Box deposit",
+        "employeeId": "20767a78-1ce5-4ac3-be6f-b5ab6e06d1c7"
+      },
+      "matchType": "Exact date, bucket, and amount"
+    },
+    {
+      "ledger": {
+        "id": "ph71z1p",
+        "source": "POS ledger",
+        "date": "2026-07-01",
+        "month": "2026-07",
+        "bucket": "Blackbox",
+        "amount": 330,
+        "rawAmount": 330,
+        "category": "Blackbox",
+        "description": "Black box ",
+        "employeeId": "20767a78-1ce5-4ac3-be6f-b5ab6e06d1c7"
+      },
+      "operations": {
+        "id": "5b989067-d8c2-4b88-9d6a-8202fb82630c",
+        "source": "Operations ledger",
+        "date": "2026-07-01",
+        "month": "2026-07",
+        "bucket": "Blackbox",
+        "amount": 330,
+        "rawAmount": 330,
+        "kind": "blackbox",
+        "title": "Black box ",
+        "notes": "Auto-routed from POS expense: Black Box deposit",
+        "employeeId": "20767a78-1ce5-4ac3-be6f-b5ab6e06d1c7"
+      },
+      "matchType": "Exact date, bucket, and amount"
+    },
+    {
+      "ledger": {
+        "id": "7tlew8w",
+        "source": "POS ledger",
+        "date": "2026-07-02",
+        "month": "2026-07",
+        "bucket": "Blackbox",
+        "amount": 500,
+        "rawAmount": 500,
+        "category": "Blackbox",
+        "description": "Black box ",
+        "employeeId": "4bcaef17-5185-4dbf-8674-a03462c0e4c5"
+      },
+      "operations": {
+        "id": "d760e523-5d9f-4a73-b552-01b757302828",
+        "source": "Operations ledger",
+        "date": "2026-07-02",
+        "month": "2026-07",
+        "bucket": "Blackbox",
+        "amount": 500,
+        "rawAmount": 500,
+        "kind": "blackbox",
+        "title": "Black box ",
+        "notes": "Auto-routed from POS expense: Black Box deposit",
+        "employeeId": "4bcaef17-5185-4dbf-8674-a03462c0e4c5"
+      },
+      "matchType": "Exact date, bucket, and amount"
+    },
+    {
+      "ledger": {
+        "id": "2s0rdz1",
+        "source": "POS ledger",
+        "date": "2026-07-03",
+        "month": "2026-07",
+        "bucket": "Blackbox",
+        "amount": 90,
+        "rawAmount": 90,
+        "category": "Blackbox",
+        "description": "Black box ",
+        "employeeId": "4bcaef17-5185-4dbf-8674-a03462c0e4c5"
+      },
+      "operations": {
+        "id": "f4edc45d-1f39-4541-b335-ba745315bc31",
+        "source": "Operations ledger",
+        "date": "2026-07-03",
+        "month": "2026-07",
+        "bucket": "Blackbox",
+        "amount": 90,
+        "rawAmount": 90,
+        "kind": "blackbox",
+        "title": "Black box ",
+        "notes": "Auto-routed from POS expense: Black Box deposit",
+        "employeeId": "4bcaef17-5185-4dbf-8674-a03462c0e4c5"
+      },
+      "matchType": "Exact date, bucket, and amount"
+    },
+    {
+      "ledger": {
+        "id": "6rzy3iw",
+        "source": "POS ledger",
+        "date": "2026-07-04",
+        "month": "2026-07",
+        "bucket": "Blackbox",
+        "amount": 200,
+        "rawAmount": 200,
+        "category": "Blackbox",
+        "description": "Black box ",
+        "employeeId": "4bcaef17-5185-4dbf-8674-a03462c0e4c5"
+      },
+      "operations": {
+        "id": "b085bd7b-292e-494e-bab1-daba9fd3e8f2",
+        "source": "Operations ledger",
+        "date": "2026-07-04",
+        "month": "2026-07",
+        "bucket": "Blackbox",
+        "amount": 200,
+        "rawAmount": 200,
+        "kind": "blackbox",
+        "title": "Black box ",
+        "notes": "Auto-routed from POS expense: Black Box deposit",
+        "employeeId": "4bcaef17-5185-4dbf-8674-a03462c0e4c5"
+      },
+      "matchType": "Exact date, bucket, and amount"
+    },
+    {
+      "ledger": {
+        "id": "kvws868",
+        "source": "POS ledger",
+        "date": "2026-07-05",
+        "month": "2026-07",
+        "bucket": "Blackbox",
+        "amount": 490,
+        "rawAmount": 490,
+        "category": "Blackbox",
+        "description": "Black box ",
+        "employeeId": "4bcaef17-5185-4dbf-8674-a03462c0e4c5"
+      },
+      "operations": {
+        "id": "d6040bad-73db-45c2-8299-2e6b66d63751",
+        "source": "Operations ledger",
+        "date": "2026-07-05",
+        "month": "2026-07",
+        "bucket": "Blackbox",
+        "amount": 490,
+        "rawAmount": 490,
+        "kind": "blackbox",
+        "title": "Black box ",
+        "notes": "Auto-routed from POS expense: Black Box deposit",
+        "employeeId": "4bcaef17-5185-4dbf-8674-a03462c0e4c5"
+      },
+      "matchType": "Exact date, bucket, and amount"
+    },
+    {
+      "ledger": {
+        "id": "ezo47vm",
+        "source": "POS ledger",
+        "date": "2026-07-06",
+        "month": "2026-07",
+        "bucket": "Blackbox",
+        "amount": 170,
+        "rawAmount": 170,
+        "category": "Blackbox",
+        "description": "Black box ",
+        "employeeId": "4bcaef17-5185-4dbf-8674-a03462c0e4c5"
+      },
+      "operations": {
+        "id": "cbb86ced-160a-4aad-94f2-379a7fb4ef4b",
+        "source": "Operations ledger",
+        "date": "2026-07-06",
+        "month": "2026-07",
+        "bucket": "Blackbox",
+        "amount": 170,
+        "rawAmount": 170,
+        "kind": "blackbox",
+        "title": "Black box ",
+        "notes": "Auto-routed from POS expense: Black Box deposit",
+        "employeeId": "4bcaef17-5185-4dbf-8674-a03462c0e4c5"
+      },
+      "matchType": "Exact date, bucket, and amount"
+    },
+    {
+      "ledger": {
+        "id": "oxlvfix",
+        "source": "POS ledger",
+        "date": "2026-07-07",
+        "month": "2026-07",
+        "bucket": "Blackbox",
+        "amount": 60,
+        "rawAmount": 60,
+        "category": "Blackbox",
+        "description": "Black box ",
+        "employeeId": "4bcaef17-5185-4dbf-8674-a03462c0e4c5"
+      },
+      "operations": {
+        "id": "970a495b-1f67-4efa-a7a3-7840e0130ebc",
+        "source": "Operations ledger",
+        "date": "2026-07-07",
+        "month": "2026-07",
+        "bucket": "Blackbox",
+        "amount": 60,
+        "rawAmount": 60,
+        "kind": "blackbox",
+        "title": "Black box ",
+        "notes": "Auto-routed from POS expense: Black Box deposit",
+        "employeeId": "4bcaef17-5185-4dbf-8674-a03462c0e4c5"
+      },
+      "matchType": "Exact date, bucket, and amount"
+    },
+    {
+      "ledger": {
+        "id": "jeg2d4v",
+        "source": "POS ledger",
+        "date": "2026-07-08",
+        "month": "2026-07",
+        "bucket": "Blackbox",
+        "amount": 280,
+        "rawAmount": 280,
+        "category": "Blackbox",
+        "description": "Black box ",
+        "employeeId": "20767a78-1ce5-4ac3-be6f-b5ab6e06d1c7"
+      },
+      "operations": {
+        "id": "b2ed8993-ca20-4e36-b5bc-b942190b4bec",
+        "source": "Operations ledger",
+        "date": "2026-07-08",
+        "month": "2026-07",
+        "bucket": "Blackbox",
+        "amount": 280,
+        "rawAmount": 280,
+        "kind": "blackbox",
+        "title": "Black box ",
+        "notes": "Auto-routed from POS expense: Black Box deposit",
+        "employeeId": "20767a78-1ce5-4ac3-be6f-b5ab6e06d1c7"
+      },
+      "matchType": "Exact date, bucket, and amount"
+    },
+    {
+      "ledger": {
+        "id": "eq9g70r",
+        "source": "POS ledger",
+        "date": "2026-07-09",
+        "month": "2026-07",
+        "bucket": "Blackbox",
+        "amount": 60,
+        "rawAmount": 60,
+        "category": "Blackbox",
+        "description": "Black box ",
+        "employeeId": "4bcaef17-5185-4dbf-8674-a03462c0e4c5"
+      },
+      "operations": {
+        "id": "f2e6b44d-6743-422b-bf8c-217d5ae22929",
+        "source": "Operations ledger",
+        "date": "2026-07-09",
+        "month": "2026-07",
+        "bucket": "Blackbox",
+        "amount": 60,
+        "rawAmount": 60,
+        "kind": "blackbox",
+        "title": "Black box ",
+        "notes": "Auto-routed from POS expense: Black Box deposit",
+        "employeeId": "4bcaef17-5185-4dbf-8674-a03462c0e4c5"
+      },
+      "matchType": "Exact date, bucket, and amount"
+    },
+    {
+      "ledger": {
+        "id": "lpogfgk",
+        "source": "POS ledger",
+        "date": "2026-07-10",
+        "month": "2026-07",
+        "bucket": "Blackbox",
+        "amount": 270,
+        "rawAmount": 270,
+        "category": "Blackbox",
+        "description": "Black box ",
+        "employeeId": "4bcaef17-5185-4dbf-8674-a03462c0e4c5"
+      },
+      "operations": {
+        "id": "7e31b9d3-0c90-4c55-83e8-c3fcef305f62",
+        "source": "Operations ledger",
+        "date": "2026-07-10",
+        "month": "2026-07",
+        "bucket": "Blackbox",
+        "amount": 270,
+        "rawAmount": 270,
+        "kind": "blackbox",
+        "title": "Black box ",
+        "notes": "Auto-routed from POS expense: Black Box deposit",
+        "employeeId": "4bcaef17-5185-4dbf-8674-a03462c0e4c5"
+      },
+      "matchType": "Exact date, bucket, and amount"
+    },
+    {
+      "ledger": {
+        "id": "zb5gvqt",
+        "source": "POS ledger",
+        "date": "2026-07-11",
+        "month": "2026-07",
+        "bucket": "Blackbox",
+        "amount": 150,
+        "rawAmount": 150,
+        "category": "Blackbox",
+        "description": "Black box ",
+        "employeeId": "4bcaef17-5185-4dbf-8674-a03462c0e4c5"
+      },
+      "operations": {
+        "id": "2c9cdfdc-bec7-43a2-881e-b7aad9086fff",
+        "source": "Operations ledger",
+        "date": "2026-07-11",
+        "month": "2026-07",
+        "bucket": "Blackbox",
+        "amount": 150,
+        "rawAmount": 150,
+        "kind": "blackbox",
+        "title": "Black box ",
+        "notes": "Auto-routed from POS expense: Black Box deposit",
+        "employeeId": "4bcaef17-5185-4dbf-8674-a03462c0e4c5"
+      },
+      "matchType": "Exact date, bucket, and amount"
+    },
+    {
+      "ledger": {
+        "id": "yikx7gn",
+        "source": "POS ledger",
+        "date": "2026-07-12",
+        "month": "2026-07",
+        "bucket": "Blackbox",
+        "amount": 300,
+        "rawAmount": 300,
+        "category": "Blackbox",
+        "description": "Black box ",
+        "employeeId": "4bcaef17-5185-4dbf-8674-a03462c0e4c5"
+      },
+      "operations": {
+        "id": "bcbc37e1-d4ed-4845-b456-27f9faf4a873",
+        "source": "Operations ledger",
+        "date": "2026-07-12",
+        "month": "2026-07",
+        "bucket": "Blackbox",
+        "amount": 300,
+        "rawAmount": 300,
+        "kind": "blackbox",
+        "title": "Black box ",
+        "notes": "Auto-routed from POS expense: Black Box deposit",
+        "employeeId": "4bcaef17-5185-4dbf-8674-a03462c0e4c5"
+      },
+      "matchType": "Exact date, bucket, and amount"
+    },
+    {
+      "ledger": {
+        "id": "lpqadzp",
+        "source": "POS ledger",
+        "date": "2026-07-13",
+        "month": "2026-07",
+        "bucket": "Blackbox",
+        "amount": 130,
+        "rawAmount": 130,
+        "category": "Blackbox",
+        "description": "Black box ",
+        "employeeId": "20767a78-1ce5-4ac3-be6f-b5ab6e06d1c7"
+      },
+      "operations": {
+        "id": "0cf8c92c-3053-435d-888f-36c69f6b15f1",
+        "source": "Operations ledger",
+        "date": "2026-07-13",
+        "month": "2026-07",
+        "bucket": "Blackbox",
+        "amount": 130,
+        "rawAmount": 130,
+        "kind": "blackbox",
+        "title": "Black box ",
+        "notes": "Auto-routed from POS expense: Black Box deposit",
+        "employeeId": "20767a78-1ce5-4ac3-be6f-b5ab6e06d1c7"
+      },
+      "matchType": "Exact date, bucket, and amount"
+    },
+    {
+      "ledger": {
+        "id": "vgkufz3",
+        "source": "POS ledger",
+        "date": "2026-07-14",
+        "month": "2026-07",
+        "bucket": "Blackbox",
+        "amount": 130,
+        "rawAmount": 130,
+        "category": "Blackbox",
+        "description": "Black box ",
+        "employeeId": "20767a78-1ce5-4ac3-be6f-b5ab6e06d1c7"
+      },
+      "operations": {
+        "id": "669f79ad-2d0a-4365-8c61-65ca552c6f0a",
+        "source": "Operations ledger",
+        "date": "2026-07-14",
+        "month": "2026-07",
+        "bucket": "Blackbox",
+        "amount": 130,
+        "rawAmount": 130,
+        "kind": "blackbox",
+        "title": "Black box ",
+        "notes": "Auto-routed from POS expense: Black Box deposit",
+        "employeeId": "20767a78-1ce5-4ac3-be6f-b5ab6e06d1c7"
+      },
+      "matchType": "Exact date, bucket, and amount"
+    },
+    {
+      "ledger": {
+        "id": "gwpet4q",
+        "source": "POS ledger",
+        "date": "2026-07-15",
+        "month": "2026-07",
+        "bucket": "Blackbox",
+        "amount": 60,
+        "rawAmount": 60,
+        "category": "Blackbox",
+        "description": "Black box ",
+        "employeeId": "4bcaef17-5185-4dbf-8674-a03462c0e4c5"
+      },
+      "operations": {
+        "id": "2894aa6a-5582-4097-9f51-4304bb2e4030",
+        "source": "Operations ledger",
+        "date": "2026-07-15",
+        "month": "2026-07",
+        "bucket": "Blackbox",
+        "amount": 60,
+        "rawAmount": 60,
+        "kind": "blackbox",
+        "title": "Black box ",
+        "notes": "Auto-routed from POS expense: Black Box deposit",
+        "employeeId": "4bcaef17-5185-4dbf-8674-a03462c0e4c5"
+      },
+      "matchType": "Exact date, bucket, and amount"
+    },
+    {
+      "ledger": {
+        "id": "wg3xsj4",
+        "source": "POS ledger",
+        "date": "2026-07-17",
+        "month": "2026-07",
+        "bucket": "Blackbox",
+        "amount": 160,
+        "rawAmount": 160,
+        "category": "Blackbox",
+        "description": "Black box ",
+        "employeeId": "20767a78-1ce5-4ac3-be6f-b5ab6e06d1c7"
+      },
+      "operations": {
+        "id": "2957fd10-1e54-432d-b26f-d84fa847da28",
+        "source": "Operations ledger",
+        "date": "2026-07-17",
+        "month": "2026-07",
+        "bucket": "Blackbox",
+        "amount": 160,
+        "rawAmount": 160,
+        "kind": "blackbox",
+        "title": "Black box ",
+        "notes": "Auto-routed from POS expense: Black Box deposit",
+        "employeeId": "20767a78-1ce5-4ac3-be6f-b5ab6e06d1c7"
+      },
+      "matchType": "Exact date, bucket, and amount"
+    },
+    {
+      "ledger": {
+        "id": "tpub52z",
+        "source": "POS ledger",
+        "date": "2026-07-18",
+        "month": "2026-07",
+        "bucket": "Blackbox",
+        "amount": 160,
+        "rawAmount": 160,
+        "category": "Blackbox",
+        "description": "Black box ",
+        "employeeId": "20767a78-1ce5-4ac3-be6f-b5ab6e06d1c7"
+      },
+      "operations": {
+        "id": "59c8f764-8dd1-4f61-b6d6-742fe70b2863",
+        "source": "Operations ledger",
+        "date": "2026-07-18",
+        "month": "2026-07",
+        "bucket": "Blackbox",
+        "amount": 160,
+        "rawAmount": 160,
+        "kind": "blackbox",
+        "title": "Black box ",
+        "notes": "Auto-routed from POS expense: Black Box deposit",
+        "employeeId": "20767a78-1ce5-4ac3-be6f-b5ab6e06d1c7"
+      },
+      "matchType": "Exact date, bucket, and amount"
+    },
+    {
+      "ledger": {
+        "id": "zsq4cg1",
+        "source": "POS ledger",
+        "date": "2026-07-19",
+        "month": "2026-07",
+        "bucket": "Blackbox",
+        "amount": 170,
+        "rawAmount": 170,
+        "category": "Blackbox",
+        "description": "Black box ",
+        "employeeId": "system"
+      },
+      "operations": {
+        "id": "f58a2dd8-8e6a-49ed-a09c-95c701b58c62",
+        "source": "Operations ledger",
+        "date": "2026-07-19",
+        "month": "2026-07",
+        "bucket": "Blackbox",
+        "amount": 170,
+        "rawAmount": 170,
+        "kind": "blackbox",
+        "title": "Black box ",
+        "notes": "Auto-routed from POS expense: Black Box deposit",
+        "employeeId": "system"
+      },
+      "matchType": "Exact date, bucket, and amount"
+    },
+    {
+      "ledger": {
+        "id": "ilxxf2n",
+        "source": "POS ledger",
+        "date": "2026-07-20",
+        "month": "2026-07",
+        "bucket": "Blackbox",
+        "amount": 160,
+        "rawAmount": 160,
+        "category": "Blackbox",
+        "description": "Black box ",
+        "employeeId": "4bcaef17-5185-4dbf-8674-a03462c0e4c5"
+      },
+      "operations": {
+        "id": "72c68611-36c8-4674-928f-6dd882b0f521",
+        "source": "Operations ledger",
+        "date": "2026-07-20",
+        "month": "2026-07",
+        "bucket": "Blackbox",
+        "amount": 160,
+        "rawAmount": 160,
+        "kind": "blackbox",
+        "title": "Black box ",
+        "notes": "Auto-routed from POS expense: Black Box deposit",
+        "employeeId": "4bcaef17-5185-4dbf-8674-a03462c0e4c5"
+      },
+      "matchType": "Exact date, bucket, and amount"
+    },
+    {
+      "ledger": {
+        "id": "o1mj381",
+        "source": "POS ledger",
+        "date": "2026-07-23",
+        "month": "2026-07",
+        "bucket": "Blackbox",
+        "amount": 330,
+        "rawAmount": 330,
+        "category": "Blackbox",
+        "description": "Black box ",
+        "employeeId": "4bcaef17-5185-4dbf-8674-a03462c0e4c5"
+      },
+      "operations": {
+        "id": "820c8bb2-47d7-444e-bd0c-0f84ff4e794b",
+        "source": "Operations ledger",
+        "date": "2026-07-23",
+        "month": "2026-07",
+        "bucket": "Blackbox",
+        "amount": 330,
+        "rawAmount": 330,
+        "kind": "blackbox",
+        "title": "Black box ",
+        "notes": "Auto-routed from POS expense: Black Box deposit",
+        "employeeId": "4bcaef17-5185-4dbf-8674-a03462c0e4c5"
+      },
+      "matchType": "Exact date, bucket, and amount"
+    },
+    {
+      "ledger": {
+        "id": "nlvjxwh",
+        "source": "POS ledger",
+        "date": "2026-07-24",
+        "month": "2026-07",
+        "bucket": "Blackbox",
+        "amount": 240,
+        "rawAmount": 240,
+        "category": "Blackbox",
+        "description": "Black box ",
+        "employeeId": "4bcaef17-5185-4dbf-8674-a03462c0e4c5"
+      },
+      "operations": {
+        "id": "44856678-fb17-4216-b6b5-98ef472521cc",
+        "source": "Operations ledger",
+        "date": "2026-07-24",
+        "month": "2026-07",
+        "bucket": "Blackbox",
+        "amount": 240,
+        "rawAmount": 240,
+        "kind": "blackbox",
+        "title": "Black box ",
+        "notes": "Auto-routed from POS expense: Black Box deposit",
+        "employeeId": "4bcaef17-5185-4dbf-8674-a03462c0e4c5"
+      },
+      "matchType": "Exact date, bucket, and amount"
+    },
+    {
+      "ledger": {
+        "id": "lmvbxe9",
+        "source": "POS ledger",
+        "date": "2026-07-25",
+        "month": "2026-07",
+        "bucket": "Blackbox",
+        "amount": 10,
+        "rawAmount": 10,
+        "category": "Blackbox",
+        "description": "Black box ",
+        "employeeId": "4bcaef17-5185-4dbf-8674-a03462c0e4c5"
+      },
+      "operations": {
+        "id": "48d6becc-5bcb-4956-9873-b1045efccdff",
+        "source": "Operations ledger",
+        "date": "2026-07-25",
+        "month": "2026-07",
+        "bucket": "Blackbox",
+        "amount": 10,
+        "rawAmount": 10,
+        "kind": "blackbox",
+        "title": "Black box ",
+        "notes": "Auto-routed from POS expense: Black Box deposit",
+        "employeeId": "4bcaef17-5185-4dbf-8674-a03462c0e4c5"
+      },
+      "matchType": "Exact date, bucket, and amount"
+    },
+    {
+      "ledger": {
+        "id": "jdb7s5y",
+        "source": "POS ledger",
+        "date": "2026-07-26",
+        "month": "2026-07",
+        "bucket": "Blackbox",
+        "amount": 180,
+        "rawAmount": 180,
+        "category": "Blackbox",
+        "description": "Black box ",
+        "employeeId": "4bcaef17-5185-4dbf-8674-a03462c0e4c5"
+      },
+      "operations": {
+        "id": "e9d8f20d-1c06-4e37-a468-5babf3e190b4",
+        "source": "Operations ledger",
+        "date": "2026-07-26",
+        "month": "2026-07",
+        "bucket": "Blackbox",
+        "amount": 180,
+        "rawAmount": 180,
+        "kind": "blackbox",
+        "title": "Black box ",
+        "notes": "Auto-routed from POS expense: Black Box deposit",
+        "employeeId": "4bcaef17-5185-4dbf-8674-a03462c0e4c5"
+      },
+      "matchType": "Exact date, bucket, and amount"
+    },
+    {
+      "ledger": {
+        "id": "2fvdvg1",
+        "source": "POS ledger",
+        "date": "2026-07-27",
+        "month": "2026-07",
+        "bucket": "Blackbox",
+        "amount": 100,
+        "rawAmount": 100,
+        "category": "Blackbox",
+        "description": "Black box ",
+        "employeeId": "4bcaef17-5185-4dbf-8674-a03462c0e4c5"
+      },
+      "operations": {
+        "id": "5c0aa08c-8f1c-42c4-ba98-b3346fe6c083",
+        "source": "Operations ledger",
+        "date": "2026-07-27",
+        "month": "2026-07",
+        "bucket": "Blackbox",
+        "amount": 100,
+        "rawAmount": 100,
+        "kind": "blackbox",
+        "title": "Black box ",
+        "notes": "Auto-routed from POS expense: Black Box deposit",
+        "employeeId": "4bcaef17-5185-4dbf-8674-a03462c0e4c5"
+      },
+      "matchType": "Exact date, bucket, and amount"
+    },
+    {
+      "ledger": {
+        "id": "moebr2a",
+        "source": "POS ledger",
+        "date": "2026-07-28",
+        "month": "2026-07",
+        "bucket": "Blackbox",
+        "amount": 300,
+        "rawAmount": 300,
+        "category": "Blackbox",
+        "description": "Black box ",
+        "employeeId": "4bcaef17-5185-4dbf-8674-a03462c0e4c5"
+      },
+      "operations": {
+        "id": "3ce2b839-08b6-4101-8700-8011fa131235",
+        "source": "Operations ledger",
+        "date": "2026-07-28",
+        "month": "2026-07",
+        "bucket": "Blackbox",
+        "amount": 300,
+        "rawAmount": 300,
+        "kind": "blackbox",
+        "title": "Black box ",
+        "notes": "Auto-routed from POS expense: Black Box deposit",
+        "employeeId": "4bcaef17-5185-4dbf-8674-a03462c0e4c5"
+      },
+      "matchType": "Exact date, bucket, and amount"
+    },
+    {
+      "ledger": {
+        "id": "l3zd2ir",
+        "source": "POS ledger",
+        "date": "2026-07-29",
+        "month": "2026-07",
+        "bucket": "Blackbox",
+        "amount": 230,
+        "rawAmount": 230,
+        "category": "Blackbox",
+        "description": "Black box ",
+        "employeeId": "4bcaef17-5185-4dbf-8674-a03462c0e4c5"
+      },
+      "operations": {
+        "id": "95853dc5-f575-478d-bb99-adb923703ed7",
+        "source": "Operations ledger",
+        "date": "2026-07-29",
+        "month": "2026-07",
+        "bucket": "Blackbox",
+        "amount": 230,
+        "rawAmount": 230,
+        "kind": "blackbox",
+        "title": "Black box ",
+        "notes": "Auto-routed from POS expense: Black Box deposit",
+        "employeeId": "4bcaef17-5185-4dbf-8674-a03462c0e4c5"
+      },
+      "matchType": "Exact date, bucket, and amount"
+    },
+    {
+      "ledger": {
+        "id": "nmfvlz3",
+        "source": "POS ledger",
+        "date": "2026-07-30",
+        "month": "2026-07",
+        "bucket": "Blackbox",
+        "amount": 280,
+        "rawAmount": 280,
+        "category": "Blackbox",
+        "description": "Black box ",
+        "employeeId": "4bcaef17-5185-4dbf-8674-a03462c0e4c5"
+      },
+      "operations": {
+        "id": "ba25a8b6-dcdf-4121-a642-4cf5b8900e7b",
+        "source": "Operations ledger",
+        "date": "2026-07-30",
+        "month": "2026-07",
+        "bucket": "Blackbox",
+        "amount": 280,
+        "rawAmount": 280,
+        "kind": "blackbox",
+        "title": "Black box ",
+        "notes": "Auto-routed from POS expense: Black Box deposit",
+        "employeeId": "4bcaef17-5185-4dbf-8674-a03462c0e4c5"
+      },
+      "matchType": "Exact date, bucket, and amount"
+    }
+  ],
+  "unmatchedLedger": [
+    {
+      "id": "qhnlwi8",
+      "source": "POS ledger",
+      "date": "2026-01-02",
+      "month": "2026-01",
+      "bucket": "Savings",
+      "amount": 210,
+      "rawAmount": 210,
+      "category": "Transfer",
+      "description": "Savings",
+      "employeeId": "4bcaef17-5185-4dbf-8674-a03462c0e4c5"
+    },
+    {
+      "id": "kxiol86",
+      "source": "POS ledger",
+      "date": "2026-01-03",
+      "month": "2026-01",
+      "bucket": "Savings",
+      "amount": 490,
+      "rawAmount": 490,
+      "category": "Savings",
+      "description": "Savings",
+      "employeeId": "20767a78-1ce5-4ac3-be6f-b5ab6e06d1c7"
+    },
+    {
+      "id": "3rrgp2a",
+      "source": "POS ledger",
+      "date": "2026-01-04",
+      "month": "2026-01",
+      "bucket": "Savings",
+      "amount": 150,
+      "rawAmount": 150,
+      "category": "Savings",
+      "description": "Savings",
+      "employeeId": "4bcaef17-5185-4dbf-8674-a03462c0e4c5"
+    },
+    {
+      "id": "05ck7u5",
+      "source": "POS ledger",
+      "date": "2026-01-06",
+      "month": "2026-01",
+      "bucket": "Savings",
+      "amount": 230,
+      "rawAmount": 230,
+      "category": "Savings",
+      "description": "Savings | Edited by Owner (owner-1) @ 2026-04-27T08:08:29.398Z | Prev: $410.00: Savings",
+      "employeeId": "4bcaef17-5185-4dbf-8674-a03462c0e4c5"
+    },
+    {
+      "id": "t1fgx2w",
+      "source": "POS ledger",
+      "date": "2026-01-07",
+      "month": "2026-01",
+      "bucket": "Savings",
+      "amount": 410,
+      "rawAmount": 410,
+      "category": "Savings",
+      "description": "Savings",
+      "employeeId": "owner"
+    },
+    {
+      "id": "bblfbg3",
+      "source": "POS ledger",
+      "date": "2026-01-08",
+      "month": "2026-01",
+      "bucket": "Savings",
+      "amount": 120,
+      "rawAmount": 120,
+      "category": "Savings",
+      "description": "Savings",
+      "employeeId": "4bcaef17-5185-4dbf-8674-a03462c0e4c5"
+    },
+    {
+      "id": "sqg5jr5",
+      "source": "POS ledger",
+      "date": "2026-01-09",
+      "month": "2026-01",
+      "bucket": "Savings",
+      "amount": 160,
+      "rawAmount": 160,
+      "category": "Savings",
+      "description": "Savings",
+      "employeeId": "4bcaef17-5185-4dbf-8674-a03462c0e4c5"
+    },
+    {
+      "id": "s85ytlq",
+      "source": "POS ledger",
+      "date": "2026-01-10",
+      "month": "2026-01",
+      "bucket": "Savings",
+      "amount": 160,
+      "rawAmount": 160,
+      "category": "Savings",
+      "description": "savings",
+      "employeeId": "4bcaef17-5185-4dbf-8674-a03462c0e4c5"
+    },
+    {
+      "id": "z5zh9ge",
+      "source": "POS ledger",
+      "date": "2026-01-11",
+      "month": "2026-01",
+      "bucket": "Savings",
+      "amount": 380,
+      "rawAmount": 380,
+      "category": "Savings",
+      "description": "Savings",
+      "employeeId": "4bcaef17-5185-4dbf-8674-a03462c0e4c5"
+    },
+    {
+      "id": "y3lwrql",
+      "source": "POS ledger",
+      "date": "2026-01-12",
+      "month": "2026-01",
+      "bucket": "Savings",
+      "amount": 60,
+      "rawAmount": 60,
+      "category": "Savings",
+      "description": "savings",
+      "employeeId": "4bcaef17-5185-4dbf-8674-a03462c0e4c5"
+    },
+    {
+      "id": "whwe1mz",
+      "source": "POS ledger",
+      "date": "2026-01-13",
+      "month": "2026-01",
+      "bucket": "Savings",
+      "amount": 60,
+      "rawAmount": 60,
+      "category": "Savings",
+      "description": "Savings",
+      "employeeId": "4bcaef17-5185-4dbf-8674-a03462c0e4c5"
+    },
+    {
+      "id": "1ofinw3",
+      "source": "POS ledger",
+      "date": "2026-01-14",
+      "month": "2026-01",
+      "bucket": "Savings",
+      "amount": 130,
+      "rawAmount": 130,
+      "category": "Savings",
+      "description": "savings",
+      "employeeId": "4bcaef17-5185-4dbf-8674-a03462c0e4c5"
+    },
+    {
+      "id": "9ob2olv",
+      "source": "POS ledger",
+      "date": "2026-01-15",
+      "month": "2026-01",
+      "bucket": "Savings",
+      "amount": 60,
+      "rawAmount": 60,
+      "category": "Savings",
+      "description": "Savings",
+      "employeeId": "4bcaef17-5185-4dbf-8674-a03462c0e4c5"
+    },
+    {
+      "id": "4swz430",
+      "source": "POS ledger",
+      "date": "2026-01-16",
+      "month": "2026-01",
+      "bucket": "Savings",
+      "amount": 70,
+      "rawAmount": 70,
+      "category": "Savings",
+      "description": "Savings",
+      "employeeId": "4bcaef17-5185-4dbf-8674-a03462c0e4c5"
+    },
+    {
+      "id": "mie2djk",
+      "source": "POS ledger",
+      "date": "2026-01-17",
+      "month": "2026-01",
+      "bucket": "Savings",
+      "amount": 290,
+      "rawAmount": 290,
+      "category": "Savings",
+      "description": "savings",
+      "employeeId": "4bcaef17-5185-4dbf-8674-a03462c0e4c5"
+    },
+    {
+      "id": "ippn0tj",
+      "source": "POS ledger",
+      "date": "2026-01-19",
+      "month": "2026-01",
+      "bucket": "Savings",
+      "amount": 200,
+      "rawAmount": 200,
+      "category": "Savings",
+      "description": "savings",
+      "employeeId": "4bcaef17-5185-4dbf-8674-a03462c0e4c5"
+    },
+    {
+      "id": "x5vfs5m",
+      "source": "POS ledger",
+      "date": "2026-01-20",
+      "month": "2026-01",
+      "bucket": "Savings",
+      "amount": 190,
+      "rawAmount": 190,
+      "category": "Savings",
+      "description": "savings",
+      "employeeId": "4bcaef17-5185-4dbf-8674-a03462c0e4c5"
+    },
+    {
+      "id": "vozdm7h",
+      "source": "POS ledger",
+      "date": "2026-01-21",
+      "month": "2026-01",
+      "bucket": "Savings",
+      "amount": 160,
+      "rawAmount": 160,
+      "category": "Savings",
+      "description": "savings",
+      "employeeId": "4bcaef17-5185-4dbf-8674-a03462c0e4c5"
+    },
+    {
+      "id": "gs3iqc9",
+      "source": "POS ledger",
+      "date": "2026-01-22",
+      "month": "2026-01",
+      "bucket": "Savings",
+      "amount": 90,
+      "rawAmount": 90,
+      "category": "Savings",
+      "description": "Savings",
+      "employeeId": "4bcaef17-5185-4dbf-8674-a03462c0e4c5"
+    },
+    {
+      "id": "29etvc8",
+      "source": "POS ledger",
+      "date": "2026-01-24",
+      "month": "2026-01",
+      "bucket": "Savings",
+      "amount": 110,
+      "rawAmount": 110,
+      "category": "Savings",
+      "description": "Savings",
+      "employeeId": "4bcaef17-5185-4dbf-8674-a03462c0e4c5"
+    },
+    {
+      "id": "y15jld3",
+      "source": "POS ledger",
+      "date": "2026-01-25",
+      "month": "2026-01",
+      "bucket": "Savings",
+      "amount": 180,
+      "rawAmount": 180,
+      "category": "Savings",
+      "description": "savings",
+      "employeeId": "4bcaef17-5185-4dbf-8674-a03462c0e4c5"
+    },
+    {
+      "id": "0mu7rsm",
+      "source": "POS ledger",
+      "date": "2026-01-27",
+      "month": "2026-01",
+      "bucket": "Savings",
+      "amount": 50,
+      "rawAmount": 50,
+      "category": "Savings",
+      "description": "savings",
+      "employeeId": "4bcaef17-5185-4dbf-8674-a03462c0e4c5"
+    },
+    {
+      "id": "h0nh56q",
+      "source": "POS ledger",
+      "date": "2026-01-28",
+      "month": "2026-01",
+      "bucket": "Savings",
+      "amount": 210,
+      "rawAmount": 210,
+      "category": "Savings",
+      "description": "savings",
+      "employeeId": "4bcaef17-5185-4dbf-8674-a03462c0e4c5"
+    },
+    {
+      "id": "wey1p23",
+      "source": "POS ledger",
+      "date": "2026-01-29",
+      "month": "2026-01",
+      "bucket": "Savings",
+      "amount": 290,
+      "rawAmount": 290,
+      "category": "Savings",
+      "description": "savings",
+      "employeeId": "4bcaef17-5185-4dbf-8674-a03462c0e4c5"
+    },
+    {
+      "id": "ta6r9sp",
+      "source": "POS ledger",
+      "date": "2026-01-31",
+      "month": "2026-01",
+      "bucket": "Savings",
+      "amount": 170,
+      "rawAmount": 170,
+      "category": "Savings",
+      "description": "savings",
+      "employeeId": "20767a78-1ce5-4ac3-be6f-b5ab6e06d1c7"
+    },
+    {
+      "id": "d57yfwr",
+      "source": "POS ledger",
+      "date": "2026-02-01",
+      "month": "2026-02",
+      "bucket": "Savings",
+      "amount": 350,
+      "rawAmount": 350,
+      "category": "Savings",
+      "description": "savings",
+      "employeeId": "20767a78-1ce5-4ac3-be6f-b5ab6e06d1c7"
+    },
+    {
+      "id": "z2hffiq",
+      "source": "POS ledger",
+      "date": "2026-02-03",
+      "month": "2026-02",
+      "bucket": "Savings",
+      "amount": 380,
+      "rawAmount": 380,
+      "category": "Savings",
+      "description": "savings",
+      "employeeId": "20767a78-1ce5-4ac3-be6f-b5ab6e06d1c7"
+    },
+    {
+      "id": "huxihhz",
+      "source": "POS ledger",
+      "date": "2026-02-05",
+      "month": "2026-02",
+      "bucket": "Savings",
+      "amount": 170,
+      "rawAmount": 170,
+      "category": "Savings",
+      "description": "savings",
+      "employeeId": "20767a78-1ce5-4ac3-be6f-b5ab6e06d1c7"
+    },
+    {
+      "id": "jdywezw",
+      "source": "POS ledger",
+      "date": "2026-02-06",
+      "month": "2026-02",
+      "bucket": "Savings",
+      "amount": 270,
+      "rawAmount": 270,
+      "category": "Savings",
+      "description": "savings",
+      "employeeId": "20767a78-1ce5-4ac3-be6f-b5ab6e06d1c7"
+    },
+    {
+      "id": "2hfl3mk",
+      "source": "POS ledger",
+      "date": "2026-02-07",
+      "month": "2026-02",
+      "bucket": "Savings",
+      "amount": 110,
+      "rawAmount": 110,
+      "category": "Savings",
+      "description": "savings",
+      "employeeId": "20767a78-1ce5-4ac3-be6f-b5ab6e06d1c7"
+    },
+    {
+      "id": "iquwelt",
+      "source": "POS ledger",
+      "date": "2026-02-08",
+      "month": "2026-02",
+      "bucket": "Savings",
+      "amount": 450,
+      "rawAmount": 450,
+      "category": "Savings",
+      "description": "savings",
+      "employeeId": "20767a78-1ce5-4ac3-be6f-b5ab6e06d1c7"
+    },
+    {
+      "id": "02n67rs",
+      "source": "POS ledger",
+      "date": "2026-02-09",
+      "month": "2026-02",
+      "bucket": "Savings",
+      "amount": 230,
+      "rawAmount": 230,
+      "category": "Savings",
+      "description": "savings",
+      "employeeId": "20767a78-1ce5-4ac3-be6f-b5ab6e06d1c7"
+    },
+    {
+      "id": "dbsanu5",
+      "source": "POS ledger",
+      "date": "2026-02-10",
+      "month": "2026-02",
+      "bucket": "Savings",
+      "amount": 110,
+      "rawAmount": 110,
+      "category": "Savings",
+      "description": "savings | Edited by Owner (owner-1) @ 2026-04-27T09:33:31.058Z | Prev: $190.00: savings",
+      "employeeId": "20767a78-1ce5-4ac3-be6f-b5ab6e06d1c7"
+    },
+    {
+      "id": "317vg2u",
+      "source": "POS ledger",
+      "date": "2026-02-11",
+      "month": "2026-02",
+      "bucket": "Savings",
+      "amount": 150,
+      "rawAmount": 150,
+      "category": "Savings",
+      "description": "savings",
+      "employeeId": "20767a78-1ce5-4ac3-be6f-b5ab6e06d1c7"
+    },
+    {
+      "id": "zim5n20",
+      "source": "POS ledger",
+      "date": "2026-02-12",
+      "month": "2026-02",
+      "bucket": "Savings",
+      "amount": 110,
+      "rawAmount": 110,
+      "category": "Savings",
+      "description": "savings",
+      "employeeId": "20767a78-1ce5-4ac3-be6f-b5ab6e06d1c7"
+    },
+    {
+      "id": "xa1aey0",
+      "source": "POS ledger",
+      "date": "2026-02-13",
+      "month": "2026-02",
+      "bucket": "Savings",
+      "amount": 300,
+      "rawAmount": 300,
+      "category": "Savings",
+      "description": "savings",
+      "employeeId": "20767a78-1ce5-4ac3-be6f-b5ab6e06d1c7"
+    },
+    {
+      "id": "8e4eoc8",
+      "source": "POS ledger",
+      "date": "2026-02-14",
+      "month": "2026-02",
+      "bucket": "Savings",
+      "amount": 820,
+      "rawAmount": 820,
+      "category": "Savings",
+      "description": "savings",
+      "employeeId": "20767a78-1ce5-4ac3-be6f-b5ab6e06d1c7"
+    },
+    {
+      "id": "zgxa1au",
+      "source": "POS ledger",
+      "date": "2026-02-15",
+      "month": "2026-02",
+      "bucket": "Savings",
+      "amount": 260,
+      "rawAmount": 260,
+      "category": "Savings",
+      "description": "savings",
+      "employeeId": "20767a78-1ce5-4ac3-be6f-b5ab6e06d1c7"
+    },
+    {
+      "id": "igxt75t",
+      "source": "POS ledger",
+      "date": "2026-02-16",
+      "month": "2026-02",
+      "bucket": "Savings",
+      "amount": 120,
+      "rawAmount": 120,
+      "category": "Savings",
+      "description": "savings",
+      "employeeId": "20767a78-1ce5-4ac3-be6f-b5ab6e06d1c7"
+    },
+    {
+      "id": "76xb5kz",
+      "source": "POS ledger",
+      "date": "2026-02-17",
+      "month": "2026-02",
+      "bucket": "Savings",
+      "amount": 280,
+      "rawAmount": 280,
+      "category": "Savings",
+      "description": "savings",
+      "employeeId": "20767a78-1ce5-4ac3-be6f-b5ab6e06d1c7"
+    },
+    {
+      "id": "i965m8h",
+      "source": "POS ledger",
+      "date": "2026-02-18",
+      "month": "2026-02",
+      "bucket": "Savings",
+      "amount": 180,
+      "rawAmount": 180,
+      "category": "Savings",
+      "description": "savings",
+      "employeeId": "4bcaef17-5185-4dbf-8674-a03462c0e4c5"
+    },
+    {
+      "id": "la3382h",
+      "source": "POS ledger",
+      "date": "2026-02-19",
+      "month": "2026-02",
+      "bucket": "Savings",
+      "amount": 170,
+      "rawAmount": 170,
+      "category": "Savings",
+      "description": "savings",
+      "employeeId": "4bcaef17-5185-4dbf-8674-a03462c0e4c5"
+    },
+    {
+      "id": "6gykrl2",
+      "source": "POS ledger",
+      "date": "2026-02-20",
+      "month": "2026-02",
+      "bucket": "Savings",
+      "amount": 140,
+      "rawAmount": 140,
+      "category": "Savings",
+      "description": "savings",
+      "employeeId": "4bcaef17-5185-4dbf-8674-a03462c0e4c5"
+    },
+    {
+      "id": "af278ep",
+      "source": "POS ledger",
+      "date": "2026-02-21",
+      "month": "2026-02",
+      "bucket": "Savings",
+      "amount": 160,
+      "rawAmount": 160,
+      "category": "Savings",
+      "description": "savings",
+      "employeeId": "4bcaef17-5185-4dbf-8674-a03462c0e4c5"
+    },
+    {
+      "id": "p5woaiw",
+      "source": "POS ledger",
+      "date": "2026-02-22",
+      "month": "2026-02",
+      "bucket": "Savings",
+      "amount": 90,
+      "rawAmount": 90,
+      "category": "Savings",
+      "description": "savings",
+      "employeeId": "4bcaef17-5185-4dbf-8674-a03462c0e4c5"
+    },
+    {
+      "id": "4rfrlcx",
+      "source": "POS ledger",
+      "date": "2026-02-23",
+      "month": "2026-02",
+      "bucket": "Savings",
+      "amount": 40,
+      "rawAmount": 40,
+      "category": "Savings",
+      "description": "savings",
+      "employeeId": "4bcaef17-5185-4dbf-8674-a03462c0e4c5"
+    },
+    {
+      "id": "bbgo0j6",
+      "source": "POS ledger",
+      "date": "2026-02-24",
+      "month": "2026-02",
+      "bucket": "Savings",
+      "amount": 70,
+      "rawAmount": 70,
+      "category": "Savings",
+      "description": "savings",
+      "employeeId": "4bcaef17-5185-4dbf-8674-a03462c0e4c5"
+    },
+    {
+      "id": "ouxdul7",
+      "source": "POS ledger",
+      "date": "2026-02-25",
+      "month": "2026-02",
+      "bucket": "Savings",
+      "amount": 560,
+      "rawAmount": 560,
+      "category": "Savings",
+      "description": "Savings",
+      "employeeId": "20767a78-1ce5-4ac3-be6f-b5ab6e06d1c7"
+    },
+    {
+      "id": "niz9wk1",
+      "source": "POS ledger",
+      "date": "2026-02-26",
+      "month": "2026-02",
+      "bucket": "Savings",
+      "amount": 170,
+      "rawAmount": 170,
+      "category": "Savings",
+      "description": "savings",
+      "employeeId": "20767a78-1ce5-4ac3-be6f-b5ab6e06d1c7"
+    },
+    {
+      "id": "c5q8e41",
+      "source": "POS ledger",
+      "date": "2026-02-27",
+      "month": "2026-02",
+      "bucket": "Savings",
+      "amount": 180,
+      "rawAmount": 180,
+      "category": "Savings",
+      "description": "savings",
+      "employeeId": "20767a78-1ce5-4ac3-be6f-b5ab6e06d1c7"
+    },
+    {
+      "id": "05kpn7a",
+      "source": "POS ledger",
+      "date": "2026-02-28",
+      "month": "2026-02",
+      "bucket": "Savings",
+      "amount": 250,
+      "rawAmount": 250,
+      "category": "Savings",
+      "description": "savings",
+      "employeeId": "20767a78-1ce5-4ac3-be6f-b5ab6e06d1c7"
+    },
+    {
+      "id": "dsk0a4q",
+      "source": "POS ledger",
+      "date": "2026-03-01",
+      "month": "2026-03",
+      "bucket": "Savings",
+      "amount": 430,
+      "rawAmount": 430,
+      "category": "Transfer",
+      "description": "Savings",
+      "employeeId": "4bcaef17-5185-4dbf-8674-a03462c0e4c5"
+    },
+    {
+      "id": "tpj7rtg",
+      "source": "POS ledger",
+      "date": "2026-03-03",
+      "month": "2026-03",
+      "bucket": "Savings",
+      "amount": 200,
+      "rawAmount": 200,
+      "category": "Transfer",
+      "description": "Savings",
+      "employeeId": "4bcaef17-5185-4dbf-8674-a03462c0e4c5"
+    },
+    {
+      "id": "guvbozi",
+      "source": "POS ledger",
+      "date": "2026-03-04",
+      "month": "2026-03",
+      "bucket": "Savings",
+      "amount": 60,
+      "rawAmount": 60,
+      "category": "Transfer",
+      "description": "Savings",
+      "employeeId": "20767a78-1ce5-4ac3-be6f-b5ab6e06d1c7"
+    },
+    {
+      "id": "o51eg0b",
+      "source": "POS ledger",
+      "date": "2026-03-05",
+      "month": "2026-03",
+      "bucket": "Savings",
+      "amount": 430,
+      "rawAmount": 430,
+      "category": "Transfer",
+      "description": "Savings",
+      "employeeId": "20767a78-1ce5-4ac3-be6f-b5ab6e06d1c7"
+    },
+    {
+      "id": "hpy4rav",
+      "source": "POS ledger",
+      "date": "2026-03-06",
+      "month": "2026-03",
+      "bucket": "Savings",
+      "amount": 160,
+      "rawAmount": 160,
+      "category": "Transfer",
+      "description": "savings",
+      "employeeId": "20767a78-1ce5-4ac3-be6f-b5ab6e06d1c7"
+    },
+    {
+      "id": "ce0sie6",
+      "source": "POS ledger",
+      "date": "2026-03-08",
+      "month": "2026-03",
+      "bucket": "Savings",
+      "amount": 160,
+      "rawAmount": 160,
+      "category": "Transfer",
+      "description": "Savings",
+      "employeeId": "4bcaef17-5185-4dbf-8674-a03462c0e4c5"
+    },
+    {
+      "id": "xevmx1b",
+      "source": "POS ledger",
+      "date": "2026-03-09",
+      "month": "2026-03",
+      "bucket": "Savings",
+      "amount": 300,
+      "rawAmount": 300,
+      "category": "Transfer",
+      "description": "Savings",
+      "employeeId": "4bcaef17-5185-4dbf-8674-a03462c0e4c5"
+    },
+    {
+      "id": "j57w9jo",
+      "source": "POS ledger",
+      "date": "2026-03-10",
+      "month": "2026-03",
+      "bucket": "Savings",
+      "amount": 250,
+      "rawAmount": 250,
+      "category": "Transfer",
+      "description": "Savings",
+      "employeeId": "20767a78-1ce5-4ac3-be6f-b5ab6e06d1c7"
+    },
+    {
+      "id": "vfwjfp0",
+      "source": "POS ledger",
+      "date": "2026-03-11",
+      "month": "2026-03",
+      "bucket": "Savings",
+      "amount": 80,
+      "rawAmount": 80,
+      "category": "Transfer",
+      "description": "Savings",
+      "employeeId": "20767a78-1ce5-4ac3-be6f-b5ab6e06d1c7"
+    },
+    {
+      "id": "cqravlb",
+      "source": "POS ledger",
+      "date": "2026-03-12",
+      "month": "2026-03",
+      "bucket": "Savings",
+      "amount": 330,
+      "rawAmount": 330,
+      "category": "Transfer",
+      "description": "savings",
+      "employeeId": "20767a78-1ce5-4ac3-be6f-b5ab6e06d1c7"
+    },
+    {
+      "id": "0qjbtov",
+      "source": "POS ledger",
+      "date": "2026-03-13",
+      "month": "2026-03",
+      "bucket": "Savings",
+      "amount": 320,
+      "rawAmount": 320,
+      "category": "Transfer",
+      "description": "savings",
+      "employeeId": "4bcaef17-5185-4dbf-8674-a03462c0e4c5"
+    },
+    {
+      "id": "z1pvtyq",
+      "source": "POS ledger",
+      "date": "2026-03-14",
+      "month": "2026-03",
+      "bucket": "Savings",
+      "amount": 260,
+      "rawAmount": 260,
+      "category": "Transfer",
+      "description": "Savings",
+      "employeeId": "4bcaef17-5185-4dbf-8674-a03462c0e4c5"
+    },
+    {
+      "id": "3soweyk",
+      "source": "POS ledger",
+      "date": "2026-03-16",
+      "month": "2026-03",
+      "bucket": "Savings",
+      "amount": 70,
+      "rawAmount": 70,
+      "category": "Transfer",
+      "description": "Savings",
+      "employeeId": "20767a78-1ce5-4ac3-be6f-b5ab6e06d1c7"
+    },
+    {
+      "id": "ouwhyg9",
+      "source": "POS ledger",
+      "date": "2026-03-17",
+      "month": "2026-03",
+      "bucket": "Savings",
+      "amount": 200,
+      "rawAmount": 200,
+      "category": "Transfer",
+      "description": "Savings",
+      "employeeId": "20767a78-1ce5-4ac3-be6f-b5ab6e06d1c7"
+    },
+    {
+      "id": "m51w3hu",
+      "source": "POS ledger",
+      "date": "2026-03-18",
+      "month": "2026-03",
+      "bucket": "Savings",
+      "amount": 110,
+      "rawAmount": 110,
+      "category": "Transfer",
+      "description": "Savings",
+      "employeeId": "20767a78-1ce5-4ac3-be6f-b5ab6e06d1c7"
+    },
+    {
+      "id": "77yn8fs",
+      "source": "POS ledger",
+      "date": "2026-03-21",
+      "month": "2026-03",
+      "bucket": "Savings",
+      "amount": 70,
+      "rawAmount": 70,
+      "category": "Transfer",
+      "description": "Savings",
+      "employeeId": "owner"
+    },
+    {
+      "id": "pfxorb4",
+      "source": "POS ledger",
+      "date": "2026-03-22",
+      "month": "2026-03",
+      "bucket": "Savings",
+      "amount": 360,
+      "rawAmount": 360,
+      "category": "Transfer",
+      "description": "Savings",
+      "employeeId": "4bcaef17-5185-4dbf-8674-a03462c0e4c5"
+    },
+    {
+      "id": "dwjt082",
+      "source": "POS ledger",
+      "date": "2026-03-23",
+      "month": "2026-03",
+      "bucket": "Savings",
+      "amount": 100,
+      "rawAmount": 100,
+      "category": "Transfer",
+      "description": "Savings",
+      "employeeId": "4bcaef17-5185-4dbf-8674-a03462c0e4c5"
+    },
+    {
+      "id": "0vzzhkn",
+      "source": "POS ledger",
+      "date": "2026-03-25",
+      "month": "2026-03",
+      "bucket": "Savings",
+      "amount": 60,
+      "rawAmount": 60,
+      "category": "Transfer",
+      "description": "Savings",
+      "employeeId": "20767a78-1ce5-4ac3-be6f-b5ab6e06d1c7"
+    },
+    {
+      "id": "zc34yr0",
+      "source": "POS ledger",
+      "date": "2026-03-26",
+      "month": "2026-03",
+      "bucket": "Savings",
+      "amount": 110,
+      "rawAmount": 110,
+      "category": "Transfer",
+      "description": "Savings",
+      "employeeId": "4bcaef17-5185-4dbf-8674-a03462c0e4c5"
+    },
+    {
+      "id": "nxo7wap",
+      "source": "POS ledger",
+      "date": "2026-03-27",
+      "month": "2026-03",
+      "bucket": "Savings",
+      "amount": 200,
+      "rawAmount": 200,
+      "category": "Transfer",
+      "description": "Savings",
+      "employeeId": "20767a78-1ce5-4ac3-be6f-b5ab6e06d1c7"
+    },
+    {
+      "id": "hw5dmtb",
+      "source": "POS ledger",
+      "date": "2026-03-28",
+      "month": "2026-03",
+      "bucket": "Savings",
+      "amount": 240,
+      "rawAmount": 240,
+      "category": "Transfer",
+      "description": "Savings",
+      "employeeId": "owner"
+    },
+    {
+      "id": "on3tn0a",
+      "source": "POS ledger",
+      "date": "2026-03-29",
+      "month": "2026-03",
+      "bucket": "Blackbox",
+      "amount": 100,
+      "rawAmount": 100,
+      "category": "Transfer",
+      "description": "Black box",
+      "employeeId": "4bcaef17-5185-4dbf-8674-a03462c0e4c5"
+    },
+    {
+      "id": "nakzheg",
+      "source": "POS ledger",
+      "date": "2026-03-30",
+      "month": "2026-03",
+      "bucket": "Blackbox",
+      "amount": 50,
+      "rawAmount": 50,
+      "category": "Transfer",
+      "description": "Black box",
+      "employeeId": "4bcaef17-5185-4dbf-8674-a03462c0e4c5"
+    },
+    {
+      "id": "k58l2r9",
+      "source": "POS ledger",
+      "date": "2026-03-31",
+      "month": "2026-03",
+      "bucket": "Savings",
+      "amount": 180,
+      "rawAmount": 180,
+      "category": "Transfer",
+      "description": "Savings | Edited by Owner (owner-1) @ 2026-04-26T18:15:59.330Z | Prev: $100.00: Savings",
+      "employeeId": "20767a78-1ce5-4ac3-be6f-b5ab6e06d1c7"
+    },
+    {
+      "id": "gkh1ibk",
+      "source": "POS ledger",
+      "date": "2026-04-01",
+      "month": "2026-04",
+      "bucket": "Blackbox",
+      "amount": 100,
+      "rawAmount": 100,
+      "category": "Transfer",
+      "description": "Savings : Blackbox | Edited by Owner (owner-1) @ 2026-04-26T18:18:15.737Z | Prev: $210.00: Savings : Blackbox",
+      "employeeId": "owner"
+    },
+    {
+      "id": "md8yrzi",
+      "source": "POS ledger",
+      "date": "2026-04-02",
+      "month": "2026-04",
+      "bucket": "Savings",
+      "amount": 210,
+      "rawAmount": 210,
+      "category": "Transfer",
+      "description": "Savings",
+      "employeeId": "20767a78-1ce5-4ac3-be6f-b5ab6e06d1c7"
+    },
+    {
+      "id": "ahy4po4",
+      "source": "POS ledger",
+      "date": "2026-04-03",
+      "month": "2026-04",
+      "bucket": "Blackbox",
+      "amount": 210,
+      "rawAmount": 210,
+      "category": "Transfer",
+      "description": "Black box ",
+      "employeeId": "20767a78-1ce5-4ac3-be6f-b5ab6e06d1c7"
+    },
+    {
+      "id": "jl0c7xr",
+      "source": "POS ledger",
+      "date": "2026-04-04",
+      "month": "2026-04",
+      "bucket": "Savings",
+      "amount": 80,
+      "rawAmount": 80,
+      "category": "Transfer",
+      "description": "Savings",
+      "employeeId": "owner"
+    },
+    {
+      "id": "1gz846n",
+      "source": "POS ledger",
+      "date": "2026-04-06",
+      "month": "2026-04",
+      "bucket": "Blackbox",
+      "amount": 120,
+      "rawAmount": 120,
+      "category": "Transfer",
+      "description": "Savings : Blackbox",
+      "employeeId": "owner"
+    },
+    {
+      "id": "omimsdf",
+      "source": "POS ledger",
+      "date": "2026-04-07",
+      "month": "2026-04",
+      "bucket": "Blackbox",
+      "amount": 120,
+      "rawAmount": 120,
+      "category": "Transfer",
+      "description": "Black box",
+      "employeeId": "20767a78-1ce5-4ac3-be6f-b5ab6e06d1c7"
+    },
+    {
+      "id": "ehe5ksd",
+      "source": "POS ledger",
+      "date": "2026-04-08",
+      "month": "2026-04",
+      "bucket": "Savings",
+      "amount": 60,
+      "rawAmount": 60,
+      "category": "Transfer",
+      "description": "savings",
+      "employeeId": "20767a78-1ce5-4ac3-be6f-b5ab6e06d1c7"
+    },
+    {
+      "id": "s8zx2lb",
+      "source": "POS ledger",
+      "date": "2026-04-11",
+      "month": "2026-04",
+      "bucket": "Blackbox",
+      "amount": 360,
+      "rawAmount": 360,
+      "category": "Transfer",
+      "description": "Black box | Edited by Owner (owner-1) @ 2026-04-26T18:41:12.848Z | Prev: $360.00: Black box | Edited by Owner (owner-1) @ 2026-04-26T18:41:25.835Z | Prev: $160.00: Black box | Edited by Owner (owner-1) @ 2026-04-26T18:41:12.848Z | Prev: $360.00: Black box | Edited by Owner (owner-1) @ 2026-04-26T18:41:37.655Z | Prev: $200.00: Black box | Edited by Owner (owner-1) @ 2026-04-26T18:41:12.848Z | Prev: $360.00: Black box | Edited by Owner (owner-1) @ 2026-04-26T18:41:25.835Z | Prev: $160.00: Black box | Edited by Owner (owner-1) @ 2026-04-26T18:41:12.848Z | Prev: $360.00: Black box | Edited by Owner (owner-1) @ 2026-04-26T18:43:36.379Z | Prev: $320.00: Black box | Edited by Owner (owner-1) @ 2026-04-26T18:41:12.848Z | Prev: $360.00: Black box | Edited by Owner (owner-1) @ 2026-04-26T18:41:25.835Z | Prev: $160.00: Black box | Edited by Owner (owner-1) @ 2026-04-26T18:41:12.848Z | Prev: $360.00: Black box | Edited by Owner (owner-1) @ 2026-04-26T18:41:37.655Z | Prev: $200.00: Black box | Edited by Owner (owner-1) @ 2026-04-26T18:41:12.848Z | Prev: $360.00: Black box | Edited by Owner (owner-1) @ 2026-04-26T18:41:25.835Z | Prev: $160.00: Black box | Edited by Owner (owner-1) @ 2026-04-26T18:41:12.848Z | Prev: $360.00: Black box",
+      "employeeId": "20767a78-1ce5-4ac3-be6f-b5ab6e06d1c7"
+    },
+    {
+      "id": "9fcxm76",
+      "source": "POS ledger",
+      "date": "2026-04-12",
+      "month": "2026-04",
+      "bucket": "Savings",
+      "amount": 70,
+      "rawAmount": 70,
+      "category": "Transfer",
+      "description": "savings",
+      "employeeId": "20767a78-1ce5-4ac3-be6f-b5ab6e06d1c7"
+    },
+    {
+      "id": "dj3b8yp",
+      "source": "POS ledger",
+      "date": "2026-04-14",
+      "month": "2026-04",
+      "bucket": "Blackbox",
+      "amount": 180,
+      "rawAmount": 180,
+      "category": "Transfer",
+      "description": "Black box ",
+      "employeeId": "20767a78-1ce5-4ac3-be6f-b5ab6e06d1c7"
+    },
+    {
+      "id": "jfme0oa",
+      "source": "POS ledger",
+      "date": "2026-04-15",
+      "month": "2026-04",
+      "bucket": "Blackbox",
+      "amount": 320,
+      "rawAmount": 320,
+      "category": "Transfer",
+      "description": "Black box ",
+      "employeeId": "20767a78-1ce5-4ac3-be6f-b5ab6e06d1c7"
+    },
+    {
+      "id": "pq1go60",
+      "source": "POS ledger",
+      "date": "2026-04-16",
+      "month": "2026-04",
+      "bucket": "Savings",
+      "amount": 90,
+      "rawAmount": 90,
+      "category": "Transfer",
+      "description": "savings",
+      "employeeId": "20767a78-1ce5-4ac3-be6f-b5ab6e06d1c7"
+    },
+    {
+      "id": "oqmg6yw",
+      "source": "POS ledger",
+      "date": "2026-04-18",
+      "month": "2026-04",
+      "bucket": "Blackbox",
+      "amount": 220,
+      "rawAmount": 220,
+      "category": "Transfer",
+      "description": "Black box ",
+      "employeeId": "4bcaef17-5185-4dbf-8674-a03462c0e4c5"
+    },
+    {
+      "id": "5vbe6s5",
+      "source": "POS ledger",
+      "date": "2026-04-19",
+      "month": "2026-04",
+      "bucket": "Savings",
+      "amount": 190,
+      "rawAmount": 190,
+      "category": "Transfer",
+      "description": "savings",
+      "employeeId": "4bcaef17-5185-4dbf-8674-a03462c0e4c5"
+    },
+    {
+      "id": "c9brxws",
+      "source": "POS ledger",
+      "date": "2026-04-20",
+      "month": "2026-04",
+      "bucket": "Blackbox",
+      "amount": 240,
+      "rawAmount": 240,
+      "category": "Transfer",
+      "description": "Black box ",
+      "employeeId": "4bcaef17-5185-4dbf-8674-a03462c0e4c5"
+    },
+    {
+      "id": "v7of1kt",
+      "source": "POS ledger",
+      "date": "2026-04-26",
+      "month": "2026-04",
+      "bucket": "Blackbox",
+      "amount": 20,
+      "rawAmount": 20,
+      "category": "Transfer",
+      "description": "Black box  | Edited by Owner (owner-1) @ 2026-04-26T16:55:09.514Z | Prev: $170.00: Black box  | Edited by Owner (owner-1) @ 2026-04-26T16:55:20.878Z | Prev: $0.00: Black box  | Edited by Owner (owner-1) @ 2026-04-26T16:55:09.514Z | Prev: $170.00: Black box ",
+      "employeeId": "4bcaef17-5185-4dbf-8674-a03462c0e4c5"
+    }
+  ],
+  "unmatchedOperations": [
+    {
+      "id": "5abbe365-90fb-43b8-9ad3-495a47be4b2c",
+      "source": "Operations ledger",
+      "date": "2026-04-20",
+      "month": "2026-04",
+      "bucket": "Savings",
+      "amount": 240,
+      "rawAmount": 240,
+      "kind": "eod_deposit",
+      "title": "Savings",
+      "notes": "",
+      "employeeId": ""
+    },
+    {
+      "id": "9223dc59-a240-4af8-88ed-22cc4fbc7cb9",
+      "source": "Operations ledger",
+      "date": "2026-04-26",
+      "month": "2026-04",
+      "bucket": "Blackbox",
+      "amount": 170,
+      "rawAmount": 170,
+      "kind": "eod_deposit",
+      "title": "Black box ",
+      "notes": "Auto-routed from POS expense: Manual deposit",
+      "employeeId": "4bcaef17-5185-4dbf-8674-a03462c0e4c5"
+    }
+  ],
+  "flags": [
+    {
+      "severity": "High",
+      "date": "2026-01-02",
+      "bucket": "Savings",
+      "amount": 210,
+      "source": "POS ledger",
+      "id": "qhnlwi8",
+      "reason": "POS shows cash sent from Dub Dub, but no matching positive operations cash activity was found on the same date, same bucket and amount, or within two days.",
+      "detail": "Savings"
+    },
+    {
+      "severity": "High",
+      "date": "2026-01-03",
+      "bucket": "Savings",
+      "amount": 490,
+      "source": "POS ledger",
+      "id": "kxiol86",
+      "reason": "POS shows cash sent from Dub Dub, but no matching positive operations cash activity was found on the same date, same bucket and amount, or within two days.",
+      "detail": "Savings"
+    },
+    {
+      "severity": "High",
+      "date": "2026-01-04",
+      "bucket": "Savings",
+      "amount": 150,
+      "source": "POS ledger",
+      "id": "3rrgp2a",
+      "reason": "POS shows cash sent from Dub Dub, but no matching positive operations cash activity was found on the same date, same bucket and amount, or within two days.",
+      "detail": "Savings"
+    },
+    {
+      "severity": "High",
+      "date": "2026-01-06",
+      "bucket": "Savings",
+      "amount": 230,
+      "source": "POS ledger",
+      "id": "05ck7u5",
+      "reason": "POS shows cash sent from Dub Dub, but no matching positive operations cash activity was found on the same date, same bucket and amount, or within two days.",
+      "detail": "Savings | Edited by Owner (owner-1) @ 2026-04-27T08:08:29.398Z | Prev: $410.00: Savings"
+    },
+    {
+      "severity": "High",
+      "date": "2026-01-07",
+      "bucket": "Savings",
+      "amount": 410,
+      "source": "POS ledger",
+      "id": "t1fgx2w",
+      "reason": "POS shows cash sent from Dub Dub, but no matching positive operations cash activity was found on the same date, same bucket and amount, or within two days.",
+      "detail": "Savings"
+    },
+    {
+      "severity": "High",
+      "date": "2026-01-08",
+      "bucket": "Savings",
+      "amount": 120,
+      "source": "POS ledger",
+      "id": "bblfbg3",
+      "reason": "POS shows cash sent from Dub Dub, but no matching positive operations cash activity was found on the same date, same bucket and amount, or within two days.",
+      "detail": "Savings"
+    },
+    {
+      "severity": "High",
+      "date": "2026-01-09",
+      "bucket": "Savings",
+      "amount": 160,
+      "source": "POS ledger",
+      "id": "sqg5jr5",
+      "reason": "POS shows cash sent from Dub Dub, but no matching positive operations cash activity was found on the same date, same bucket and amount, or within two days.",
+      "detail": "Savings"
+    },
+    {
+      "severity": "High",
+      "date": "2026-01-10",
+      "bucket": "Savings",
+      "amount": 160,
+      "source": "POS ledger",
+      "id": "s85ytlq",
+      "reason": "POS shows cash sent from Dub Dub, but no matching positive operations cash activity was found on the same date, same bucket and amount, or within two days.",
+      "detail": "savings"
+    },
+    {
+      "severity": "High",
+      "date": "2026-01-11",
+      "bucket": "Savings",
+      "amount": 380,
+      "source": "POS ledger",
+      "id": "z5zh9ge",
+      "reason": "POS shows cash sent from Dub Dub, but no matching positive operations cash activity was found on the same date, same bucket and amount, or within two days.",
+      "detail": "Savings"
+    },
+    {
+      "severity": "High",
+      "date": "2026-01-12",
+      "bucket": "Savings",
+      "amount": 60,
+      "source": "POS ledger",
+      "id": "y3lwrql",
+      "reason": "POS shows cash sent from Dub Dub, but no matching positive operations cash activity was found on the same date, same bucket and amount, or within two days.",
+      "detail": "savings"
+    },
+    {
+      "severity": "High",
+      "date": "2026-01-13",
+      "bucket": "Savings",
+      "amount": 60,
+      "source": "POS ledger",
+      "id": "whwe1mz",
+      "reason": "POS shows cash sent from Dub Dub, but no matching positive operations cash activity was found on the same date, same bucket and amount, or within two days.",
+      "detail": "Savings"
+    },
+    {
+      "severity": "High",
+      "date": "2026-01-14",
+      "bucket": "Savings",
+      "amount": 130,
+      "source": "POS ledger",
+      "id": "1ofinw3",
+      "reason": "POS shows cash sent from Dub Dub, but no matching positive operations cash activity was found on the same date, same bucket and amount, or within two days.",
+      "detail": "savings"
+    },
+    {
+      "severity": "High",
+      "date": "2026-01-15",
+      "bucket": "Savings",
+      "amount": 60,
+      "source": "POS ledger",
+      "id": "9ob2olv",
+      "reason": "POS shows cash sent from Dub Dub, but no matching positive operations cash activity was found on the same date, same bucket and amount, or within two days.",
+      "detail": "Savings"
+    },
+    {
+      "severity": "High",
+      "date": "2026-01-16",
+      "bucket": "Savings",
+      "amount": 70,
+      "source": "POS ledger",
+      "id": "4swz430",
+      "reason": "POS shows cash sent from Dub Dub, but no matching positive operations cash activity was found on the same date, same bucket and amount, or within two days.",
+      "detail": "Savings"
+    },
+    {
+      "severity": "High",
+      "date": "2026-01-17",
+      "bucket": "Savings",
+      "amount": 290,
+      "source": "POS ledger",
+      "id": "mie2djk",
+      "reason": "POS shows cash sent from Dub Dub, but no matching positive operations cash activity was found on the same date, same bucket and amount, or within two days.",
+      "detail": "savings"
+    },
+    {
+      "severity": "High",
+      "date": "2026-01-19",
+      "bucket": "Savings",
+      "amount": 200,
+      "source": "POS ledger",
+      "id": "ippn0tj",
+      "reason": "POS shows cash sent from Dub Dub, but no matching positive operations cash activity was found on the same date, same bucket and amount, or within two days.",
+      "detail": "savings"
+    },
+    {
+      "severity": "High",
+      "date": "2026-01-20",
+      "bucket": "Savings",
+      "amount": 190,
+      "source": "POS ledger",
+      "id": "x5vfs5m",
+      "reason": "POS shows cash sent from Dub Dub, but no matching positive operations cash activity was found on the same date, same bucket and amount, or within two days.",
+      "detail": "savings"
+    },
+    {
+      "severity": "High",
+      "date": "2026-01-21",
+      "bucket": "Savings",
+      "amount": 160,
+      "source": "POS ledger",
+      "id": "vozdm7h",
+      "reason": "POS shows cash sent from Dub Dub, but no matching positive operations cash activity was found on the same date, same bucket and amount, or within two days.",
+      "detail": "savings"
+    },
+    {
+      "severity": "High",
+      "date": "2026-01-22",
+      "bucket": "Savings",
+      "amount": 90,
+      "source": "POS ledger",
+      "id": "gs3iqc9",
+      "reason": "POS shows cash sent from Dub Dub, but no matching positive operations cash activity was found on the same date, same bucket and amount, or within two days.",
+      "detail": "Savings"
+    },
+    {
+      "severity": "High",
+      "date": "2026-01-24",
+      "bucket": "Savings",
+      "amount": 110,
+      "source": "POS ledger",
+      "id": "29etvc8",
+      "reason": "POS shows cash sent from Dub Dub, but no matching positive operations cash activity was found on the same date, same bucket and amount, or within two days.",
+      "detail": "Savings"
+    },
+    {
+      "severity": "High",
+      "date": "2026-01-25",
+      "bucket": "Savings",
+      "amount": 180,
+      "source": "POS ledger",
+      "id": "y15jld3",
+      "reason": "POS shows cash sent from Dub Dub, but no matching positive operations cash activity was found on the same date, same bucket and amount, or within two days.",
+      "detail": "savings"
+    },
+    {
+      "severity": "High",
+      "date": "2026-01-27",
+      "bucket": "Savings",
+      "amount": 50,
+      "source": "POS ledger",
+      "id": "0mu7rsm",
+      "reason": "POS shows cash sent from Dub Dub, but no matching positive operations cash activity was found on the same date, same bucket and amount, or within two days.",
+      "detail": "savings"
+    },
+    {
+      "severity": "High",
+      "date": "2026-01-28",
+      "bucket": "Savings",
+      "amount": 210,
+      "source": "POS ledger",
+      "id": "h0nh56q",
+      "reason": "POS shows cash sent from Dub Dub, but no matching positive operations cash activity was found on the same date, same bucket and amount, or within two days.",
+      "detail": "savings"
+    },
+    {
+      "severity": "High",
+      "date": "2026-01-29",
+      "bucket": "Savings",
+      "amount": 290,
+      "source": "POS ledger",
+      "id": "wey1p23",
+      "reason": "POS shows cash sent from Dub Dub, but no matching positive operations cash activity was found on the same date, same bucket and amount, or within two days.",
+      "detail": "savings"
+    },
+    {
+      "severity": "High",
+      "date": "2026-01-31",
+      "bucket": "Savings",
+      "amount": 170,
+      "source": "POS ledger",
+      "id": "ta6r9sp",
+      "reason": "POS shows cash sent from Dub Dub, but no matching positive operations cash activity was found on the same date, same bucket and amount, or within two days.",
+      "detail": "savings"
+    },
+    {
+      "severity": "High",
+      "date": "2026-02-01",
+      "bucket": "Savings",
+      "amount": 350,
+      "source": "POS ledger",
+      "id": "d57yfwr",
+      "reason": "POS shows cash sent from Dub Dub, but no matching positive operations cash activity was found on the same date, same bucket and amount, or within two days.",
+      "detail": "savings"
+    },
+    {
+      "severity": "High",
+      "date": "2026-02-03",
+      "bucket": "Savings",
+      "amount": 380,
+      "source": "POS ledger",
+      "id": "z2hffiq",
+      "reason": "POS shows cash sent from Dub Dub, but no matching positive operations cash activity was found on the same date, same bucket and amount, or within two days.",
+      "detail": "savings"
+    },
+    {
+      "severity": "High",
+      "date": "2026-02-05",
+      "bucket": "Savings",
+      "amount": 170,
+      "source": "POS ledger",
+      "id": "huxihhz",
+      "reason": "POS shows cash sent from Dub Dub, but no matching positive operations cash activity was found on the same date, same bucket and amount, or within two days.",
+      "detail": "savings"
+    },
+    {
+      "severity": "High",
+      "date": "2026-02-06",
+      "bucket": "Savings",
+      "amount": 270,
+      "source": "POS ledger",
+      "id": "jdywezw",
+      "reason": "POS shows cash sent from Dub Dub, but no matching positive operations cash activity was found on the same date, same bucket and amount, or within two days.",
+      "detail": "savings"
+    },
+    {
+      "severity": "High",
+      "date": "2026-02-07",
+      "bucket": "Savings",
+      "amount": 110,
+      "source": "POS ledger",
+      "id": "2hfl3mk",
+      "reason": "POS shows cash sent from Dub Dub, but no matching positive operations cash activity was found on the same date, same bucket and amount, or within two days.",
+      "detail": "savings"
+    },
+    {
+      "severity": "High",
+      "date": "2026-02-08",
+      "bucket": "Savings",
+      "amount": 450,
+      "source": "POS ledger",
+      "id": "iquwelt",
+      "reason": "POS shows cash sent from Dub Dub, but no matching positive operations cash activity was found on the same date, same bucket and amount, or within two days.",
+      "detail": "savings"
+    },
+    {
+      "severity": "High",
+      "date": "2026-02-09",
+      "bucket": "Savings",
+      "amount": 230,
+      "source": "POS ledger",
+      "id": "02n67rs",
+      "reason": "POS shows cash sent from Dub Dub, but no matching positive operations cash activity was found on the same date, same bucket and amount, or within two days.",
+      "detail": "savings"
+    },
+    {
+      "severity": "High",
+      "date": "2026-02-10",
+      "bucket": "Savings",
+      "amount": 110,
+      "source": "POS ledger",
+      "id": "dbsanu5",
+      "reason": "POS shows cash sent from Dub Dub, but no matching positive operations cash activity was found on the same date, same bucket and amount, or within two days.",
+      "detail": "savings | Edited by Owner (owner-1) @ 2026-04-27T09:33:31.058Z | Prev: $190.00: savings"
+    },
+    {
+      "severity": "High",
+      "date": "2026-02-11",
+      "bucket": "Savings",
+      "amount": 150,
+      "source": "POS ledger",
+      "id": "317vg2u",
+      "reason": "POS shows cash sent from Dub Dub, but no matching positive operations cash activity was found on the same date, same bucket and amount, or within two days.",
+      "detail": "savings"
+    },
+    {
+      "severity": "High",
+      "date": "2026-02-12",
+      "bucket": "Savings",
+      "amount": 110,
+      "source": "POS ledger",
+      "id": "zim5n20",
+      "reason": "POS shows cash sent from Dub Dub, but no matching positive operations cash activity was found on the same date, same bucket and amount, or within two days.",
+      "detail": "savings"
+    },
+    {
+      "severity": "High",
+      "date": "2026-02-13",
+      "bucket": "Savings",
+      "amount": 300,
+      "source": "POS ledger",
+      "id": "xa1aey0",
+      "reason": "POS shows cash sent from Dub Dub, but no matching positive operations cash activity was found on the same date, same bucket and amount, or within two days.",
+      "detail": "savings"
+    },
+    {
+      "severity": "High",
+      "date": "2026-02-14",
+      "bucket": "Savings",
+      "amount": 820,
+      "source": "POS ledger",
+      "id": "8e4eoc8",
+      "reason": "POS shows cash sent from Dub Dub, but no matching positive operations cash activity was found on the same date, same bucket and amount, or within two days.",
+      "detail": "savings"
+    },
+    {
+      "severity": "High",
+      "date": "2026-02-15",
+      "bucket": "Savings",
+      "amount": 260,
+      "source": "POS ledger",
+      "id": "zgxa1au",
+      "reason": "POS shows cash sent from Dub Dub, but no matching positive operations cash activity was found on the same date, same bucket and amount, or within two days.",
+      "detail": "savings"
+    },
+    {
+      "severity": "High",
+      "date": "2026-02-16",
+      "bucket": "Savings",
+      "amount": 120,
+      "source": "POS ledger",
+      "id": "igxt75t",
+      "reason": "POS shows cash sent from Dub Dub, but no matching positive operations cash activity was found on the same date, same bucket and amount, or within two days.",
+      "detail": "savings"
+    },
+    {
+      "severity": "High",
+      "date": "2026-02-17",
+      "bucket": "Savings",
+      "amount": 280,
+      "source": "POS ledger",
+      "id": "76xb5kz",
+      "reason": "POS shows cash sent from Dub Dub, but no matching positive operations cash activity was found on the same date, same bucket and amount, or within two days.",
+      "detail": "savings"
+    },
+    {
+      "severity": "High",
+      "date": "2026-02-18",
+      "bucket": "Savings",
+      "amount": 180,
+      "source": "POS ledger",
+      "id": "i965m8h",
+      "reason": "POS shows cash sent from Dub Dub, but no matching positive operations cash activity was found on the same date, same bucket and amount, or within two days.",
+      "detail": "savings"
+    },
+    {
+      "severity": "High",
+      "date": "2026-02-19",
+      "bucket": "Savings",
+      "amount": 170,
+      "source": "POS ledger",
+      "id": "la3382h",
+      "reason": "POS shows cash sent from Dub Dub, but no matching positive operations cash activity was found on the same date, same bucket and amount, or within two days.",
+      "detail": "savings"
+    },
+    {
+      "severity": "High",
+      "date": "2026-02-20",
+      "bucket": "Savings",
+      "amount": 140,
+      "source": "POS ledger",
+      "id": "6gykrl2",
+      "reason": "POS shows cash sent from Dub Dub, but no matching positive operations cash activity was found on the same date, same bucket and amount, or within two days.",
+      "detail": "savings"
+    },
+    {
+      "severity": "High",
+      "date": "2026-02-21",
+      "bucket": "Savings",
+      "amount": 160,
+      "source": "POS ledger",
+      "id": "af278ep",
+      "reason": "POS shows cash sent from Dub Dub, but no matching positive operations cash activity was found on the same date, same bucket and amount, or within two days.",
+      "detail": "savings"
+    },
+    {
+      "severity": "High",
+      "date": "2026-02-22",
+      "bucket": "Savings",
+      "amount": 90,
+      "source": "POS ledger",
+      "id": "p5woaiw",
+      "reason": "POS shows cash sent from Dub Dub, but no matching positive operations cash activity was found on the same date, same bucket and amount, or within two days.",
+      "detail": "savings"
+    },
+    {
+      "severity": "High",
+      "date": "2026-02-23",
+      "bucket": "Savings",
+      "amount": 40,
+      "source": "POS ledger",
+      "id": "4rfrlcx",
+      "reason": "POS shows cash sent from Dub Dub, but no matching positive operations cash activity was found on the same date, same bucket and amount, or within two days.",
+      "detail": "savings"
+    },
+    {
+      "severity": "High",
+      "date": "2026-02-24",
+      "bucket": "Savings",
+      "amount": 70,
+      "source": "POS ledger",
+      "id": "bbgo0j6",
+      "reason": "POS shows cash sent from Dub Dub, but no matching positive operations cash activity was found on the same date, same bucket and amount, or within two days.",
+      "detail": "savings"
+    },
+    {
+      "severity": "High",
+      "date": "2026-02-25",
+      "bucket": "Savings",
+      "amount": 560,
+      "source": "POS ledger",
+      "id": "ouxdul7",
+      "reason": "POS shows cash sent from Dub Dub, but no matching positive operations cash activity was found on the same date, same bucket and amount, or within two days.",
+      "detail": "Savings"
+    },
+    {
+      "severity": "High",
+      "date": "2026-02-26",
+      "bucket": "Savings",
+      "amount": 170,
+      "source": "POS ledger",
+      "id": "niz9wk1",
+      "reason": "POS shows cash sent from Dub Dub, but no matching positive operations cash activity was found on the same date, same bucket and amount, or within two days.",
+      "detail": "savings"
+    },
+    {
+      "severity": "High",
+      "date": "2026-02-27",
+      "bucket": "Savings",
+      "amount": 180,
+      "source": "POS ledger",
+      "id": "c5q8e41",
+      "reason": "POS shows cash sent from Dub Dub, but no matching positive operations cash activity was found on the same date, same bucket and amount, or within two days.",
+      "detail": "savings"
+    },
+    {
+      "severity": "High",
+      "date": "2026-02-28",
+      "bucket": "Savings",
+      "amount": 250,
+      "source": "POS ledger",
+      "id": "05kpn7a",
+      "reason": "POS shows cash sent from Dub Dub, but no matching positive operations cash activity was found on the same date, same bucket and amount, or within two days.",
+      "detail": "savings"
+    },
+    {
+      "severity": "High",
+      "date": "2026-03-01",
+      "bucket": "Savings",
+      "amount": 430,
+      "source": "POS ledger",
+      "id": "dsk0a4q",
+      "reason": "POS shows cash sent from Dub Dub, but no matching positive operations cash activity was found on the same date, same bucket and amount, or within two days.",
+      "detail": "Savings"
+    },
+    {
+      "severity": "High",
+      "date": "2026-03-03",
+      "bucket": "Savings",
+      "amount": 200,
+      "source": "POS ledger",
+      "id": "tpj7rtg",
+      "reason": "POS shows cash sent from Dub Dub, but no matching positive operations cash activity was found on the same date, same bucket and amount, or within two days.",
+      "detail": "Savings"
+    },
+    {
+      "severity": "High",
+      "date": "2026-03-04",
+      "bucket": "Savings",
+      "amount": 60,
+      "source": "POS ledger",
+      "id": "guvbozi",
+      "reason": "POS shows cash sent from Dub Dub, but no matching positive operations cash activity was found on the same date, same bucket and amount, or within two days.",
+      "detail": "Savings"
+    },
+    {
+      "severity": "High",
+      "date": "2026-03-05",
+      "bucket": "Savings",
+      "amount": 430,
+      "source": "POS ledger",
+      "id": "o51eg0b",
+      "reason": "POS shows cash sent from Dub Dub, but no matching positive operations cash activity was found on the same date, same bucket and amount, or within two days.",
+      "detail": "Savings"
+    },
+    {
+      "severity": "High",
+      "date": "2026-03-06",
+      "bucket": "Savings",
+      "amount": 160,
+      "source": "POS ledger",
+      "id": "hpy4rav",
+      "reason": "POS shows cash sent from Dub Dub, but no matching positive operations cash activity was found on the same date, same bucket and amount, or within two days.",
+      "detail": "savings"
+    },
+    {
+      "severity": "High",
+      "date": "2026-03-08",
+      "bucket": "Savings",
+      "amount": 160,
+      "source": "POS ledger",
+      "id": "ce0sie6",
+      "reason": "POS shows cash sent from Dub Dub, but no matching positive operations cash activity was found on the same date, same bucket and amount, or within two days.",
+      "detail": "Savings"
+    },
+    {
+      "severity": "High",
+      "date": "2026-03-09",
+      "bucket": "Savings",
+      "amount": 300,
+      "source": "POS ledger",
+      "id": "xevmx1b",
+      "reason": "POS shows cash sent from Dub Dub, but no matching positive operations cash activity was found on the same date, same bucket and amount, or within two days.",
+      "detail": "Savings"
+    },
+    {
+      "severity": "High",
+      "date": "2026-03-10",
+      "bucket": "Savings",
+      "amount": 250,
+      "source": "POS ledger",
+      "id": "j57w9jo",
+      "reason": "POS shows cash sent from Dub Dub, but no matching positive operations cash activity was found on the same date, same bucket and amount, or within two days.",
+      "detail": "Savings"
+    },
+    {
+      "severity": "High",
+      "date": "2026-03-11",
+      "bucket": "Savings",
+      "amount": 80,
+      "source": "POS ledger",
+      "id": "vfwjfp0",
+      "reason": "POS shows cash sent from Dub Dub, but no matching positive operations cash activity was found on the same date, same bucket and amount, or within two days.",
+      "detail": "Savings"
+    },
+    {
+      "severity": "High",
+      "date": "2026-03-12",
+      "bucket": "Savings",
+      "amount": 330,
+      "source": "POS ledger",
+      "id": "cqravlb",
+      "reason": "POS shows cash sent from Dub Dub, but no matching positive operations cash activity was found on the same date, same bucket and amount, or within two days.",
+      "detail": "savings"
+    },
+    {
+      "severity": "High",
+      "date": "2026-03-13",
+      "bucket": "Savings",
+      "amount": 320,
+      "source": "POS ledger",
+      "id": "0qjbtov",
+      "reason": "POS shows cash sent from Dub Dub, but no matching positive operations cash activity was found on the same date, same bucket and amount, or within two days.",
+      "detail": "savings"
+    },
+    {
+      "severity": "High",
+      "date": "2026-03-14",
+      "bucket": "Savings",
+      "amount": 260,
+      "source": "POS ledger",
+      "id": "z1pvtyq",
+      "reason": "POS shows cash sent from Dub Dub, but no matching positive operations cash activity was found on the same date, same bucket and amount, or within two days.",
+      "detail": "Savings"
+    },
+    {
+      "severity": "High",
+      "date": "2026-03-16",
+      "bucket": "Savings",
+      "amount": 70,
+      "source": "POS ledger",
+      "id": "3soweyk",
+      "reason": "POS shows cash sent from Dub Dub, but no matching positive operations cash activity was found on the same date, same bucket and amount, or within two days.",
+      "detail": "Savings"
+    },
+    {
+      "severity": "High",
+      "date": "2026-03-17",
+      "bucket": "Savings",
+      "amount": 200,
+      "source": "POS ledger",
+      "id": "ouwhyg9",
+      "reason": "POS shows cash sent from Dub Dub, but no matching positive operations cash activity was found on the same date, same bucket and amount, or within two days.",
+      "detail": "Savings"
+    },
+    {
+      "severity": "High",
+      "date": "2026-03-18",
+      "bucket": "Savings",
+      "amount": 110,
+      "source": "POS ledger",
+      "id": "m51w3hu",
+      "reason": "POS shows cash sent from Dub Dub, but no matching positive operations cash activity was found on the same date, same bucket and amount, or within two days.",
+      "detail": "Savings"
+    },
+    {
+      "severity": "High",
+      "date": "2026-03-21",
+      "bucket": "Savings",
+      "amount": 70,
+      "source": "POS ledger",
+      "id": "77yn8fs",
+      "reason": "POS shows cash sent from Dub Dub, but no matching positive operations cash activity was found on the same date, same bucket and amount, or within two days.",
+      "detail": "Savings"
+    },
+    {
+      "severity": "High",
+      "date": "2026-03-22",
+      "bucket": "Savings",
+      "amount": 360,
+      "source": "POS ledger",
+      "id": "pfxorb4",
+      "reason": "POS shows cash sent from Dub Dub, but no matching positive operations cash activity was found on the same date, same bucket and amount, or within two days.",
+      "detail": "Savings"
+    },
+    {
+      "severity": "High",
+      "date": "2026-03-23",
+      "bucket": "Savings",
+      "amount": 100,
+      "source": "POS ledger",
+      "id": "dwjt082",
+      "reason": "POS shows cash sent from Dub Dub, but no matching positive operations cash activity was found on the same date, same bucket and amount, or within two days.",
+      "detail": "Savings"
+    },
+    {
+      "severity": "High",
+      "date": "2026-03-25",
+      "bucket": "Savings",
+      "amount": 60,
+      "source": "POS ledger",
+      "id": "0vzzhkn",
+      "reason": "POS shows cash sent from Dub Dub, but no matching positive operations cash activity was found on the same date, same bucket and amount, or within two days.",
+      "detail": "Savings"
+    },
+    {
+      "severity": "High",
+      "date": "2026-03-26",
+      "bucket": "Savings",
+      "amount": 110,
+      "source": "POS ledger",
+      "id": "zc34yr0",
+      "reason": "POS shows cash sent from Dub Dub, but no matching positive operations cash activity was found on the same date, same bucket and amount, or within two days.",
+      "detail": "Savings"
+    },
+    {
+      "severity": "High",
+      "date": "2026-03-27",
+      "bucket": "Savings",
+      "amount": 200,
+      "source": "POS ledger",
+      "id": "nxo7wap",
+      "reason": "POS shows cash sent from Dub Dub, but no matching positive operations cash activity was found on the same date, same bucket and amount, or within two days.",
+      "detail": "Savings"
+    },
+    {
+      "severity": "High",
+      "date": "2026-03-28",
+      "bucket": "Savings",
+      "amount": 240,
+      "source": "POS ledger",
+      "id": "hw5dmtb",
+      "reason": "POS shows cash sent from Dub Dub, but no matching positive operations cash activity was found on the same date, same bucket and amount, or within two days.",
+      "detail": "Savings"
+    },
+    {
+      "severity": "High",
+      "date": "2026-03-29",
+      "bucket": "Blackbox",
+      "amount": 100,
+      "source": "POS ledger",
+      "id": "on3tn0a",
+      "reason": "POS shows cash sent from Dub Dub, but no matching positive operations cash activity was found on the same date, same bucket and amount, or within two days.",
+      "detail": "Black box"
+    },
+    {
+      "severity": "High",
+      "date": "2026-03-30",
+      "bucket": "Blackbox",
+      "amount": 50,
+      "source": "POS ledger",
+      "id": "nakzheg",
+      "reason": "POS shows cash sent from Dub Dub, but no matching positive operations cash activity was found on the same date, same bucket and amount, or within two days.",
+      "detail": "Black box"
+    },
+    {
+      "severity": "High",
+      "date": "2026-03-31",
+      "bucket": "Savings",
+      "amount": 180,
+      "source": "POS ledger",
+      "id": "k58l2r9",
+      "reason": "POS shows cash sent from Dub Dub, but no matching positive operations cash activity was found on the same date, same bucket and amount, or within two days.",
+      "detail": "Savings | Edited by Owner (owner-1) @ 2026-04-26T18:15:59.330Z | Prev: $100.00: Savings"
+    },
+    {
+      "severity": "High",
+      "date": "2026-04-01",
+      "bucket": "Blackbox",
+      "amount": 100,
+      "source": "POS ledger",
+      "id": "gkh1ibk",
+      "reason": "POS shows cash sent from Dub Dub, but no matching positive operations cash activity was found on the same date, same bucket and amount, or within two days.",
+      "detail": "Savings : Blackbox | Edited by Owner (owner-1) @ 2026-04-26T18:18:15.737Z | Prev: $210.00: Savings : Blackbox"
+    },
+    {
+      "severity": "High",
+      "date": "2026-04-02",
+      "bucket": "Savings",
+      "amount": 210,
+      "source": "POS ledger",
+      "id": "md8yrzi",
+      "reason": "POS shows cash sent from Dub Dub, but no matching positive operations cash activity was found on the same date, same bucket and amount, or within two days.",
+      "detail": "Savings"
+    },
+    {
+      "severity": "High",
+      "date": "2026-04-03",
+      "bucket": "Blackbox",
+      "amount": 210,
+      "source": "POS ledger",
+      "id": "ahy4po4",
+      "reason": "POS shows cash sent from Dub Dub, but no matching positive operations cash activity was found on the same date, same bucket and amount, or within two days.",
+      "detail": "Black box "
+    },
+    {
+      "severity": "High",
+      "date": "2026-04-04",
+      "bucket": "Savings",
+      "amount": 80,
+      "source": "POS ledger",
+      "id": "jl0c7xr",
+      "reason": "POS shows cash sent from Dub Dub, but no matching positive operations cash activity was found on the same date, same bucket and amount, or within two days.",
+      "detail": "Savings"
+    },
+    {
+      "severity": "High",
+      "date": "2026-04-06",
+      "bucket": "Blackbox",
+      "amount": 120,
+      "source": "POS ledger",
+      "id": "1gz846n",
+      "reason": "POS shows cash sent from Dub Dub, but no matching positive operations cash activity was found on the same date, same bucket and amount, or within two days.",
+      "detail": "Savings : Blackbox"
+    },
+    {
+      "severity": "High",
+      "date": "2026-04-07",
+      "bucket": "Blackbox",
+      "amount": 120,
+      "source": "POS ledger",
+      "id": "omimsdf",
+      "reason": "POS shows cash sent from Dub Dub, but no matching positive operations cash activity was found on the same date, same bucket and amount, or within two days.",
+      "detail": "Black box"
+    },
+    {
+      "severity": "High",
+      "date": "2026-04-08",
+      "bucket": "Savings",
+      "amount": 60,
+      "source": "POS ledger",
+      "id": "ehe5ksd",
+      "reason": "POS shows cash sent from Dub Dub, but no matching positive operations cash activity was found on the same date, same bucket and amount, or within two days.",
+      "detail": "savings"
+    },
+    {
+      "severity": "High",
+      "date": "2026-04-11",
+      "bucket": "Blackbox",
+      "amount": 360,
+      "source": "POS ledger",
+      "id": "s8zx2lb",
+      "reason": "POS shows cash sent from Dub Dub, but no matching positive operations cash activity was found on the same date, same bucket and amount, or within two days.",
+      "detail": "Black box | Edited by Owner (owner-1) @ 2026-04-26T18:41:12.848Z | Prev: $360.00: Black box | Edited by Owner (owner-1) @ 2026-04-26T18:41:25.835Z | Prev: $160.00: Black box | Edited by Owner (owner-1) @ 2026-04-26T18:41:12.848Z | Prev: $360.00: Black box | Edited by Owner (owner-1) @ 2026-04-26T18:41:37.655Z | Prev: $200.00: Black box | Edited by Owner (owner-1) @ 2026-04-26T18:41:12.848Z | Prev: $360.00: Black box | Edited by Owner (owner-1) @ 2026-04-26T18:41:25.835Z | Prev: $160.00: Black box | Edited by Owner (owner-1) @ 2026-04-26T18:41:12.848Z | Prev: $360.00: Black box | Edited by Owner (owner-1) @ 2026-04-26T18:43:36.379Z | Prev: $320.00: Black box | Edited by Owner (owner-1) @ 2026-04-26T18:41:12.848Z | Prev: $360.00: Black box | Edited by Owner (owner-1) @ 2026-04-26T18:41:25.835Z | Prev: $160.00: Black box | Edited by Owner (owner-1) @ 2026-04-26T18:41:12.848Z | Prev: $360.00: Black box | Edited by Owner (owner-1) @ 2026-04-26T18:41:37.655Z | Prev: $200.00: Black box | Edited by Owner (owner-1) @ 2026-04-26T18:41:12.848Z | Prev: $360.00: Black box | Edited by Owner (owner-1) @ 2026-04-26T18:41:25.835Z | Prev: $160.00: Black box | Edited by Owner (owner-1) @ 2026-04-26T18:41:12.848Z | Prev: $360.00: Black box"
+    },
+    {
+      "severity": "High",
+      "date": "2026-04-12",
+      "bucket": "Savings",
+      "amount": 70,
+      "source": "POS ledger",
+      "id": "9fcxm76",
+      "reason": "POS shows cash sent from Dub Dub, but no matching positive operations cash activity was found on the same date, same bucket and amount, or within two days.",
+      "detail": "savings"
+    },
+    {
+      "severity": "High",
+      "date": "2026-04-14",
+      "bucket": "Blackbox",
+      "amount": 180,
+      "source": "POS ledger",
+      "id": "dj3b8yp",
+      "reason": "POS shows cash sent from Dub Dub, but no matching positive operations cash activity was found on the same date, same bucket and amount, or within two days.",
+      "detail": "Black box "
+    },
+    {
+      "severity": "High",
+      "date": "2026-04-15",
+      "bucket": "Blackbox",
+      "amount": 320,
+      "source": "POS ledger",
+      "id": "jfme0oa",
+      "reason": "POS shows cash sent from Dub Dub, but no matching positive operations cash activity was found on the same date, same bucket and amount, or within two days.",
+      "detail": "Black box "
+    },
+    {
+      "severity": "High",
+      "date": "2026-04-16",
+      "bucket": "Savings",
+      "amount": 90,
+      "source": "POS ledger",
+      "id": "pq1go60",
+      "reason": "POS shows cash sent from Dub Dub, but no matching positive operations cash activity was found on the same date, same bucket and amount, or within two days.",
+      "detail": "savings"
+    },
+    {
+      "severity": "High",
+      "date": "2026-04-18",
+      "bucket": "Blackbox",
+      "amount": 220,
+      "source": "POS ledger",
+      "id": "oqmg6yw",
+      "reason": "POS shows cash sent from Dub Dub, but no matching positive operations cash activity was found on the same date, same bucket and amount, or within two days.",
+      "detail": "Black box "
+    },
+    {
+      "severity": "High",
+      "date": "2026-04-19",
+      "bucket": "Savings",
+      "amount": 190,
+      "source": "POS ledger",
+      "id": "5vbe6s5",
+      "reason": "POS shows cash sent from Dub Dub, but no matching positive operations cash activity was found on the same date, same bucket and amount, or within two days.",
+      "detail": "savings"
+    },
+    {
+      "severity": "High",
+      "date": "2026-04-20",
+      "bucket": "Blackbox",
+      "amount": 240,
+      "source": "POS ledger",
+      "id": "c9brxws",
+      "reason": "POS shows cash sent from Dub Dub, but no matching positive operations cash activity was found on the same date, same bucket and amount, or within two days.",
+      "detail": "Black box "
+    },
+    {
+      "severity": "High",
+      "date": "2026-04-26",
+      "bucket": "Blackbox",
+      "amount": 20,
+      "source": "POS ledger",
+      "id": "v7of1kt",
+      "reason": "POS shows cash sent from Dub Dub, but no matching positive operations cash activity was found on the same date, same bucket and amount, or within two days.",
+      "detail": "Black box  | Edited by Owner (owner-1) @ 2026-04-26T16:55:09.514Z | Prev: $170.00: Black box  | Edited by Owner (owner-1) @ 2026-04-26T16:55:20.878Z | Prev: $0.00: Black box  | Edited by Owner (owner-1) @ 2026-04-26T16:55:09.514Z | Prev: $170.00: Black box "
+    },
+    {
+      "severity": "High",
+      "date": "2026-04-20",
+      "bucket": "Savings",
+      "amount": 240,
+      "source": "Operations ledger",
+      "id": "5abbe365-90fb-43b8-9ad3-495a47be4b2c",
+      "reason": "Operations shows cash activity for Dub Dub, but no matching POS ledger transfer was found.",
+      "detail": "eod_deposit Savings"
+    },
+    {
+      "severity": "High",
+      "date": "2026-04-26",
+      "bucket": "Blackbox",
+      "amount": 170,
+      "source": "Operations ledger",
+      "id": "9223dc59-a240-4af8-88ed-22cc4fbc7cb9",
+      "reason": "Operations shows cash activity for Dub Dub, but no matching POS ledger transfer was found.",
+      "detail": "eod_deposit Black box  Auto-routed from POS expense: Manual deposit"
+    },
+    {
+      "severity": "Medium",
+      "date": "2026-03-19",
+      "bucket": "Savings",
+      "amount": 330,
+      "source": "POS ledger / Operations ledger",
+      "id": "csqf6oq -> 13b26ad0-1605-4c31-bb23-47384aef06db",
+      "reason": "Matched only by amount and bucket within two days. POS date 2026-03-19; operations date 2026-03-20.",
+      "detail": "Savings"
+    },
+    {
+      "severity": "Medium",
+      "date": "2026-02-14",
+      "bucket": "Savings",
+      "amount": 820,
+      "source": "POS ledger",
+      "id": "8e4eoc8",
+      "reason": "Amount is high versus the observed distribution. Outlier threshold used: $500.00.",
+      "detail": "savings"
+    },
+    {
+      "severity": "Medium",
+      "date": "2026-02-25",
+      "bucket": "Savings",
+      "amount": 560,
+      "source": "POS ledger",
+      "id": "ouxdul7",
+      "reason": "Amount is high versus the observed distribution. Outlier threshold used: $500.00.",
+      "detail": "Savings"
+    },
+    {
+      "severity": "Medium",
+      "date": "2026-06-28",
+      "bucket": "Blackbox",
+      "amount": 630,
+      "source": "POS ledger",
+      "id": "tilxqxy",
+      "reason": "Amount is high versus the observed distribution. Outlier threshold used: $500.00.",
+      "detail": "Black box "
+    },
+    {
+      "severity": "Medium",
+      "date": "2026-07-02",
+      "bucket": "Blackbox",
+      "amount": 500,
+      "source": "POS ledger",
+      "id": "7tlew8w",
+      "reason": "Amount is high versus the observed distribution. Outlier threshold used: $500.00.",
+      "detail": "Black box "
+    },
+    {
+      "severity": "Medium",
+      "date": "2026-06-28",
+      "bucket": "Blackbox",
+      "amount": 630,
+      "source": "Operations ledger",
+      "id": "8e024d82-1c9e-44aa-86bb-efee7a6b5c9e",
+      "reason": "Amount is high versus the observed distribution. Outlier threshold used: $500.00.",
+      "detail": "overhead_contribution Black box  Auto-routed from POS expense: Overhead contribution"
+    },
+    {
+      "severity": "Medium",
+      "date": "2026-07-02",
+      "bucket": "Blackbox",
+      "amount": 500,
+      "source": "Operations ledger",
+      "id": "d760e523-5d9f-4a73-b552-01b757302828",
+      "reason": "Amount is high versus the observed distribution. Outlier threshold used: $500.00.",
+      "detail": "blackbox Black box  Auto-routed from POS expense: Black Box deposit"
+    },
+    {
+      "severity": "Low",
+      "date": "2026-01-02",
+      "bucket": "Savings",
+      "amount": 0,
+      "source": "POS ledger",
+      "id": "yw262jg",
+      "reason": "Zero-value row excluded from totals because it is not actual cash movement.",
+      "detail": "Savings | Edited by Owner (owner-1) @ 2026-04-27T07:57:59.717Z | Prev: $210.00: Savings"
+    },
+    {
+      "severity": "Low",
+      "date": "2026-01-02",
+      "bucket": "Savings",
+      "amount": 0,
+      "source": "POS ledger",
+      "id": "qneh16m",
+      "reason": "Zero-value row excluded from totals because it is not actual cash movement.",
+      "detail": "savings | Edited by Owner (owner-1) @ 2026-04-27T07:58:36.960Z | Prev: $210.00: savings"
+    }
+  ],
+  "executiveSummary": [
+    "Dub Dub POS records show $33,980.00 sent to Savings / Black Box from January 1 to July 31, 2026, but operations cash activity only shows $16,220.00 for the same shop and buckets.",
+    "The unexplained gap is $17,760.00 before any manual correction: $18,170.00 is in POS with no matching operations cash activity, while $410.00 is in operations with no matching POS transfer.",
+    "Only 82 POS rows matched a positive operations cash row. 92 POS transfer rows and 2 operations cash rows need review.",
+    "Drift resets were excluded. Zero-value edit-history rows were also excluded from actual totals and listed only as low-priority data hygiene flags."
+  ],
+  "highAmountThreshold": 500
+}
