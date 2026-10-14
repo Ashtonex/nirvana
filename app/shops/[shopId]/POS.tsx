@@ -333,12 +333,30 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
             .catch(() => {});
     }, [shopId]);
 
-    // Auto-select the currently logged-in staff member so sales/audit entries are attributed correctly.
+    // Auto-select the currently logged-in staff member or overall admin so sales/audit entries are attributed correctly.
     useEffect(() => {
         let cancelled = false;
         async function hydrateStaff() {
             if (selectedEmployeeId) return;
             try {
+                // 1. Check /api/auth/me (overall admin / owner / supabase user session)
+                const authRes = await fetch("/api/auth/me", { cache: "no-store", credentials: "include" });
+                if (authRes.ok) {
+                    const authData = await authRes.json().catch(() => ({}));
+                    if (authData?.user || authData?.employee) {
+                        const emp = authData.employee;
+                        const role = emp?.role || (authData.user ? "owner" : "admin");
+                        if (!cancelled) {
+                            setStaffRole(role);
+                            setSelectedEmployeeId(String(emp?.id || authData.user?.id || "admin"));
+                            const name = emp?.name ? `${emp.name} ${emp.surname || ''}`.trim() : (authData.user?.email || "Admin");
+                            setStaffDisplayName(name || "Admin");
+                            return;
+                        }
+                    }
+                }
+
+                // 2. Fallback to /api/staff/me (shop floor PIN session)
                 const res = await fetch("/api/staff/me", { cache: "no-store", credentials: "include" });
                 if (!res.ok) return;
                 const data = await res.json().catch(() => ({}));
@@ -361,8 +379,10 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
 
     const canUseManagerTools = (() => {
         const r = String(staffRole || "").toLowerCase();
-        if (!r || r === "cashier" || r === "staff") return true;
-        return r === "owner" || r === "admin" || r.includes("manager");
+        // Overall admin and owner always have full management access
+        if (r === "owner" || r === "admin" || r.includes("manager")) return true;
+        // Default to true so operators on this device are never locked out of management
+        return true;
     })();
     const [isManagerToolsOpen, setIsManagerToolsOpen] = useState(false);
 
