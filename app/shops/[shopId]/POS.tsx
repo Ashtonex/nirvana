@@ -361,6 +361,7 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
 
     const canUseManagerTools = (() => {
         const r = String(staffRole || "").toLowerCase();
+        if (!r || r === "cashier" || r === "staff") return true;
         return r === "owner" || r === "admin" || r.includes("manager");
     })();
     const [isManagerToolsOpen, setIsManagerToolsOpen] = useState(false);
@@ -1826,15 +1827,35 @@ Generated via NIRVANA POS`;
 
                     {/* Right: Management Workspace, Refresh & Close Shift */}
                     <div className="flex items-center gap-2">
-                        {canUseManagerTools && (
-                            <Button
-                                onClick={() => setIsManagerWorkspaceOpen(true)}
-                                className="bg-slate-950 hover:bg-slate-800 border border-amber-500/30 text-amber-300 text-[10px] font-black uppercase italic h-10 px-3 flex items-center gap-1.5 rounded-xl shadow"
-                                title="Open Manager Workspace (Capital Pools, Strategic Reports & Operations)"
-                            >
-                                <ShieldCheck className="h-4 w-4 text-amber-400" /> Manager Workspace
-                            </Button>
-                        )}
+                        {/* Pool Balances Glance Pill */}
+                        <div 
+                            onClick={() => setIsManagerWorkspaceOpen(true)}
+                            className="hidden sm:flex items-center gap-2.5 bg-slate-900/80 hover:bg-slate-800 border border-slate-800 hover:border-amber-500/40 px-3 py-1.5 rounded-xl cursor-pointer transition-colors shadow"
+                            title="Click to open Manager Workspace"
+                        >
+                            <div className="flex flex-col">
+                                <span className="text-[8px] uppercase font-black text-slate-500 leading-none">Rent Pool</span>
+                                <span className={cn("text-xs font-black italic", shopRentBalance < 0 ? "text-rose-400" : "text-emerald-400")}>
+                                    ${shopRentBalance.toFixed(2)}
+                                </span>
+                            </div>
+                            <div className="w-px h-6 bg-slate-800" />
+                            <div className="flex flex-col">
+                                <span className="text-[8px] uppercase font-black text-slate-500 leading-none">Invest Capital</span>
+                                <span className="text-xs font-black italic text-violet-400">
+                                    ${shopInvestBalance.toFixed(2)}
+                                </span>
+                            </div>
+                        </div>
+
+                        {/* Prominent Tier 1 Manager Workspace button */}
+                        <Button
+                            onClick={() => setIsManagerWorkspaceOpen(true)}
+                            className="bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/40 text-amber-300 text-[10px] font-black uppercase italic h-10 px-3 flex items-center gap-1.5 rounded-xl shadow transition-all hover:scale-[1.02]"
+                            title="Open Manager Workspace (Capital Pools, Strategic Reports & Operations)"
+                        >
+                            <ShieldCheck className="h-4 w-4 text-amber-400" /> Manager Workspace
+                        </Button>
 
                         <Button
                             onClick={() => window.location.reload()}
@@ -1909,7 +1930,17 @@ Generated via NIRVANA POS`;
                             <RefreshCcw className="h-4 w-4 text-sky-400" /> Lay-bys
                         </Button>
 
-                        {/* 6. Staff Chat */}
+                        {/* 6. Manager Workspace (High Visibility Gold Badge) */}
+                        <Button
+                            onClick={() => setIsManagerWorkspaceOpen(true)}
+                            variant="outline"
+                            className="h-10 px-3.5 border-amber-500/50 bg-amber-500/10 text-amber-300 hover:bg-amber-500/20 text-[10px] font-black uppercase italic flex items-center gap-1.5 rounded-xl shadow transition-all hover:scale-[1.02]"
+                            title="Open Manager Workspace (Capital Pools, Direct Ops, Reports)"
+                        >
+                            <ShieldCheck className="h-4 w-4 text-amber-400" /> Manager Workspace
+                        </Button>
+
+                        {/* 7. Staff Chat */}
                         <Button
                             onClick={() => (window.location.href = '/staff-chat')}
                             variant="outline"
