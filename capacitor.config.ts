@@ -1,13 +1,18 @@
 import type { CapacitorConfig } from '@capacitor/cli';
 
+// When CAPACITOR_SERVER_URL is provided, Capacitor loads the remote deployment.
+// Otherwise, it runs offline from locally bundled assets in public/out.
+const serverUrl = process.env.CAPACITOR_SERVER_URL;
+
 const config: CapacitorConfig = {
   appId: 'com.nirvana.pos',
   appName: 'Nirvana POS',
   webDir: 'public',
-  server: {
-    // Mobile app loads from your hosted Vercel site
-    url: 'https://nirvana-ten-zeta.vercel.app',
+  server: serverUrl ? {
+    url: serverUrl,
     cleartext: true,
+    androidScheme: 'https'
+  } : {
     androidScheme: 'https'
   },
   ios: {

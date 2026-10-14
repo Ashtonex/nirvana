@@ -61,6 +61,8 @@ import {
 } from "../../actions";
 import { useOfflineSales } from "@/components/useOfflineSales";
 import { thermalPrinter } from "@/lib/thermalPrinter";
+import { CategoryBar, ProductGrid, TenderModal, CashierSwitchModal, RegisterDrawerModal } from "@/components/pos";
+import { cacheCatalogForShop, getLocalCatalogForShop } from "@/lib/local-db";
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
@@ -184,6 +186,89 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
                 item.category?.toLowerCase().includes(query));
         });
     }, [groupedInventory, deferredSearchTerm, shopId]);
+
+    // Loyverse UI Enhancements
+    const [selectedCategory, setSelectedCategory] = useState<string>('ALL');
+    const [isTenderModalOpen, setIsTenderModalOpen] = useState(false);
+    const [isCashierSwitchModalOpen, setIsCashierSwitchModalOpen] = useState(false);
+    const [isRegisterDrawerModalOpen, setIsRegisterDrawerModalOpen] = useState(false);
+
+    // Dynamic category extraction
+    const categories = useMemo(() => {
+        const set = new Set<string>();
+        for (const item of groupedInventory) {
+            if (item.category) set.add(item.category);
+        }
+        return Array.from(set).sort();
+    }, [groupedInventory]);
+
+    const categoryCounts = useMemo(() => {
+        const counts: Record<string, number> = { ALL: 0 };
+        for (const item of groupedInventory) {
+            const isServiceOrAdhoc = item.id?.startsWith("service_") || item.id?.startsWith("adhoc");
+            if (item.shopQuantity > 0 || isServiceOrAdhoc) {
+                counts.ALL = (counts.ALL || 0) + 1;
+                const cat = item.category || 'General';
+                counts[cat] = (counts[cat] || 0) + 1;
+            }
+        }
+        return counts;
+    }, [groupedInventory]);
+
+    // Fast, touch-friendly Loyverse product listing
+    const displayProducts = useMemo(() => {
+        const query = deferredSearchTerm.toLowerCase().trim();
+        return groupedInventory.filter((item: any) => {
+            const isServiceOrAdhoc = item.id?.startsWith("service_") || item.id?.startsWith("adhoc");
+            if (item.shopQuantity <= 0 && !isServiceOrAdhoc) {
+                return false;
+            }
+
+            if (shopId === "tshirts") {
+                try {
+                    const { classifyTeeLine } = require("@/lib/tshirts");
+                    if (classifyTeeLine(item) === "unknown") return false;
+                } catch {}
+            }
+
+            if (selectedCategory !== 'ALL' && item.category !== selectedCategory) {
+                return false;
+            }
+
+            if (query) {
+                const nameMatches = item.name?.toLowerCase().includes(query);
+                const catMatches = item.category?.toLowerCase().includes(query);
+                const skuMatches = item.sku?.toLowerCase().includes(query);
+                return nameMatches || catMatches || skuMatches;
+            }
+
+            return true;
+        }).map((item: any) => {
+            const defaultSellingPrice = Math.round(((item.landedCost || 10) * 1.4) * 1.155 * 100) / 100;
+            return {
+                ...item,
+                sellingPrice: item.price || item.sellingPrice || defaultSellingPrice
+            };
+        });
+    }, [groupedInventory, deferredSearchTerm, selectedCategory, shopId]);
+
+    // Local catalog cache for instantaneous offline launches
+    useEffect(() => {
+        if (displayProducts.length > 0) {
+            const catalogToCache = displayProducts.map((p: any) => ({
+                id: p.id,
+                name: p.name,
+                category: p.category || 'General',
+                price: Number(p.sellingPrice || 0),
+                shopQuantity: Number(p.shopQuantity || 0),
+                shopId,
+                landedCost: Number(p.landedCost || 0),
+                sku: p.sku || p.id,
+                updatedAt: new Date().toISOString()
+            }));
+            cacheCatalogForShop(shopId, catalogToCache).catch(() => {});
+        }
+    }, [displayProducts, shopId]);
 
     // POS Modes
     const [posMode, setPosMode] = useState<'sale' | 'quote' | 'layby'>('sale');
@@ -2067,13 +2152,35 @@ Generated via NIRVANA POS`;
                 </Modal>
 
                 <div className="flex gap-1.5 sm:gap-2 w-full mt-4 sm:mt-0 sm:w-auto overflow-x-auto pb-2 scrollbar-hide px-2 sm:px-0">
-                    <div className="bg-slate-900 border border-slate-800 px-2 sm:px-3 py-2 rounded-lg flex items-center gap-2 sm:gap-3 h-10 shadow-lg min-w-max">
-                        <Coins className="h-4 w-4 text-emerald-400" />
-                        <div className="flex flex-col">
+                    {/* Cashier Quick Switch Button (1s Local PIN) */}
+                    <button
+                        type="button"
+                        onClick={() => setIsCashierSwitchModalOpen(true)}
+                        className="bg-slate-900 border border-slate-800 hover:border-violet-500/60 px-2 sm:px-3 py-2 rounded-lg flex items-center gap-2 sm:gap-3 h-10 shadow-lg min-w-max transition-all cursor-pointer group"
+                        title="Switch Cashier (1s PIN Verification)"
+                    >
+                        <Users className="h-4 w-4 text-violet-400 group-hover:scale-110 transition-transform" />
+                        <div className="flex flex-col text-left">
+                            <span className="text-[9px] sm:text-[10px] text-slate-500 uppercase font-black leading-none">Cashier</span>
+                            <span className="text-xs font-bold text-slate-200 truncate max-w-[80px]">
+                                {staffDisplayName || (employees.find((e: any) => e.id === selectedEmployeeId)?.name) || "Select"}
+                            </span>
+                        </div>
+                    </button>
+
+                    {/* Cash Drawer Management (Open float / Outflow / Close) */}
+                    <button
+                        type="button"
+                        onClick={() => setIsRegisterDrawerModalOpen(true)}
+                        className="bg-slate-900 border border-slate-800 hover:border-emerald-500/60 px-2 sm:px-3 py-2 rounded-lg flex items-center gap-2 sm:gap-3 h-10 shadow-lg min-w-max transition-all cursor-pointer group"
+                        title="Manage Register Drawer (Open Float, Expenses, Close)"
+                    >
+                        <Coins className="h-4 w-4 text-emerald-400 group-hover:scale-110 transition-transform" />
+                        <div className="flex flex-col text-left">
                             <span className="text-[9px] sm:text-[10px] text-slate-500 uppercase font-black leading-none">Drawer</span>
                             <span className="text-xs font-bold text-slate-200">${liveCashInDrawer.toFixed(2)}</span>
                         </div>
-                    </div>
+                    </button>
 
                     <div className="bg-slate-900 border border-slate-800 px-2 sm:px-3 py-2 rounded-lg flex items-center gap-2 sm:gap-3 h-10 shadow-lg min-w-max">
                         <AlertCircle className="h-4 w-4 text-rose-400" />
@@ -2147,117 +2254,44 @@ Generated via NIRVANA POS`;
                     </div>
                 </div>
 
-                {!searchTerm ? (
-                    <div className="flex flex-col items-center justify-center py-12 bg-slate-900/20 border border-dashed border-slate-800 rounded-2xl">
-                        <Search className="h-8 w-8 text-slate-700 mb-3" />
-                        <p className="text-[10px] text-slate-500 font-black uppercase tracking-widest">Search for a product to add to cart</p>
-                    </div>
-                ) : filteredInventory.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center py-20 bg-slate-900/40 border border-dashed border-slate-800 rounded-2xl">
+                {/* Loyverse Category Pill Filter Bar */}
+                <div className="space-y-2">
+                    <CategoryBar
+                        categories={categories}
+                        selectedCategory={selectedCategory}
+                        onSelectCategory={setSelectedCategory}
+                        categoryCounts={categoryCounts}
+                    />
+                </div>
+
+                {/* Loyverse Touch-First Product Grid */}
+                {displayProducts.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-20 bg-slate-900/40 border border-dashed border-slate-800 rounded-3xl">
                         <PackagePlus className="h-12 w-12 text-slate-700 mb-4" />
-                        <p className="text-slate-400 font-bold uppercase text-xs">No products found for "{searchTerm}"</p>
-                        <Button
-                            variant="outline"
-                            className="mt-4 border-violet-500/50 text-violet-400 text-[10px] font-black uppercase italic"
-                            onClick={() => {
-                                setNewProduct({ ...newProduct, name: searchTerm, initialStock: "0" });
-                                setIsAddProductModalOpen(true);
-                            }}
-                        >
-                            Add "{searchTerm}" as new product
-                        </Button>
+                        <p className="text-slate-400 font-bold uppercase text-xs">
+                            {searchTerm ? `No products found for "${searchTerm}"` : `No items in category "${selectedCategory}"`}
+                        </p>
+                        {searchTerm && (
+                            <Button
+                                variant="outline"
+                                className="mt-4 border-violet-500/50 text-violet-400 text-[10px] font-black uppercase italic"
+                                onClick={() => {
+                                    setNewProduct({ ...newProduct, name: searchTerm, initialStock: "0" });
+                                    setIsAddProductModalOpen(true);
+                                }}
+                            >
+                                Add "{searchTerm}" as new product
+                            </Button>
+                        )}
                     </div>
                 ) : (
-                    <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
-                        {filteredInventory.map((item) => {
-                            // Show shop allocation instead of total global stock
-                            const allocation = item.allocations?.find((a: any) => a.shopId === shopId);
-                            const qtyAtShop = allocation ? allocation.quantity : 0;
-                            const totalNetworkStock = item.quantity || 0;
-
-                            const dynamicOverhead = totalShopStock > 0 ? (shopExpenses as number) / totalShopStock : 0;
-                            const baseCost = (item.landedCost || 0) + dynamicOverhead;
-
-                            const shipment = db.shipments?.find((s: any) => s.id === item.shipmentId);
-                            const supplier = shipment?.supplier || "Global Provider";
-
-                            const daysInStock = Math.floor((new Date().getTime() - new Date(item.dateAdded).getTime()) / (1000 * 3600 * 24));
-                            const totalInventoryCount = inventoryState.reduce((sum, i) => sum + i.quantity, 0);
-                            const totalGlobalOverhead = db.globalExpenses ? Object.values(db.globalExpenses).reduce((acc: number, val: any) => acc + Number(val), 0) : 0;
-                            const dailyBleed = totalInventoryCount > 0 ? (totalGlobalOverhead / 30) / totalInventoryCount : 0;
-                            const cumulativeBleed = dailyBleed * daysInStock;
-
-                            const minRecovery = (item.landedCost + cumulativeBleed) * 1.155;
-                            const suggestions = [
-                                { label: "Recovery", price: minRecovery, color: "text-rose-400", icon: <Skull className="h-3 w-3" /> },
-                                { label: "Conservative", price: (item.landedCost * 1.2) * 1.155, color: "text-amber-400", icon: <Coins className="h-3 w-3" /> },
-                                { label: "Balanced", price: (item.landedCost * 1.4) * 1.155, color: "text-emerald-400", icon: <TrendingUp className="h-3 w-3" /> },
-                                { label: "Performance", price: (item.landedCost * 1.6) * 1.155, color: "text-sky-400", icon: <Sparkles className="h-3 w-3" /> },
-                                { label: "Premium", price: (item.landedCost * 1.8) * 1.155, color: "text-violet-400", icon: <BadgeCheck className="h-3 w-3" /> },
-                            ];
-
-                            const isZombie = daysInStock > 60;
-
-                            return (
-                                <Card key={item.id} className={cn("group transition-all duration-300 bg-slate-900/40 border-slate-800/50 overflow-hidden relative", (qtyAtShop > 0 || item.id.startsWith('adhoc')) ? "hover:border-violet-500/50" : "opacity-30 grayscale")}>
-                                    <div className="absolute top-0 right-0 p-2 z-20">
-                                        {isZombie && (
-                                            <Badge className="bg-rose-500/10 text-rose-500 border-rose-500/10 text-[8px] font-black uppercase flex items-center gap-1">
-                                                <Skull className="h-2 w-2" /> Zombie
-                                            </Badge>
-                                        )}
-                                    </div>
-
-                                    <CardContent className="pt-6">
-                                        <div className="flex justify-between items-start mb-2">
-                                            <Badge variant="outline" className="text-[9px] uppercase font-black tracking-widest text-slate-500 bg-slate-900/50 border-slate-800 px-2 py-0">
-                                                {item.category}
-                                            </Badge>
-                                            <div className="text-right">
-                                                <span className="text-sm font-black block italic tracking-tighter text-white">
-                                                    ${minRecovery.toFixed(2)} <span className="text-[10px] text-slate-600 font-normal">Min</span>
-                                                </span>
-                                            </div>
-                                        </div>
-                                        <h3 className="font-semibold text-slate-100 truncate mb-1">{item.name}</h3>
-                                        <div className="flex items-center gap-1.5 opacity-70 mb-4">
-                                            <Truck className="h-3 w-3 text-slate-500" />
-                                            <span className="text-[10px] text-slate-400 uppercase font-bold">{supplier}</span>
-                                        </div>
-
-                                        <div className="space-y-1.5 border-t border-slate-800/50 pt-4 mt-2">
-                                            <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 flex items-center gap-2">
-                                                <Sparkles className="h-3 w-3 text-violet-400" /> Oracle Suggestions
-                                            </p>
-                                            <div className="grid grid-cols-1 gap-1">
-                                                {suggestions.map((s, idx) => (
-                                                    <button
-                                                        key={idx}
-                                                        onClick={() => (qtyAtShop > 0 || item.id.startsWith('adhoc')) && addToCart(item, s.price)}
-                                                        className="flex items-center justify-between p-2 rounded-lg bg-slate-950/50 border border-slate-800 hover:border-violet-500/50 hover:bg-slate-900 transition-all group/btn"
-                                                    >
-                                                        <div className="flex items-center gap-2">
-                                                            <div className={cn("p-1 rounded bg-slate-900", s.color)}>{s.icon}</div>
-                                                            <span className="text-[10px] font-black uppercase tracking-tight text-slate-400 group-hover/btn:text-slate-200">{s.label}</span>
-                                                        </div>
-                                                        <span className={cn("text-xs font-black italic", s.color)}>${s.price.toFixed(2)}</span>
-                                                    </button>
-                                                ))}
-                                            </div>
-                                        </div>
-
-                                        <div className="mt-4 pt-3 border-t border-slate-800/50 flex justify-between items-center bg-slate-950/30 -mx-6 -mb-6 px-6 py-4">
-                                            <div className="flex flex-col">
-                                                <span className="text-[10px] text-slate-500 uppercase font-black leading-none">In Shop</span>
-                                                <span className="text-xs font-bold text-slate-200">{qtyAtShop} Units</span>
-                                            </div>
-                                            <div className={cn("h-2 w-2 rounded-full", qtyAtShop < 5 ? "bg-rose-500 animate-pulse" : "bg-emerald-500")} />
-                                        </div>
-                                    </CardContent>
-                                </Card>
-                            );
-                        })}
-                    </div>
+                    <ProductGrid
+                        items={displayProducts}
+                        onAddToCart={(item) => {
+                            const defaultPrice = Number(item.sellingPrice || Math.round(((item.landedCost || 10) * 1.4) * 1.155 * 100) / 100);
+                            addToCart(item, defaultPrice);
+                        }}
+                    />
                 )}
             </div>
 
@@ -2466,22 +2500,73 @@ Generated via NIRVANA POS`;
 
                     <Button
                         className={cn(
-                            "w-full h-14 font-black text-sm uppercase italic tracking-[0.2em] rounded-xl",
-                            posMode === 'sale' ? "bg-emerald-600 hover:bg-emerald-500" :
+                            "w-full h-14 font-black text-sm uppercase italic tracking-[0.2em] rounded-xl cursor-pointer shadow-xl",
+                            posMode === 'sale' ? "bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-950/40" :
                                 posMode === 'layby' ? "bg-sky-600 hover:bg-sky-500" :
                                     "bg-amber-600 hover:bg-amber-500"
                         )}
                         disabled={cart.length === 0 || isPending}
-                        onClick={handleCheckout}
+                        onClick={() => {
+                            if (posMode === 'sale') {
+                                setIsTenderModalOpen(true);
+                            } else {
+                                handleCheckout();
+                            }
+                        }}
                     >
                         {isPending ? <RefreshCcw className="h-5 w-5 animate-spin" /> :
-                            posMode === 'sale' ? "Execute Sale" :
+                            posMode === 'sale' ? `Charge $${totalDue.toFixed(2)}` :
                                 posMode === 'layby' ? "Confirm Lay-by" :
                                     "Process Quote"
                         }
                     </Button>
                 </CardContent>
             </Card>
+
+            {/* Loyverse Tender Modal */}
+            <TenderModal
+                isOpen={isTenderModalOpen}
+                onClose={() => setIsTenderModalOpen(false)}
+                totalDue={totalDue}
+                defaultClientName={clientName}
+                defaultClientPhone={clientPhone}
+                onCompletePayment={async (tenderData) => {
+                    setPaymentMethod(tenderData.paymentMethod === 'card' ? 'cash' : tenderData.paymentMethod);
+                    if (tenderData.clientName) setClientName(tenderData.clientName);
+                    if (tenderData.clientPhone) setClientPhone(tenderData.clientPhone);
+                    await handleCheckout();
+                }}
+            />
+
+            {/* 1-Second Cashier Switch Modal (Salted Hash PIN) */}
+            <CashierSwitchModal
+                isOpen={isCashierSwitchModalOpen}
+                onClose={() => setIsCashierSwitchModalOpen(false)}
+                currentCashierName={staffDisplayName || (employees.find((e: any) => e.id === selectedEmployeeId)?.name)}
+                onCashierSwitched={(emp) => {
+                    setSelectedEmployeeId(emp.id);
+                    setStaffDisplayName(emp.name);
+                    setStaffRole(emp.role);
+                }}
+            />
+
+            {/* Offline-First Cash Drawer Management Modal */}
+            <RegisterDrawerModal
+                isOpen={isRegisterDrawerModalOpen}
+                onClose={() => setIsRegisterDrawerModalOpen(false)}
+                shopId={shopId}
+                employeeId={selectedEmployeeId || 'SYSTEM'}
+                onDrawerActionCompleted={(msg) => {
+                    console.log(msg);
+                    fetch(`/api/operations/ledger?limit=5000&shopId=${shopId}`, { cache: "no-store", credentials: "include" })
+                        .then(r => r.ok ? r.json() : { rows: [] })
+                        .then(d => {
+                            const rows = Array.isArray(d.rows) ? d.rows : [];
+                            setOpsLedger(rows.filter((r: any) => r.shop_id === shopId));
+                        })
+                        .catch(() => {});
+                }}
+            />
 
             {/* Lay-by Management Modal */}
             <Modal isOpen={isLaybyModalOpen} onClose={() => setIsLaybyModalOpen(false)} title="Pending Lay-bys">

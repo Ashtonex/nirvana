@@ -23,6 +23,7 @@ import {
     type LocalSale,
     type LocalSettings
 } from '@/lib/local-db';
+import { ensureConnectivityMonitor, getConnectivity, subscribeConnectivity } from '@/lib/connectivity';
 
 interface UseLocalDataResult<T> {
     data: T | null;
@@ -116,18 +117,8 @@ export function useLocalSettings(): UseLocalDataResult<LocalSettings> {
         initialized.current = true;
         
         initLocalDB().then(() => refresh());
-        
-        // Listen for online/offline events
-        const handleOnline = () => setIsOnlineState(true);
-        const handleOffline = () => setIsOnlineState(false);
-        
-        window.addEventListener('online', handleOnline);
-        window.addEventListener('offline', handleOffline);
-        
-        return () => {
-            window.removeEventListener('online', handleOnline);
-            window.removeEventListener('offline', handleOffline);
-        };
+
+        return subscribeConnectivity(setIsOnlineState);
     }, [refresh]);
 
     const save = useCallback(async (newData: LocalSettings) => {
@@ -203,22 +194,9 @@ function useLocalData<T>(
         initialized.current = true;
         
         initLocalDB().then(() => refresh());
-        
-        // Listen for online/offline
-        const handleOnline = () => setIsOnlineState(true);
-        const handleOffline = () => setIsOnlineState(false);
-        
-        if (typeof window !== 'undefined') {
-            window.addEventListener('online', handleOnline);
-            window.addEventListener('offline', handleOffline);
-        }
-        
-        return () => {
-            if (typeof window !== 'undefined') {
-                window.removeEventListener('online', handleOnline);
-                window.removeEventListener('offline', handleOffline);
-            }
-        };
+
+        if (typeof window === 'undefined') return;
+        return subscribeConnectivity(setIsOnlineState);
     }, [refresh]);
 
     const save = useCallback(async (newData: T) => {
@@ -357,26 +335,20 @@ export function useAppOfflineStatus() {
     const [pendingCount, setPendingCount] = useState(0);
 
     useEffect(() => {
-        setIsOnlineState(navigator.onLine);
-        
-        const updateStatus = async () => {
-            setIsOnlineState(navigator.onLine);
-            if (navigator.onLine) {
-                const count = await getPendingSyncCount();
-                setPendingCount(count);
+        ensureConnectivityMonitor();
+        setIsOnlineState(getConnectivity());
+
+        const unsubscribe = subscribeConnectivity((online) => {
+            setIsOnlineState(online);
+            if (online) {
+                getPendingSyncCount().then(setPendingCount);
             }
-        };
-        
-        window.addEventListener('online', updateStatus);
-        window.addEventListener('offline', updateStatus);
-        
+        });
+
         // Initial count
         getPendingSyncCount().then(setPendingCount);
-        
-        return () => {
-            window.removeEventListener('online', updateStatus);
-            window.removeEventListener('offline', updateStatus);
-        };
+
+        return unsubscribe;
     }, []);
 
     return { isOnline: isOnlineState, pendingCount };

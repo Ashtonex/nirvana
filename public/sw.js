@@ -1,47 +1,22 @@
 /* eslint-disable no-restricted-globals */
-const VERSION = 'v4';
+const VERSION = 'v5';
 const SHELL_CACHE = `nirvana-shell-${VERSION}`;
 const RUNTIME_CACHE = `nirvana-runtime-${VERSION}`;
 
-// Minimal app-shell assets. Keep this list small and stable.
+// Pre-cache essential application shell assets
 const SHELL_ASSETS = [
   '/',
+  '/staff-login',
+  '/mobile-menu',
   '/manifest.json',
   '/icon-192.png',
   '/icon-512.png',
 ];
 
-function openDB() {
-  return new Promise((resolve, reject) => {
-    const request = indexedDB.open('nirvana-offline', 1);
-    request.onerror = () => reject(request.error);
-    request.onsuccess = () => resolve({
-      getAll: (store) => new Promise((res, rej) => {
-        const tx = request.result.transaction(store, 'readonly');
-        const req = tx.objectStore(store).getAll();
-        req.onsuccess = () => res(req.result);
-        req.onerror = () => rej(req.error);
-      }),
-      delete: (store, id) => new Promise((res, rej) => {
-        const tx = request.result.transaction(store, 'readwrite');
-        tx.objectStore(store).delete(id);
-        tx.oncomplete = () => res();
-        tx.onerror = () => rej(tx.error);
-      })
-    });
-    request.onupgradeneeded = (event) => {
-      const db = event.target.result;
-      if (!db.objectStoreNames.contains('pending-sales')) {
-        db.createObjectStore('pending-sales', { keyPath: 'id' });
-      }
-    };
-  });
-}
-
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(SHELL_CACHE)
-      .then((cache) => cache.addAll(SHELL_ASSETS))
+      .then((cache) => cache.addAll(SHELL_ASSETS).catch((err) => console.warn('[SW] Shell cache partial fail:', err)))
       .then(() => self.skipWaiting())
   );
 });
@@ -70,51 +45,49 @@ function isApi(url) {
   return url.pathname.startsWith('/api/');
 }
 
-// Network-first for HTML navigations (pages), fallback to cached shell.
+// Network-first for HTML navigations (pages), with resilient fallback to cached routes
 async function handleNavigate(request) {
   try {
     const fresh = await fetch(request);
-    const cache = await caches.open(RUNTIME_CACHE);
-    cache.put(request, fresh.clone());
+    if (fresh.ok) {
+      const cache = await caches.open(RUNTIME_CACHE);
+      cache.put(request, fresh.clone());
+    }
     return fresh;
   } catch {
     const cached = await caches.match(request);
     if (cached) return cached;
+    const staffLogin = await caches.match('/staff-login');
+    if (staffLogin) return staffLogin;
     return (await caches.match('/')) || Response.error();
   }
 }
 
-// Cache-first for static assets.
+// Cache-first for static assets
 async function handleStatic(request) {
   const cached = await caches.match(request);
   if (cached) return cached;
-  const fresh = await fetch(request);
-  const cache = await caches.open(RUNTIME_CACHE);
-  cache.put(request, fresh.clone());
-  return fresh;
+  try {
+    const fresh = await fetch(request);
+    if (fresh.ok) {
+      const cache = await caches.open(RUNTIME_CACHE);
+      cache.put(request, fresh.clone());
+    }
+    return fresh;
+  } catch {
+    return Response.error();
+  }
 }
 
 // Background sync: push queued offline sales when back online
 self.addEventListener('sync', (event) => {
   if (event.tag === 'sync-sales') {
     event.waitUntil((async () => {
-      const db = await openDB();
-      const sales = await db.getAll('pending-sales');
-      for (const sale of sales) {
-        try {
-          const response = await fetch('/api/sales/offline', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(sale)
-          });
-          if (response.ok) {
-            await db.delete('pending-sales', sale.id);
-          }
-        } catch (e) {
-          // Keep in queue; will retry on next sync
-          console.error('Failed to sync sale:', e);
-        }
-      }
+      // Notify clients to run their sync engine
+      const clients = await self.clients.matchAll();
+      clients.forEach(client => {
+        client.postMessage({ type: 'TRIGGER_BACKGROUND_SYNC' });
+      });
     })());
   }
 });
@@ -123,13 +96,13 @@ self.addEventListener('fetch', (event) => {
   const request = event.request;
   const url = new URL(request.url);
 
-  // Only handle same-origin.
+  // Only handle same-origin
   if (url.origin !== self.location.origin) return;
 
-  // Never interfere with API calls.
+  // Never interfere with API calls
   if (isApi(url)) return;
 
-  // Ignore non-GET.
+  // Ignore non-GET
   if (request.method !== 'GET') return;
 
   if (request.mode === 'navigate') {

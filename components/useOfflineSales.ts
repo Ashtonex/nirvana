@@ -1,183 +1,113 @@
 'use client';
 
-import { useEffect, useRef, useCallback, useState } from 'react';
+import { useEffect, useCallback, useState } from 'react';
+import { ensureConnectivityMonitor, getConnectivity, subscribeConnectivity } from '@/lib/connectivity';
+import { queueOfflineSale, getPendingSyncCount } from '@/lib/local-db';
+import { syncEngine, type SyncStatus } from '@/lib/sync-engine';
 
-interface PendingSale {
-    id: string;
+export interface PendingSale {
+    id?: string;
     shopId: string;
     itemId: string;
     itemName: string;
     quantity: number;
     unitPrice: number;
-    totalBeforeTax: number;
+    totalBeforeTax?: number;
     employeeId: string;
-    clientName: string;
-    paymentMethod: string;
+    clientName?: string;
+    paymentMethod?: string;
     discount?: number;
-    date: string;
-}
-
-const DB_NAME = 'nirvana-offline';
-const STORE_NAME = 'pending-sales';
-
-function openDB(): Promise<IDBDatabase> {
-    return new Promise((resolve, reject) => {
-        const request = indexedDB.open(DB_NAME, 1);
-        request.onerror = () => reject(request.error);
-        request.onsuccess = () => resolve(request.result);
-        request.onupgradeneeded = (event) => {
-            const db = (event.target as IDBOpenDBRequest).result;
-            if (!db.objectStoreNames.contains(STORE_NAME)) {
-                db.createObjectStore(STORE_NAME, { keyPath: 'id' });
-            }
-        };
-    });
-}
-
-async function getPendingCountFromDB(): Promise<number> {
-    try {
-        const db = await openDB();
-        return new Promise((resolve, reject) => {
-            const tx = db.transaction(STORE_NAME, 'readonly');
-            const request = tx.objectStore(STORE_NAME).count();
-            request.onsuccess = () => resolve(request.result);
-            request.onerror = () => reject(request.error);
-        });
-    } catch {
-        return 0;
-    }
-}
-
-async function syncPendingSalesFromDB(onSync?: () => void) {
-    if (!navigator.onLine) return;
-    
-    try {
-        const db = await openDB();
-        const tx = db.transaction(STORE_NAME, 'readonly');
-        const store = tx.objectStore(STORE_NAME);
-        const getAllRequest = store.getAll();
-        
-        getAllRequest.onsuccess = async () => {
-            const sales = getAllRequest.result as PendingSale[];
-            
-            for (const sale of sales) {
-                try {
-                    const response = await fetch('/api/sales/offline', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(sale),
-                        credentials: 'include'
-                    });
-                    
-                    if (response.ok) {
-                        const deleteTx = db.transaction(STORE_NAME, 'readwrite');
-                        deleteTx.objectStore(STORE_NAME).delete(sale.id);
-                    }
-                } catch (e) {
-                    console.error('Failed to sync sale:', sale.id, e);
-                }
-            }
-            onSync?.();
-        };
-    } catch (e) {
-        console.error('Failed to open DB for sync:', e);
-    }
+    date?: string;
 }
 
 export function useOfflineSales() {
     const [isOnline, setIsOnline] = useState(true);
     const [pendingCount, setPendingCount] = useState(0);
-    const isOnlineRef = useRef(true);
-    const syncPendingSalesRef = useRef<() => Promise<void>>(() => Promise.resolve());
-    const getPendingCountRef = useRef<() => Promise<number>>(() => Promise.resolve(0));
+    const [syncStatus, setSyncStatus] = useState<SyncStatus>(syncEngine.getStatus());
 
     useEffect(() => {
-        isOnlineRef.current = navigator.onLine;
-        setIsOnline(navigator.onLine);
-        
-        const handleOnline = () => {
-            isOnlineRef.current = true;
-            setIsOnline(true);
-            syncPendingSalesRef.current();
-        };
-        
-        const handleOffline = () => {
-            isOnlineRef.current = false;
-            setIsOnline(false);
-        };
-        
-        window.addEventListener('online', handleOnline);
-        window.addEventListener('offline', handleOffline);
-        
-        // Try to sync on mount
-        syncPendingSalesRef.current();
-        
-        // Get initial pending count
-        getPendingCountRef.current().then(setPendingCount);
-        
-        // Register background sync
-        if ('serviceWorker' in navigator && 'SyncManager' in window) {
+        ensureConnectivityMonitor();
+        setIsOnline(getConnectivity());
+
+        const unsubConnectivity = subscribeConnectivity((online) => {
+            setIsOnline(online);
+        });
+
+        const unsubSync = syncEngine.subscribe((status) => {
+            setSyncStatus(status);
+            setPendingCount(status.pendingCount);
+        });
+
+        // Background sync registration if supported
+        if (typeof window !== 'undefined' && 'serviceWorker' in navigator && 'SyncManager' in window) {
             navigator.serviceWorker.ready.then((registration) => {
-                (registration as any).sync.register('sync-sales').catch(console.error);
-            });
+                (registration as any).sync?.register('sync-sales').catch(() => {});
+            }).catch(() => {});
         }
-        
+
         return () => {
-            window.removeEventListener('online', handleOnline);
-            window.removeEventListener('offline', handleOffline);
+            unsubConnectivity();
+            unsubSync();
         };
     }, []);
 
-    const saveSaleOffline = useCallback(async (sale: Omit<PendingSale, 'id' | 'date'>): Promise<string> => {
-        const db = await openDB();
-        const id = `offline-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-        
-        const pendingSale: PendingSale = {
-            ...sale,
-            id,
-            date: new Date().toISOString()
-        };
-        
-        return new Promise((resolve, reject) => {
-            const tx = db.transaction(STORE_NAME, 'readwrite');
-            const store = tx.objectStore(STORE_NAME);
-            const request = store.add(pendingSale);
-            
-            request.onsuccess = async () => {
-                const count = await getPendingCountFromDB();
-                setPendingCount(count);
-                if (isOnlineRef.current) {
-                    syncPendingSalesFromDB(async () => {
-                        const newCount = await getPendingCountFromDB();
-                        setPendingCount(newCount);
-                    });
-                }
-                resolve(id);
-            };
-            
-            request.onerror = () => reject(request.error);
+    const saveSaleOffline = useCallback(async (sale: PendingSale): Promise<string> => {
+        const date = sale.date || new Date().toISOString();
+        const unitPrice = Number(sale.unitPrice || 0);
+        const quantity = Number(sale.quantity || 1);
+        const discount = Number(sale.discount || 0);
+        const subtotal = Math.max(0, (unitPrice * quantity) - discount);
+        const taxRate = 0.155;
+        const tax = subtotal * taxRate;
+        const totalWithTax = subtotal + tax;
+
+        const id = await queueOfflineSale({
+            id: sale.id,
+            shopId: sale.shopId,
+            employeeId: sale.employeeId,
+            clientName: sale.clientName || 'General Walk-in',
+            paymentMethod: sale.paymentMethod || 'cash',
+            discount,
+            date,
+            items: [{
+                itemId: sale.itemId,
+                itemName: sale.itemName,
+                quantity,
+                unitPrice,
+                discount,
+                tax
+            }],
+            totalBeforeTax: subtotal,
+            tax,
+            totalWithTax
         });
+
+        await syncEngine.refreshPendingCount();
+
+        // If online, immediately try to flush
+        if (getConnectivity()) {
+            syncEngine.syncNow().catch(() => {});
+        }
+
+        return id;
     }, []);
 
     const syncPendingSales = useCallback(async () => {
-        await syncPendingSalesFromDB(async () => {
-            const count = await getPendingCountFromDB();
-            setPendingCount(count);
-        });
+        await syncEngine.syncNow();
     }, []);
 
     const getPendingCount = useCallback(async (): Promise<number> => {
-        return getPendingCountFromDB();
+        return await getPendingSyncCount();
     }, []);
-
-    syncPendingSalesRef.current = syncPendingSales;
-    getPendingCountRef.current = getPendingCount;
 
     return {
         saveSaleOffline,
         syncPendingSales,
         getPendingCount,
         isOnline,
-        pendingCount
+        pendingCount,
+        isSyncing: syncStatus.isSyncing,
+        failedCount: syncStatus.failedCount,
+        lastSyncTime: syncStatus.lastSyncTime
     };
 }

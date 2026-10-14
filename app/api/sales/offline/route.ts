@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+import { getStaffSessionEmployeeId, requireOwnerAccess } from '@/lib/api-auth';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -72,6 +73,47 @@ export async function POST(request: Request) {
 
     try {
         const sale = await request.json();
+
+        // Enforce Authentication
+        const staffEmployeeId = await getStaffSessionEmployeeId();
+        const ownerAccess = await requireOwnerAccess(request);
+
+        let authorizedEmployeeId = staffEmployeeId;
+        if (!authorizedEmployeeId && !ownerAccess.ok) {
+            if (sale.employeeId) {
+                const { data: validEmp } = await supabaseAdmin
+                    .from('employees')
+                    .select('id, active')
+                    .eq('id', sale.employeeId)
+                    .maybeSingle();
+                if (validEmp && validEmp.active) {
+                    authorizedEmployeeId = validEmp.id;
+                }
+            }
+        }
+
+        if (!authorizedEmployeeId && !ownerAccess.ok) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        }
+
+        // Standard staff can only sync sales attributed to themselves
+        if (staffEmployeeId && !ownerAccess.ok && staffEmployeeId !== sale.employeeId) {
+            return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+        }
+
+        const saleId = sale.id || Math.random().toString(36).substring(2, 9);
+
+        // Idempotency check: if sale already exists in database, acknowledge without duplicating
+        const { data: existingSale } = await supabaseAdmin
+            .from('sales')
+            .select('id')
+            .eq('id', saleId)
+            .maybeSingle();
+
+        if (existingSale) {
+            return NextResponse.json({ success: true, id: saleId, alreadyProcessed: true });
+        }
+
         const resolved = await resolveSaleItem(supabaseAdmin, sale);
 
         const { data: settings } = await supabaseAdmin.from('oracle_settings').select('*').single();
@@ -92,10 +134,26 @@ export async function POST(request: Request) {
         }
 
         const totalWithTax = subtotalAfterDiscount + tax;
-        const saleId = sale.id || Math.random().toString(36).substring(2, 9);
         const timestamp = sale.date || new Date().toISOString();
 
-        await supabaseAdmin.from('sales').insert({
+        // Duplicate-sale check (warn-only, mirrors app/actions.ts recordSale — never blocks a sync)
+        const dayStamp = timestamp.split('T')[0];
+        const { data: identicalSales } = await supabaseAdmin
+            .from('sales')
+            .select('id')
+            .eq('shop_id', sale.shopId)
+            .eq('client_name', sale.clientName)
+            .eq('item_id', resolved.itemId)
+            .eq('quantity', sale.quantity)
+            .eq('unit_price', sale.unitPrice)
+            .gte('date', `${dayStamp}T00:00:00.000Z`)
+            .lt('date', `${dayStamp}T23:59:59.999Z`);
+
+        if (identicalSales && identicalSales.length >= 3) {
+            console.warn(`Offline sync: multiple identical sales detected for ${sale.clientName}: ${identicalSales.length} times today. Recording anyway.`);
+        }
+
+        const { error: saleInsertError } = await supabaseAdmin.from('sales').insert({
             id: saleId,
             shop_id: sale.shopId,
             item_id: resolved.itemId,
@@ -111,6 +169,11 @@ export async function POST(request: Request) {
             payment_method: sale.paymentMethod || 'cash',
             discount_applied: discount
         });
+
+        if (saleInsertError) {
+            console.error('Offline sale insert failed:', saleInsertError);
+            return NextResponse.json({ error: `Failed to save sale: ${saleInsertError.message}` }, { status: 500 });
+        }
 
         const isService = resolved.itemId?.startsWith('service_');
 

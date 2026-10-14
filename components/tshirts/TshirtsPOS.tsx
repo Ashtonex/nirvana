@@ -11,15 +11,11 @@ import {
   Badge,
 } from "@/components/ui";
 import {
-  Minus,
-  Plus,
-  ShoppingCart,
-  Trash2,
   Search,
   Shirt,
-  Receipt,
-  X,
   Printer,
+  X,
+  Users,
 } from "lucide-react";
 import { recordSale, addNewProductFromPos } from "@/app/actions";
 import { useOfflineSales } from "@/components/useOfflineSales";
@@ -33,6 +29,15 @@ import {
   teeLineLabel,
   shopAllocationQty,
 } from "@/lib/tshirts";
+import {
+  CategoryBar,
+  ProductGrid,
+  TicketSidebar,
+  TenderModal,
+  CashierSwitchModal,
+  type PosProductItem,
+} from "@/components/pos";
+import { cacheCatalogForShop, getLocalCatalogForShop } from "@/lib/local-db";
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
 
@@ -42,9 +47,6 @@ function cn(...inputs: ClassValue[]) {
 
 type CartLine = { item: any; quantity: number; price: number };
 
-/**
- * Filters items to only show recognized tees with stock > 0
- */
 function filterValidTees(items: any[], shopId: string): any[] {
   return items.filter((item) => {
     const qty = shopAllocationQty(item, shopId);
@@ -72,22 +74,29 @@ export default function TshirtsPOS({
   const [cart, setCart] = useState<CartLine[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const deferredSearch = useDeferredValue(searchTerm);
+  const [selectedCategory, setSelectedCategory] = useState<string>("ALL");
   const [selectedEmployeeId, setSelectedEmployeeId] = useState("");
+  const [staffDisplayName, setStaffDisplayName] = useState("");
   const [clientName, setClientName] = useState("");
-  const [paymentMethod, setPaymentMethod] = useState<"cash" | "ecocash">("cash");
+  const [clientPhone, setClientPhone] = useState("");
+  const [paymentMethod, setPaymentMethod] = useState<"cash" | "ecocash" | "card">("cash");
   const [discount, setDiscount] = useState(0);
   const [isPending, startTransition] = useTransition();
+
+  // Modals
+  const [isTenderModalOpen, setIsTenderModalOpen] = useState(false);
+  const [isCashierSwitchModalOpen, setIsCashierSwitchModalOpen] = useState(false);
   const [receiptOpen, setReceiptOpen] = useState(false);
   const [lastReceipt, setLastReceipt] = useState<any>(null);
 
+  // Printer & Backlog Controls
   const [printerTransport, setPrinterTransport] = useState<'usb' | 'bluetooth'>('usb');
   const [isPrinterConnected, setIsPrinterConnected] = useState(false);
   const [isConnectingPrinter, setIsConnectingPrinter] = useState(false);
   const [isBacklogMode, setIsBacklogMode] = useState(false);
   const [backlogDate, setBacklogDate] = useState(() => new Date().toISOString().split('T')[0]);
 
-  const { saveSaleOffline, getPendingCount, isOnline } = useOfflineSales();
-  const [pendingSync, setPendingSync] = useState(0);
+  const { saveSaleOffline, getPendingCount, isOnline, pendingCount } = useOfflineSales();
 
   const handleConnectPrinter = async (transport: 'usb' | 'bluetooth') => {
     setIsConnectingPrinter(true);
@@ -111,37 +120,128 @@ export default function TshirtsPOS({
     setInventoryState(inventory || []);
   }, [inventory]);
 
-  useEffect(() => {
-    getPendingCount().then(setPendingSync);
-  }, [getPendingCount]);
-
+  // Hydrate staff info
   useEffect(() => {
     if (selectedEmployeeId) return;
     fetch("/api/staff/me", { cache: "no-store", credentials: "include" })
       .then((r) => (r.ok ? r.json() : null))
       .then((data) => {
         const id = data?.staff?.id;
-        if (id) setSelectedEmployeeId(String(id));
+        const name = data?.staff?.name;
+        if (id) {
+          setSelectedEmployeeId(String(id));
+          if (name) setStaffDisplayName(name);
+        }
       })
       .catch(() => {});
   }, [selectedEmployeeId]);
 
-  const query = deferredSearch.toLowerCase().trim();
-
-  const catalogue = useMemo(() => {
-    const list = inventoryState || [];
-    // Always filter to only recognized tees with stock > 0
-    const validTees = filterValidTees(list, shopId);
-    
-    if (!query) {
-      return validTees;
+  // Services available at Tee Shop
+  const services: PosProductItem[] = useMemo(() => [
+    {
+      id: "service_branding",
+      name: "Branding Service",
+      category: "Services",
+      price: 1.50,
+      shopQuantity: 9999,
+      sku: "SRV-BRAND"
     }
-    return validTees.filter(
-      (item) =>
-        item.name?.toLowerCase().includes(query) ||
-        item.category?.toLowerCase().includes(query)
-    );
-  }, [inventoryState, query, shopId]);
+  ], []);
+
+  // Tee Categories
+  const categories = useMemo(() => ["Plain T-Shirts", "Golf T-Shirts", "Services"], []);
+
+  // Compute full catalogue formatted as PosProductItem
+  const allTeeProducts = useMemo<PosProductItem[]>(() => {
+    const validTees = filterValidTees(inventoryState || [], shopId);
+    const mappedTees: PosProductItem[] = validTees.map((item) => {
+      const qty = shopAllocationQty(item, shopId);
+      const price = Math.round(defaultSalePrice(Number(item.landedCost || 0), taxRate) * 100) / 100;
+      const line = classifyTeeLine(item);
+      const catLabel = line === "golf" ? "Golf T-Shirts" : "Plain T-Shirts";
+
+      return {
+        id: item.id,
+        name: item.name,
+        category: catLabel,
+        price,
+        sellingPrice: price,
+        shopQuantity: qty,
+        landedCost: Number(item.landedCost || 0),
+        sku: item.sku || item.id,
+      };
+    });
+
+    return [...mappedTees, ...services];
+  }, [inventoryState, shopId, taxRate, services]);
+
+  // Category counts
+  const categoryCounts = useMemo(() => {
+    const counts: Record<string, number> = { ALL: allTeeProducts.length };
+    for (const p of allTeeProducts) {
+      const cat = p.category || "General";
+      counts[cat] = (counts[cat] || 0) + 1;
+    }
+    return counts;
+  }, [allTeeProducts]);
+
+  // Filtered catalogue by category and search
+  const filteredProducts = useMemo(() => {
+    const query = deferredSearch.toLowerCase().trim();
+    return allTeeProducts.filter((item) => {
+      if (selectedCategory !== "ALL" && item.category !== selectedCategory) {
+        return false;
+      }
+      if (query) {
+        return (
+          item.name?.toLowerCase().includes(query) ||
+          item.category?.toLowerCase().includes(query) ||
+          item.sku?.toLowerCase().includes(query)
+        );
+      }
+      return true;
+    });
+  }, [allTeeProducts, selectedCategory, deferredSearch]);
+
+  // Cache tee catalog locally
+  useEffect(() => {
+    if (allTeeProducts.length > 0) {
+      cacheCatalogForShop(
+        shopId,
+        allTeeProducts.map((p) => ({
+          id: p.id,
+          name: p.name,
+          category: p.category || "General",
+          price: Number(p.price || 0),
+          shopQuantity: Number(p.shopQuantity || 0),
+          shopId,
+          sku: p.sku || p.id,
+          updatedAt: new Date().toISOString(),
+        }))
+      ).catch(() => {});
+    }
+  }, [allTeeProducts, shopId]);
+
+  // Fallback hydration if offline on initial mount
+  useEffect(() => {
+    if (inventoryState.length === 0) {
+      getLocalCatalogForShop(shopId).then((cached) => {
+        if (cached.length > 0) {
+          setInventoryState(
+            cached.map((c) => ({
+              id: c.id,
+              name: c.name,
+              category: c.category,
+              landedCost: c.landedCost || 0,
+              allocations: [{ shopId: c.shopId, quantity: c.shopQuantity }],
+              price: c.price,
+              sku: c.sku,
+            }))
+          );
+        }
+      }).catch(() => {});
+    }
+  }, [shopId, inventoryState.length]);
 
   const addToCart = (item: any, price: number) => {
     const existing = cart.find((c) => c.item.id === item.id);
@@ -154,7 +254,20 @@ export default function TshirtsPOS({
     } else {
       setCart([...cart, { item, quantity: 1, price }]);
     }
-    setSearchTerm("");
+  };
+
+  const handleUpdateQuantity = (itemId: string, newQty: number) => {
+    if (newQty <= 0) {
+      setCart(cart.filter((c) => c.item.id !== itemId));
+    } else {
+      setCart(
+        cart.map((c) => (c.item.id === itemId ? { ...c, quantity: newQty } : c))
+      );
+    }
+  };
+
+  const handleRemoveFromCart = (itemId: string) => {
+    setCart(cart.filter((c) => c.item.id !== itemId));
   };
 
   const totalWithTax = cart.reduce((s, c) => s + c.price * c.quantity, 0);
@@ -165,116 +278,123 @@ export default function TshirtsPOS({
   const totalTax = totalWithTax - totalBeforeTax;
   const totalDue = Math.max(0, totalWithTax - discount);
 
-  const handleCheckout = () => {
-    if (cart.length === 0) {
-      alert("Cart is empty.");
-      return;
-    }
-    if (!selectedEmployeeId) {
-      alert("Select a cashier.");
-      return;
-    }
+  const handleExecutePayment = async (tenderData: {
+    paymentMethod: "cash" | "ecocash" | "card";
+    amountTendered: number;
+    changeDue: number;
+    clientName: string;
+    clientPhone: string;
+    printReceipt: boolean;
+  }) => {
+    if (cart.length === 0) throw new Error("Cart is empty.");
+    if (!selectedEmployeeId) throw new Error("Please select or authenticate a cashier first.");
 
-    startTransition(async () => {
-      try {
-        const cashier =
-          employees.find((e: any) => e.id === selectedEmployeeId)?.name || "Staff";
-        const receiptItems: { name: string; quantity: number; priceNet: number; priceGross: number; totalNet: number; totalGross: number; tax: number }[] = [];
-        const txnId = Math.random().toString(36).substring(2, 9).toUpperCase();
-        const saleDate = isBacklogMode ? backlogDate : new Date().toISOString();
-        const dateStamp = new Date(saleDate).toLocaleDateString();
-        const timeStamp = new Date(saleDate).toLocaleTimeString();
+    const cashier =
+      staffDisplayName ||
+      employees.find((e: any) => e.id === selectedEmployeeId)?.name ||
+      "Staff";
+    const receiptItems: any[] = [];
+    const txnId = Math.random().toString(36).substring(2, 9).toUpperCase();
+    const saleDate = isBacklogMode ? backlogDate : new Date().toISOString();
+    const dateStamp = new Date(saleDate).toLocaleDateString();
+    const timeStamp = new Date(saleDate).toLocaleTimeString();
 
-        if (!isOnline) {
-          for (const entry of cart) {
-            const netPrice = entry.price / (1 + taxRate);
-            const grossPrice = entry.price;
-            const lineNet = netPrice * entry.quantity;
-            const lineGross = grossPrice * entry.quantity;
-            const itemTax = lineGross - lineNet;
+    if (!isOnline) {
+      for (const entry of cart) {
+        const netPrice = entry.price / (1 + taxRate);
+        const grossPrice = entry.price;
+        const lineNet = netPrice * entry.quantity;
+        const lineGross = grossPrice * entry.quantity;
+        const itemTax = lineGross - lineNet;
 
-            await saveSaleOffline({
-              shopId,
-              itemId: entry.item.id,
-              itemName: entry.item.name,
-              quantity: entry.quantity,
-              unitPrice: netPrice,
-              totalBeforeTax: lineNet,
-              employeeId: selectedEmployeeId,
-              clientName: clientName || "Walk-in",
-              paymentMethod,
-              discount,
-            });
-
-            receiptItems.push({
-              name: entry.item.name,
-              quantity: entry.quantity,
-              priceNet: netPrice,
-              priceGross: grossPrice,
-              totalNet: lineNet,
-              totalGross: lineGross,
-              tax: itemTax
-            });
-          }
-          setPendingSync(await getPendingCount());
-        } else {
-          for (const entry of cart) {
-            const netPrice = entry.price / (1 + taxRate);
-            const grossPrice = entry.price;
-            const lineNet = netPrice * entry.quantity;
-            const lineGross = grossPrice * entry.quantity;
-            const itemTax = lineGross - lineNet;
-
-            await recordSale({
-              shopId,
-              itemId: entry.item.id,
-              itemName: entry.item.name,
-              quantity: entry.quantity,
-              unitPrice: netPrice,
-              totalBeforeTax: lineNet,
-              employeeId: selectedEmployeeId,
-              clientName: clientName || "Walk-in",
-              paymentMethod,
-              discount,
-              date: saleDate,
-            });
-
-            receiptItems.push({
-              name: entry.item.name,
-              quantity: entry.quantity,
-              priceNet: netPrice,
-              priceGross: grossPrice,
-              totalNet: lineNet,
-              totalGross: lineGross,
-              tax: itemTax
-            });
-          }
-        }
-
-        setLastReceipt({
-          receiptNo: `#TEE-${txnId}`,
-          orderId: `TEE-${txnId}`,
-          transactionId: `TEE-${txnId}`,
-          shopName,
-          cashier,
-          clientName: clientName || "Walk-in",
-          dateStamp,
-          timeStamp,
-          items: receiptItems,
-          subtotal: totalBeforeTax,
-          tax: totalTax,
+        await saveSaleOffline({
+          shopId,
+          itemId: entry.item.id,
+          itemName: entry.item.name,
+          quantity: entry.quantity,
+          unitPrice: netPrice,
+          totalBeforeTax: lineNet,
+          employeeId: selectedEmployeeId,
+          clientName: tenderData.clientName || "Walk-in",
+          paymentMethod: tenderData.paymentMethod,
           discount,
-          total: totalDue,
-          paymentMethod,
-          offline: !isOnline,
         });
-        setCart([]);
-        setReceiptOpen(true);
-      } catch (e: unknown) {
-        const msg = e instanceof Error ? e.message : "Checkout failed.";
-        alert(msg);
+
+        receiptItems.push({
+          name: entry.item.name,
+          quantity: entry.quantity,
+          priceNet: netPrice,
+          priceGross: grossPrice,
+          totalNet: lineNet,
+          totalGross: lineGross,
+          tax: itemTax,
+        });
       }
-    });
+    } else {
+      for (const entry of cart) {
+        const netPrice = entry.price / (1 + taxRate);
+        const grossPrice = entry.price;
+        const lineNet = netPrice * entry.quantity;
+        const lineGross = grossPrice * entry.quantity;
+        const itemTax = lineGross - lineNet;
+
+        await recordSale({
+          shopId,
+          itemId: entry.item.id,
+          itemName: entry.item.name,
+          quantity: entry.quantity,
+          unitPrice: netPrice,
+          totalBeforeTax: lineNet,
+          employeeId: selectedEmployeeId,
+          clientName: tenderData.clientName || "Walk-in",
+          paymentMethod: tenderData.paymentMethod === "card" ? "cash" : tenderData.paymentMethod,
+          discount,
+          date: saleDate,
+        });
+
+        receiptItems.push({
+          name: entry.item.name,
+          quantity: entry.quantity,
+          priceNet: netPrice,
+          priceGross: grossPrice,
+          totalNet: lineNet,
+          totalGross: lineGross,
+          tax: itemTax,
+        });
+      }
+    }
+
+    const receipt = {
+      receiptNo: `#TEE-${txnId}`,
+      orderId: `TEE-${txnId}`,
+      transactionId: `TEE-${txnId}`,
+      shopName,
+      cashier,
+      clientName: tenderData.clientName || "Walk-in",
+      dateStamp,
+      timeStamp,
+      items: receiptItems,
+      subtotal: totalBeforeTax,
+      tax: totalTax,
+      discount,
+      total: totalDue,
+      amountTendered: tenderData.amountTendered,
+      changeDue: tenderData.changeDue,
+      paymentMethod: tenderData.paymentMethod,
+      offline: !isOnline,
+    };
+
+    setLastReceipt(receipt);
+    setCart([]);
+    setReceiptOpen(true);
+
+    if (tenderData.printReceipt) {
+      try {
+        await thermalPrinter.printReceipt(receipt);
+      } catch {
+        console.warn("[Thermal Printer] Printer not connected for auto-print.");
+      }
+    }
   };
 
   const handleAddProduct = async (name: string) => {
@@ -317,8 +437,10 @@ export default function TshirtsPOS({
   };
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[1fr_380px]">
+    <div className="grid gap-6 lg:grid-cols-[1fr_400px]">
+      {/* Left Pane: Search, Category Bar, and Loyverse Product Grid */}
       <div className="space-y-4">
+        {/* Search Bar */}
         <div className="relative">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-orange-500/70" />
           <Input
@@ -330,43 +452,35 @@ export default function TshirtsPOS({
         </div>
 
         {/* Action Controls Bar */}
-        <div className="flex flex-wrap items-center gap-2 p-2 bg-slate-900/40 border border-orange-500/10 rounded-xl">
-          {/* Branding Service Button */}
+        <div className="flex flex-wrap items-center gap-2 p-2 bg-slate-900/40 border border-orange-500/10 rounded-2xl">
+          {/* Cashier Switch Button (1s PIN) */}
+          <button
+            type="button"
+            onClick={() => setIsCashierSwitchModalOpen(true)}
+            className="bg-slate-950/80 border border-slate-800 hover:border-orange-500/50 px-3 py-1.5 rounded-xl flex items-center gap-2 h-9 text-xs font-bold text-slate-200 cursor-pointer transition-colors"
+            title="Switch Cashier"
+          >
+            <Users className="h-4 w-4 text-orange-400" />
+            <span>
+              {staffDisplayName ||
+                employees.find((e: any) => e.id === selectedEmployeeId)?.name ||
+                "Select Cashier"}
+            </span>
+          </button>
+
+          {/* Quick Add Branding Service */}
           <Button
             onClick={() => {
-              const existing = cart.find((c) => c.item.id === "service_branding");
-              if (existing) {
-                setCart(
-                  cart.map((c) =>
-                    c.item.id === "service_branding"
-                      ? { ...c, quantity: c.quantity + 1 }
-                      : c
-                  )
-                );
-              } else {
-                setCart([
-                  ...cart,
-                  {
-                    item: {
-                      id: "service_branding",
-                      name: "Branding Service",
-                      category: "Services",
-                      landedCost: 0,
-                      allocations: []
-                    },
-                    quantity: 1,
-                    price: 1.50
-                  }
-                ]);
-              }
+              const srv = services.find((s) => s.id === "service_branding");
+              if (srv) addToCart(srv, srv.price || 1.5);
             }}
-            className="bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-500 hover:to-amber-500 text-[10px] font-black uppercase italic h-9 px-3 flex items-center gap-2 shadow-lg rounded-lg"
+            className="bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-500 hover:to-amber-500 text-[10px] font-black uppercase italic h-9 px-3 flex items-center gap-2 shadow-lg rounded-xl"
           >
-            <Shirt className="h-4 w-4" /> + Branding Service ($1.50)
+            <Shirt className="h-4 w-4" /> + Branding ($1.50)
           </Button>
 
           {/* Backlog Controls */}
-          <div className="flex items-center gap-1 bg-slate-950/80 border border-slate-800 rounded-lg p-1 h-9 px-3">
+          <div className="flex items-center gap-1 bg-slate-950/80 border border-slate-800 rounded-xl p-1 h-9 px-3">
             <div className="flex items-center gap-2 mr-1">
               <input
                 type="checkbox"
@@ -393,16 +507,16 @@ export default function TshirtsPOS({
           </div>
 
           {/* Printer Connection */}
-          <div className="flex items-center gap-1 bg-slate-950/80 border border-slate-800 rounded-lg p-1 h-9">
+          <div className="flex items-center gap-1 bg-slate-950/80 border border-slate-800 rounded-xl p-1 h-9">
             <Button
               onClick={() => handleConnectPrinter("usb")}
               disabled={isConnectingPrinter}
               variant="ghost"
               className={cn(
-                "h-7 px-2 text-[8px] font-black uppercase italic flex items-center gap-1 rounded",
+                "h-7 px-2 text-[8px] font-black uppercase italic",
                 isPrinterConnected && printerTransport === "usb"
-                  ? "bg-emerald-500/20 text-emerald-400 font-bold"
-                  : "text-slate-500 hover:text-slate-300"
+                  ? "bg-emerald-500/20 text-emerald-400"
+                  : "text-slate-500"
               )}
             >
               USB
@@ -412,256 +526,96 @@ export default function TshirtsPOS({
               disabled={isConnectingPrinter}
               variant="ghost"
               className={cn(
-                "h-7 px-2 text-[8px] font-black uppercase italic flex items-center gap-1 rounded",
+                "h-7 px-2 text-[8px] font-black uppercase italic",
                 isPrinterConnected && printerTransport === "bluetooth"
-                  ? "bg-blue-500/20 text-blue-400 font-bold"
-                  : "text-slate-500 hover:text-slate-300"
+                  ? "bg-blue-500/20 text-blue-400"
+                  : "text-slate-500"
               )}
             >
               {isConnectingPrinter && printerTransport === "bluetooth" ? "..." : "BT"}
             </Button>
           </div>
 
-          {/* Connected Indicator */}
-          {isPrinterConnected && (
-            <Badge className="bg-emerald-500/10 text-emerald-400 border-emerald-500/30 text-[9px] font-black uppercase py-1">
-              Printer: {printerTransport.toUpperCase()} Connected
+          {!isOnline && (
+            <Badge className="bg-amber-500/10 text-amber-400 border-amber-500/30 text-[9px] uppercase font-bold py-1">
+              Offline ({pendingCount} queued)
             </Badge>
           )}
         </div>
 
-        {!isOnline && (
-          <Badge className="bg-amber-500/10 text-amber-400 border-amber-500/30">
-            Offline — {pendingSync} sale(s) queued
-          </Badge>
-        )}
+        {/* Category Selector Pills */}
+        <CategoryBar
+          categories={categories}
+          selectedCategory={selectedCategory}
+          onSelectCategory={setSelectedCategory}
+          categoryCounts={categoryCounts}
+        />
 
-        {catalogue.length === 0 ? (
-          <Card className="border-dashed border-orange-500/20 bg-slate-900/30">
-            <CardContent className="py-16 text-center">
-              <Shirt className="h-12 w-12 text-orange-500/40 mx-auto mb-4" />
-              <p className="text-slate-400 text-sm font-medium">
-                {query
-                  ? `No tees match "${searchTerm}".`
-                  : "No tees in stock at this shop. Allocate T-shirt inventory to Nirvana Tees or add a new tee."}
-              </p>
-              {query && (
-                <Button
-                  className="mt-4 bg-orange-600 hover:bg-orange-500"
-                  onClick={() => handleAddProduct(searchTerm)}
-                  disabled={isPending}
-                >
-                  Add &quot;{searchTerm}&quot; as new tee
-                </Button>
-              )}
-            </CardContent>
-          </Card>
-        ) : (
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-            {catalogue.map((item) => {
-              const qty = shopAllocationQty(item, shopId);
-              const price = defaultSalePrice(Number(item.landedCost || 0), taxRate);
-              const outOfStock = qty <= 0;
-              const line = classifyTeeLine(item);
+        {/* Loyverse Touch-First Product Grid */}
+        <ProductGrid
+          items={filteredProducts}
+          onAddToCart={(item) => addToCart(item, Number(item.price || item.sellingPrice || 0))}
+          currencySymbol="$"
+        />
 
-              return (
-                <Card
-                  key={item.id}
-                  className={cn(
-                    "bg-slate-900/50 border-orange-500/10 transition-all hover:border-orange-500/40",
-                    outOfStock && "opacity-40"
-                  )}
-                >
-                  <CardContent className="pt-5 pb-4">
-                    <div className="flex justify-between items-start gap-2 mb-2">
-                      <Badge
-                        variant="outline"
-                        className={cn(
-                          "text-[9px] uppercase font-black",
-                          line === "golf"
-                            ? "border-sky-500/30 text-sky-300"
-                            : "border-orange-500/20 text-orange-300/80"
-                        )}
-                      >
-                        {teeLineLabel(line)}
-                      </Badge>
-                      <span className="text-xs font-mono text-slate-500">
-                        {qty} in stock
-                      </span>
-                    </div>
-                    <h3 className="font-bold text-slate-100 truncate">{item.name}</h3>
-                    <p className="text-lg font-black text-orange-400 mt-2 font-mono">
-                      ${price.toFixed(2)}
-                    </p>
-                    <Button
-                      className="w-full mt-3 bg-orange-600 hover:bg-orange-500 font-black uppercase text-[10px] tracking-widest"
-                      disabled={outOfStock || isPending}
-                      onClick={() => addToCart(item, price)}
-                    >
-                      <Plus className="h-3 w-3 mr-1" /> Add to cart
-                    </Button>
-                  </CardContent>
-                </Card>
-              );
-            })}
+        {filteredProducts.length === 0 && deferredSearch && (
+          <div className="text-center pt-2">
+            <Button
+              variant="outline"
+              className="border-orange-500/40 text-orange-400 text-xs font-bold uppercase"
+              onClick={() => handleAddProduct(deferredSearch)}
+              disabled={isPending}
+            >
+              Add &quot;{deferredSearch}&quot; as new tee
+            </Button>
           </div>
         )}
       </div>
 
-      <Card className="bg-slate-950/80 border-orange-500/25 h-fit lg:sticky lg:top-4 shadow-2xl shadow-orange-950/20">
-        <CardHeader className="pb-3 border-b border-orange-500/10">
-          <CardTitle className="flex items-center gap-2 text-lg font-black uppercase italic">
-            <ShoppingCart className="h-5 w-5 text-orange-500" />
-            Tee Cart
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4 pt-4">
-          <div className="space-y-2">
-            <label className="text-[10px] font-black uppercase text-slate-500 tracking-widest">
-              Cashier
-            </label>
-            <select
-              value={selectedEmployeeId}
-              onChange={(e) => setSelectedEmployeeId(e.target.value)}
-              className="w-full h-10 rounded-lg bg-slate-900 border border-slate-800 px-3 text-sm"
-            >
-              <option value="">Select staff…</option>
-              {employees.map((e: any) => (
-                <option key={e.id} value={e.id}>
-                  {e.name}
-                </option>
-              ))}
-            </select>
-          </div>
+      {/* Right Pane: Persistent Loyverse Ticket */}
+      <div className="h-full">
+        <TicketSidebar
+          cart={cart}
+          onUpdateQuantity={handleUpdateQuantity}
+          onRemoveItem={handleRemoveFromCart}
+          onClearCart={() => setCart([])}
+          onOpenTender={() => setIsTenderModalOpen(true)}
+          subtotal={totalBeforeTax}
+          tax={totalTax}
+          discount={discount}
+          total={totalDue}
+          taxRatePercent={Math.round(taxRate * 1000) / 10}
+          currencySymbol="$"
+          className="lg:sticky lg:top-4"
+        />
+      </div>
 
-          <Input
-            placeholder="Customer name (optional)"
-            value={clientName}
-            onChange={(e) => setClientName(e.target.value)}
-            className="bg-slate-900 border-slate-800"
-          />
+      {/* Loyverse Quick Tender Modal */}
+      <TenderModal
+        isOpen={isTenderModalOpen}
+        onClose={() => setIsTenderModalOpen(false)}
+        totalDue={totalDue}
+        defaultClientName={clientName}
+        defaultClientPhone={clientPhone}
+        currencySymbol="$"
+        onCompletePayment={handleExecutePayment}
+      />
 
-          <div className="flex gap-2">
-            {(["cash", "ecocash"] as const).map((m) => (
-              <Button
-                key={m}
-                type="button"
-                variant={paymentMethod === m ? "default" : "outline"}
-                className={cn(
-                  "flex-1 text-[10px] font-black uppercase",
-                  paymentMethod === m && "bg-orange-600 hover:bg-orange-500"
-                )}
-                onClick={() => setPaymentMethod(m)}
-              >
-                {m}
-              </Button>
-            ))}
-          </div>
+      {/* 1-Second Cashier Switch Modal */}
+      <CashierSwitchModal
+        isOpen={isCashierSwitchModalOpen}
+        onClose={() => setIsCashierSwitchModalOpen(false)}
+        currentCashierName={
+          staffDisplayName ||
+          employees.find((e: any) => e.id === selectedEmployeeId)?.name
+        }
+        onCashierSwitched={(emp) => {
+          setSelectedEmployeeId(emp.id);
+          setStaffDisplayName(emp.name);
+        }}
+      />
 
-          <div className="max-h-48 overflow-y-auto space-y-2">
-            {cart.length === 0 ? (
-              <p className="text-xs text-slate-500 text-center py-6">Cart is empty</p>
-            ) : (
-              cart.map((line) => (
-                <div
-                  key={line.item.id}
-                  className="flex items-center gap-2 p-2 rounded-lg bg-slate-900/80 border border-slate-800"
-                >
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold truncate">{line.item.name}</p>
-                    <div className="flex items-center gap-1 mt-1">
-                      <span className="text-[10px] text-slate-500 font-bold">$</span>
-                      <input
-                        type="number"
-                        step="0.01"
-                        value={line.price}
-                        onChange={(e) => {
-                          const val = parseFloat(e.target.value) || 0;
-                          setCart(
-                            cart.map((c) =>
-                              c.item.id === line.item.id ? { ...c, price: val } : c
-                            )
-                          );
-                        }}
-                        className="w-16 h-6 rounded bg-slate-950 border border-slate-800 text-xs font-mono text-orange-400 px-1 text-center focus:outline-none focus:border-orange-500/50"
-                      />
-                      <span className="text-[9px] text-slate-500 font-bold">each</span>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      className="h-7 w-7"
-                      onClick={() =>
-                        setCart(
-                          cart.map((c) =>
-                            c.item.id === line.item.id
-                              ? { ...c, quantity: Math.max(1, c.quantity - 1) }
-                              : c
-                          )
-                        )
-                      }
-                    >
-                      <Minus className="h-3 w-3" />
-                    </Button>
-                    <span className="text-sm font-mono w-6 text-center">{line.quantity}</span>
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      className="h-7 w-7"
-                      onClick={() =>
-                        setCart(
-                          cart.map((c) =>
-                            c.item.id === line.item.id
-                              ? { ...c, quantity: c.quantity + 1 }
-                              : c
-                          )
-                        )
-                      }
-                    >
-                      <Plus className="h-3 w-3" />
-                    </Button>
-                  </div>
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    className="h-7 w-7 text-rose-400"
-                    onClick={() => setCart(cart.filter((c) => c.item.id !== line.item.id))}
-                  >
-                    <Trash2 className="h-3 w-3" />
-                  </Button>
-                </div>
-              ))
-            )}
-          </div>
-
-          <div className="space-y-1 pt-2 border-t border-slate-800 text-sm">
-            <div className="flex justify-between text-slate-400">
-              <span>Subtotal</span>
-              <span className="font-mono">${totalBeforeTax.toFixed(2)}</span>
-            </div>
-            <div className="flex justify-between text-slate-400">
-              <span>Tax</span>
-              <span className="font-mono">${totalTax.toFixed(2)}</span>
-            </div>
-            <div className="flex justify-between text-lg font-black text-white pt-1">
-              <span>Total</span>
-              <span className="font-mono text-orange-400">${totalDue.toFixed(2)}</span>
-            </div>
-          </div>
-
-          <Button
-            className="w-full h-12 bg-orange-600 hover:bg-orange-500 font-black uppercase tracking-widest"
-            disabled={isPending || cart.length === 0}
-            onClick={handleCheckout}
-          >
-            <Receipt className="h-4 w-4 mr-2" />
-            {isPending ? "Processing…" : "Complete sale"}
-          </Button>
-        </CardContent>
-      </Card>
-
+      {/* Receipt Modal */}
       {receiptOpen && lastReceipt && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-sm">
           <Card className="w-full max-w-sm border-orange-500/30 bg-slate-900 shadow-2xl">
