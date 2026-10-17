@@ -85,12 +85,27 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Item not found" }, { status: 404 });
     }
 
-    const requestedTotal = allocations.reduce((sum: number, a: any) => sum + (parseInt(a.quantity) || 0), 0);
-    if (requestedTotal > item.quantity) {
-      return NextResponse.json(
-        { error: `Total allocations (${requestedTotal}) exceed master stock (${item.quantity})` },
-        { status: 400 }
-      );
+    // Fetch all existing allocations for this item to determine true total across all shops
+    const { data: allExistingAllocs } = await supabaseAdmin
+      .from("inventory_allocations")
+      .select("id, shop_id, quantity")
+      .eq("item_id", itemId);
+
+    const allocMap = new Map<string, number>();
+    (allExistingAllocs || []).forEach((a: any) => allocMap.set(a.shop_id, Number(a.quantity || 0)));
+    allocations.forEach((a: any) => allocMap.set(a.shopId, Math.max(0, parseInt(a.quantity) || 0)));
+
+    let newTotalAcrossAllShops = 0;
+    for (const q of allocMap.values()) {
+      newTotalAcrossAllShops += q;
+    }
+
+    // Auto-increase master stock if physical allocations exceed old master stock
+    if (newTotalAcrossAllShops > Number(item.quantity || 0)) {
+      await supabaseAdmin
+        .from("inventory_items")
+        .update({ quantity: newTotalAcrossAllShops })
+        .eq("id", itemId);
     }
 
     for (const alloc of allocations) {

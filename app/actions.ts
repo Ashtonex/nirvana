@@ -3,7 +3,7 @@
 import { Database, InventoryItem, Sale, Shipment, FinancialEntry, Quotation, Employee, AuditEntry, OracleEmail } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import { ORACLE_RECIPIENT } from "@/lib/resend";
-import { supabase, supabaseAdmin } from "@/lib/supabase";
+import { supabase, supabaseAdmin, fetchAllRows } from "@/lib/supabase";
 import { createHash, randomUUID } from "crypto";
 import { sendEmail } from "@/lib/email";
 import { sendWhatsAppMessage } from "@/lib/twilio";
@@ -156,8 +156,10 @@ export async function getDashboardData(daysLimit = 60) {
     try {
         const dateThreshold = new Date(Date.now() - daysLimit * 24 * 60 * 60 * 1000).toISOString();
 
-        const { data: inventory } = await supabaseAdmin.from('inventory_items').select('*').limit(10000);
-        const { data: allocations } = await supabaseAdmin.from('inventory_allocations').select('*').limit(10000);
+        const [inventory, allocations] = await Promise.all([
+            fetchAllRows((c) => c.from('inventory_items').select('*')),
+            fetchAllRows((c) => c.from('inventory_allocations').select('*'))
+        ]);
         const { data: sales } = await supabaseAdmin.from('sales').select('*').is('deleted_at', null).gte('date', dateThreshold).order('date', { ascending: false }).limit(20000);
         const { data: shops } = await supabaseAdmin.from('shops').select('*').limit(1000);
         const { data: quotations } = await supabaseAdmin.from('quotations').select('*').limit(10000);
@@ -304,9 +306,9 @@ export async function getShopDashboardData(shopId: string, daysLimit = 60) {
         const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
 
         // 1. Fetch only data scoped to this specific shop (Efficiency Upgrade)
-        const [invRes, allocRes, salesRes, allTimeSalesRes, monthSalesRes, shopRes, quotesRes, empRes, settingsRes, ledgerRes] = await Promise.all([
-            supabaseAdmin.from('inventory_items').select('*').limit(5000),
-            supabaseAdmin.from('inventory_allocations').select('*').eq('shop_id', shopId),
+        const [inventory, allocations, salesRes, allTimeSalesRes, monthSalesRes, shopRes, quotesRes, empRes, settingsRes, ledgerRes] = await Promise.all([
+            fetchAllRows((c) => c.from('inventory_items').select('*')),
+            fetchAllRows((c) => c.from('inventory_allocations').select('*').eq('shop_id', shopId)),
             supabaseAdmin.from('sales').select('*').eq('shop_id', shopId).is('deleted_at', null).gte('date', dateThreshold).order('date', { ascending: false }).limit(5000),
             supabaseAdmin.from('sales').select('total_with_tax').eq('shop_id', shopId).is('deleted_at', null).limit(50000),
             supabaseAdmin.from('sales').select('total_with_tax').eq('shop_id', shopId).is('deleted_at', null).gte('date', monthStart).limit(10000),
@@ -317,8 +319,6 @@ export async function getShopDashboardData(shopId: string, daysLimit = 60) {
             supabaseAdmin.from('ledger_entries').select('*').eq('shop_id', shopId).is('deleted_at', null).gte('date', dateThreshold).order('date', { ascending: false }).limit(5000),
         ]);
 
-        const inventory = invRes.data || [];
-        const allocations = allocRes.data || [];
         const ledgerRows = ledgerRes.data || [];
         const last60DaySales = salesRes.data || [];
         const allTimeSales = allTimeSalesRes.data || [];
@@ -336,6 +336,8 @@ export async function getShopDashboardData(shopId: string, daysLimit = 60) {
              filteredInventory = inventory.filter((i: any) => isNirvanaTeeItem(i));
          }
 
+        const normalizedTargetShop = String(shopId || '').toLowerCase().trim();
+
         return {
             inventory: filteredInventory.map((i: any) => ({
                 id: i.id,
@@ -343,7 +345,7 @@ export async function getShopDashboardData(shopId: string, daysLimit = 60) {
                 category: i.category || "General",
                 quantity: Number(i.quantity || 0),
                 landedCost: Number(i.landed_cost || 0),
-                allocations: allocations.filter((a: any) => a.item_id === i.id).map((a: any) => ({
+                allocations: allocations.filter((a: any) => a.item_id === i.id && String(a.shop_id || '').toLowerCase().trim() === normalizedTargetShop).map((a: any) => ({
                     shopId: a.shop_id,
                     quantity: Number(a.quantity || 0)
                 }))
@@ -1127,20 +1129,30 @@ export async function recordStocktake(stocktakeData: any) {
             .eq('shop_id', shopId)
             .maybeSingle();
 
-        if (!item || !alloc) continue;
+        if (!item) continue;
 
-        const systemQty = Number(alloc.quantity || 0);
+        const systemQty = alloc ? Number(alloc.quantity || 0) : 0;
         const diff = physicalQuantity - systemQty;
-        if (diff === 0) continue;
+        if (diff === 0 && alloc) continue;
 
-        await supabaseAdmin
-            .from('inventory_allocations')
-            .update({ quantity: physicalQuantity })
-            .eq('item_id', itemId)
-            .eq('shop_id', shopId);
+        if (alloc) {
+            await supabaseAdmin
+                .from('inventory_allocations')
+                .update({ quantity: physicalQuantity })
+                .eq('item_id', itemId)
+                .eq('shop_id', shopId);
+        } else {
+            await supabaseAdmin
+                .from('inventory_allocations')
+                .insert({
+                    item_id: itemId,
+                    shop_id: shopId,
+                    quantity: physicalQuantity
+                });
+        }
 
         const globalQty = Number(item.quantity || 0);
-        const nextGlobal = (globalQty - systemQty) + physicalQuantity;
+        const nextGlobal = Math.max(0, (globalQty - systemQty) + physicalQuantity);
         await supabaseAdmin.from('inventory_items').update({ quantity: nextGlobal }).eq('id', itemId);
 
         const landed = Number((item as any).landed_cost || 0);
@@ -1167,8 +1179,10 @@ export async function recordStocktake(stocktakeData: any) {
     }
 
     revalidatePath("/inventory");
+    revalidatePath("/inventory/stocktake");
     revalidatePath(`/shops/${shopId}`);
     revalidatePath("/admin/audit");
+    revalidatePath("/api/dashboard/data");
 }
 
 export async function getShipments() {
@@ -1308,7 +1322,7 @@ export async function addNewProductFromPos(productData: any) {
         .limit(5);
 
     const existingList = existingMatches || [];
-    const existing = existingList.find((i: any) => String(i.name || '').toLowerCase() === name.toLowerCase()) || existingList[0];
+    const existing = existingList.find((i: any) => String(i.name || '').toLowerCase() === name.toLowerCase());
 
     const id = existing?.id || Math.random().toString(36).substring(2, 9);
     const createdNew = !existing?.id;
@@ -1334,23 +1348,26 @@ export async function addNewProductFromPos(productData: any) {
     // Ensure shop allocation exists and is incremented when adding stock from POS.
     const { data: alloc } = await supabaseAdmin
         .from('inventory_allocations')
-        .select('quantity')
+        .select('id, quantity')
         .eq('item_id', id)
         .eq('shop_id', shopId)
         .maybeSingle();
 
+    let newShopQty = initialStock;
     if (!alloc) {
         await supabaseAdmin.from('inventory_allocations').insert({
             item_id: id,
             shop_id: shopId,
             quantity: initialStock
         });
-    } else if (initialStock > 0) {
-        await supabaseAdmin
-            .from('inventory_allocations')
-            .update({ quantity: Number(alloc.quantity || 0) + initialStock })
-            .eq('item_id', id)
-            .eq('shop_id', shopId);
+    } else {
+        newShopQty = Number(alloc.quantity || 0) + initialStock;
+        if (initialStock > 0) {
+            await supabaseAdmin
+                .from('inventory_allocations')
+                .update({ quantity: newShopQty })
+                .eq('id', alloc.id);
+        }
     }
 
     const totalCost = initialStock * landedCost;
@@ -1365,6 +1382,7 @@ export async function addNewProductFromPos(productData: any) {
         }]);
     }
     revalidatePath("/inventory");
+    revalidatePath("/inventory/stocktake");
     revalidatePath("/");
     revalidatePath(`/shops/${shopId}`);
     if (shopId === TSHIRTS_SHOP_ID) {
@@ -1380,6 +1398,8 @@ export async function addNewProductFromPos(productData: any) {
         landedCost: Number(existing?.landed_cost || landedCost),
         createdNew,
         addedStock: initialStock,
+        shopQuantity: newShopQty,
+        allocations: [{ shopId, quantity: newShopQty }]
     };
 }
 
@@ -4474,18 +4494,31 @@ export async function reapportionStock(itemId: string, allocations: { shopId: st
     const { data: item } = await supabaseAdmin.from('inventory_items').select('quantity, name').eq('id', itemId).single();
     if (!item) throw new Error("Item not found");
 
-    const requestedTotal = allocations.reduce((sum, a) => sum + a.quantity, 0);
-    if (requestedTotal > item.quantity) {
-        throw new Error(`Total allocations (${requestedTotal}) exceed master stock (${item.quantity})`);
+    // Fetch all existing allocations for this item to determine true total across all shops
+    const { data: allExistingAllocs } = await supabaseAdmin
+        .from('inventory_allocations')
+        .select('id, shop_id, quantity')
+        .eq('item_id', itemId);
+
+    const allocMap = new Map<string, number>();
+    (allExistingAllocs || []).forEach((a: any) => allocMap.set(a.shop_id, Number(a.quantity || 0)));
+    allocations.forEach((a) => allocMap.set(a.shopId, Math.max(0, Number(a.quantity || 0))));
+
+    let newTotalAcrossAllShops = 0;
+    for (const q of allocMap.values()) {
+        newTotalAcrossAllShops += q;
+    }
+
+    // If total allocated units exceed previous master stock, auto-update master stock to reflect reality
+    if (newTotalAcrossAllShops > Number(item.quantity || 0)) {
+        await supabaseAdmin
+            .from('inventory_items')
+            .update({ quantity: newTotalAcrossAllShops })
+            .eq('id', itemId);
     }
 
     for (const alloc of allocations) {
-        const { data: existing } = await supabaseAdmin
-            .from('inventory_allocations')
-            .select('id')
-            .eq('item_id', itemId)
-            .eq('shop_id', alloc.shopId)
-            .maybeSingle();
+        const existing = (allExistingAllocs || []).find((e: any) => e.shop_id === alloc.shopId);
 
         if (existing) {
             await supabaseAdmin.from('inventory_allocations').update({ quantity: alloc.quantity }).eq('id', existing.id);
@@ -4515,6 +4548,7 @@ export async function reapportionStock(itemId: string, allocations: { shopId: st
     revalidatePath('/inventory');
     revalidatePath('/inventory/stocktake');
     revalidatePath('/admin/inventory-manager');
+    revalidatePath('/api/dashboard/data');
 
     return (verifiedAllocations || []).map((row: any) => ({
         shopId: row.shop_id,

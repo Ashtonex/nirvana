@@ -94,7 +94,7 @@ export default function StocktakePage() {
     // Filter for shop view - items with allocations at selected shop
     const shopItems = selectedShop 
         ? inventory.filter((item: any) => 
-            item.allocations.some((a: any) => a.shopId === selectedShop)
+            (item.allocations || []).some((a: any) => String(a.shopId || '').toLowerCase() === String(selectedShop || '').toLowerCase())
           )
         : [];
 
@@ -102,9 +102,9 @@ export default function StocktakePage() {
     const filterItems = (items: any[]) => {
         return items.filter((item: any) =>
             !searchTerm ||
-            item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            item.category.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            item.id.toLowerCase().includes(searchTerm.toLowerCase())
+            (item.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+            (item.category || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+            (item.id || '').toLowerCase().includes(searchTerm.toLowerCase())
         );
     };
 
@@ -112,17 +112,29 @@ export default function StocktakePage() {
     
     // Split into "with stock" and "without stock"
     const itemsWithStock = filteredShopItems.filter((item: any) => {
-        const alloc = item.allocations.find((a: any) => a.shopId === selectedShop);
+        const alloc = (item.allocations || []).find((a: any) => String(a.shopId || '').toLowerCase() === String(selectedShop || '').toLowerCase());
         return (alloc?.quantity || 0) > 0;
     });
     
     const itemsWithoutStock = filteredShopItems.filter((item: any) => {
-        const alloc = item.allocations.find((a: any) => a.shopId === selectedShop);
+        const alloc = (item.allocations || []).find((a: any) => String(a.shopId || '').toLowerCase() === String(selectedShop || '').toLowerCase());
         return (alloc?.quantity || 0) === 0;
     });
 
+    // When searching in shop view, find items in the master inventory not yet allocated to this shop
+    const unallocatedMatchingItems = selectedShop && searchTerm.trim()
+        ? inventory.filter((item: any) => {
+            const hasAlloc = (item.allocations || []).some((a: any) => String(a.shopId || '').toLowerCase() === String(selectedShop || '').toLowerCase());
+            if (hasAlloc) return false;
+            const term = searchTerm.toLowerCase();
+            return (item.name || '').toLowerCase().includes(term) ||
+                   (item.category || '').toLowerCase().includes(term) ||
+                   (item.id || '').toLowerCase().includes(term);
+          }).slice(0, 30)
+        : [];
+
     const handleCountChange = (itemId: string, val: string) => {
-        setCounts(prev => ({ ...prev, [itemId]: parseInt(val) || 0 }));
+        setCounts(prev => ({ ...prev, [itemId]: Math.max(0, parseInt(val) || 0) }));
         setPendingChanges(prev => new Set(prev).add(itemId));
     };
 
@@ -130,8 +142,8 @@ export default function StocktakePage() {
         if (!selectedShop) return;
         setSavingItem(itemId);
         try {
-            const item = shopItems.find((i: any) => i.id === itemId);
-            const alloc = item?.allocations.find((a: any) => a.shopId === selectedShop);
+            const item = inventory.find((i: any) => i.id === itemId);
+            const alloc = (item?.allocations || []).find((a: any) => String(a.shopId || '').toLowerCase() === String(selectedShop || '').toLowerCase());
             const systemQty = alloc?.quantity || 0;
             const physicalQty = counts[itemId] !== undefined ? counts[itemId] : systemQty;
             
@@ -561,12 +573,65 @@ export default function StocktakePage() {
                                 </Card>
                             )}
 
-                            {filteredShopItems.length === 0 && (
+                            {/* SECTION 3: UNALLOCATED CATALOG PRODUCTS MATCHING SEARCH */}
+                            {unallocatedMatchingItems.length > 0 && (
+                                <Card className="border-sky-500/20">
+                                    <CardHeader className="bg-sky-500/10 border-b border-sky-500/20">
+                                        <CardTitle className="flex items-center gap-2 text-sky-400">
+                                            <Package className="h-5 w-5" />
+                                            CATALOG PRODUCTS NOT YET ALLOCATED TO THIS SHOP ({unallocatedMatchingItems.length})
+                                        </CardTitle>
+                                        <p className="text-[10px] text-slate-400">Enter physical count to allocate and establish stock at this shop</p>
+                                    </CardHeader>
+                                    <CardContent className="p-0">
+                                        <div className="divide-y divide-slate-800">
+                                            {unallocatedMatchingItems.map((item: any) => (
+                                                <div key={item.id} className="flex items-center gap-4 p-4 hover:bg-slate-900/40 transition-colors">
+                                                    <div className="flex-1">
+                                                        <div className="flex items-center gap-2">
+                                                            <p className="font-black text-white uppercase italic">{item.name}</p>
+                                                            <Badge className="bg-sky-500/10 text-sky-400 border-sky-500/20 text-[8px]">New Allocation</Badge>
+                                                        </div>
+                                                        <p className="text-[10px] text-slate-500 uppercase">{item.category} • Master Total: {item.quantity || 0}</p>
+                                                    </div>
+                                                    <div className="flex items-center gap-2">
+                                                        <Input
+                                                            type="number"
+                                                            className="w-20 bg-slate-900 border-slate-800 text-center font-black text-sky-400"
+                                                            placeholder="0"
+                                                            value={counts[item.id] !== undefined ? counts[item.id] : ""}
+                                                            onChange={(e) => handleCountChange(item.id, e.target.value)}
+                                                        />
+                                                        <Button
+                                                            size="sm"
+                                                            onClick={() => saveSingleItem(item.id)}
+                                                            disabled={savingItem === item.id || (counts[item.id] === undefined && !pendingChanges.has(item.id))}
+                                                            className="bg-sky-600 hover:bg-sky-500 text-white font-black text-xs"
+                                                            title="Allocate to this shop"
+                                                        >
+                                                            {savingItem === item.id ? (
+                                                                <Loader2 className="h-4 w-4 animate-spin" />
+                                                            ) : (
+                                                                <>
+                                                                    <Plus className="h-4 w-4 mr-1" />
+                                                                    Allocate
+                                                                </>
+                                                            )}
+                                                        </Button>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </CardContent>
+                                </Card>
+                            )}
+
+                            {filteredShopItems.length === 0 && unallocatedMatchingItems.length === 0 && (
                                 <Card className="bg-slate-900/50 border-slate-800">
                                     <CardContent className="p-12 text-center">
                                         <Package className="h-12 w-12 text-slate-700 mx-auto mb-4" />
                                         <p className="text-slate-500 uppercase font-black tracking-widest">
-                                            {searchTerm ? "No matching items found" : "No items allocated to this shop"}
+                                            {searchTerm ? "No matching items found in shop or catalog" : "No items allocated to this shop"}
                                         </p>
                                     </CardContent>
                                 </Card>

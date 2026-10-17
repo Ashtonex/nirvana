@@ -47,3 +47,33 @@ export const supabaseAdmin =
         })
         : createMockSupabaseClient('admin');
 
+/**
+ * PostgREST enforces a hard server-side limit of 1000 rows per request.
+ * Any query expecting >1000 rows (such as all inventory items or all allocations)
+ * will be silently truncated unless fetched with range-based pagination.
+ * This helper transparently paginates until all matching rows are retrieved.
+ */
+export async function fetchAllRows<T = any>(
+    buildQuery: (client: typeof supabaseAdmin) => any,
+    pageSize = 1000,
+    maxRows = 100000
+): Promise<T[]> {
+    if (!supabaseUrl || !serviceRoleKey) return [];
+    const all: T[] = [];
+    let page = 0;
+    while (all.length < maxRows) {
+        const from = page * pageSize;
+        const to = from + pageSize - 1;
+        const { data, error } = await buildQuery(supabaseAdmin).range(from, to);
+        if (error) {
+            console.error('[fetchAllRows] Error fetching page:', error);
+            throw error;
+        }
+        if (!data || data.length === 0) break;
+        all.push(...(data as T[]));
+        if (data.length < pageSize) break;
+        page++;
+    }
+    return all;
+}
+

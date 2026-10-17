@@ -39,6 +39,7 @@ import {
     PackagePlus,
     ClipboardList,
     ArrowRightLeft,
+    ArrowRight,
     Power,
     MessageSquare,
     LogOut,
@@ -426,7 +427,15 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
     const todaysTotalSales = todaysSales.reduce((sum: number, s: any) => sum + (s.totalWithTax || 0), 0);
 
     const [isAddProductModalOpen, setIsAddProductModalOpen] = useState(false);
-    const [newProduct, setNewProduct] = useState({ name: "", category: "", landedCost: "", initialStock: "0" });
+    const [newProduct, setNewProduct] = useState({ name: "", category: "", landedCost: "", initialStock: "1" });
+    const [isCheckoutFocused, setIsCheckoutFocused] = useState(false);
+
+    // Auto reset checkout focus when cart is emptied
+    useEffect(() => {
+        if (cart.length === 0) {
+            setIsCheckoutFocused(false);
+        }
+    }, [cart.length]);
 
     // Quick Sale Modal State (manual entry for untracked products)
     const [isQuickSaleModalOpen, setIsQuickSaleModalOpen] = useState(false);
@@ -838,6 +847,7 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
             setCart([...cart, { item, quantity: qtyToAdd, price }]);
         }
         setSearchTerm("");
+        setIsCheckoutFocused(true);
     };
 
     const removeFromCart = (id: string) => {
@@ -955,13 +965,32 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
                     initialStock: stockToAdd
                 });
 
+                const landed = parseFloat(newProduct.landedCost) || 10;
+                const prodName = newProduct.name;
+                const prodCategory = newProduct.category;
+
                 upsertLocalInventoryItem(
-                    { ...addedItem, name: newProduct.name, category: newProduct.category, landedCost: parseFloat(newProduct.landedCost) },
+                    { ...addedItem, name: prodName, category: prodCategory, landedCost: landed },
                     Number(addedItem?.addedStock ?? stockToAdd)
                 );
                 setIsAddProductModalOpen(false);
-                setNewProduct({ name: "", category: "", landedCost: "", initialStock: "0" });
-                alert(`${newProduct.name} added to inventory system.`);
+                setNewProduct({ name: "", category: "", landedCost: "", initialStock: "1" });
+
+                // If stock was added, immediately add 1 unit to cart and focus checkout
+                if (stockToAdd > 0 && addedItem?.id) {
+                    const defaultPrice = Math.round(((landed * 1.4) * 1.155) * 100) / 100;
+                    const itemObj = {
+                        id: addedItem.id,
+                        name: prodName,
+                        category: prodCategory,
+                        quantity: stockToAdd,
+                        landedCost: landed,
+                        allocations: [{ shopId, quantity: stockToAdd }]
+                    };
+                    addToCart(itemObj, defaultPrice, 1);
+                }
+
+                alert(`${prodName} added to inventory system.`);
             } catch (error) {
                 alert("Failed to add product");
             }
@@ -1731,7 +1760,26 @@ Generated via NIRVANA POS`;
 
     return (
         <div className="grid gap-4 md:gap-6 md:grid-cols-12 grid-cols-1">
-            <div className="md:col-span-8 col-span-1 space-y-4 md:space-y-6">
+            <div className={cn("space-y-4 md:space-y-6", isCheckoutFocused && cart.length > 0 ? "hidden" : "md:col-span-8 col-span-1")}>
+                {/* Active Cart Floating Bar when browsing catalog */}
+                {!isCheckoutFocused && cart.length > 0 && (
+                    <div className="sticky top-2 z-30 flex items-center justify-between bg-violet-950/90 border border-violet-500/50 backdrop-blur-md px-4 py-2.5 rounded-2xl shadow-2xl">
+                        <div className="flex items-center gap-2">
+                            <ShoppingCart className="h-4 w-4 text-violet-400" />
+                            <span className="text-xs font-black uppercase text-violet-100">
+                                {cart.reduce((s, c) => s + c.quantity, 0)} item{cart.length !== 1 ? 's' : ''} in cart • ${totalDue.toFixed(2)}
+                            </span>
+                        </div>
+                        <Button
+                            size="sm"
+                            onClick={() => setIsCheckoutFocused(true)}
+                            className="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black uppercase h-8 px-4 rounded-xl shadow-lg flex items-center gap-1.5"
+                        >
+                            Process Sale <ArrowRight className="h-3.5 w-3.5" />
+                        </Button>
+                    </div>
+                )}
+
                 {/* Full-width Search Bar */}
                 <div className="relative w-full group">
                     <SearchBar
@@ -2193,7 +2241,7 @@ Generated via NIRVANA POS`;
                                 variant="outline"
                                 className="mt-4 border-violet-500/50 text-violet-400 text-[10px] font-black uppercase italic"
                                 onClick={() => {
-                                    setNewProduct({ ...newProduct, name: searchTerm, initialStock: "0" });
+                                    setNewProduct({ ...newProduct, name: searchTerm, initialStock: "1" });
                                     setIsAddProductModalOpen(true);
                                 }}
                             >
@@ -2212,8 +2260,28 @@ Generated via NIRVANA POS`;
                 )}
             </div>
 
-            <Card className="md:col-span-4 col-span-1 md:sticky md:top-6 border-slate-800 bg-slate-950/40 backdrop-blur-md mb-safe">
+            <Card className={cn("border-slate-800 bg-slate-950/40 backdrop-blur-md mb-safe transition-all", isCheckoutFocused && cart.length > 0 ? "col-span-12 max-w-4xl mx-auto w-full" : "md:col-span-4 col-span-1 md:sticky md:top-6")}>
                 <CardHeader>
+                    {/* Quick navigation back to product catalog when checkout is focused */}
+                    {isCheckoutFocused && cart.length > 0 && (
+                        <div className="flex items-center justify-between pb-3 mb-3 border-b border-slate-800/80">
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setIsCheckoutFocused(false)}
+                                className="border-violet-500/50 text-violet-300 hover:bg-violet-500/10 text-xs font-black uppercase flex items-center gap-2 rounded-xl h-9"
+                            >
+                                <ArrowRightLeft className="h-3.5 w-3.5" /> ← Add More Products / Catalog
+                            </Button>
+                            <div className="text-right">
+                                <span className="text-[10px] font-black text-emerald-400 uppercase tracking-widest block">
+                                    Cart Active ({cart.reduce((s, c) => s + c.quantity, 0)} items)
+                                </span>
+                                <span className="text-[9px] text-slate-500 font-bold">Ready to process sale</span>
+                            </div>
+                        </div>
+                    )}
+
                     {/* Daily Sales Total Badge */}
                     <div className="mb-3 p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
                         <div className="text-[10px] font-black text-emerald-400 uppercase tracking-widest mb-1">Today's Sales</div>

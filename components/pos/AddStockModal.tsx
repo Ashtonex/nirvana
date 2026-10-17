@@ -92,7 +92,7 @@ export const AddStockModal: React.FC<AddStockModalProps> = ({
     // Current shop allocation of selected item
     const currentShopStock = useMemo(() => {
         if (!selectedItem) return 0;
-        const alloc = (selectedItem.allocations || []).find((a: any) => a.shopId === shopId);
+        const alloc = (selectedItem.allocations || []).find((a: any) => String(a.shopId || '').toLowerCase() === String(shopId || '').toLowerCase());
         return alloc ? Number(alloc.quantity || 0) : 0;
     }, [selectedItem, shopId]);
 

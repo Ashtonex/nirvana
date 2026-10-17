@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { supabaseAdmin } from "@/lib/supabase";
+import { supabaseAdmin, fetchAllRows } from "@/lib/supabase";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -9,28 +9,17 @@ export async function GET(request: Request) {
     // Use POST body or query to force fresh data
     const timestamp = Date.now();
     
-    // Fetch with fresh flag - query directly without caching
-    const { data: inventory, error: invError } = await supabaseAdmin
-      .from('inventory_items')
-      .select('*')
-      .limit(10000);
-      
-    const { data: allocations, error: allocError } = await supabaseAdmin
-      .from('inventory_allocations')
-      .select('*')
-      .limit(10000);
-      
-    const { data: shops, error: shopsError } = await supabaseAdmin
-      .from('shops')
-      .select('*')
-      .limit(10000);
+    // Fetch all records with pagination to prevent PostgREST 1000 row truncation
+    const [inventory, allocations, { data: shops, error: shopsError }] = await Promise.all([
+      fetchAllRows((c) => c.from('inventory_items').select('*')),
+      fetchAllRows((c) => c.from('inventory_allocations').select('*')),
+      supabaseAdmin.from('shops').select('*').limit(1000)
+    ]);
 
     console.log('[API /dashboard/data] Timestamp:', timestamp);
-    console.log('[API /dashboard/data] Shops:', shops?.map((s: any) => ({ id: s.id, name: s.name })));
-    console.log('[API /dashboard/data] Total allocations fetched:', allocations?.length);
+    console.log('[API /dashboard/data] Total inventory fetched:', inventory.length);
+    console.log('[API /dashboard/data] Total allocations fetched:', allocations.length);
 
-    if (invError) console.error('[API] Inventory error:', invError);
-    if (allocError) console.error('[API] Allocations error:', allocError);
     if (shopsError) console.error('[API] Shops error:', shopsError);
 
     const mappedInventory = (inventory || []).map((i: any) => ({

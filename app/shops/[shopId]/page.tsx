@@ -48,8 +48,8 @@ export default async function ShopPage({ params }: { params: { shopId: string } 
 
     const revenueSummary = db.revenueSummary || { allTime: 0, last60Days: 0, monthToDate: 0 };
     const inventoryCount = db.inventory.reduce((sum: number, item: any) => {
-        const allocation = item.allocations.find((a: any) => a.shopId === shopId);
-        return sum + (allocation ? allocation.quantity : 0);
+        const allocation = (item.allocations || []).find((a: any) => String(a.shopId || '').toLowerCase() === String(shopId || '').toLowerCase());
+        return sum + (allocation ? Number(allocation.quantity || 0) : 0);
     }, 0);
 
     return (
