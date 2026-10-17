@@ -86,7 +86,7 @@ export default function ShopStocktakeClient({
     // Filter and search
     const [searchTerm, setSearchTerm] = useState("");
     const [selectedCategory, setSelectedCategory] = useState<string>("ALL");
-    const [activeTab, setActiveTab] = useState<"all" | "in_stock" | "modified" | "discrepancies" | "zero" | "zombie">("all");
+    const [activeTab, setActiveTab] = useState<"in_stock" | "all" | "modified" | "discrepancies" | "zero" | "zombie">("in_stock");
 
     // Auditor selection
     const activeEmployees = employees.filter((e) => e.active !== false);
@@ -912,17 +912,17 @@ export default function ShopStocktakeClient({
             {/* Live Metrics Quick Glance */}
             <div className="grid gap-3 grid-cols-2 md:grid-cols-4">
                 <div className="bg-slate-900/50 border border-slate-800 p-3.5 rounded-2xl space-y-1">
-                    <span className="text-[9px] uppercase font-black text-slate-500 tracking-wider">Physical Count</span>
+                    <span className="text-[9px] uppercase font-black text-slate-500 tracking-wider">Physical Count ({shop.name})</span>
                     <div className="text-2xl font-black text-white font-mono">
                         {liveMetrics.totalCountedUnits.toLocaleString()} <span className="text-xs font-bold text-slate-500">pcs</span>
                     </div>
                     <span className="text-[10px] text-slate-400 font-medium">
-                        System was: {liveMetrics.totalSystemUnits.toLocaleString()} pcs
+                        System was: {liveMetrics.totalSystemUnits.toLocaleString()} pcs at {shop.name}
                     </span>
                 </div>
 
                 <div className="bg-slate-900/50 border border-slate-800 p-3.5 rounded-2xl space-y-1">
-                    <span className="text-[9px] uppercase font-black text-slate-500 tracking-wider">Locked Capital (Cost)</span>
+                    <span className="text-[9px] uppercase font-black text-slate-500 tracking-wider">Locked Capital ({shop.name})</span>
                     <div className="text-2xl font-black text-emerald-400 font-mono">
                         ${liveMetrics.totalCostLocked.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </div>
@@ -932,7 +932,7 @@ export default function ShopStocktakeClient({
                 </div>
 
                 <div className="bg-slate-900/50 border border-slate-800 p-3.5 rounded-2xl space-y-1">
-                    <span className="text-[9px] uppercase font-black text-slate-500 tracking-wider">Discrepancies</span>
+                    <span className="text-[9px] uppercase font-black text-slate-500 tracking-wider">Discrepancies ({shop.name})</span>
                     <div className="text-2xl font-black font-mono">
                         {liveMetrics.shrinkageCount > 0 ? (
                             <span className="text-rose-400">-{liveMetrics.shrinkageCount} pcs (-${liveMetrics.shrinkageCost.toFixed(2)})</span>
@@ -965,7 +965,7 @@ export default function ShopStocktakeClient({
                     <div className="relative flex-1">
                         <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-500" />
                         <Input
-                            placeholder="Search products by name, SKU, or category..."
+                            placeholder={`Search ${shop.name} stock or master catalog by name, SKU...`}
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
                             className="pl-12 h-12 bg-slate-900/70 border-slate-800 text-sm focus:border-indigo-500/50 rounded-2xl shadow"
@@ -983,20 +983,12 @@ export default function ShopStocktakeClient({
                     {/* Filter Tabs */}
                     <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0">
                         <button
-                            onClick={() => setActiveTab("all")}
-                            className={`px-3 py-2 rounded-xl text-xs font-black uppercase transition-all whitespace-nowrap ${
-                                activeTab === "all" ? "bg-indigo-600 text-white" : "bg-slate-900/80 text-slate-400 hover:text-white"
-                            }`}
-                        >
-                            All ({items.length})
-                        </button>
-                        <button
                             onClick={() => setActiveTab("in_stock")}
                             className={`px-3 py-2 rounded-xl text-xs font-black uppercase transition-all whitespace-nowrap ${
                                 activeTab === "in_stock" ? "bg-indigo-600 text-white" : "bg-slate-900/80 text-slate-400 hover:text-white"
                             }`}
                         >
-                            In Stock ({items.filter((i) => i.physicalQuantity > 0 || i.systemQuantity > 0).length})
+                            {shop.name} Stock ({items.filter((i) => i.physicalQuantity > 0 || i.systemQuantity > 0).length})
                         </button>
                         <button
                             onClick={() => setActiveTab("discrepancies")}
@@ -1021,6 +1013,14 @@ export default function ShopStocktakeClient({
                             }`}
                         >
                             Zombie (&gt;8m)
+                        </button>
+                        <button
+                            onClick={() => setActiveTab("all")}
+                            className={`px-3 py-2 rounded-xl text-xs font-black uppercase transition-all whitespace-nowrap ${
+                                activeTab === "all" ? "bg-slate-800 text-white" : "bg-slate-900/80 text-slate-500 hover:text-white"
+                            }`}
+                        >
+                            Master Catalog ({items.length})
                         </button>
                     </div>
                 </div>
