@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { enforceOwnerOnly } from "@/lib/auth-helpers";
-import { supabaseAdmin } from "@/lib/supabase";
+import { supabaseAdmin, fetchAllRows } from "@/lib/supabase";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -45,20 +45,16 @@ export async function GET() {
     const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
 
     const [
-      { data: inventoryData, error: inventoryError },
-      { data: sales30dData },
-      { data: salesAllData },
+      inventoryData,
+      sales30dData,
+      salesAllData,
       { data: shipmentsData },
     ] = await Promise.all([
-      supabaseAdmin.from("inventory_items").select("*, inventory_allocations(*)"),
-      supabaseAdmin.from("sales").select("item_id, item_name, quantity, total_with_tax, date").is("deleted_at", null).gte("date", thirtyDaysAgo),
-      supabaseAdmin.from("sales").select("item_id, item_name, quantity, total_with_tax, date").is("deleted_at", null),
+      fetchAllRows((c) => c.from("inventory_items").select("*, inventory_allocations(*)")),
+      fetchAllRows((c) => c.from("sales").select("item_id, item_name, quantity, total_with_tax, date").is("deleted_at", null).gte("date", thirtyDaysAgo)),
+      fetchAllRows((c) => c.from("sales").select("item_id, item_name, quantity, total_with_tax, date").is("deleted_at", null)),
       supabaseAdmin.from("shipments").select("*"),
     ]);
-
-    if (inventoryError) {
-      return NextResponse.json({ success: false, message: inventoryError.message }, { status: 500 });
-    }
 
     const sales30d = sales30dData || [];
     const salesAll = salesAllData || [];

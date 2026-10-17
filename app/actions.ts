@@ -1191,8 +1191,7 @@ export async function getShipments() {
 }
 
 export async function getInventoryHistory() {
-    const { data } = await supabaseAdmin.from('inventory_items').select('*, inventory_allocations(*)').order('date_added', { ascending: false });
-    return data || [];
+    return fetchAllRows((c) => c.from('inventory_items').select('*, inventory_allocations(*)').order('date_added', { ascending: false }));
 }
 
 export async function getFinancials(startDate?: string, endDate?: string) {
@@ -2609,7 +2608,7 @@ export async function getOracleMasterPulse(daysLimit = 60) {
 
 export async function getZombieStockReport() {
     const { data: settings } = await supabaseAdmin.from('oracle_settings').select('zombie_days').single();
-    const { data: inventory } = await supabaseAdmin.from('inventory_items').select('*');
+    const inventory = await fetchAllRows((c) => c.from('inventory_items').select('*'));
     if (!inventory) return [];
     return inventory.filter((i: any) => {
         const days = Math.floor((new Date().getTime() - new Date(i.date_added).getTime()) / (1000 * 3600 * 24));
@@ -3202,28 +3201,28 @@ Oracle Master Intelligence — Automated Report`;
 
 export async function exportDatabase(): Promise<string> {
     const [
-        { data: inventory },
-        { data: allocations },
-        { data: sales },
+        inventory,
+        allocations,
+        sales,
         { data: shops },
-        { data: shipments },
+        shipments,
         { data: employees },
-        { data: ledger },
-        { data: auditLog },
-        { data: quotations },
-        { data: transfers },
+        ledger,
+        auditLog,
+        quotations,
+        transfers,
         { data: settings },
     ] = await Promise.all([
-        supabaseAdmin.from('inventory_items').select('*'),
-        supabaseAdmin.from('inventory_allocations').select('*'),
-        supabaseAdmin.from('sales').select('*'),
+        fetchAllRows((c) => c.from('inventory_items').select('*')),
+        fetchAllRows((c) => c.from('inventory_allocations').select('*')),
+        fetchAllRows((c) => c.from('sales').select('*')),
         supabaseAdmin.from('shops').select('*'),
-        supabaseAdmin.from('shipments').select('*'),
+        fetchAllRows((c) => c.from('shipments').select('*')),
         supabaseAdmin.from('employees').select('*'),
-        supabaseAdmin.from('ledger_entries').select('*'),
-        supabaseAdmin.from('audit_log').select('*'),
-        supabaseAdmin.from('quotations').select('*'),
-        supabaseAdmin.from('transfers').select('*'),
+        fetchAllRows((c) => c.from('ledger_entries').select('*')),
+        fetchAllRows((c) => c.from('audit_log').select('*')),
+        fetchAllRows((c) => c.from('quotations').select('*')),
+        fetchAllRows((c) => c.from('transfers').select('*')),
         supabaseAdmin.from('oracle_settings').select('*').single(),
     ]);
 

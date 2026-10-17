@@ -292,13 +292,12 @@ export async function getSalesVsOverheadsData() {
     const { start: monthStart, end: monthEnd } = getMonthDateRange(year, month);
 
     const { data: shops } = await supabaseAdmin.from('shops').select('id, name, expenses');
-    const { data: ledger } = await supabaseAdmin.from('ledger_entries').select('shop_id, type, amount, date')
-        .eq('type', 'expense')
-        .gte('date', monthStart)
-        .lte('date', monthEnd);
-    const { data: sales } = await supabaseAdmin.from('sales').select('shop_id, total_with_tax, date')
-        .gte('date', monthStart)
-        .lte('date', monthEnd);
+    const ledger = await fetchAll<any>('ledger_entries', 'shop_id, type, amount, date', (q) =>
+        q.eq('type', 'expense').gte('date', monthStart).lte('date', monthEnd)
+    );
+    const sales = await fetchAll<any>('sales', 'shop_id, total_with_tax, date', (q) =>
+        q.gte('date', monthStart).lte('date', monthEnd)
+    );
     
     const shopList = shops || [];
     const ledgerExpenses = (ledger || []).filter((l: any) => l.type === 'expense');

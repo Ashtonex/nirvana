@@ -1,4 +1,4 @@
-import { supabaseAdmin } from '@/lib/supabase';
+import { supabaseAdmin, fetchAllRows } from '@/lib/supabase';
 import { NextResponse } from 'next/server';
 import { promises as fs } from 'fs';
 import path from 'path';
@@ -26,17 +26,17 @@ export async function POST(request: Request) {
 
     // Fetch all data from Supabase
     const [
-      { data: sales },
-      { data: ledger },
+      sales,
+      ledger,
       { data: operations },
-      { data: inventory },
+      inventory,
       { data: shops },
       { data: employees }
     ] = await Promise.all([
-      supabaseAdmin.from('sales').select('*'),
-      supabaseAdmin.from('ledger_entries').select('*'),
+      fetchAllRows((c) => c.from('sales').select('*')),
+      fetchAllRows((c) => c.from('ledger_entries').select('*')),
       supabaseAdmin.from('operations_ledger').select('*'),
-      supabaseAdmin.from('inventory_items').select('*'),
+      fetchAllRows((c) => c.from('inventory_items').select('*')),
       supabaseAdmin.from('shops').select('*'),
       supabaseAdmin.from('employees').select('*')
     ]);
