@@ -3,6 +3,7 @@
 import React, { useState, useTransition, useEffect, useMemo, useDeferredValue } from "react";
 import { isSavingsOrBlackboxTransferEntry } from "@/lib/transfer-classification";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import {
     Card,
     CardContent,
@@ -1957,6 +1958,16 @@ Generated via NIRVANA POS`;
                         >
                             <PackagePlus className="h-4 w-4" /> Add Stock
                         </Button>
+
+                        {/* Stocktake Audit Link */}
+                        <Link href={`/shops/${shopId}/stocktake`}>
+                            <Button
+                                className="bg-indigo-600 hover:bg-indigo-500 text-white text-[10px] font-black uppercase italic h-10 px-3.5 flex items-center gap-2 rounded-xl shadow-lg shadow-indigo-600/20 transition-all hover:scale-[1.02]"
+                                title="Conduct physical stocktake and generate capital health audit report"
+                            >
+                                <ClipboardList className="h-4 w-4" /> Stocktake
+                            </Button>
+                        </Link>
 
                         {/* 2. Record Expense */}
                         <Button

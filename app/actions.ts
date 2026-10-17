@@ -4842,3 +4842,527 @@ export async function getInventoryAdjustmentLog() {
         return [];
     }
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TOUCH-FIRST SHOP STOCKTAKE AUDIT & CAPITAL HEALTH ACTION
+// ─────────────────────────────────────────────────────────────────────────────
+export type ShopStocktakeCountItem = {
+    itemId: string;
+    name: string;
+    category?: string;
+    physicalQuantity: number;
+    systemQuantity: number;
+    landedCost: number;
+    sellingPrice: number;
+    dateAdded?: string;
+    sku?: string;
+};
+
+export type ShopStocktakeInput = {
+    shopId: string;
+    auditorEmployeeId?: string;
+    auditorName?: string;
+    items: ShopStocktakeCountItem[];
+    notes?: string;
+};
+
+export async function completeShopStocktake(input: ShopStocktakeInput) {
+    const shopId = String(input.shopId || '').trim();
+    if (!shopId) throw new Error("Missing shopId");
+
+    const actor = await getActorFromCookies().catch(() => null);
+    const auditorName = input.auditorName || actor?.name || "Staff Auditor";
+    const auditorId = input.auditorEmployeeId || actor?.id || "staff";
+
+    const timestamp = new Date();
+    const timestampIso = timestamp.toISOString();
+    const dateFormatted = timestamp.toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric'
+    });
+
+    // 30-Day Monthly Schedule
+    const nextDueDate = new Date(timestamp.getTime() + 30 * 24 * 60 * 60 * 1000);
+    const nextDueDateFormatted = nextDueDate.toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric'
+    });
+
+    // Fetch Shop info
+    const { data: shopData } = await supabaseAdmin
+        .from('shops')
+        .select('id, name')
+        .eq('id', shopId)
+        .maybeSingle();
+    const shopName = shopData?.name || shopId.toUpperCase();
+
+    const items = Array.isArray(input.items) ? input.items : [];
+
+    let totalPhysicalUnits = 0;
+    let totalSystemUnits = 0;
+    let totalLockedCapitalCost = 0;
+    let totalPotentialRevenue = 0;
+    let shrinkageUnits = 0;
+    let shrinkageValueCost = 0;
+    let surplusUnits = 0;
+    let surplusValueCost = 0;
+    let adjustedItemCount = 0;
+
+    // Aging Buckets Accumulators
+    const buckets = {
+        under2m: { label: "< 2 Months (Fresh)", count: 0, units: 0, costValue: 0, retailValue: 0, items: [] as any[] },
+        twoTo4m: { label: "2 - 4 Months (Aging)", count: 0, units: 0, costValue: 0, retailValue: 0, items: [] as any[] },
+        fourTo6m: { label: "4 - 6 Months (Stagnant)", count: 0, units: 0, costValue: 0, retailValue: 0, items: [] as any[] },
+        sixTo8m: { label: "6 - 8 Months (Critical)", count: 0, units: 0, costValue: 0, retailValue: 0, items: [] as any[] },
+        over8m: { label: "8+ Months (Zombie Capital)", count: 0, units: 0, costValue: 0, retailValue: 0, items: [] as any[] }
+    };
+
+    const ledgerInserts: any[] = [];
+
+    // Process each item
+    for (const item of items) {
+        const itemId = String(item.itemId || '').trim();
+        if (!itemId) continue;
+
+        const physicalQty = Math.max(0, Math.round(Number(item.physicalQuantity || 0)));
+        const systemQty = Math.max(0, Math.round(Number(item.systemQuantity || 0)));
+        const landedCost = Math.max(0, Number(item.landedCost || 0));
+        const sellingPrice = Math.max(0, Number(item.sellingPrice || (landedCost * 1.617)));
+        const delta = physicalQty - systemQty;
+
+        totalPhysicalUnits += physicalQty;
+        totalSystemUnits += systemQty;
+
+        const itemCostTotal = physicalQty * landedCost;
+        const itemRetailTotal = physicalQty * sellingPrice;
+        totalLockedCapitalCost += itemCostTotal;
+        totalPotentialRevenue += itemRetailTotal;
+
+        // Discrepancy handling
+        if (delta !== 0) {
+            adjustedItemCount++;
+            if (delta < 0) {
+                const missingUnits = Math.abs(delta);
+                const lostCost = missingUnits * landedCost;
+                shrinkageUnits += missingUnits;
+                shrinkageValueCost += lostCost;
+
+                ledgerInserts.push({
+                    id: Math.random().toString(36).substring(2, 9),
+                    shop_id: shopId,
+                    type: 'expense',
+                    category: 'Stock Adjustment',
+                    amount: lostCost,
+                    date: timestampIso,
+                    description: `Stocktake Shrinkage: ${item.name} (${systemQty} -> ${physicalQty}, -${missingUnits} units @ $${landedCost.toFixed(2)})`,
+                    employee_id: auditorId
+                });
+            } else {
+                const extraUnits = delta;
+                const gainCost = extraUnits * landedCost;
+                surplusUnits += extraUnits;
+                surplusValueCost += gainCost;
+
+                ledgerInserts.push({
+                    id: Math.random().toString(36).substring(2, 9),
+                    shop_id: shopId,
+                    type: 'income',
+                    category: 'Stock Adjustment',
+                    amount: gainCost,
+                    date: timestampIso,
+                    description: `Stocktake Surplus: ${item.name} (${systemQty} -> ${physicalQty}, +${extraUnits} units @ $${landedCost.toFixed(2)})`,
+                    employee_id: auditorId
+                });
+            }
+
+            // Upsert Allocation
+            const { data: existingAlloc } = await supabaseAdmin
+                .from('inventory_allocations')
+                .select('id')
+                .eq('item_id', itemId)
+                .eq('shop_id', shopId)
+                .maybeSingle();
+
+            if (existingAlloc?.id) {
+                await supabaseAdmin
+                    .from('inventory_allocations')
+                    .update({ quantity: physicalQty })
+                    .eq('id', existingAlloc.id);
+            } else {
+                await supabaseAdmin
+                    .from('inventory_allocations')
+                    .insert({
+                        item_id: itemId,
+                        shop_id: shopId,
+                        quantity: physicalQty
+                    });
+            }
+
+            // Update global inventory quantity
+            const { data: invItem } = await supabaseAdmin
+                .from('inventory_items')
+                .select('quantity, landed_cost')
+                .eq('id', itemId)
+                .maybeSingle();
+
+            if (invItem) {
+                const currentGlobal = Number(invItem.quantity || 0);
+                const nextGlobal = Math.max(0, currentGlobal + delta);
+                await supabaseAdmin
+                    .from('inventory_items')
+                    .update({
+                        quantity: nextGlobal,
+                        landed_cost: landedCost,
+                        acquisition_price: landedCost
+                    })
+                    .eq('id', itemId);
+            }
+        } else {
+            // Even if quantity matches, update landed cost if updated
+            const { data: invItem } = await supabaseAdmin
+                .from('inventory_items')
+                .select('landed_cost')
+                .eq('id', itemId)
+                .maybeSingle();
+
+            if (invItem && Math.abs(Number(invItem.landed_cost || 0) - landedCost) > 0.001) {
+                await supabaseAdmin
+                    .from('inventory_items')
+                    .update({
+                        landed_cost: landedCost,
+                        acquisition_price: landedCost
+                    })
+                    .eq('id', itemId);
+            }
+        }
+
+        // Categorize into aging bucket if in physical stock
+        if (physicalQty > 0) {
+            const addedDate = item.dateAdded ? new Date(item.dateAdded) : timestamp;
+            const diffMs = timestamp.getTime() - addedDate.getTime();
+            const daysInSystem = Math.max(0, Math.floor(diffMs / (1000 * 60 * 60 * 24)));
+
+            const itemSummary = {
+                id: itemId,
+                name: item.name,
+                category: item.category || 'General',
+                quantity: physicalQty,
+                landedCost,
+                sellingPrice,
+                totalCost: itemCostTotal,
+                totalRetail: itemRetailTotal,
+                daysInSystem,
+                dateAdded: item.dateAdded
+            };
+
+            if (daysInSystem < 60) {
+                buckets.under2m.count++;
+                buckets.under2m.units += physicalQty;
+                buckets.under2m.costValue += itemCostTotal;
+                buckets.under2m.retailValue += itemRetailTotal;
+                buckets.under2m.items.push(itemSummary);
+            } else if (daysInSystem < 120) {
+                buckets.twoTo4m.count++;
+                buckets.twoTo4m.units += physicalQty;
+                buckets.twoTo4m.costValue += itemCostTotal;
+                buckets.twoTo4m.retailValue += itemRetailTotal;
+                buckets.twoTo4m.items.push(itemSummary);
+            } else if (daysInSystem < 180) {
+                buckets.fourTo6m.count++;
+                buckets.fourTo6m.units += physicalQty;
+                buckets.fourTo6m.costValue += itemCostTotal;
+                buckets.fourTo6m.retailValue += itemRetailTotal;
+                buckets.fourTo6m.items.push(itemSummary);
+            } else if (daysInSystem < 240) {
+                buckets.sixTo8m.count++;
+                buckets.sixTo8m.units += physicalQty;
+                buckets.sixTo8m.costValue += itemCostTotal;
+                buckets.sixTo8m.retailValue += itemRetailTotal;
+                buckets.sixTo8m.items.push(itemSummary);
+            } else {
+                buckets.over8m.count++;
+                buckets.over8m.units += physicalQty;
+                buckets.over8m.costValue += itemCostTotal;
+                buckets.over8m.retailValue += itemRetailTotal;
+                buckets.over8m.items.push(itemSummary);
+            }
+        }
+    }
+
+    // Insert ledger entries in batch
+    if (ledgerInserts.length > 0) {
+        await supabaseAdmin.from('ledger_entries').insert(ledgerInserts);
+    }
+
+    // Clearance Strategies & Actionable Recommendations
+    const recommendations: string[] = [];
+    if (buckets.over8m.units > 0) {
+        recommendations.push(
+            `🚨 CRITICAL: Liquidate ${buckets.over8m.units} units of Zombie Stock (held 8+ months, $${buckets.over8m.costValue.toFixed(2)} locked capital). Launch a "Clearance at Cost" event or wholesale bundling to liberate cash into high-demand inventory.`
+        );
+    }
+    if (buckets.sixTo8m.units > 0) {
+        recommendations.push(
+            `⚠️ HIGH PRIORITY: ${buckets.sixTo8m.units} units are in the 6-8 month danger zone ($${buckets.sixTo8m.costValue.toFixed(2)} cost). Deploy "Buy 1 Get 1 at 50% Off" bundling paired with fresh arrivals, or execute inter-shop stock rebalancing transfers.`
+        );
+    }
+    if (buckets.fourTo6m.units > 0) {
+        recommendations.push(
+            `💡 PROACTIVE: ${buckets.fourTo6m.units} units are entering stagnation (4-6 months, $${buckets.fourTo6m.costValue.toFixed(2)} cost). Run a 20-25% weekend flash discount and reposition them on front display counters to stimulate turnover before margin decays.`
+        );
+    }
+    if (shrinkageUnits > 0) {
+        recommendations.push(
+            `🔍 LOSS PREVENTION: Unaccounted shrinkage of ${shrinkageUnits} units ($${shrinkageValueCost.toFixed(2)} loss) detected. Review till logs and physical security protocols immediately.`
+        );
+    }
+    if (recommendations.length === 0) {
+        recommendations.push(
+            `✅ EXCELLENT HEALTH: Inventory turnover is optimal with minimal stagnation. Maintain current restocking rhythm.`
+        );
+    }
+
+    // Blind spots addressed
+    const blindSpots = [
+        "Phantom Inventory Unmasked: Reconciled physical discrepancies that standard sales reports never detect.",
+        "Trapped Capital Visibility: Identified exactly how many dollars are locked in aged non-moving stock rather than producing revenue.",
+        "Holding Cost Deterioration: Exposed items sitting past 180 days that are subject to shelf wear, style obsolescence, and inflation drag.",
+        "Cash Reinvestment Path: Provided actionable liquidation targets to recycle dead capital into high-velocity daily sellers."
+    ];
+
+    // Audit Log
+    const reportRef = `STK-${shopId.toUpperCase()}-${Math.random().toString(36).substring(2, 7).toUpperCase()}`;
+    await supabaseAdmin.from('audit_log').insert({
+        id: Math.random().toString(36).substring(2, 9),
+        timestamp: timestampIso,
+        employee_id: auditorId,
+        action: 'SHOP_STOCKTAKE_AUDIT',
+        details: `Ref ${reportRef} for ${shopName} by ${auditorName}. Counted: ${totalPhysicalUnits} units, Cost Capital: $${totalLockedCapitalCost.toFixed(2)}, Retail: $${totalPotentialRevenue.toFixed(2)}, Shrinkage: $${shrinkageValueCost.toFixed(2)}. Next Due: ${nextDueDateFormatted}`
+    });
+
+    // Format WhatsApp Message
+    const formatPct = (val: number) => totalLockedCapitalCost > 0 ? ((val / totalLockedCapitalCost) * 100).toFixed(1) : '0.0';
+    const whatsappBody = 
+`📋 *NIRVANA STOCKTAKE & CAPITAL REPORT*
+🏪 *Shop:* ${shopName}
+👤 *Auditor:* ${auditorName}
+📅 *Date:* ${dateFormatted}
+🔖 *Ref:* ${reportRef}
+
+━━━━━━━━━━━━━━━━━━━━━
+📦 *INVENTORY VALUATION*
+• *Total Units Counted:* ${totalPhysicalUnits.toLocaleString()} pcs
+• *Locked Capital (At Cost):* $${totalLockedCapitalCost.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+• *Expected Retail Revenue:* $${totalPotentialRevenue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+• *Projected Gross Margin:* $${(totalPotentialRevenue - totalLockedCapitalCost).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+
+⚖️ *DISCREPANCY AUDIT*
+• Shrinkage: ${shrinkageUnits > 0 ? `-${shrinkageUnits} pcs (-$${shrinkageValueCost.toFixed(2)}) ⚠️` : 'None (0) ✅'}
+• Surplus: ${surplusUnits > 0 ? `+${surplusUnits} pcs (+$${surplusValueCost.toFixed(2)})` : 'None (0)'}
+
+⏳ *CAPITAL AGING BREAKDOWN*
+• *< 2 Months (Fresh):* $${buckets.under2m.costValue.toFixed(2)} (${formatPct(buckets.under2m.costValue)}%) | ${buckets.under2m.units} pcs
+• *2 - 4 Months (Aging):* $${buckets.twoTo4m.costValue.toFixed(2)} (${formatPct(buckets.twoTo4m.costValue)}%) | ${buckets.twoTo4m.units} pcs
+• *4 - 6 Months (Stagnant):* $${buckets.fourTo6m.costValue.toFixed(2)} (${formatPct(buckets.fourTo6m.costValue)}%) | ${buckets.fourTo6m.units} pcs
+• *6 - 8 Months (Critical):* $${buckets.sixTo8m.costValue.toFixed(2)} (${formatPct(buckets.sixTo8m.costValue)}%) | ${buckets.sixTo8m.units} pcs
+• *8+ Months (Zombie):* $${buckets.over8m.costValue.toFixed(2)} (${formatPct(buckets.over8m.costValue)}%) | ${buckets.over8m.units} pcs ${buckets.over8m.units > 0 ? '🚨' : '✅'}
+
+🎯 *TOP CLEARANCE RECOMMENDATION*
+${recommendations[0]}
+
+📅 *NEXT STOCKTAKE SCHEDULE*
+*Next Due Date:* ${nextDueDateFormatted} (Monthly Cycle)
+━━━━━━━━━━━━━━━━━━━━━
+_Generated via Nirvana Strategic POS Intelligence_`;
+
+    // Attempt automated WhatsApp dispatch
+    try {
+        const { data: managers } = await supabaseAdmin
+            .from('employees')
+            .select('mobile, role, shop_id')
+            .or(`shop_id.eq.${shopId},role.ilike.%owner%,role.ilike.%admin%`)
+            .limit(10);
+
+        const recipients = new Set<string>();
+        // Add known executive fallback
+        recipients.add('+263776905673');
+
+        for (const m of (managers || [])) {
+            const rawPhone = String(m.mobile || '').trim();
+            if (rawPhone.startsWith('+')) {
+                recipients.add(rawPhone);
+            }
+        }
+
+        for (const phone of Array.from(recipients)) {
+            await sendWhatsAppMessage(phone, whatsappBody).catch((err) => {
+                console.warn(`WhatsApp dispatch to ${phone} skipped:`, err?.message || err);
+            });
+        }
+    } catch (e) {
+        console.warn('Automated WhatsApp dispatch exception:', e);
+    }
+
+    revalidatePath(`/shops/${shopId}`);
+    revalidatePath(`/shops/${shopId}/stocktake`);
+    revalidatePath(`/inventory`);
+    revalidatePath(`/inventory/stocktake`);
+    revalidatePath(`/admin/audit`);
+    revalidatePath(`/api/dashboard/data`);
+
+    return {
+        success: true,
+        reportRef,
+        completedAt: timestampIso,
+        nextDueDate: nextDueDateFormatted,
+        nextDueIso: nextDueDate.toISOString(),
+        shop: { id: shopId, name: shopName },
+        auditor: { id: auditorId, name: auditorName },
+        summary: {
+            totalItemsAudited: items.length,
+            totalPhysicalUnits,
+            totalSystemUnits,
+            totalLockedCapitalCost,
+            totalPotentialRevenue,
+            projectedGrossMargin: totalPotentialRevenue - totalLockedCapitalCost,
+            shrinkageUnits,
+            shrinkageValueCost,
+            surplusUnits,
+            surplusValueCost,
+            adjustedItemCount
+        },
+        agingBuckets: {
+            under2m: { ...buckets.under2m, pct: formatPct(buckets.under2m.costValue) },
+            twoTo4m: { ...buckets.twoTo4m, pct: formatPct(buckets.twoTo4m.costValue) },
+            fourTo6m: { ...buckets.fourTo6m, pct: formatPct(buckets.fourTo6m.costValue) },
+            sixTo8m: { ...buckets.sixTo8m, pct: formatPct(buckets.sixTo8m.costValue) },
+            over8m: { ...buckets.over8m, pct: formatPct(buckets.over8m.costValue) },
+        },
+        recommendations,
+        blindSpots,
+        whatsappSummaryText: whatsappBody
+    };
+}
+
+export async function addNewUnitFromStocktake(input: {
+    shopId: string;
+    name: string;
+    category?: string;
+    physicalQuantity: number;
+    landedCost: number;
+    sellingPrice?: number;
+    sku?: string;
+    auditorId?: string;
+}) {
+    const shopId = String(input.shopId || '').trim();
+    const name = String(input.name || '').trim();
+    if (!shopId) throw new Error("Missing shopId");
+    if (!name) throw new Error("Product name is required");
+
+    const category = String(input.category || 'General').trim() || 'General';
+    const physicalQuantity = Math.max(0, Math.round(Number(input.physicalQuantity || 0)));
+    const landedCost = Math.max(0, Number(input.landedCost || 0));
+    const sellingPrice = Number(input.sellingPrice || (landedCost * 1.617));
+    const timestamp = new Date().toISOString();
+
+    // Check duplicate
+    const { data: existingMatches } = await supabaseAdmin
+        .from('inventory_items')
+        .select('id, name, quantity, category, landed_cost')
+        .ilike('name', name)
+        .limit(5);
+
+    const existing = (existingMatches || []).find(
+        (i: any) => String(i.name || '').toLowerCase() === name.toLowerCase()
+    );
+
+    let itemId = existing?.id;
+    if (!itemId) {
+        itemId = Math.random().toString(36).substring(2, 9);
+        await supabaseAdmin.from('inventory_items').insert({
+            id: itemId,
+            shipment_id: 'STOCKTAKE-INTAKE',
+            name,
+            category,
+            quantity: physicalQuantity,
+            acquisition_price: landedCost,
+            landed_cost: landedCost,
+            date_added: timestamp
+        });
+    } else {
+        await supabaseAdmin
+            .from('inventory_items')
+            .update({
+                quantity: Number(existing.quantity || 0) + physicalQuantity,
+                landed_cost: landedCost,
+                acquisition_price: landedCost
+            })
+            .eq('id', itemId);
+    }
+
+    // Upsert allocation
+    const { data: alloc } = await supabaseAdmin
+        .from('inventory_allocations')
+        .select('id, quantity')
+        .eq('item_id', itemId)
+        .eq('shop_id', shopId)
+        .maybeSingle();
+
+    if (alloc?.id) {
+        await supabaseAdmin
+            .from('inventory_allocations')
+            .update({ quantity: Number(alloc.quantity || 0) + physicalQuantity })
+            .eq('id', alloc.id);
+    } else {
+        await supabaseAdmin
+            .from('inventory_allocations')
+            .insert({
+                item_id: itemId,
+                shop_id: shopId,
+                quantity: physicalQuantity
+            });
+    }
+
+    const totalCost = physicalQuantity * landedCost;
+    if (totalCost > 0) {
+        await supabaseAdmin.from('ledger_entries').insert([{
+            id: Math.random().toString(36).substring(2, 9),
+            shop_id: shopId,
+            type: 'asset',
+            category: 'Inventory Acquisition',
+            amount: totalCost,
+            date: timestamp,
+            description: `Stocktake Intake (New Unit): ${name} (${physicalQuantity} units @ $${landedCost.toFixed(2)})`,
+            employee_id: input.auditorId || 'POS-STOCKTAKE'
+        }]);
+    }
+
+    await supabaseAdmin.from('audit_log').insert({
+        id: Math.random().toString(36).substring(2, 9),
+        timestamp,
+        employee_id: input.auditorId || 'POS-STOCKTAKE',
+        action: 'STOCKTAKE_NEW_UNIT_ADDED',
+        details: `Added new unit ${name} (${physicalQuantity} pcs @ $${landedCost.toFixed(2)}) for ${shopId} during stocktake audit`
+    });
+
+    revalidatePath(`/shops/${shopId}`);
+    revalidatePath(`/shops/${shopId}/stocktake`);
+
+    return {
+        success: true,
+        item: {
+            id: itemId,
+            name,
+            category,
+            landedCost,
+            sellingPrice,
+            physicalQuantity,
+            systemQuantity: 0,
+            dateAdded: timestamp,
+            sku: input.sku || itemId
+        }
+    };
+}
+

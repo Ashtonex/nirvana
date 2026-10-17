@@ -8,3 +8,4 @@ export * from './ReturnModal';
 export * from './AddStockModal';
 export * from './PoolClosingModal';
 export * from './ManagerWorkspaceModal';
+export * from './ShopStocktakeClient';

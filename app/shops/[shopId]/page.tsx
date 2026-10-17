@@ -23,7 +23,8 @@ import {
     Trash2,
     Calendar,
     ArrowRight,
-    CheckCircle
+    CheckCircle,
+    ClipboardList
 } from "lucide-react";
 
 export default async function ShopPage({ params }: { params: { shopId: string } }) {
@@ -56,9 +57,14 @@ export default async function ShopPage({ params }: { params: { shopId: string } 
         <div className="space-y-8 pb-32">
             <div className="flex justify-between items-end">
                 <div className="space-y-1">
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2.5">
                         <h1 className="text-3xl sm:text-4xl font-black tracking-tighter uppercase italic">{shop.name}</h1>
                         <Badge className="bg-emerald-500/10 text-emerald-500 border-emerald-500/20">Operational</Badge>
+                        <Link href={`/shops/${shopId}/stocktake`}>
+                            <Button size="sm" className="bg-indigo-600 hover:bg-indigo-500 text-white text-[10px] font-black uppercase tracking-wider h-8 px-3 rounded-xl shadow-lg shadow-indigo-600/20 flex items-center gap-1.5 transition-all hover:scale-105">
+                                <ClipboardList className="h-3.5 w-3.5" /> Stocktake
+                            </Button>
+                        </Link>
                     </div>
                     <p className="text-slate-400 font-medium tracking-tight">Strategic command for location {shopId.toUpperCase()}</p>
                 </div>
