@@ -4493,6 +4493,12 @@ export async function reapportionStock(itemId: string, allocations: { shopId: st
     const { data: item } = await supabaseAdmin.from('inventory_items').select('quantity, name').eq('id', itemId).single();
     if (!item) throw new Error("Item not found");
 
+    // Sanitize once so every downstream use (totals AND writes) sees the same non-negative value.
+    const sanitizedAllocations = allocations.map((a) => ({
+        shopId: a.shopId,
+        quantity: Math.max(0, Math.round(Number(a.quantity) || 0))
+    }));
+
     // Fetch all existing allocations for this item to determine true total across all shops
     const { data: allExistingAllocs } = await supabaseAdmin
         .from('inventory_allocations')
@@ -4501,7 +4507,7 @@ export async function reapportionStock(itemId: string, allocations: { shopId: st
 
     const allocMap = new Map<string, number>();
     (allExistingAllocs || []).forEach((a: any) => allocMap.set(a.shop_id, Number(a.quantity || 0)));
-    allocations.forEach((a) => allocMap.set(a.shopId, Math.max(0, Number(a.quantity || 0))));
+    sanitizedAllocations.forEach((a) => allocMap.set(a.shopId, a.quantity));
 
     let newTotalAcrossAllShops = 0;
     for (const q of allocMap.values()) {
@@ -4509,14 +4515,15 @@ export async function reapportionStock(itemId: string, allocations: { shopId: st
     }
 
     // If total allocated units exceed previous master stock, auto-update master stock to reflect reality
-    if (newTotalAcrossAllShops > Number(item.quantity || 0)) {
+    const previousMasterQuantity = Number(item.quantity || 0);
+    if (newTotalAcrossAllShops > previousMasterQuantity) {
         await supabaseAdmin
             .from('inventory_items')
             .update({ quantity: newTotalAcrossAllShops })
             .eq('id', itemId);
     }
 
-    for (const alloc of allocations) {
+    for (const alloc of sanitizedAllocations) {
         const existing = (allExistingAllocs || []).find((e: any) => e.shop_id === alloc.shopId);
 
         if (existing) {
@@ -4530,12 +4537,15 @@ export async function reapportionStock(itemId: string, allocations: { shopId: st
         }
     }
 
+    const masterStockRaised = newTotalAcrossAllShops > previousMasterQuantity;
     await supabaseAdmin.from('audit_log').insert({
         id: Math.random().toString(36).substring(2, 9),
         timestamp,
         employee_id: actor.id,
         action: 'STOCKS_REAPPORTIONED',
-        details: `${item.name} reapportioned across ${allocations.length} shops by ${actor.name}`
+        details: masterStockRaised
+            ? `${item.name} reapportioned across ${sanitizedAllocations.length} shops by ${actor.name}. Master stock auto-raised from ${previousMasterQuantity} to ${newTotalAcrossAllShops} to match submitted allocations.`
+            : `${item.name} reapportioned across ${sanitizedAllocations.length} shops by ${actor.name}`
     });
 
     const { data: verifiedAllocations } = await supabaseAdmin
@@ -4897,7 +4907,29 @@ export async function completeShopStocktake(input: ShopStocktakeInput) {
         .maybeSingle();
     const shopName = shopData?.name || shopId.toUpperCase();
 
-    const items = Array.isArray(input.items) ? input.items : [];
+    const allItems = Array.isArray(input.items) ? input.items : [];
+    // Only process items actually relevant to this shop's count (has physical stock now or
+    // had system stock) instead of scanning the entire company-wide catalog on every submit.
+    const items = allItems.filter((i: any) => {
+        const p = Math.max(0, Math.round(Number(i?.physicalQuantity || 0)));
+        const s = Math.max(0, Math.round(Number(i?.systemQuantity || 0)));
+        return p > 0 || s > 0;
+    });
+    const itemIds = items.map((i: any) => String(i.itemId || '').trim()).filter(Boolean);
+
+    // Fetch LIVE allocation + inventory data right now (not the client's page-load snapshot),
+    // so sales made during the audit aren't silently overwritten by a stale baseline.
+    const [{ data: liveAllocs }, { data: liveInventoryItems }] = itemIds.length
+        ? await Promise.all([
+            supabaseAdmin.from('inventory_allocations').select('item_id, quantity').eq('shop_id', shopId).in('item_id', itemIds),
+            supabaseAdmin.from('inventory_items').select('id, quantity, landed_cost').in('id', itemIds)
+        ])
+        : [{ data: [] as any[] }, { data: [] as any[] }];
+
+    const liveAllocMap = new Map<string, number>();
+    (liveAllocs || []).forEach((a: any) => liveAllocMap.set(a.item_id, Number(a.quantity || 0)));
+    const liveInvMap = new Map<string, { quantity: number; landed_cost: number }>();
+    (liveInventoryItems || []).forEach((i: any) => liveInvMap.set(i.id, { quantity: Number(i.quantity || 0), landed_cost: Number(i.landed_cost || 0) }));
 
     let totalPhysicalUnits = 0;
     let totalSystemUnits = 0;
@@ -4926,7 +4958,8 @@ export async function completeShopStocktake(input: ShopStocktakeInput) {
         if (!itemId) continue;
 
         const physicalQty = Math.max(0, Math.round(Number(item.physicalQuantity || 0)));
-        const systemQty = Math.max(0, Math.round(Number(item.systemQuantity || 0)));
+        // Use the live allocation fetched just above, not the client's page-load snapshot.
+        const systemQty = liveAllocMap.get(itemId) ?? 0;
         const landedCost = Math.max(0, Number(item.landedCost || 0));
         const sellingPrice = Math.max(0, Number(item.sellingPrice || (landedCost * 1.617)));
         const delta = physicalQty - systemQty;
@@ -4976,19 +5009,13 @@ export async function completeShopStocktake(input: ShopStocktakeInput) {
                 });
             }
 
-            // Upsert Allocation
-            const { data: existingAlloc } = await supabaseAdmin
-                .from('inventory_allocations')
-                .select('id')
-                .eq('item_id', itemId)
-                .eq('shop_id', shopId)
-                .maybeSingle();
-
-            if (existingAlloc?.id) {
+            // Upsert Allocation (existence already known from the live batch fetch above)
+            if (liveAllocMap.has(itemId)) {
                 await supabaseAdmin
                     .from('inventory_allocations')
                     .update({ quantity: physicalQty })
-                    .eq('id', existingAlloc.id);
+                    .eq('item_id', itemId)
+                    .eq('shop_id', shopId);
             } else {
                 await supabaseAdmin
                     .from('inventory_allocations')
@@ -4999,16 +5026,10 @@ export async function completeShopStocktake(input: ShopStocktakeInput) {
                     });
             }
 
-            // Update global inventory quantity
-            const { data: invItem } = await supabaseAdmin
-                .from('inventory_items')
-                .select('quantity, landed_cost')
-                .eq('id', itemId)
-                .maybeSingle();
-
+            // Update global inventory quantity using the live snapshot fetched above
+            const invItem = liveInvMap.get(itemId);
             if (invItem) {
-                const currentGlobal = Number(invItem.quantity || 0);
-                const nextGlobal = Math.max(0, currentGlobal + delta);
+                const nextGlobal = Math.max(0, invItem.quantity + delta);
                 await supabaseAdmin
                     .from('inventory_items')
                     .update({
@@ -5019,14 +5040,9 @@ export async function completeShopStocktake(input: ShopStocktakeInput) {
                     .eq('id', itemId);
             }
         } else {
-            // Even if quantity matches, update landed cost if updated
-            const { data: invItem } = await supabaseAdmin
-                .from('inventory_items')
-                .select('landed_cost')
-                .eq('id', itemId)
-                .maybeSingle();
-
-            if (invItem && Math.abs(Number(invItem.landed_cost || 0) - landedCost) > 0.001) {
+            // Even if quantity matches, update landed cost if it changed
+            const invItem = liveInvMap.get(itemId);
+            if (invItem && Math.abs(invItem.landed_cost - landedCost) > 0.001) {
                 await supabaseAdmin
                     .from('inventory_items')
                     .update({

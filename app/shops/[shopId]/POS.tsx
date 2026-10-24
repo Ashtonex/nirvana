@@ -381,10 +381,8 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
 
     const canUseManagerTools = (() => {
         const r = String(staffRole || "").toLowerCase();
-        // Overall admin and owner always have full management access
-        if (r === "owner" || r === "admin" || r.includes("manager")) return true;
-        // Default to true so operators on this device are never locked out of management
-        return true;
+        if (!r || r === "cashier" || r === "staff") return true;
+        return r === "owner" || r === "admin" || r.includes("manager");
     })();
     const [isManagerToolsOpen, setIsManagerToolsOpen] = useState(false);
 

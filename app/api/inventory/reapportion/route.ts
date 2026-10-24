@@ -85,6 +85,12 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Item not found" }, { status: 404 });
     }
 
+    // Sanitize once so every downstream use (totals AND writes) sees the same non-negative value.
+    const sanitizedAllocations = allocations.map((a: any) => ({
+      shopId: a.shopId,
+      quantity: Math.max(0, parseInt(a.quantity) || 0),
+    }));
+
     // Fetch all existing allocations for this item to determine true total across all shops
     const { data: allExistingAllocs } = await supabaseAdmin
       .from("inventory_allocations")
@@ -93,7 +99,7 @@ export async function POST(req: Request) {
 
     const allocMap = new Map<string, number>();
     (allExistingAllocs || []).forEach((a: any) => allocMap.set(a.shop_id, Number(a.quantity || 0)));
-    allocations.forEach((a: any) => allocMap.set(a.shopId, Math.max(0, parseInt(a.quantity) || 0)));
+    sanitizedAllocations.forEach((a) => allocMap.set(a.shopId, a.quantity));
 
     let newTotalAcrossAllShops = 0;
     for (const q of allocMap.values()) {
@@ -101,16 +107,18 @@ export async function POST(req: Request) {
     }
 
     // Auto-increase master stock if physical allocations exceed old master stock
-    if (newTotalAcrossAllShops > Number(item.quantity || 0)) {
+    const previousMasterQuantity = Number(item.quantity || 0);
+    const masterStockRaised = newTotalAcrossAllShops > previousMasterQuantity;
+    if (masterStockRaised) {
       await supabaseAdmin
         .from("inventory_items")
         .update({ quantity: newTotalAcrossAllShops })
         .eq("id", itemId);
     }
 
-    for (const alloc of allocations) {
+    for (const alloc of sanitizedAllocations) {
       const shopId = alloc.shopId;
-      const quantity = parseInt(alloc.quantity) || 0;
+      const quantity = alloc.quantity;
 
       console.log(`[REAPPORTION] Processing allocation for shop ${shopId}, qty: ${quantity}`);
 
@@ -176,7 +184,9 @@ export async function POST(req: Request) {
       timestamp,
       employee_id: actor.id,
       action: "STOCKS_REAPPORTIONED",
-      details: `${item.name} reapportioned across ${allocations.length} shops by ${actor.name}`,
+      details: masterStockRaised
+        ? `${item.name} reapportioned across ${sanitizedAllocations.length} shops by ${actor.name}. Master stock auto-raised from ${previousMasterQuantity} to ${newTotalAcrossAllShops} to match submitted allocations.`
+        : `${item.name} reapportioned across ${sanitizedAllocations.length} shops by ${actor.name}`,
     });
 
     // Force cache invalidation

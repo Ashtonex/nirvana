@@ -344,7 +344,11 @@ export default function ShopStocktakeClient({
     const handleCompleteStocktake = () => {
         startCompleteTransition(async () => {
             try {
-                const payload: ShopStocktakeCountItem[] = items.map((i) => ({
+                // Only send items actually relevant to this shop (in stock now or previously),
+                // instead of the entire company-wide catalog, to keep the payload small and fast.
+                const payload: ShopStocktakeCountItem[] = items
+                    .filter((i) => Number(i.physicalQuantity || 0) > 0 || Number(i.systemQuantity || 0) > 0)
+                    .map((i) => ({
                     itemId: i.id,
                     name: i.name,
                     category: i.category,
