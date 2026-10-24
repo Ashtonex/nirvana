@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo, useTransition } from "react";
+import React, { useState, useMemo, useEffect, useTransition } from "react";
 import Link from "next/link";
 import {
     Card,
@@ -110,6 +110,120 @@ export default function ShopStocktakeClient({
     const [newUnitSellingPrice, setNewUnitSellingPrice] = useState("");
     const [isAddingUnit, startAddUnitTransition] = useTransition();
     const [isCompleting, startCompleteTransition] = useTransition();
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // OFFLINE RESILIENCE: local draft autosave + connectivity awareness.
+    // A stocktake can run for a long time on a shop-floor device with patchy
+    // signal; losing a half-finished count to a reload, crash, or dropped
+    // connection would mean re-counting the whole shop from scratch.
+    // ─────────────────────────────────────────────────────────────────────────
+    const draftStorageKey = `nirvana_stocktake_draft_${shop.id}`;
+    const [isOnline, setIsOnline] = useState(() => (typeof navigator === "undefined" ? true : navigator.onLine));
+    const [pendingDraft, setPendingDraft] = useState<{ savedAt: number; selectedAuditorId?: string; overrides: any[] } | null>(null);
+    const [lastSavedAt, setLastSavedAt] = useState<number | null>(null);
+
+    // Track connectivity so we can gate network-dependent actions and reassure the auditor.
+    useEffect(() => {
+        const goOnline = () => setIsOnline(true);
+        const goOffline = () => setIsOnline(false);
+        window.addEventListener("online", goOnline);
+        window.addEventListener("offline", goOffline);
+        return () => {
+            window.removeEventListener("online", goOnline);
+            window.removeEventListener("offline", goOffline);
+        };
+    }, []);
+
+    // On first load, check for a draft left behind by a previous session (crash, reload,
+    // battery die, accidental tab close) and offer to resume it rather than silently losing it.
+    useEffect(() => {
+        try {
+            const raw = window.localStorage.getItem(draftStorageKey);
+            if (!raw) return;
+            const parsed = JSON.parse(raw);
+            if (parsed && Array.isArray(parsed.overrides) && parsed.overrides.length > 0) {
+                setPendingDraft(parsed);
+            } else {
+                window.localStorage.removeItem(draftStorageKey);
+            }
+        } catch {
+            // Corrupt or inaccessible draft (private mode, quota) - ignore, start fresh.
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
+    // Autosave (debounced) every time counts change, but only once the draft-resume question
+    // has been resolved - otherwise we'd overwrite the saved draft with the fresh empty state
+    // before the auditor even gets a chance to resume it.
+    useEffect(() => {
+        if (pendingDraft) return;
+        const timer = setTimeout(() => {
+            try {
+                const overrides = items
+                    .filter((i) => i.isModified)
+                    .map((i) => ({
+                        id: i.id,
+                        physicalQuantity: i.physicalQuantity,
+                        landedCost: i.landedCost,
+                        sellingPrice: i.sellingPrice
+                    }));
+
+                if (overrides.length === 0) {
+                    window.localStorage.removeItem(draftStorageKey);
+                    return;
+                }
+
+                const savedAt = Date.now();
+                window.localStorage.setItem(draftStorageKey, JSON.stringify({ savedAt, selectedAuditorId, overrides }));
+                setLastSavedAt(savedAt);
+            } catch {
+                // Storage unavailable/full - counting still works, it just won't survive a crash.
+            }
+        }, 600);
+        return () => clearTimeout(timer);
+    }, [items, selectedAuditorId, pendingDraft, draftStorageKey]);
+
+    const formatRelativeTime = (ts: number) => {
+        const seconds = Math.max(0, Math.floor((Date.now() - ts) / 1000));
+        if (seconds < 5) return "just now";
+        if (seconds < 60) return `${seconds}s ago`;
+        const minutes = Math.floor(seconds / 60);
+        if (minutes < 60) return `${minutes}m ago`;
+        const hours = Math.floor(minutes / 60);
+        return `${hours}h ago`;
+    };
+
+    const handleResumeDraft = () => {
+        if (!pendingDraft) return;
+        const overrideMap = new Map<string, any>(pendingDraft.overrides.map((o: any) => [o.id, o]));
+        setItems((prev) =>
+            prev.map((item) => {
+                const o = overrideMap.get(item.id);
+                if (!o) return item;
+                const physicalQuantity = Math.max(0, Math.round(Number(o.physicalQuantity) || 0));
+                return {
+                    ...item,
+                    physicalQuantity,
+                    landedCost: Math.max(0, Number(o.landedCost ?? item.landedCost) || 0),
+                    sellingPrice: Math.max(0, Number(o.sellingPrice ?? item.sellingPrice) || 0),
+                    isModified: true
+                };
+            })
+        );
+        if (pendingDraft.selectedAuditorId && activeEmployees.some((e) => e.id === pendingDraft.selectedAuditorId)) {
+            setSelectedAuditorId(pendingDraft.selectedAuditorId);
+        }
+        setPendingDraft(null);
+    };
+
+    const handleDiscardDraft = () => {
+        try {
+            window.localStorage.removeItem(draftStorageKey);
+        } catch {
+            // ignore
+        }
+        setPendingDraft(null);
+    };
 
     // Categories list
     const categories = useMemo(() => {
@@ -292,6 +406,10 @@ export default function ShopStocktakeClient({
             alert("Please enter a product name.");
             return;
         }
+        if (!isOnline) {
+            alert("You're offline. Adding a new product needs a connection - your form details are kept, just reconnect and try again.");
+            return;
+        }
 
         const cost = parseFloat(newUnitLandedCost) || 0;
         const retail = parseFloat(newUnitSellingPrice) || Math.round(cost * 1.617 * 100) / 100;
@@ -342,6 +460,10 @@ export default function ShopStocktakeClient({
 
     // Handle Complete Stocktake Submission
     const handleCompleteStocktake = () => {
+        if (!isOnline) {
+            alert("You're offline. Your counts are saved safely on this device - reconnect and try again to finish the stocktake.");
+            return;
+        }
         startCompleteTransition(async () => {
             try {
                 // Only send items actually relevant to this shop (in stock now or previously),
@@ -368,6 +490,11 @@ export default function ShopStocktakeClient({
                 });
 
                 if (report.success) {
+                    try {
+                        window.localStorage.removeItem(draftStorageKey);
+                    } catch {
+                        // ignore
+                    }
                     setAuditReport(report);
                     setIsConfirmModalOpen(false);
                 }
@@ -850,6 +977,48 @@ export default function ShopStocktakeClient({
     // ─────────────────────────────────────────────────────────────────────────
     return (
         <div className="max-w-7xl mx-auto space-y-6 pb-32 pt-2 px-2 sm:px-4">
+            {/* Resume Previous Draft Banner */}
+            {pendingDraft && (
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-amber-950/40 border border-amber-500/40 p-4 rounded-2xl">
+                    <div className="flex items-start gap-3">
+                        <RefreshCw className="h-5 w-5 text-amber-400 shrink-0 mt-0.5" />
+                        <div>
+                            <p className="text-sm font-black text-amber-300 uppercase tracking-wide">
+                                Unsaved count found from {formatRelativeTime(pendingDraft.savedAt)}
+                            </p>
+                            <p className="text-xs text-slate-400">
+                                {pendingDraft.overrides.length} item{pendingDraft.overrides.length !== 1 ? "s" : ""} had counts entered before this device reloaded or lost connection. Resume to keep that work, or discard to start a fresh count.
+                            </p>
+                        </div>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                        <Button
+                            variant="outline"
+                            onClick={handleDiscardDraft}
+                            className="border-slate-700 text-slate-300 hover:text-white text-xs font-black uppercase h-9"
+                        >
+                            Discard
+                        </Button>
+                        <Button
+                            onClick={handleResumeDraft}
+                            className="bg-amber-600 hover:bg-amber-500 text-white text-xs font-black uppercase h-9 px-4"
+                        >
+                            Resume Count
+                        </Button>
+                    </div>
+                </div>
+            )}
+
+            {/* Offline Status Banner */}
+            {!isOnline && (
+                <div className="flex items-center gap-3 bg-rose-950/40 border border-rose-500/40 p-3.5 rounded-2xl">
+                    <AlertCircle className="h-5 w-5 text-rose-400 shrink-0" />
+                    <p className="text-xs text-rose-300 font-medium">
+                        <strong className="font-black uppercase">Offline.</strong> Your counts are being saved on this device as you go - nothing is lost. Adding new products and finishing the stocktake need a connection.
+                    </p>
+                </div>
+            )}
+
             {/* Top Navigation & Status Bar */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-slate-900/90 border border-slate-800 p-4 sm:p-5 rounded-3xl backdrop-blur-md shadow-2xl">
                 <div className="flex items-center gap-3">
@@ -869,6 +1038,11 @@ export default function ShopStocktakeClient({
                         </div>
                         <p className="text-xs text-slate-400">
                             Touch-first stock count • Update physical counts & landed costs
+                        </p>
+                        <p className="text-[10px] text-slate-500 font-medium flex items-center gap-1 mt-0.5">
+                            <Clock className="h-3 w-3" />
+                            {lastSavedAt ? `Saved on this device ${formatRelativeTime(lastSavedAt)}` : "Not yet saved on this device"}
+                            {!isOnline && <span className="text-rose-400 font-bold">• Offline</span>}
                         </p>
                     </div>
                 </div>
@@ -1369,10 +1543,11 @@ export default function ShopStocktakeClient({
                                 </Button>
                                 <Button
                                     onClick={handleAddNewUnit}
-                                    disabled={isAddingUnit || !newUnitName.trim()}
+                                    disabled={isAddingUnit || !newUnitName.trim() || !isOnline}
+                                    title={!isOnline ? "Reconnect to add new products" : undefined}
                                     className="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black uppercase px-5"
                                 >
-                                    {isAddingUnit ? "Adding..." : "Save & Allocate Unit"}
+                                    {isAddingUnit ? "Adding..." : !isOnline ? "Offline - Reconnect to Save" : "Save & Allocate Unit"}
                                 </Button>
                             </div>
                         </CardContent>
@@ -1446,6 +1621,13 @@ export default function ShopStocktakeClient({
                                 </ul>
                             </div>
 
+                            {!isOnline && (
+                                <div className="p-3 bg-rose-950/40 border border-rose-500/40 rounded-xl text-[11px] text-rose-300 flex items-start gap-2">
+                                    <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
+                                    <span>You're offline. Your counts are safe on this device, but submitting needs a connection - reconnect and try again.</span>
+                                </div>
+                            )}
+
                             <div className="flex justify-end gap-2.5 pt-2">
                                 <Button
                                     variant="outline"
@@ -1457,10 +1639,11 @@ export default function ShopStocktakeClient({
                                 </Button>
                                 <Button
                                     onClick={handleCompleteStocktake}
-                                    disabled={isCompleting}
+                                    disabled={isCompleting || !isOnline}
+                                    title={!isOnline ? "Reconnect to submit the stocktake - your counts are saved on this device" : undefined}
                                     className="bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-black uppercase px-6 shadow-lg shadow-indigo-600/30"
                                 >
-                                    {isCompleting ? "Reconciling..." : "Confirm & Complete Stocktake"}
+                                    {isCompleting ? "Reconciling..." : !isOnline ? "Offline - Reconnect to Submit" : "Confirm & Complete Stocktake"}
                                 </Button>
                             </div>
                         </CardContent>
