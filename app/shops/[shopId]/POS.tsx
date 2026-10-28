@@ -45,6 +45,7 @@ import {
     MessageSquare,
     LogOut,
     Printer,
+    Bluetooth,
     Heart,
     Warehouse
 } from "lucide-react";
@@ -194,8 +195,15 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
                 }
             }
 
-            return (item.name?.toLowerCase().includes(query) ||
-                item.category?.toLowerCase().includes(query));
+            const nameNorm = (item.name || "").toLowerCase();
+            const catNorm = (item.category || "").toLowerCase();
+            const skuNorm = (item.sku || item.id || "").toLowerCase();
+            const normalizedHaystack = `${nameNorm} ${catNorm} ${skuNorm} ${nameNorm.replace(/t-shirt/g, 'tshirt t shirt tee tees').replace(/2xl/g, 'xxl 2xl').replace(/xxl/g, '2xl xxl')}`;
+            const tokens = query.split(/\s+/).filter(Boolean);
+            return tokens.every((token: string) => {
+                const cleanToken = token.replace(/[^a-z0-9]/g, '');
+                return normalizedHaystack.includes(token) || (cleanToken.length > 0 && normalizedHaystack.replace(/[^a-z0-9\s]/g, '').includes(cleanToken));
+            });
         });
     }, [groupedInventory, deferredSearchTerm, shopId]);
 
@@ -248,15 +256,22 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
             }
 
             if (query) {
-                const nameMatches = item.name?.toLowerCase().includes(query);
-                const catMatches = item.category?.toLowerCase().includes(query);
-                const skuMatches = item.sku?.toLowerCase().includes(query);
-                return nameMatches || catMatches || skuMatches;
+                const nameNorm = (item.name || "").toLowerCase();
+                const catNorm = (item.category || "").toLowerCase();
+                const skuNorm = (item.sku || item.id || "").toLowerCase();
+                const normalizedHaystack = `${nameNorm} ${catNorm} ${skuNorm} ${nameNorm.replace(/t-shirt/g, 'tshirt t shirt tee tees').replace(/2xl/g, 'xxl 2xl').replace(/xxl/g, '2xl xxl')}`;
+                const tokens = query.split(/\s+/).filter(Boolean);
+                return tokens.every((token: string) => {
+                    const cleanToken = token.replace(/[^a-z0-9]/g, '');
+                    return normalizedHaystack.includes(token) || (cleanToken.length > 0 && normalizedHaystack.replace(/[^a-z0-9\s]/g, '').includes(cleanToken));
+                });
             }
 
             return true;
         }).map((item: any) => {
-            const defaultSellingPrice = Math.round(((item.landedCost || 10) * 1.4) * 1.155 * 100) / 100;
+            const isTee = (item.category === "Plain T-Shirt" || item.category === "Plain Golf T-Shirt" || item.name?.toLowerCase().includes("plain") || item.name?.toLowerCase().includes("t-shirt") || item.name?.toLowerCase().includes("atta"));
+            const teePrice = (item.category === "Plain Golf T-Shirt" || item.name?.toLowerCase().includes("golf")) ? 5.00 : 3.50;
+            const defaultSellingPrice = isTee ? teePrice : Math.round(((item.landedCost || 10) * 1.4) * 1.155 * 100) / 100;
             return {
                 ...item,
                 sellingPrice: item.price || item.sellingPrice || defaultSellingPrice
@@ -1839,8 +1854,22 @@ Generated via NIRVANA POS`;
                             </div>
                         </button>
 
-                        {/* Compact Printer & Hardware */}
-                        <div className="hidden sm:flex items-center gap-1 bg-slate-950 border border-slate-800 rounded-xl p-1 h-10">
+                        {/* Restored: Expenses Entered Quick View */}
+                        <button
+                            type="button"
+                            onClick={() => setIsExpensesModalOpen(true)}
+                            className="bg-slate-950 border border-slate-800 hover:border-rose-500/60 px-3 py-1.5 rounded-xl flex items-center gap-2 h-10 shadow transition-all cursor-pointer group"
+                            title="View expenses entered today"
+                        >
+                            <AlertCircle className="h-4 w-4 text-rose-400 group-hover:scale-110 transition-transform" />
+                            <div className="flex flex-col text-left">
+                                <span className="text-[9px] text-slate-500 uppercase font-black leading-none">Exp.</span>
+                                <span className="text-xs font-bold text-rose-400 font-mono">${todaysPosExpenses.toFixed(2)}</span>
+                            </div>
+                        </button>
+
+                        {/* Restored: Bluetooth Printer Switch & Hardware (Visible on mobile & desktop) */}
+                        <div className="flex items-center gap-1 bg-slate-950 border border-slate-800 rounded-xl p-1 h-10 shadow">
                             <Button
                                 onClick={() => handleConnectPrinter('usb')}
                                 disabled={isConnectingPrinter}
@@ -1857,11 +1886,15 @@ Generated via NIRVANA POS`;
                                 disabled={isConnectingPrinter}
                                 variant="ghost"
                                 className={cn(
-                                    "h-8 px-2 text-[9px] font-black uppercase italic flex items-center gap-1 rounded-lg",
-                                    (isPrinterConnected && printerTransport === 'bluetooth') ? "bg-blue-500/20 text-blue-400" : "text-slate-500"
+                                    "h-8 px-2.5 text-[9px] font-black uppercase italic flex items-center gap-1.5 rounded-lg transition-all",
+                                    (isPrinterConnected && printerTransport === 'bluetooth')
+                                        ? "bg-blue-600 text-white shadow-md shadow-blue-500/30"
+                                        : "text-blue-400 hover:text-white hover:bg-blue-950/40"
                                 )}
+                                title="Switch on / connect Bluetooth receipt printer"
                             >
-                                {isConnectingPrinter && printerTransport === 'bluetooth' ? "..." : "BT"}
+                                <Bluetooth className={cn("h-3.5 w-3.5", isPrinterConnected && printerTransport === 'bluetooth' ? "text-white animate-pulse" : "text-blue-400")} />
+                                <span>{isConnectingPrinter && printerTransport === 'bluetooth' ? "Connecting..." : (isPrinterConnected && printerTransport === 'bluetooth') ? "BT Online" : "Bluetooth"}</span>
                             </Button>
                         </div>
 
@@ -1975,6 +2008,16 @@ Generated via NIRVANA POS`;
                             title="Record shop expense"
                         >
                             <Minus className="h-4 w-4" /> Add Exp.
+                        </Button>
+
+                        {/* Restored: View Expenses Entered */}
+                        <Button
+                            onClick={() => setIsExpensesModalOpen(true)}
+                            variant="outline"
+                            className="h-10 px-3 border-rose-500/30 text-rose-200 hover:bg-rose-500/10 text-[10px] font-black uppercase italic flex items-center gap-1.5 rounded-xl shadow transition-all hover:scale-[1.02]"
+                            title="View all entered expenses and cash routing"
+                        >
+                            <FileText className="h-4 w-4 text-rose-400" /> Expenses (${todaysPosExpenses.toFixed(2)})
                         </Button>
 
                         {/* 3. Product Returns */}

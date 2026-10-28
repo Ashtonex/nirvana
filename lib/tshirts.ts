@@ -72,9 +72,9 @@ export function classifyTeeLine(item: {
         cat.includes("shirt")) &&
       !cat.includes("golf")) ||
     (!isExplicitlyNonTee &&
-      (/\bplain\b/.test(name) &&
+      (/\bplain\b/.test(name) || /\batta\b/.test(name) || /\bround neck\b/.test(name) || /\bkids\b/.test(name) || /\bunknown brand\b/.test(name)) &&
         (/\bt-?shirt\b/.test(name) || /\btee\b/.test(name)) &&
-        !/\bgolf\b/.test(name)));
+        !/\bgolf\b/.test(name));
 
   if (isPlain) return "plain";
 
