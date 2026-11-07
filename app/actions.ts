@@ -1747,6 +1747,144 @@ export async function receiveStockInShop(input: {
     throw new Error(`Unsupported movement type: ${movementType}`);
 }
 
+export async function transferStockBetweenShops(input: {
+    fromShopId: string;
+    toShopId: string;
+    itemId: string;
+    quantity: number;
+    notes?: string;
+    employeeId?: string;
+}) {
+    const actor = await getActorFromCookies().catch(() => null);
+    const fromShopId = String(input.fromShopId || '').trim();
+    const toShopId = String(input.toShopId || '').trim();
+    const itemId = String(input.itemId || '').trim();
+    const qty = Math.max(1, Math.round(Number(input.quantity || 0)));
+    const timestamp = new Date().toISOString();
+    const effectiveEmployeeId = input.employeeId || actor?.id || 'POS';
+
+    if (!fromShopId) throw new Error("Source shop is required");
+    if (!toShopId) throw new Error("Destination shop is required");
+    if (fromShopId.toLowerCase() === toShopId.toLowerCase()) {
+        throw new Error("Source and destination shop cannot be the same");
+    }
+    if (!itemId) throw new Error("Item ID is required");
+    if (qty <= 0) throw new Error("Transfer quantity must be greater than zero");
+
+    // 1. Fetch item from master catalog
+    const { data: item, error: itemErr } = await supabaseAdmin
+        .from('inventory_items')
+        .select('*')
+        .eq('id', itemId)
+        .maybeSingle();
+
+    if (itemErr || !item) {
+        throw new Error("Product not found in master catalog");
+    }
+
+    // 2. Fetch source allocation (shop A)
+    const { data: sourceAlloc, error: sourceErr } = await supabaseAdmin
+        .from('inventory_allocations')
+        .select('*')
+        .eq('item_id', itemId)
+        .ilike('shop_id', fromShopId)
+        .maybeSingle();
+
+    if (sourceErr) throw new Error(`Database error fetching source allocation: ${sourceErr.message}`);
+
+    const sourceQty = Number(sourceAlloc?.quantity || 0);
+    if (sourceQty < qty) {
+        throw new Error(`Insufficient stock in ${fromShopId.toUpperCase()}. Available: ${sourceQty}, requested transfer: ${qty}`);
+    }
+
+    // 3. Fetch destination allocation (shop B)
+    const { data: destAlloc, error: destErr } = await supabaseAdmin
+        .from('inventory_allocations')
+        .select('*')
+        .eq('item_id', itemId)
+        .ilike('shop_id', toShopId)
+        .maybeSingle();
+
+    if (destErr) throw new Error(`Database error fetching destination allocation: ${destErr.message}`);
+
+    const destQty = Number(destAlloc?.quantity || 0);
+
+    const newSourceQty = Math.max(0, sourceQty - qty);
+    const newDestQty = destQty + qty;
+
+    // 4. Update source allocation (deduct from Shop A)
+    if (sourceAlloc) {
+        const { error: updSrcErr } = await supabaseAdmin
+            .from('inventory_allocations')
+            .update({ quantity: newSourceQty })
+            .eq('id', sourceAlloc.id);
+        if (updSrcErr) throw new Error(`Failed to deduct stock from source shop: ${updSrcErr.message}`);
+    } else {
+        throw new Error(`Source allocation not found for ${item.name} at ${fromShopId}`);
+    }
+
+    // 5. Update or insert destination allocation (add to Shop B)
+    if (destAlloc) {
+        const { error: updDestErr } = await supabaseAdmin
+            .from('inventory_allocations')
+            .update({ quantity: newDestQty })
+            .eq('id', destAlloc.id);
+        if (updDestErr) throw new Error(`Failed to add stock to destination shop: ${updDestErr.message}`);
+    } else {
+        const { error: insDestErr } = await supabaseAdmin
+            .from('inventory_allocations')
+            .insert({
+                item_id: itemId,
+                shop_id: toShopId,
+                quantity: newDestQty
+            });
+        if (insDestErr) throw new Error(`Failed to create allocation in destination shop: ${insDestErr.message}`);
+    }
+
+    // 6. Fetch shop display names for audit readability
+    const { data: shopsData } = await supabaseAdmin
+        .from('shops')
+        .select('id, name')
+        .in('id', [fromShopId, toShopId]);
+
+    const shopMap = new Map((shopsData || []).map((s: any) => [String(s.id).toLowerCase(), s.name]));
+    const fromShopName = shopMap.get(fromShopId.toLowerCase()) || fromShopId.toUpperCase();
+    const toShopName = shopMap.get(toShopId.toLowerCase()) || toShopId.toUpperCase();
+
+    // 7. Audit log
+    const refCode = `TRF-${Math.random().toString(36).substring(2, 7).toUpperCase()}`;
+    await supabaseAdmin.from('audit_log').insert({
+        id: Math.random().toString(36).substring(2, 9),
+        timestamp,
+        employee_id: effectiveEmployeeId,
+        action: 'INTER_SHOP_TRANSFER',
+        details: `Ref ${refCode}: Transferred ${qty} units of "${item.name}" from ${fromShopName} (${sourceQty} -> ${newSourceQty}) to ${toShopName} (${destQty} -> ${newDestQty})${input.notes ? ` | Notes: ${input.notes}` : ''}`,
+    });
+
+    // 8. Revalidate Next.js paths
+    revalidatePath(`/shops/${fromShopId}`);
+    revalidatePath(`/shops/${toShopId}`);
+    revalidatePath('/inventory');
+    revalidatePath('/admin/audit');
+    revalidatePath('/api/dashboard/data');
+    revalidatePath('/');
+
+    return {
+        success: true,
+        refCode,
+        itemId,
+        itemName: item.name,
+        fromShopId,
+        fromShopName,
+        toShopId,
+        toShopName,
+        transferredQty: qty,
+        newSourceQty,
+        newDestQty,
+        timestamp
+    };
+}
+
 export async function openCashRegister(shopId: string, expectedAmount: number, actualAmount: number) {
     const timestamp = new Date().toISOString();
     const id = Math.random().toString(36).substring(2, 9);

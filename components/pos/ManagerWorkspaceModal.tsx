@@ -31,6 +31,7 @@ interface ManagerWorkspaceModalProps {
     onOpenDirectOps: () => void;
     onOpenReportsHistory: () => void;
     onGenerateStrategicReport: () => void;
+    onOpenStockTransfer?: () => void;
 }
 
 export const ManagerWorkspaceModal: React.FC<ManagerWorkspaceModalProps> = ({
@@ -46,6 +47,7 @@ export const ManagerWorkspaceModal: React.FC<ManagerWorkspaceModalProps> = ({
     onOpenDirectOps,
     onOpenReportsHistory,
     onGenerateStrategicReport,
+    onOpenStockTransfer,
 }) => {
     if (!isOpen) return null;
 
@@ -110,7 +112,7 @@ export const ManagerWorkspaceModal: React.FC<ManagerWorkspaceModalProps> = ({
                     {/* Operations Actions */}
                     <div className="space-y-2">
                         <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">
-                            Cash Operations & Transfers
+                            Cash Operations & Stock Transfers
                         </span>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                             <Button
@@ -132,6 +134,18 @@ export const ManagerWorkspaceModal: React.FC<ManagerWorkspaceModalProps> = ({
                             >
                                 <ArrowRightLeft className="mr-2 h-4 w-4 text-violet-400" /> Direct Ops Transfer
                             </Button>
+
+                            {onOpenStockTransfer && (
+                                <Button
+                                    onClick={() => {
+                                        onClose();
+                                        onOpenStockTransfer();
+                                    }}
+                                    className="bg-slate-950 hover:bg-slate-800 border border-cyan-500/30 text-cyan-300 text-xs font-black uppercase tracking-wider h-11 flex items-center justify-start px-3 sm:col-span-2"
+                                >
+                                    <PackagePlus className="mr-2 h-4 w-4 text-cyan-400" /> Inter-Shop Stock Transfer
+                                </Button>
+                            )}
                         </div>
                     </div>
 

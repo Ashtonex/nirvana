@@ -307,6 +307,27 @@ export class ThermalPrinterService {
         };
         await this.printReceipt(mockReceipt);
     }
+
+    async printCustomText(text: string) {
+        const encoder = new TextEncoder();
+        const init = new Uint8Array([0x1b, 0x40]);
+        const fontB = new Uint8Array([0x1b, 0x4d, 0x01]);
+        const left = new Uint8Array([0x1b, 0x61, 0x00]);
+        const feedCut = new Uint8Array([0x0a, 0x0a, 0x0a, 0x1d, 0x56, 0x41, 0x03]);
+
+        const textBytes = encoder.encode(text + "\n\n");
+        const chunks = [init, fontB, left, textBytes, feedCut];
+
+        const totalLength = chunks.reduce((acc, c) => acc + c.length, 0);
+        const combined = new Uint8Array(totalLength);
+        let offset = 0;
+        chunks.forEach((c) => {
+            combined.set(c, offset);
+            offset += c.length;
+        });
+
+        await this.printRaw(combined);
+    }
 }
 
 export const thermalPrinter = new ThermalPrinterService();

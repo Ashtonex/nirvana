@@ -74,7 +74,8 @@ import {
     ReturnModal,
     AddStockModal,
     PoolClosingModal,
-    ManagerWorkspaceModal
+    ManagerWorkspaceModal,
+    TransferStockModal
 } from "@/components/pos";
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -415,6 +416,7 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
 
     const [isReturnModalOpen, setIsReturnModalOpen] = useState(false);
     const [isAddStockModalOpen, setIsAddStockModalOpen] = useState(false);
+    const [isTransferStockModalOpen, setIsTransferStockModalOpen] = useState(false);
     const [isPoolClosingModalOpen, setIsPoolClosingModalOpen] = useState(false);
     const [isManagerWorkspaceOpen, setIsManagerWorkspaceOpen] = useState(false);
     const [returnSaleId, setReturnSaleId] = useState("");
@@ -926,6 +928,31 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
             };
             return next;
         });
+    };
+
+    const handleStockTransferred = ({ itemId, fromShopId, toShopId, transferredQty, newSourceQty, newDestQty }: any) => {
+        setInventoryState((prev) =>
+            (prev || []).map((it: any) => {
+                if (it.id !== itemId) return it;
+                const allocations = Array.isArray(it.allocations) ? [...it.allocations] : [];
+
+                const srcIdx = allocations.findIndex((a: any) => String(a.shopId || '').toLowerCase() === String(fromShopId || '').toLowerCase());
+                if (srcIdx >= 0) {
+                    allocations[srcIdx] = { ...allocations[srcIdx], quantity: newSourceQty };
+                } else {
+                    allocations.push({ shopId: fromShopId, quantity: newSourceQty });
+                }
+
+                const destIdx = allocations.findIndex((a: any) => String(a.shopId || '').toLowerCase() === String(toShopId || '').toLowerCase());
+                if (destIdx >= 0) {
+                    allocations[destIdx] = { ...allocations[destIdx], quantity: newDestQty };
+                } else {
+                    allocations.push({ shopId: toShopId, quantity: newDestQty });
+                }
+
+                return { ...it, allocations };
+            })
+        );
     };
 
     const updateQty = (id: string, delta: number) => {
@@ -1988,6 +2015,15 @@ Generated via NIRVANA POS`;
                             title="Add stock to existing SKUs or create new products"
                         >
                             <PackagePlus className="h-4 w-4" /> Add Stock
+                        </Button>
+
+                        {/* Inter-Shop Stock Transfer */}
+                        <Button
+                            onClick={() => setIsTransferStockModalOpen(true)}
+                            className="bg-cyan-600 hover:bg-cyan-500 text-white text-[10px] font-black uppercase italic h-10 px-3.5 flex items-center gap-2 rounded-xl shadow-lg shadow-cyan-600/20 transition-all hover:scale-[1.02]"
+                            title="Transfer stock from this shop to another shop"
+                        >
+                            <ArrowRightLeft className="h-4 w-4" /> Transfer Stock
                         </Button>
 
                         {/* Stocktake Audit Link */}
@@ -3367,6 +3403,18 @@ Generated via NIRVANA POS`;
                 }}
             />
 
+            {/* Inter-Shop Stock Transfer Modal */}
+            <TransferStockModal
+                isOpen={isTransferStockModalOpen}
+                onClose={() => setIsTransferStockModalOpen(false)}
+                currentShopId={shopId}
+                currentShopName={shop?.name}
+                inventory={inventoryState}
+                shops={db.shops || []}
+                employeeId={selectedEmployeeId}
+                onStockTransferred={handleStockTransferred}
+            />
+
             {/* Mandatory Pool Accountability & Shift Closing Modal */}
             <PoolClosingModal
                 isOpen={isPoolClosingModalOpen}
@@ -3392,6 +3440,7 @@ Generated via NIRVANA POS`;
                 shopInvestBalance={shopInvestBalance}
                 todaysOpsIncome={todaysOpsIncome}
                 todaysOpsPosts={todaysOpsPosts}
+                onOpenStockTransfer={() => setIsTransferStockModalOpen(true)}
                 onOpenOpsPost={() => {
                     setOpsPostAmount("");
                     setOpsPostNotes("");
