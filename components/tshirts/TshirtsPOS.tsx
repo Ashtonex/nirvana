@@ -295,9 +295,11 @@ export default function TshirtsPOS({
       "Staff";
     const receiptItems: any[] = [];
     const txnId = Math.random().toString(36).substring(2, 9).toUpperCase();
-    const saleDate = isBacklogMode ? backlogDate : new Date().toISOString();
+    const saleDate = isBacklogMode && backlogDate
+      ? `${backlogDate}T12:00:00.000Z`
+      : new Date().toISOString();
     const dateStamp = new Date(saleDate).toLocaleDateString();
-    const timeStamp = new Date(saleDate).toLocaleTimeString();
+    const timeStamp = isBacklogMode ? "12:00:00 (Backlog)" : new Date(saleDate).toLocaleTimeString();
 
     if (!isOnline) {
       for (const entry of cart) {
@@ -318,6 +320,7 @@ export default function TshirtsPOS({
           clientName: tenderData.clientName || "Walk-in",
           paymentMethod: tenderData.paymentMethod,
           discount,
+          date: saleDate,
         });
 
         receiptItems.push({
@@ -479,8 +482,13 @@ export default function TshirtsPOS({
             <Shirt className="h-4 w-4" /> + Branding ($1.50)
           </Button>
 
-          {/* Backlog Controls */}
-          <div className="flex items-center gap-1 bg-slate-950/80 border border-slate-800 rounded-xl p-1 h-9 px-3">
+          {/* Historical / Backlog Controls */}
+          <div className={cn(
+            "flex items-center gap-1 border rounded-xl p-1 h-9 px-3 transition-colors",
+            isBacklogMode
+              ? "bg-orange-950/40 border-orange-500/60"
+              : "bg-slate-950/80 border-slate-800"
+          )}>
             <div className="flex items-center gap-2 mr-1">
               <input
                 type="checkbox"
@@ -491,9 +499,9 @@ export default function TshirtsPOS({
               />
               <label
                 htmlFor="backlog-mode"
-                className="text-[9px] font-black uppercase text-slate-400 cursor-pointer whitespace-nowrap"
+                className="text-[9px] font-black uppercase text-slate-300 cursor-pointer whitespace-nowrap"
               >
-                Backlog
+                Historical / Backlog
               </label>
             </div>
             {isBacklogMode && (
@@ -501,7 +509,7 @@ export default function TshirtsPOS({
                 type="date"
                 value={backlogDate}
                 onChange={(e) => setBacklogDate(e.target.value)}
-                className="bg-transparent border-none text-[9px] font-black uppercase text-orange-400 focus:ring-0 w-24 p-0 ml-1 font-mono"
+                className="bg-transparent border-none text-[9px] font-black uppercase text-orange-400 focus:ring-0 w-28 p-0 ml-1 font-mono"
               />
             )}
           </div>

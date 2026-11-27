@@ -1228,6 +1228,8 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
                             const lineGross = grossPrice * entry.quantity;
                             const itemTax = lineGross - lineNet;
 
+                            const backlogIsoDate = isBacklogMode && backlogDate ? `${backlogDate}T12:00:00.000Z` : undefined;
+
                             // For offline, we save to IndexedDB - untracked items also use same structure
                             await saveSaleOffline({
                                 shopId,
@@ -1239,7 +1241,8 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
                                 employeeId: selectedEmployeeId || "system",
                                 clientName: clientName || "General Walk-in",
                                 paymentMethod,
-                                discount: discountAmount
+                                discount: discountAmount,
+                                date: backlogIsoDate
                             });
 
                             applyLocalStockDecrement(entry.item.id, entry.quantity);
@@ -1272,8 +1275,8 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
                             discount: discountAmount,
                             tax: totalTax,
                             total: totalDue,
-                            dateStamp: new Date().toLocaleDateString(),
-                            timeStamp: new Date().toLocaleTimeString(),
+                            dateStamp: isBacklogMode && backlogDate ? new Date(`${backlogDate}T12:00:00.000Z`).toLocaleDateString() : new Date().toLocaleDateString(),
+                            timeStamp: isBacklogMode && backlogDate ? "12:00:00 (Backlog)" : new Date().toLocaleTimeString(),
                             paymentMethod,
                             isOfflineQueued: true
                         };
@@ -1290,6 +1293,8 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
                             const lineGross = grossPrice * entry.quantity;
                             const itemTax = lineGross - lineNet;
 
+                            const backlogIsoDate = isBacklogMode && backlogDate ? `${backlogDate}T12:00:00.000Z` : undefined;
+
                             if (isUntracked) {
                                 await recordUntrackedSale({
                                     shopId,
@@ -1301,7 +1306,7 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
                                     clientName: clientName || "General Walk-in",
                                     paymentMethod,
                                     discount: discountAmount,
-                                    date: isBacklogMode ? backlogDate : undefined
+                                    date: backlogIsoDate
                                 });
                             } else {
                                 await recordSale({
@@ -1315,7 +1320,7 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
                                     clientName: clientName || "General Walk-in",
                                     paymentMethod,
                                     discount: discountAmount,
-                                    date: isBacklogMode ? backlogDate : undefined
+                                    date: backlogIsoDate
                                 });
                             }
 
@@ -1345,8 +1350,8 @@ export default function POS({ shopId, inventory, db }: { shopId: string, invento
                             discount: discountAmount,
                             tax: totalTax,
                             total: totalDue,
-                            dateStamp: isBacklogMode ? new Date(backlogDate).toLocaleDateString() : new Date().toLocaleDateString(),
-                            timeStamp: isBacklogMode ? "00:00:00 (Backlog)" : new Date().toLocaleTimeString(),
+                            dateStamp: isBacklogMode && backlogDate ? new Date(`${backlogDate}T12:00:00.000Z`).toLocaleDateString() : new Date().toLocaleDateString(),
+                            timeStamp: isBacklogMode && backlogDate ? "12:00:00 (Backlog)" : new Date().toLocaleTimeString(),
                             paymentMethod
                         };
 
@@ -1850,7 +1855,7 @@ Generated via NIRVANA POS`;
                 {/* TIER 1: SHIFT STATUS & DEVICE STRIP */}
                 <div className="flex flex-wrap items-center justify-between gap-2 bg-slate-900/60 border border-slate-800 p-2.5 rounded-2xl backdrop-blur-md">
                     {/* Left: Cashier & Cash Drawer & Hardware */}
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
                         {/* Cashier Quick Switch Button (1s PIN Verification) */}
                         <button
                             type="button"
@@ -1925,22 +1930,29 @@ Generated via NIRVANA POS`;
                             </Button>
                         </div>
 
-                        {/* Compact Backlog toggle */}
-                        <div className="hidden md:flex items-center gap-1 bg-slate-950 border border-slate-800 rounded-xl px-2.5 h-10">
+                        {/* Historical / Backlog Entry toggle (visible for all accounts & screen sizes) */}
+                        <div className={cn(
+                            "flex items-center gap-1.5 border rounded-xl px-2.5 h-10 transition-colors",
+                            isBacklogMode
+                                ? "bg-violet-950/40 border-violet-500/60"
+                                : "bg-slate-950 border-slate-800"
+                        )}>
                             <input 
                                 type="checkbox" 
                                 id="backlog-mode" 
                                 checked={isBacklogMode} 
                                 onChange={(e) => setIsBacklogMode(e.target.checked)}
-                                className="h-3 w-3 rounded border-slate-700 bg-slate-800 text-violet-600 focus:ring-violet-500"
+                                className="h-3.5 w-3.5 rounded border-slate-700 bg-slate-800 text-violet-600 focus:ring-violet-500 cursor-pointer"
                             />
-                            <label htmlFor="backlog-mode" className="text-[9px] font-black uppercase text-slate-400 cursor-pointer ml-1">Backlog</label>
+                            <label htmlFor="backlog-mode" className="text-[9px] font-black uppercase text-slate-300 cursor-pointer whitespace-nowrap">
+                                Historical / Backlog
+                            </label>
                             {isBacklogMode && (
                                 <input 
                                     type="date" 
                                     value={backlogDate} 
                                     onChange={(e) => setBacklogDate(e.target.value)}
-                                    className="bg-transparent border-none text-[9px] font-black uppercase text-violet-400 focus:ring-0 w-24 p-0 ml-1"
+                                    className="bg-transparent border-none text-[10px] font-black uppercase text-violet-300 focus:ring-0 w-28 p-0 ml-1"
                                 />
                             )}
                         </div>
@@ -2537,6 +2549,29 @@ Generated via NIRVANA POS`;
                                 >
                                     EcoCash
                                 </button>
+                            </div>
+                            <div className={cn(
+                                "flex items-center justify-between gap-2 pt-2 mt-2 border-t border-slate-800/80 rounded-lg px-2 py-1.5",
+                                isBacklogMode && "bg-violet-950/40 border border-violet-500/40"
+                            )}>
+                                <label htmlFor="cart-backlog-mode" className="flex items-center gap-2 text-[10px] font-black uppercase text-slate-300 cursor-pointer">
+                                    <input
+                                        type="checkbox"
+                                        id="cart-backlog-mode"
+                                        checked={isBacklogMode}
+                                        onChange={(e) => setIsBacklogMode(e.target.checked)}
+                                        className="h-3.5 w-3.5 rounded border-slate-700 bg-slate-800 text-violet-600 focus:ring-violet-500"
+                                    />
+                                    Historical Entry Date
+                                </label>
+                                {isBacklogMode && (
+                                    <input
+                                        type="date"
+                                        value={backlogDate}
+                                        onChange={(e) => setBacklogDate(e.target.value)}
+                                        className="bg-slate-950 border border-violet-500/40 rounded px-2 py-1 text-[10px] font-black text-violet-300"
+                                    />
+                                )}
                             </div>
                         </div>
                     )}
